@@ -1,0 +1,99 @@
+package subscriber
+
+import (
+	"context"
+	"encoding/json"
+	"log/slog"
+
+	"github.com/gabrielnakaema/project-chat/internal/config"
+	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/service"
+)
+
+type ChatSubscriber struct {
+	logger      *slog.Logger
+	subscriber  *Subscriber
+	chatService *service.ChatService
+}
+
+func NewChatSubscriber(config *config.Config, logger *slog.Logger, chatService *service.ChatService) (*ChatSubscriber, error) {
+	subscriber, err := NewSubscriber(config, "chat.subscriber")
+	if err != nil {
+		return nil, domain.ServerError("failed to create chat subscriber", err)
+	}
+
+	chatSubscriber := &ChatSubscriber{
+		subscriber:  subscriber,
+		logger:      logger,
+		chatService: chatService,
+	}
+
+	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ChatMemberCreated}
+
+	err = subscriber.Subscribe(context.Background(), topics, chatSubscriber.handleChatEvents, chatSubscriber.logger)
+	if err != nil {
+		return nil, domain.ServerError("failed to subscribe to chat events", err)
+	}
+
+	return chatSubscriber, nil
+}
+
+func (cs *ChatSubscriber) handleChatEvents(ctx context.Context, message Message) error {
+	switch message.Topic {
+	case events.ProjectCreated:
+		return cs.handleProjectCreated(ctx, message)
+	case events.ProjectMemberCreated:
+		return cs.handleProjectMemberCreated(ctx, message)
+	case events.ChatMemberCreated:
+		return cs.handleChatMemberCreated(ctx, message)
+	}
+
+	return nil
+}
+
+func (cs *ChatSubscriber) handleProjectCreated(ctx context.Context, message Message) error {
+	var project domain.Project
+	err := json.Unmarshal(message.Value, &project)
+	if err != nil {
+		return domain.ServerError("failed to unmarshal project", err)
+	}
+
+	err = cs.chatService.CreateChatFromProject(ctx, &project)
+	if err != nil {
+		return domain.ServerError("failed to create chat from project", err)
+	}
+
+	return nil
+}
+
+func (cs *ChatSubscriber) handleProjectMemberCreated(ctx context.Context, message Message) error {
+	var projectMember domain.ProjectMember
+	err := json.Unmarshal(message.Value, &projectMember)
+	if err != nil {
+		return domain.ServerError("failed to unmarshal project member", err)
+	}
+
+	err = cs.chatService.CreateMemberFromProjectMember(ctx, &projectMember)
+	if err != nil {
+		cs.logger.Error("failed to create member from project member", "error", err)
+		return domain.ServerError("failed to create member from project member", err)
+	}
+
+	return nil
+}
+
+func (cs *ChatSubscriber) handleChatMemberCreated(ctx context.Context, message Message) error {
+	var chatMember domain.ChatMember
+	err := json.Unmarshal(message.Value, &chatMember)
+	if err != nil {
+		return domain.ServerError("failed to unmarshal chat member", err)
+	}
+
+	err = cs.chatService.CreateJoinedMessage(ctx, &chatMember)
+	if err != nil {
+		return domain.ServerError("failed to update member last seen at", err)
+	}
+
+	return nil
+}
