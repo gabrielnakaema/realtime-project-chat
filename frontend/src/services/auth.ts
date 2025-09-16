@@ -1,0 +1,29 @@
+import type { ILoginForm } from '@/schemas/login.schema';
+import { api } from './api';
+import type { LoginResponse } from '@/types/auth';
+
+export const login = async (form: ILoginForm) => {
+  const payload = {
+    email: form.email,
+    password: form.password,
+  };
+
+  const response = await api.post('auth/login', {
+    json: payload,
+    credentials: 'include',
+  });
+
+  const json = await response.json<LoginResponse>();
+
+  return json;
+};
+
+export const attemptRefreshToken = async () => {
+  const response = await api.post('auth/refresh-token', {
+    credentials: 'include',
+  });
+
+  const json = await response.json<LoginResponse>();
+
+  return json;
+};
