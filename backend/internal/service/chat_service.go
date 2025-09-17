@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -70,6 +71,10 @@ func (cs *ChatService) CreateChatFromProject(ctx context.Context, project *domai
 func (cs *ChatService) CreateMemberFromProjectMember(ctx context.Context, projectMember *domain.ProjectMember) error {
 	chat, err := cs.chatRepository.GetByProjectId(ctx, projectMember.ProjectId)
 	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			return err
+		}
 		return domain.ServerError("failed to get chat", err)
 	}
 
@@ -95,7 +100,6 @@ func (cs *ChatService) CreateMemberFromProjectMember(ctx context.Context, projec
 }
 
 func (cs *ChatService) CreateJoinedMessage(ctx context.Context, chatMember *domain.ChatMember) error {
-
 	user, err := cs.userRepository.GetById(ctx, chatMember.UserId)
 	if err != nil {
 		return domain.ServerError("failed to get user", err)

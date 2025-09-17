@@ -3,6 +3,7 @@ package subscriber
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 
 	"github.com/gabrielnakaema/project-chat/internal/config"
@@ -76,6 +77,15 @@ func (cs *ChatSubscriber) handleProjectMemberCreated(ctx context.Context, messag
 
 	err = cs.chatService.CreateMemberFromProjectMember(ctx, &projectMember)
 	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				cs.logger.Info("chat not found, skipping creation of chat member from project member", "project_member", projectMember)
+				return nil
+			}
+			return err
+		}
+
 		cs.logger.Error("failed to create member from project member", "error", err)
 		return domain.ServerError("failed to create member from project member", err)
 	}
