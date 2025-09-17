@@ -106,12 +106,13 @@ SELECT
         'created_at',
         tc.task_change_author_created_at
       )
-    ) filter (where tc.task_change_id is not null)
-  ), '[]'::jsonb) as task_changes
+    )
+  ) filter (where tc.task_change_id is not null), '[]'::jsonb) as task_changes
 FROM tasks t
 LEFT JOIN task_changes_cte tc ON tc.task_change_task_id = t.id
 LEFT JOIN users a ON a.id = t.author_id
 WHERE t.id = $1
+GROUP BY t.id, a.name, a.email, a.created_at
 `
 
 type GetTaskByIdRow struct {
