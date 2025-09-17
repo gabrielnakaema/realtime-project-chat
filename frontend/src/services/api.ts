@@ -1,5 +1,5 @@
 import ky from 'ky';
-import { attemptRefreshToken } from './auth';
+import { attemptLogout, attemptRefreshToken } from './auth';
 
 export interface ApiError {
   message: string;
@@ -14,11 +14,6 @@ let failedRequests: Array<{
   resolve: (value: unknown) => void;
   reject: (reason?: unknown) => void;
 }> = [];
-/* let token = '';
-
-export const setToken = (token: string) => {
-  token = token;
-}; */
 
 const processQueue = (error: unknown, token?: string) => {
   failedRequests.forEach((prom) => {
@@ -99,6 +94,10 @@ export const api = ky.create({
 
           return ky(request, options);
         } catch (error) {
+          attemptLogout();
+          tokenService.setToken('');
+          failedRequests = [];
+          window.location.reload();
           processQueue(error);
           throw error;
         } finally {

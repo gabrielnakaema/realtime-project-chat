@@ -12,6 +12,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { handleError } from './utils/handle-error.ts';
 import { ToastContainer } from 'react-toastify';
 import { AuthProvider } from './contexts/auth-context.tsx';
+import { ThemeProvider } from './contexts/theme-context.tsx';
 
 // Create a new router instance
 const router = createRouter({
@@ -54,13 +55,15 @@ if (rootElement && !rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement);
   root.render(
     <StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <RouterProvider router={router} />
-        </AuthProvider>
-        <ToastContainer position="top-right" autoClose={4000} theme={theme} />
-        <ReactQueryDevtools initialIsOpen={false} />
-      </QueryClientProvider>
+      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
+          <ToastContainer position="top-right" autoClose={4000} theme={theme} />
+          <ReactQueryDevtools initialIsOpen={false} />
+        </QueryClientProvider>
+      </ThemeProvider>
     </StrictMode>,
   );
 }

@@ -1,6 +1,6 @@
 import { LoadingSpinner } from '@/components/loading';
 import { tokenService } from '@/services/api';
-import { attemptRefreshToken } from '@/services/auth';
+import { attemptLogout, attemptRefreshToken } from '@/services/auth';
 import { userQueryKeys } from '@/services/query-keys';
 import { getMe } from '@/services/users';
 import type { LoginResponse } from '@/types/auth';
@@ -54,10 +54,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setAuthStatus('authenticated');
   };
 
-  const logout = () => {
-    setAuthStatus('unauthenticated');
-    tokenService.setToken('');
-    navigate({ to: '/' });
+  const logout = async () => {
+    try {
+      await attemptLogout();
+      setAuthStatus('unauthenticated');
+      tokenService.setToken('');
+      navigate({ to: '/' });
+    } catch (error) {
+      console.error(error);
+      setAuthStatus('unauthenticated');
+      tokenService.setToken('');
+      navigate({ to: '/' });
+    } finally {
+    }
   };
 
   if (authStatus === 'loading') {

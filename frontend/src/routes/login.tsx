@@ -1,5 +1,5 @@
-import { loginSchema, type ILoginForm } from '@/schemas/login.schema';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { loginSchema, type ILoginForm } from '@/schemas/login-schema';
+import { createFileRoute, Link, Navigate } from '@tanstack/react-router';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { Input } from '@/components/input';
@@ -7,6 +7,7 @@ import { useMutation } from '@tanstack/react-query';
 import { login } from '@/services/auth';
 import { LoadingSpinner } from '@/components/loading';
 import { useAuth } from '@/hooks/use-auth';
+import { Button } from '@/components/button';
 
 export const Route = createFileRoute('/login')({
   component: RouteComponent,
@@ -20,7 +21,7 @@ function RouteComponent() {
   } = useForm<ILoginForm>({
     resolver: zodResolver(loginSchema),
   });
-  const { authenticate } = useAuth();
+  const { authenticate, authStatus } = useAuth();
 
   const { mutate, isPending } = useMutation({
     mutationFn: login,
@@ -32,6 +33,10 @@ function RouteComponent() {
   const onSubmit: SubmitHandler<ILoginForm> = (form) => {
     mutate(form);
   };
+
+  if (authStatus === 'authenticated') {
+    return <Navigate to="/projects" />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
@@ -58,13 +63,9 @@ function RouteComponent() {
             {...register('password')}
           />
 
-          <button
-            type="submit"
-            disabled={isPending}
-            className="w-full px-4 py-2 text-white bg-blue-600 cursor-pointer hover:bg-blue-700 disabled:bg-blue-400 rounded-md font-medium transition-colors"
-          >
+          <Button type="submit" disabled={isPending} className="w-full">
             {isPending ? <LoadingSpinner size="1.5em" /> : 'Sign In'}
-          </button>
+          </Button>
         </form>
         <div className="mt-6 text-center">
           <p className="text-sm text-slate-600 dark:text-slate-400">

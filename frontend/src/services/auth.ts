@@ -1,6 +1,6 @@
-import type { ILoginForm } from '@/schemas/login.schema';
-import { api } from './api';
+import type { ILoginForm } from '@/schemas/login-schema';
 import type { LoginResponse } from '@/types/auth';
+import { api } from './api';
 
 export const login = async (form: ILoginForm) => {
   const payload = {
@@ -26,4 +26,10 @@ export const attemptRefreshToken = async () => {
   const json = await response.json<LoginResponse>();
 
   return json;
+};
+
+export const attemptLogout = async () => {
+  await api.post('auth/logout', {
+    credentials: 'include',
+  });
 };
