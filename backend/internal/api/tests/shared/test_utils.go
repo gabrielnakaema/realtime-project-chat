@@ -5,16 +5,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 )
 
 type HTTPClient struct {
 	BaseURL string
 	Token   string
+	Client  *http.Client
 }
 
 func NewHTTPClient(baseURL string) *HTTPClient {
+	jar, _ := cookiejar.New(nil)
+
+	httpClient := &http.Client{
+		Jar: jar,
+	}
+
 	return &HTTPClient{
 		BaseURL: baseURL,
+		Client:  httpClient,
 	}
 }
 
@@ -38,7 +47,7 @@ func (c *HTTPClient) POST(endpoint string, payload interface{}) (*http.Response,
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
 
-	return http.DefaultClient.Do(req)
+	return c.Client.Do(req)
 }
 
 func (c *HTTPClient) GET(endpoint string) (*http.Response, error) {
@@ -51,7 +60,7 @@ func (c *HTTPClient) GET(endpoint string) (*http.Response, error) {
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
 
-	return http.DefaultClient.Do(req)
+	return c.Client.Do(req)
 }
 
 func (c *HTTPClient) PUT(endpoint string, payload interface{}) (*http.Response, error) {
@@ -70,7 +79,7 @@ func (c *HTTPClient) PUT(endpoint string, payload interface{}) (*http.Response, 
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
 
-	return http.DefaultClient.Do(req)
+	return c.Client.Do(req)
 }
 
 func (c *HTTPClient) DELETE(endpoint string) (*http.Response, error) {
@@ -83,7 +92,7 @@ func (c *HTTPClient) DELETE(endpoint string) (*http.Response, error) {
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
 
-	return http.DefaultClient.Do(req)
+	return c.Client.Do(req)
 }
 
 func (c *HTTPClient) CreateUserAndLogin(email, password string) (string, error) {

@@ -54,6 +54,14 @@ func (m *mockUserService) GetMe(ctx context.Context, id uuid.UUID) (*domain.User
 	return args.Get(0).(*domain.User), args.Error(1)
 }
 
+func (m *mockUserService) Logout(ctx context.Context, userId uuid.UUID, token string) error {
+	args := m.Called(ctx, userId, token)
+	if args.Get(0) == nil {
+		return args.Error(0)
+	}
+	return args.Error(0)
+}
+
 func TestUserHandler_Create(t *testing.T) {
 	tests := []struct {
 		name           string

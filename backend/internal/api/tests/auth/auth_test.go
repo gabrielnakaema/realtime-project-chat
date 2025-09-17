@@ -3,6 +3,7 @@ package auth_test
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/cookiejar"
 	"testing"
 
 	"github.com/gabrielnakaema/project-chat/internal/api/tests/shared"
@@ -44,10 +45,8 @@ func TestAuthEndpoints(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Contains(t, response, "access_token")
-		assert.Contains(t, response, "refresh_token")
 		assert.Contains(t, response, "user")
 		assert.NotEmpty(t, response["access_token"])
-		assert.NotEmpty(t, response["refresh_token"])
 	})
 
 	t.Run("POST /auth/login invalid credentials", func(t *testing.T) {
@@ -184,11 +183,7 @@ func TestAuthEndpoints(t *testing.T) {
 		err = json.NewDecoder(loginResp.Body).Decode(&loginResponse)
 		require.NoError(t, err)
 
-		refreshPayload := map[string]string{
-			"refresh_token": loginResponse["refresh_token"].(string),
-		}
-
-		refreshResp, err := client.POST("/auth/refresh-token", refreshPayload)
+		refreshResp, err := client.POST("/auth/refresh-token", map[string]string{})
 		require.NoError(t, err)
 		defer refreshResp.Body.Close()
 
@@ -200,42 +195,57 @@ func TestAuthEndpoints(t *testing.T) {
 
 		assert.Contains(t, refreshResponse, "access_token")
 		assert.NotEmpty(t, refreshResponse["access_token"])
-
-		// If same token is used again, it should return 401
-		secondRefreshResp, err := client.POST("/auth/refresh-token", refreshPayload)
-		require.NoError(t, err)
-		defer secondRefreshResp.Body.Close()
-
-		assert.Equal(t, http.StatusUnauthorized, secondRefreshResp.StatusCode)
 	})
 
 	t.Run("POST /auth/refresh-token validation errors", func(t *testing.T) {
 		type testCase struct {
 			name           string
-			payload        map[string]string
+			setupCookie    func(*http.Request)
 			expectedStatus int
 		}
 
-		validationErrorStatus := http.StatusUnprocessableEntity
-
 		testCases := []testCase{
 			{
-				name:           "no refresh token",
-				payload:        map[string]string{},
-				expectedStatus: validationErrorStatus,
+				name: "no refresh token cookie",
+				setupCookie: func(req *http.Request) {
+				},
+				expectedStatus: http.StatusUnauthorized,
 			},
 			{
-				name: "empty refresh token",
-				payload: map[string]string{
-					"refresh_token": "",
+				name: "empty refresh token cookie",
+				setupCookie: func(req *http.Request) {
+					req.AddCookie(&http.Cookie{
+						Name:  "project_chat_refresh_token",
+						Value: "",
+					})
 				},
-				expectedStatus: validationErrorStatus,
+				expectedStatus: http.StatusUnauthorized,
+			},
+			{
+				name: "invalid refresh token cookie",
+				setupCookie: func(req *http.Request) {
+					req.AddCookie(&http.Cookie{
+						Name:  "project_chat_refresh_token",
+						Value: "invalid_token_value",
+					})
+				},
+				expectedStatus: http.StatusUnauthorized,
 			},
 		}
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				resp, err := client.POST("/auth/refresh-token", tc.payload)
+				client.Client.Jar = nil
+				jar, _ := cookiejar.New(nil)
+				client.Client.Jar = jar
+
+				req, err := http.NewRequest("POST", client.BaseURL+"/auth/refresh-token", nil)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+
+				tc.setupCookie(req)
+
+				resp, err := client.Client.Do(req)
 				require.NoError(t, err)
 				defer resp.Body.Close()
 				assert.Equal(t, tc.expectedStatus, resp.StatusCode)
@@ -243,15 +253,4 @@ func TestAuthEndpoints(t *testing.T) {
 		}
 	})
 
-	t.Run("POST /auth/refresh-token invalid refresh token", func(t *testing.T) {
-		refreshPayload := map[string]string{
-			"refresh_token": "invalid-refresh-token",
-		}
-
-		resp, err := client.POST("/auth/refresh-token", refreshPayload)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-
-		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-	})
 }
