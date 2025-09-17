@@ -43,6 +43,7 @@ func (a *Api) Router() http.Handler {
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/login", a.handlers.User.Login)
 		r.Post("/refresh-token", a.handlers.User.RefreshToken)
+		r.Post("/logout", a.handlers.User.Logout)
 	})
 
 	r.Route("/projects", func(r chi.Router) {

@@ -3,8 +3,10 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/logger"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/gabrielnakaema/project-chat/internal/validator"
@@ -20,6 +22,7 @@ type userService interface {
 	Login(context.Context, service.LoginRequest) (*service.LoginResult, error)
 	RefreshToken(context.Context, service.RefreshTokenRequest) (*service.LoginResult, error)
 	GetMe(context.Context, uuid.UUID) (*domain.User, error)
+	Logout(context.Context, uuid.UUID, string) error
 }
 
 type UserHandler struct {
@@ -140,6 +143,50 @@ func (uh *UserHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJSON(w, http.StatusOK, loginResultToResponse(result), nil)
 }
 
+func (uh *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+	if userId == uuid.Nil {
+		clearRefreshTokenCookie(w)
+		utils.WriteJSON(w, http.StatusOK, nil, nil)
+		return
+	}
+
+	refreshToken, err := r.Cookie(RefreshTokenCookieName)
+	if err != nil {
+		clearRefreshTokenCookie(w)
+		utils.WriteJSON(w, http.StatusOK, nil, nil)
+		return
+	}
+
+	if refreshToken == nil {
+		clearRefreshTokenCookie(w)
+		utils.WriteJSON(w, http.StatusOK, nil, nil)
+		return
+	}
+
+	log := logger.FromContext(r.Context())
+
+	err = uh.userService.Logout(r.Context(), userId, refreshToken.Value)
+	if err != nil {
+		log.Error("error while logging out", "error", err, "user_id", userId, "refresh_token", refreshToken.Value)
+	}
+
+	clearRefreshTokenCookie(w)
+	utils.WriteJSON(w, http.StatusOK, nil, nil)
+}
+
+func clearRefreshTokenCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     RefreshTokenCookieName,
+		Value:    "",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+		Expires:  time.Now().Add(-1 * time.Hour),
+	})
+}
+
 func setRefreshTokenCookie(w http.ResponseWriter, refreshToken string) {
 	// TODO: Manage production domains and secure cookies
 	http.SetCookie(w, &http.Cookie{
@@ -149,6 +196,7 @@ func setRefreshTokenCookie(w http.ResponseWriter, refreshToken string) {
 		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
+		Expires:  time.Now().Add(3 * time.Hour),
 	})
 }
 

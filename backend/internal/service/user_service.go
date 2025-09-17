@@ -203,6 +203,21 @@ func (us *UserService) RefreshToken(ctx context.Context, request RefreshTokenReq
 	return &result, nil
 }
 
+func (us *UserService) Logout(ctx context.Context, userId uuid.UUID, token string) error {
+	refreshToken, err := us.userRepository.GetRefreshToken(ctx, token)
+	if err != nil {
+		return err
+	}
+
+	if refreshToken.UserId != userId {
+		return domain.ForbiddenError("invalid refresh token")
+	}
+
+	refreshToken.Active = false
+
+	return us.userRepository.UpdateRefreshTokenActive(ctx, refreshToken)
+}
+
 func GenerateRefreshToken(length int) (string, error) {
 	b := make([]byte, length)
 	if _, err := io.ReadFull(rand.Reader, b); err != nil {
