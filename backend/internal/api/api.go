@@ -51,7 +51,7 @@ func NewApi() (*Api, error) {
 		return nil, err
 	}
 
-	pub, err := publisher.NewPublisher(config)
+	pub, err := publisher.NewPublisher(config, logger)
 	if err != nil {
 		return nil, err
 	}
