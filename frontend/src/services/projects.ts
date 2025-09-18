@@ -25,3 +25,21 @@ export const createProject = async (form: IProjectForm) => {
 
   return json;
 };
+
+interface CreateProjectMemberRequest {
+  projectId: string;
+  email: string;
+}
+
+export const createProjectMember = async (form: CreateProjectMemberRequest) => {
+  const payload = {
+    email: form.email,
+  };
+
+  const response = await api.post(`projects/${form.projectId}/members`, {
+    json: payload,
+  });
+
+  const json = await response.json();
+  return json;
+};

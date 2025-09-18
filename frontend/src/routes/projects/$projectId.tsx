@@ -1,3 +1,4 @@
+import { AddProjectMember } from '@/components/add-project-member';
 import { KanbanBoard } from '@/components/kanban-board';
 import { getProject } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
@@ -37,6 +38,7 @@ function RouteComponent() {
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
+                <AddProjectMember projectId={projectId} />
                 <Users className="w-4 h-4 text-slate-500" />
                 <div className="flex -space-x-2">
                   {project?.members.slice(0, 4).map((member) => (
