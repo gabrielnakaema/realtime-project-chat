@@ -4,9 +4,9 @@ import { getProject } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { ArrowLeft, Settings, Users } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Settings, Users } from 'lucide-react';
 
-export const Route = createFileRoute('/projects/$projectId')({
+export const Route = createFileRoute('/projects/$projectId/')({
   component: RouteComponent,
 });
 
@@ -40,6 +40,7 @@ function RouteComponent() {
               <div className="flex items-center gap-2">
                 <AddProjectMember projectId={projectId} />
                 <Users className="w-4 h-4 text-slate-500" />
+
                 <div className="flex -space-x-2">
                   {project?.members.slice(0, 4).map((member) => (
                     <div
@@ -58,6 +59,14 @@ function RouteComponent() {
                   )}
                 </div>
               </div>
+              <Link
+                to={`/projects/$projectId/chat`}
+                className="inline-flex items-center px-3 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-md font-medium transition-colors"
+                params={{ projectId }}
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Chat
+              </Link>
               <button className="inline-flex items-center px-3 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-md font-medium transition-colors">
                 <Settings className="w-4 h-4 mr-2" />
                 Settings

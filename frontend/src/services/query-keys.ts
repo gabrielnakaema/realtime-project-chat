@@ -13,3 +13,9 @@ export const taskQueryKeys = {
   listByProjectId: (projectId: string) => ['tasks', 'list', { projectId }],
   details: (id: string) => ['tasks', 'details', id],
 } as const;
+
+export const chatQueryKeys = {
+  all: ['chats'],
+  detailsByProjectId: (projectId: string) => ['chats', 'details', { projectId }],
+  listMessagesByProjectId: (projectId: string, before: string) => ['chats', 'messages', { projectId, before }],
+} as const;

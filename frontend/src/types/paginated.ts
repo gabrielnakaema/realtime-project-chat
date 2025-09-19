@@ -4,3 +4,8 @@ export interface Paginated<T> {
   page: number;
   limit: number;
 }
+
+export interface CursorPaginated<T> {
+  data: T[];
+  hasNext: boolean;
+}

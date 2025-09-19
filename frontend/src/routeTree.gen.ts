@@ -13,7 +13,8 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ProjectsRouteRouteImport } from './routes/projects/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
-import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
+import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
+import { Route as ProjectsProjectIdChatRouteImport } from './routes/projects/$projectId/chat'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -35,9 +36,14 @@ const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ProjectsRouteRoute,
 } as any)
-const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
-  id: '/$projectId',
-  path: '/$projectId',
+const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
+  id: '/$projectId/',
+  path: '/$projectId/',
+  getParentRoute: () => ProjectsRouteRoute,
+} as any)
+const ProjectsProjectIdChatRoute = ProjectsProjectIdChatRouteImport.update({
+  id: '/$projectId/chat',
+  path: '/$projectId/chat',
   getParentRoute: () => ProjectsRouteRoute,
 } as any)
 
@@ -45,22 +51,25 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/projects': typeof ProjectsRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
+  '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/projects': typeof ProjectsIndexRoute
+  '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
+  '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/projects': typeof ProjectsRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -68,17 +77,24 @@ export interface FileRouteTypes {
     | '/'
     | '/projects'
     | '/login'
-    | '/projects/$projectId'
     | '/projects/'
+    | '/projects/$projectId/chat'
+    | '/projects/$projectId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/projects/$projectId' | '/projects'
+  to:
+    | '/'
+    | '/login'
+    | '/projects'
+    | '/projects/$projectId/chat'
+    | '/projects/$projectId'
   id:
     | '__root__'
     | '/'
     | '/projects'
     | '/login'
-    | '/projects/$projectId'
     | '/projects/'
+    | '/projects/$projectId/chat'
+    | '/projects/$projectId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -117,24 +133,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsIndexRouteImport
       parentRoute: typeof ProjectsRouteRoute
     }
-    '/projects/$projectId': {
-      id: '/projects/$projectId'
+    '/projects/$projectId/': {
+      id: '/projects/$projectId/'
       path: '/$projectId'
       fullPath: '/projects/$projectId'
-      preLoaderRoute: typeof ProjectsProjectIdRouteImport
+      preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
+      parentRoute: typeof ProjectsRouteRoute
+    }
+    '/projects/$projectId/chat': {
+      id: '/projects/$projectId/chat'
+      path: '/$projectId/chat'
+      fullPath: '/projects/$projectId/chat'
+      preLoaderRoute: typeof ProjectsProjectIdChatRouteImport
       parentRoute: typeof ProjectsRouteRoute
     }
   }
 }
 
 interface ProjectsRouteRouteChildren {
-  ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
+  ProjectsProjectIdChatRoute: typeof ProjectsProjectIdChatRoute
+  ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
 }
 
 const ProjectsRouteRouteChildren: ProjectsRouteRouteChildren = {
-  ProjectsProjectIdRoute: ProjectsProjectIdRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
+  ProjectsProjectIdChatRoute: ProjectsProjectIdChatRoute,
+  ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
 }
 
 const ProjectsRouteRouteWithChildren = ProjectsRouteRoute._addFileChildren(
