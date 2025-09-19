@@ -2,10 +2,12 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/queries"
+	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -41,7 +43,7 @@ func (cr *ChatRepository) Create(ctx context.Context, chat *domain.Chat) error {
 
 	chat.Id = id
 
-	for i, member := range chat.Members {
+	for _, member := range chat.Members {
 		params := queries.CreateChatMemberParams{
 			UserID:     member.UserId,
 			ChatID:     chat.Id,
@@ -53,8 +55,6 @@ func (cr *ChatRepository) Create(ctx context.Context, chat *domain.Chat) error {
 		if err != nil {
 			return err
 		}
-
-		chat.Members[i].Id = id
 	}
 
 	return tx.Commit(ctx)
@@ -115,5 +115,96 @@ func (cr *ChatRepository) GetByProjectId(ctx context.Context, projectId uuid.UUI
 		Messages:  []domain.ChatMessage{},
 	}
 
+	if chatResult.Members != nil {
+		bytes, err := json.Marshal(chatResult.Members)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(bytes, &chat.Members)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &chat, nil
+}
+
+func (cr *ChatRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Chat, error) {
+	q := queries.New(cr.pool)
+	chatResult, err := q.GetChatById(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.NotFoundError("chat not found")
+		}
+		return nil, err
+	}
+
+	chat := domain.Chat{
+		Id:        chatResult.ID,
+		ProjectId: chatResult.ProjectID.Bytes,
+		CreatedAt: chatResult.CreatedAt.Time,
+		UpdatedAt: chatResult.UpdatedAt.Time,
+		Members:   []domain.ChatMember{},
+	}
+
+	if chatResult.Members != nil {
+		bytes, err := json.Marshal(chatResult.Members)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(bytes, &chat.Members)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &chat, nil
+}
+
+func (cr *ChatRepository) ListMessages(ctx context.Context, chatId uuid.UUID, params utils.PaginationBeforeParams) ([]domain.ChatMessage, error) {
+	q := queries.New(cr.pool)
+
+	queriesParams := queries.ListChatMessagesParams{
+		ChatID: chatId,
+		Limit:  params.Limit,
+	}
+	if params.Before != nil {
+		queriesParams.CreatedAt = pgtype.Timestamptz{Time: *params.Before, Valid: true}
+	}
+
+	result, err := q.ListChatMessages(ctx, queriesParams)
+	if err != nil {
+		return nil, err
+	}
+
+	messages := []domain.ChatMessage{}
+	for _, messageResult := range result {
+		message := domain.ChatMessage{
+			Id:          messageResult.ID,
+			ChatId:      messageResult.ChatID,
+			MessageType: domain.MessageType(messageResult.MessageType),
+			Content:     messageResult.Content,
+			CreatedAt:   messageResult.CreatedAt.Time,
+			UpdatedAt:   messageResult.UpdatedAt.Time,
+		}
+
+		if messageResult.UserID.Valid {
+			message.UserId = (*uuid.UUID)(messageResult.UserID.Bytes[:])
+
+			user := domain.User{
+				Id:   *message.UserId,
+				Name: messageResult.UserName.String,
+			}
+
+			message.Member = &domain.ChatMember{
+				UserId: *message.UserId,
+				ChatId: message.ChatId,
+				User:   &user,
+			}
+		}
+
+		messages = append(messages, message)
+	}
+
+	return messages, nil
 }

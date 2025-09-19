@@ -7,11 +7,11 @@ import (
 )
 
 type User struct {
-	Id        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
+	Id        uuid.UUID `json:"id,omitempty"`
+	Name      string    `json:"name,omitempty"`
+	Email     string    `json:"email,omitempty"`
 	Password  string    `json:"-"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
 }
 
 type RefreshToken struct {

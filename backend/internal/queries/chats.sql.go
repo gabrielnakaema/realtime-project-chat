@@ -70,35 +70,177 @@ func (q *Queries) CreateChatMessage(ctx context.Context, arg CreateChatMessagePa
 }
 
 const getChatById = `-- name: GetChatById :one
-SELECT id, project_id, created_at, updated_at FROM chats WHERE id = $1
+with chat_members_cte as (
+	select 
+		cm.chat_id as member_chat_id,
+		cm.user_id as member_user_id,
+		cm.joined_at as member_joined_at,
+		cm.last_seen_at as member_last_seen_at,
+		u."name" as member_name
+	from chat_members cm
+	left join users u on u.id = cm.user_id
+)
+select 
+	c.id, c.project_id, c.created_at, c.updated_at,
+	coalesce(
+		jsonb_agg(
+			jsonb_build_object(
+				'chat_id', cm.member_chat_id,
+				'user_id', cm.member_user_id,
+				'last_seen_at', cm.member_last_seen_at,
+				'joined_at', cm.member_joined_at,
+				'user',
+				jsonb_build_object(
+					'id', cm.member_user_id,
+					'name', cm.member_name
+				)
+			)
+		) filter (where cm.member_user_id is not null and cm.member_chat_id is not null)
+	, '[]'::jsonb) as members
+from chats c
+left join chat_members_cte cm on cm.member_chat_id = c.id
+where c.id = $1
+group by c.id
 `
 
-func (q *Queries) GetChatById(ctx context.Context, id uuid.UUID) (Chat, error) {
+type GetChatByIdRow struct {
+	ID        uuid.UUID
+	ProjectID pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+	Members   interface{}
+}
+
+func (q *Queries) GetChatById(ctx context.Context, id uuid.UUID) (GetChatByIdRow, error) {
 	row := q.db.QueryRow(ctx, getChatById, id)
-	var i Chat
+	var i GetChatByIdRow
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Members,
 	)
 	return i, err
 }
 
 const getChatByProjectId = `-- name: GetChatByProjectId :one
-SELECT id, project_id, created_at, updated_at FROM chats WHERE project_id = $1
+with chat_members_cte as (
+	select 
+		cm.chat_id as member_chat_id,
+		cm.user_id as member_user_id,
+		cm.joined_at as member_joined_at,
+		cm.last_seen_at as member_last_seen_at,
+		u."name" as member_name
+	from chat_members cm
+	left join users u on u.id = cm.user_id
+)
+select 
+	c.id, c.project_id, c.created_at, c.updated_at,
+	coalesce(
+		jsonb_agg(
+			jsonb_build_object(
+				'chat_id', cm.member_chat_id,
+				'user_id', cm.member_user_id,
+				'last_seen_at', cm.member_last_seen_at,
+				'joined_at', cm.member_joined_at,
+				'user',
+				jsonb_build_object(
+					'id', cm.member_user_id,
+					'name', cm.member_name
+				)
+			)
+		) filter (where cm.member_user_id is not null and cm.member_chat_id is not null)
+	, '[]'::jsonb) as members
+from chats c
+left join chat_members_cte cm on cm.member_chat_id = c.id
+where c.project_id = $1
+group by c.id
 `
 
-func (q *Queries) GetChatByProjectId(ctx context.Context, projectID pgtype.UUID) (Chat, error) {
+type GetChatByProjectIdRow struct {
+	ID        uuid.UUID
+	ProjectID pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+	Members   interface{}
+}
+
+func (q *Queries) GetChatByProjectId(ctx context.Context, projectID pgtype.UUID) (GetChatByProjectIdRow, error) {
 	row := q.db.QueryRow(ctx, getChatByProjectId, projectID)
-	var i Chat
+	var i GetChatByProjectIdRow
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Members,
 	)
 	return i, err
+}
+
+const listChatMessages = `-- name: ListChatMessages :many
+select 
+	cm.id,
+	cm.chat_id,
+	cm.content,
+	cm.created_at,
+	cm.updated_at,
+	cm.user_id,
+	cm.message_type,
+	u.name as user_name
+from chat_messages cm
+left join users u on u.id = cm.user_id
+where cm.chat_id = $1
+and cm.created_at <= coalesce($2, CURRENT_TIMESTAMP)
+order by cm.created_at asc
+limit $3
+`
+
+type ListChatMessagesParams struct {
+	ChatID    uuid.UUID
+	CreatedAt pgtype.Timestamptz
+	Limit     int32
+}
+
+type ListChatMessagesRow struct {
+	ID          uuid.UUID
+	ChatID      uuid.UUID
+	Content     string
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	UserID      pgtype.UUID
+	MessageType string
+	UserName    pgtype.Text
+}
+
+func (q *Queries) ListChatMessages(ctx context.Context, arg ListChatMessagesParams) ([]ListChatMessagesRow, error) {
+	rows, err := q.db.Query(ctx, listChatMessages, arg.ChatID, arg.CreatedAt, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListChatMessagesRow
+	for rows.Next() {
+		var i ListChatMessagesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ChatID,
+			&i.Content,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UserID,
+			&i.MessageType,
+			&i.UserName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateChatMemberLastSeenAt = `-- name: UpdateChatMemberLastSeenAt :exec

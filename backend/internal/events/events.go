@@ -11,7 +11,8 @@ const (
 	ProjectMemberCreated Topic = "project.member.created"
 	ProjectMemberRemoved Topic = "project.member.removed"
 
-	ChatMemberCreated Topic = "chat.member.created"
+	ChatMemberCreated  Topic = "chat.member.created"
+	ChatMessageCreated Topic = "chat.message.created"
 )
 
 func (t Topic) String() string {
@@ -25,6 +26,7 @@ func (t Topic) Valid() bool {
 		ProjectMemberCreated,
 		ProjectMemberRemoved,
 		ChatMemberCreated,
+		ChatMessageCreated,
 	}
 
 	return slices.Contains(allowedTopics, t)

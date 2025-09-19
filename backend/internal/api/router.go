@@ -53,6 +53,13 @@ func (a *Api) Router() http.Handler {
 		r.Get("/{id}", a.handlers.Project.Get)
 		r.Put("/{id}", a.handlers.Project.Update)
 		r.Post("/{id}/members", a.handlers.Project.CreateMember)
+		r.Get("/{id}/chat", a.handlers.Chat.GetChatByProjectId)
+		r.Get("/{id}/chat/messages", a.handlers.Chat.ListMessagesByProjectId)
+	})
+
+	r.Route("/chats", func(r chi.Router) {
+		r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
+		r.Post("/messages", a.handlers.Chat.CreateMessage)
 	})
 
 	r.Route("/tasks", func(r chi.Router) {

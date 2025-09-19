@@ -17,11 +17,10 @@ type Chat struct {
 }
 
 type ChatMember struct {
-	Id         uuid.UUID `json:"id"`
-	ChatId     uuid.UUID `json:"chat_id"`
-	UserId     uuid.UUID `json:"user_id"`
-	LastSeenAt time.Time `json:"last_seen_at"`
-	JoinedAt   time.Time `json:"joined_at"`
+	ChatId     uuid.UUID `json:"chat_id,omitempty"`
+	UserId     uuid.UUID `json:"user_id,omitempty"`
+	LastSeenAt time.Time `json:"last_seen_at,omitempty"`
+	JoinedAt   time.Time `json:"joined_at,omitempty"`
 
 	User *User `json:"user,omitempty"`
 	Chat *Chat `json:"chat,omitempty"`

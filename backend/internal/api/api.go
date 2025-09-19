@@ -33,6 +33,7 @@ type Api struct {
 
 type Handlers struct {
 	AuthMiddleware *handlers.AuthMiddleware
+	Chat           *handlers.ChatHandler
 	Project        *handlers.ProjectHandler
 	Task           *handlers.TaskHandler
 	User           *handlers.UserHandler
@@ -70,6 +71,8 @@ func NewApi() (*Api, error) {
 		return nil, err
 	}
 
+	chatHandler := handlers.NewChatHandler(chatService)
+
 	userService := service.NewUserService(jwtProvider, userRepo)
 	userHandler := handlers.NewUserHandler(userService)
 
@@ -81,6 +84,7 @@ func NewApi() (*Api, error) {
 
 	handlers := Handlers{
 		AuthMiddleware: authMiddleware,
+		Chat:           chatHandler,
 		Project:        projectHandler,
 		Task:           taskHandler,
 		User:           userHandler,
