@@ -10,13 +10,25 @@ export const getChatByProjectId = async (projectId: string) => {
   return json;
 };
 
-export const listMessagesByProjectId = async (projectId: string, before: string) => {
+interface ListMessagesByProjectIdPayload {
+  before: string;
+  id: string;
+  projectId: string;
+}
+
+export const listMessagesByProjectId = async (payload: ListMessagesByProjectIdPayload) => {
   const searchParams = new URLSearchParams();
-  if (before) {
-    searchParams.set('before', before);
+  if (payload.before) {
+    searchParams.set('before', payload.before);
   }
 
-  const response = await api.get(`projects/${projectId}/chat/messages`, {
+  if (payload.id) {
+    searchParams.set('id', payload.id);
+  }
+
+  searchParams.set('limit', '30');
+
+  const response = await api.get(`projects/${payload.projectId}/chat/messages`, {
     searchParams,
   });
 

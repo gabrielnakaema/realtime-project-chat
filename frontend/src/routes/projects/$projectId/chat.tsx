@@ -1,74 +1,87 @@
 import { AddProjectMember } from '@/components/add-project-member';
+import { LoadingSpinner } from '@/components/loading';
+import { MembersAvatarList } from '@/components/members-avatar-list';
 import { useAuth } from '@/hooks/use-auth';
-import { createMessage, getChatByProjectId, listMessagesByProjectId } from '@/services/chat';
-import { getProject } from '@/services/projects';
-import { chatQueryKeys, projectQueryKeys } from '@/services/query-keys';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useChat } from '@/hooks/use-chat';
+import { cn } from '@/lib/utils';
+import { chatSchema, type IChatForm } from '@/schemas/chat-schema';
+import { createMessage } from '@/services/chat';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ArrowLeft, Send, Users } from 'lucide-react';
-import { useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
+import { useForm, type SubmitHandler } from 'react-hook-form';
 
 export const Route = createFileRoute('/projects/$projectId/chat')({
   component: RouteComponent,
 });
 
+const formatTime = (timestamp: string) => {
+  return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatDate = (timestamp: string) => {
+  return new Date(timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' });
+};
+
 function RouteComponent() {
   const { projectId } = Route.useParams();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const isInitialRender = useRef(true);
 
-  const [newMessage, setNewMessage] = useState('');
-  const [before, setBefore] = useState<string | null>(null);
-
-  const { data: project } = useQuery({
-    queryKey: projectQueryKeys.details(projectId),
-    queryFn: () => getProject(projectId),
+  const { register, handleSubmit, reset } = useForm<IChatForm>({
+    resolver: zodResolver(chatSchema),
   });
 
-  const { data: chatData } = useQuery({
-    queryKey: chatQueryKeys.detailsByProjectId(projectId),
-    queryFn: () => getChatByProjectId(projectId),
-  });
+  const { project, chatData, messages, observedRef, chatContainerRef } = useChat(projectId);
 
-  const { data: messagesData } = useQuery({
-    queryKey: chatQueryKeys.listMessagesByProjectId(projectId, before || ''),
-    queryFn: () => listMessagesByProjectId(projectId, before || ''),
-  });
-
-  const { mutate } = useMutation({
+  const { mutate, isPending } = useMutation({
     mutationFn: createMessage,
     onSuccess: () => {
-      setNewMessage('');
-      queryClient.invalidateQueries({ queryKey: chatQueryKeys.listMessagesByProjectId(projectId, before || '') });
+      reset();
     },
   });
 
-  const formatTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  useLayoutEffect(() => {
+    const container = chatContainerRef.current;
+    if (!container || messages.length === 0) {
+      return;
+    }
 
-  const formatDate = (timestamp: string) => {
-    return new Date(timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' });
-  };
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'instant',
+      });
+      return;
+    }
 
-  const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+    const isNearBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
 
+    if (isNearBottom) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, [messages]);
+
+  const onSubmit: SubmitHandler<IChatForm> = (form) => {
     if (!chatData?.id) {
       return;
     }
 
     mutate({
       chat_id: chatData.id,
-      content: newMessage,
+      content: form.content,
     });
   };
 
-  const messages = messagesData?.data || [];
-
   return (
-    <div className="flex flex-col h-screen flex-1">
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+    <div className="flex flex-col h-screen flex-1 ">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700  ">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -89,35 +102,22 @@ function RouteComponent() {
               <div className="flex items-center gap-2">
                 <AddProjectMember projectId={projectId} />
                 <Users className="w-4 h-4 text-slate-500" />
-
-                <div className="flex -space-x-2">
-                  {project?.members.slice(0, 4).map((member) => (
-                    <div
-                      key={member.id}
-                      className="w-8 h-8 bg-blue-600 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center text-white text-xs font-medium"
-                    >
-                      {member?.user?.name.charAt(0).toUpperCase()}
-                    </div>
-                  ))}
-                  {(project?.members?.length || 0) > 4 && (
-                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-white dark:border-slate-800 flex items-center justify-center">
-                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                        +{(project?.members?.length || 0) - 4}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                <MembersAvatarList names={project?.members.map((member) => member.user?.name) || []} max={4} />
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-6 bg-[var(--background)]">
+        <div ref={observedRef} className="h-1 bg-transparent" />
         <div className="max-w-4xl mx-auto space-y-4">
           {messages.map((message, index) => {
-            const showDate =
-              index === 0 || formatDate(message.created_at) !== formatDate(messages[index - 1].created_at);
+            const previousMessage = index > 0 ? messages[index - 1] : null;
+            const previousMessageDate = previousMessage ? formatDate(previousMessage.created_at) : null;
+            const messageDate = formatDate(message.created_at);
+
+            const showDate = index === 0 || previousMessageDate !== messageDate;
             const isCurrentUser = message.member?.user?.id === user?.id;
             const isSystem = message.message_type === 'system';
 
@@ -126,7 +126,7 @@ function RouteComponent() {
                 {showDate && (
                   <div className="flex justify-center my-6">
                     <span className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-xs px-3 py-1 rounded-full">
-                      {formatDate(message.created_at)}
+                      {messageDate}
                     </span>
                   </div>
                 )}
@@ -136,13 +136,13 @@ function RouteComponent() {
                     <span className="text-sm text-slate-500 dark:text-slate-400 italic">{message.content}</span>
                   </div>
                 ) : (
-                  <div className={`flex gap-3 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
+                  <div className={cn('flex gap-3', isCurrentUser && 'flex-row-reverse')}>
                     {!isCurrentUser && (
                       <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-medium mt-1">
                         {message.member?.user?.name.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <div className={`flex-1 max-w-md ${isCurrentUser ? 'text-right' : ''}`}>
+                    <div className={cn('flex-1 max-w-md', isCurrentUser && 'text-right')}>
                       {!isCurrentUser && (
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
@@ -154,11 +154,12 @@ function RouteComponent() {
                         </div>
                       )}
                       <div
-                        className={`rounded-lg px-4 py-2 ${
-                          isCurrentUser
-                            ? 'bg-blue-600 text-white ml-auto'
-                            : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700'
-                        }`}
+                        className={cn(
+                          'rounded-lg px-4 py-2',
+                          isCurrentUser && 'bg-blue-600 text-white ml-auto',
+                          !isCurrentUser &&
+                            'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700',
+                        )}
                       >
                         <p className="text-sm leading-relaxed">{message.content}</p>
                       </div>
@@ -180,23 +181,28 @@ function RouteComponent() {
 
       <div className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
         <div className="max-w-4xl mx-auto">
-          <form onSubmit={handleSendMessage} className="flex items-end gap-3">
+          <form onSubmit={handleSubmit(onSubmit)} className="flex items-end gap-3">
             <div className="flex-1">
               <div className="relative">
-                <input
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                <textarea
                   placeholder="Type your message..."
                   className="w-full px-3 py-3 pr-20 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  {...register('content')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(onSubmit)(e);
+                    }
+                  }}
                 />
               </div>
             </div>
             <button
               type="submit"
-              disabled={!newMessage.trim()}
               className="px-4 py-3 text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-md font-medium transition-colors"
+              disabled={isPending}
             >
-              <Send className="w-4 h-4" />
+              {isPending ? <LoadingSpinner size="1em" /> : <Send className="w-4 h-4" />}
             </button>
           </form>
         </div>

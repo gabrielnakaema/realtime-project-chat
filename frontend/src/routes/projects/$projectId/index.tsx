@@ -1,5 +1,6 @@
 import { AddProjectMember } from '@/components/add-project-member';
 import { KanbanBoard } from '@/components/kanban-board';
+import { MembersAvatarList } from '@/components/members-avatar-list';
 import { getProject } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
 import { useQuery } from '@tanstack/react-query';
@@ -41,23 +42,7 @@ function RouteComponent() {
                 <AddProjectMember projectId={projectId} />
                 <Users className="w-4 h-4 text-slate-500" />
 
-                <div className="flex -space-x-2">
-                  {project?.members.slice(0, 4).map((member) => (
-                    <div
-                      key={member.id}
-                      className="w-8 h-8 bg-blue-600 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center text-white text-xs font-medium"
-                    >
-                      {member?.user?.name.charAt(0).toUpperCase()}
-                    </div>
-                  ))}
-                  {(project?.members?.length || 0) > 4 && (
-                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-white dark:border-slate-800 flex items-center justify-center">
-                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                        +{(project?.members?.length || 0) - 4}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                <MembersAvatarList names={project?.members.map((member) => member.user?.name) || []} max={4} />
               </div>
               <Link
                 to={`/projects/$projectId/chat`}

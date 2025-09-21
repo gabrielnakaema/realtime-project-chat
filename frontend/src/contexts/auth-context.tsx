@@ -29,7 +29,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     queryFn: getMe,
     enabled: authStatus === 'authenticated',
   });
-  const navigate = useNavigate();
 
   const initAuth = async () => {
     try {
@@ -59,12 +58,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       await attemptLogout();
       setAuthStatus('unauthenticated');
       tokenService.setToken('');
-      navigate({ to: '/' });
     } catch (error) {
       console.error(error);
       setAuthStatus('unauthenticated');
       tokenService.setToken('');
-      navigate({ to: '/' });
     } finally {
     }
   };
