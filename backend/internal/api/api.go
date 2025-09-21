@@ -95,11 +95,12 @@ func NewApi() (*Api, error) {
 	}
 
 	api := Api{
-		handlers: &handlers,
-		config:   config,
-		pool:     pool,
-		logger:   logger,
-		Ws:       ws,
+		handlers:  &handlers,
+		config:    config,
+		pool:      pool,
+		logger:    logger,
+		Ws:        ws,
+		Publisher: pub,
 	}
 
 	return &api, nil
@@ -133,7 +134,7 @@ func (a *Api) Serve() error {
 		shutdownError <- server.Shutdown(ctx)
 	}()
 
-	a.logger.Info("starting server", "addr", addr)
+	a.logger.Info("starting server", "addr", addr, "environment", a.config.Environment)
 
 	err := server.ListenAndServe()
 	if !errors.Is(err, http.ErrServerClosed) {
@@ -145,7 +146,7 @@ func (a *Api) Serve() error {
 		return err
 	}
 
-	a.logger.Info("stopped server", "addr", addr)
+	a.logger.Info("stopped server", "addr", addr, "environment", a.config.Environment)
 
 	return nil
 }
