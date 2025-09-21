@@ -6,14 +6,13 @@ import type { ChatMessage, SocketEvent } from '@/types/chat';
 import type { CursorPaginated } from '@/types/paginated';
 import { handleError } from '@/utils/handle-error';
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useAuth } from './use-auth';
 
 export const useChat = (projectId: string) => {
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuth();
 
-  const [before, setBefore] = useState<string | null>(null);
   const observedRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const socket = useRef<WebSocket>(null);
@@ -160,8 +159,6 @@ export const useChat = (projectId: string) => {
     project,
     chatData,
     messagesData,
-    before,
-    setBefore,
     observedRef,
     chatContainerRef,
     messages,

@@ -68,10 +68,16 @@ export const CreateProject = () => {
             id="description"
             label="Description"
             placeholder="Enter project description"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(onSubmit)();
+              }
+            }}
             error={errors.description?.message}
             {...register('description')}
           />
-          <Button type="submit" disabled={isPending}>
+          <Button type="submit" disabled={isPending} className="ml-auto">
             {isPending ? <LoadingSpinner size="1.5em" /> : 'Create project'}
           </Button>
         </form>

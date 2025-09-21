@@ -81,10 +81,16 @@ export const CreateTask = ({ projectId }: CreateTaskModalProps) => {
             label="Description"
             id="description"
             placeholder="Enter task description"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(onSubmit)();
+              }
+            }}
             {...register('description')}
             error={errors.description?.message}
           />
-          <div className="flex items-center gap-4 w-full">
+          <div className="flex items-center gap-4 w-full justify-end">
             <DialogClose asChild>
               <Button type="button" variant="secondary">
                 Cancel
