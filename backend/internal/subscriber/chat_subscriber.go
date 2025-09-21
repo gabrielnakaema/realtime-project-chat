@@ -10,15 +10,17 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/ws"
 )
 
 type ChatSubscriber struct {
 	logger      *slog.Logger
 	subscriber  *Subscriber
 	chatService *service.ChatService
+	wsServer    *ws.Server
 }
 
-func NewChatSubscriber(config *config.Config, logger *slog.Logger, chatService *service.ChatService) (*ChatSubscriber, error) {
+func NewChatSubscriber(config *config.Config, logger *slog.Logger, chatService *service.ChatService, wsServer *ws.Server) (*ChatSubscriber, error) {
 	subscriber, err := NewSubscriber(config, "chat.subscriber")
 	if err != nil {
 		return nil, domain.ServerError("failed to create chat subscriber", err)
@@ -28,9 +30,10 @@ func NewChatSubscriber(config *config.Config, logger *slog.Logger, chatService *
 		subscriber:  subscriber,
 		logger:      logger,
 		chatService: chatService,
+		wsServer:    wsServer,
 	}
 
-	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ChatMemberCreated}
+	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ChatMemberCreated, events.ChatMessageCreated}
 
 	err = subscriber.Subscribe(context.Background(), topics, chatSubscriber.handleChatEvents, chatSubscriber.logger)
 	if err != nil {
@@ -48,6 +51,8 @@ func (cs *ChatSubscriber) handleChatEvents(ctx context.Context, message Message)
 		return cs.handleProjectMemberCreated(ctx, message)
 	case events.ChatMemberCreated:
 		return cs.handleChatMemberCreated(ctx, message)
+	case events.ChatMessageCreated:
+		return cs.handleChatMessageCreated(ctx, message)
 	}
 
 	return nil
@@ -62,6 +67,16 @@ func (cs *ChatSubscriber) handleProjectCreated(ctx context.Context, message Mess
 
 	err = cs.chatService.CreateChatFromProject(ctx, &project)
 	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.ServerErrorCode && domainErr.Cause != nil {
+				cs.logger.Error("failed to create chat from project", "error", domainErr.Cause.Error())
+				cs.logger.Error("project", "project", project)
+				return nil
+			}
+			return err
+		}
+		cs.logger.Error("failed to create chat from project", "error", err.Error())
 		return domain.ServerError("failed to create chat from project", err)
 	}
 
@@ -103,6 +118,21 @@ func (cs *ChatSubscriber) handleChatMemberCreated(ctx context.Context, message M
 	err = cs.chatService.CreateJoinedMessage(ctx, &chatMember)
 	if err != nil {
 		return domain.ServerError("failed to update member last seen at", err)
+	}
+
+	return nil
+}
+
+func (cs *ChatSubscriber) handleChatMessageCreated(ctx context.Context, message Message) error {
+	var chatMessage domain.ChatMessage
+	err := json.Unmarshal(message.Value, &chatMessage)
+	if err != nil {
+		return domain.ServerError("failed to unmarshal chat message", err)
+	}
+
+	err = cs.wsServer.SendMessages(ctx, &chatMessage)
+	if err != nil {
+		return domain.ServerError("failed to send messages", err)
 	}
 
 	return nil

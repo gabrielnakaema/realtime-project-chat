@@ -1,7 +1,10 @@
 package api
 
 import (
+	"bufio"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 
@@ -70,6 +73,11 @@ func (a *Api) Router() http.Handler {
 		r.Put("/{id}", a.handlers.Task.Update)
 	})
 
+	r.Route("/ws", func(r chi.Router) {
+		fmt.Println("ws route")
+		r.Get("/", a.Ws.Handler)
+	})
+
 	return r
 }
 
@@ -90,6 +98,14 @@ type responseWriter struct {
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := rw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("ResponseWriter does not implement http.Hijacker")
+	}
+	return hijacker.Hijack()
 }
 
 func (a *Api) slogMiddleware(next http.Handler) http.Handler {

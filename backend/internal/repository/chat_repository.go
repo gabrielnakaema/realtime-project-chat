@@ -93,7 +93,14 @@ func (cr *ChatRepository) CreateMessage(ctx context.Context, message *domain.Cha
 		params.UserID = pgtype.UUID{Bytes: *message.UserId, Valid: true}
 	}
 
-	return q.CreateChatMessage(ctx, params)
+	id, err := q.CreateChatMessage(ctx, params)
+	if err != nil {
+		return err
+	}
+
+	message.Id = id
+
+	return nil
 }
 
 func (cr *ChatRepository) GetByProjectId(ctx context.Context, projectId uuid.UUID) (*domain.Chat, error) {
@@ -165,11 +172,10 @@ func (cr *ChatRepository) ListMessages(ctx context.Context, chatId uuid.UUID, pa
 	q := queries.New(cr.pool)
 
 	queriesParams := queries.ListChatMessagesParams{
-		ChatID: chatId,
-		Limit:  params.Limit,
-	}
-	if params.Before != nil {
-		queriesParams.CreatedAt = pgtype.Timestamptz{Time: *params.Before, Valid: true}
+		ChatID:    chatId,
+		Limit:     params.Limit,
+		CreatedAt: pgtype.Timestamptz{Time: params.Before, Valid: true},
+		Column3:   params.Id,
 	}
 
 	result, err := q.ListChatMessages(ctx, queriesParams)

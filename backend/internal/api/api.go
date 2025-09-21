@@ -20,6 +20,7 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/subscriber"
 	"github.com/gabrielnakaema/project-chat/internal/token"
+	"github.com/gabrielnakaema/project-chat/internal/ws"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -29,6 +30,7 @@ type Api struct {
 	handlers  *Handlers
 	logger    *slog.Logger
 	Publisher *publisher.Publisher
+	Ws        *ws.Server
 }
 
 type Handlers struct {
@@ -65,8 +67,10 @@ func NewApi() (*Api, error) {
 	taskRepo := repository.NewTaskRepository(pool)
 	userRepo := repository.NewUserRepository(pool)
 
+	ws := ws.NewServer(jwtProvider, logger, chatRepo, pub)
+
 	chatService := service.NewChatService(chatRepo, userRepo, pub)
-	_, err = subscriber.NewChatSubscriber(config, logger, chatService)
+	_, err = subscriber.NewChatSubscriber(config, logger, chatService, ws)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +99,7 @@ func NewApi() (*Api, error) {
 		config:   config,
 		pool:     pool,
 		logger:   logger,
+		Ws:       ws,
 	}
 
 	return &api, nil

@@ -44,8 +44,8 @@ func (q *Queries) CreateChatMember(ctx context.Context, arg CreateChatMemberPara
 	return err
 }
 
-const createChatMessage = `-- name: CreateChatMessage :exec
-INSERT INTO chat_messages (chat_id, user_id, content, created_at, updated_at, message_type) VALUES ($1, $2, $3, $4, $5, $6)
+const createChatMessage = `-- name: CreateChatMessage :one
+INSERT INTO chat_messages (chat_id, user_id, content, created_at, updated_at, message_type) VALUES ($1, $2, $3, $4, $5, $6) returning id
 `
 
 type CreateChatMessageParams struct {
@@ -57,8 +57,8 @@ type CreateChatMessageParams struct {
 	MessageType string
 }
 
-func (q *Queries) CreateChatMessage(ctx context.Context, arg CreateChatMessageParams) error {
-	_, err := q.db.Exec(ctx, createChatMessage,
+func (q *Queries) CreateChatMessage(ctx context.Context, arg CreateChatMessageParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createChatMessage,
 		arg.ChatID,
 		arg.UserID,
 		arg.Content,
@@ -66,7 +66,9 @@ func (q *Queries) CreateChatMessage(ctx context.Context, arg CreateChatMessagePa
 		arg.UpdatedAt,
 		arg.MessageType,
 	)
-	return err
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getChatById = `-- name: GetChatById :one
@@ -192,14 +194,15 @@ select
 from chat_messages cm
 left join users u on u.id = cm.user_id
 where cm.chat_id = $1
-and cm.created_at <= coalesce($2, CURRENT_TIMESTAMP)
-order by cm.created_at asc
-limit $3
+and (cm.created_at, cm.id) < ($2, $3::uuid)
+order by cm.created_at desc, cm.id desc
+limit $4
 `
 
 type ListChatMessagesParams struct {
 	ChatID    uuid.UUID
 	CreatedAt pgtype.Timestamptz
+	Column3   uuid.UUID
 	Limit     int32
 }
 
@@ -215,7 +218,12 @@ type ListChatMessagesRow struct {
 }
 
 func (q *Queries) ListChatMessages(ctx context.Context, arg ListChatMessagesParams) ([]ListChatMessagesRow, error) {
-	rows, err := q.db.Query(ctx, listChatMessages, arg.ChatID, arg.CreatedAt, arg.Limit)
+	rows, err := q.db.Query(ctx, listChatMessages,
+		arg.ChatID,
+		arg.CreatedAt,
+		arg.Column3,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}

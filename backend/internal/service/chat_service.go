@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
@@ -122,6 +123,11 @@ func (cs *ChatService) CreateJoinedMessage(ctx context.Context, chatMember *doma
 		return domain.ServerError("failed to create joined message", err)
 	}
 
+	err = cs.publisher.Publish(ctx, events.ChatMessageCreated, message)
+	if err != nil {
+		return domain.ServerError("failed to create publisher event", err)
+	}
+
 	return nil
 }
 
@@ -148,10 +154,12 @@ func (cs *ChatService) CreateMessage(ctx context.Context, request CreateChatMess
 		return nil, domain.ServerError("failed to get chat", err)
 	}
 
+	var foundMember *domain.ChatMember
 	hasPermission := false
 	for _, member := range chat.Members {
 		if member.UserId == request.UserId {
 			hasPermission = true
+			foundMember = &member
 			break
 		}
 	}
@@ -161,15 +169,12 @@ func (cs *ChatService) CreateMessage(ctx context.Context, request CreateChatMess
 
 	message := domain.ChatMessage{
 		MessageType: domain.MessageTypeText,
-		Member: &domain.ChatMember{
-			UserId: request.UserId,
-			ChatId: request.ChatId,
-		},
-		ChatId:    request.ChatId,
-		UserId:    &request.UserId,
-		Content:   request.Content,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Member:      foundMember,
+		ChatId:      request.ChatId,
+		UserId:      &request.UserId,
+		Content:     request.Content,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
 	err = cs.chatRepository.CreateMessage(ctx, &message)
@@ -247,6 +252,8 @@ func (cs *ChatService) ListMessagesByProjectId(ctx context.Context, request List
 	if err != nil {
 		return nil, domain.ServerError("failed to list messages", err)
 	}
+
+	slices.Reverse(chat.Messages)
 
 	cursorPaginated := utils.CursorPaginated[domain.ChatMessage]{
 		Data:    chat.Messages,

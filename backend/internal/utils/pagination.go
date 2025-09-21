@@ -1,6 +1,10 @@
 package utils
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type CursorPaginated[T any] struct {
 	Data    []T  `json:"data"`
@@ -8,6 +12,7 @@ type CursorPaginated[T any] struct {
 }
 
 type PaginationBeforeParams struct {
-	Before *time.Time `json:"before"`
-	Limit  int32      `json:"limit"`
+	Before time.Time `json:"before"`
+	Id     uuid.UUID `json:"id"`
+	Limit  int32     `json:"limit"`
 }

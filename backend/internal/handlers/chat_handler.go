@@ -109,6 +109,17 @@ func (ch *ChatHandler) ListMessagesByProjectId(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	limit := utils.GetQueryInt(r, "limit", 10)
+	if limit <= 0 {
+		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		return
+	}
+
+	if limit > 50 {
+		BadRequestResponse(w, errors.New("limit must be less than 50"))
+		return
+	}
+
 	before := utils.GetQueryString(r, "before", "")
 	beforeTime := time.Now()
 	if before != "" {
@@ -118,7 +129,17 @@ func (ch *ChatHandler) ListMessagesByProjectId(w http.ResponseWriter, r *http.Re
 			return
 		}
 		beforeTime = date
-		return
+	}
+
+	beforeId := utils.GetQueryString(r, "id", "")
+	beforeIdUUID := uuid.Nil
+	if beforeId != "" {
+		parsedBeforeId, err := uuid.Parse(beforeId)
+		if err != nil {
+			BadRequestResponse(w, err)
+			return
+		}
+		beforeIdUUID = parsedBeforeId
 	}
 
 	parsedProjectId, err := uuid.Parse(projectId)
@@ -133,13 +154,16 @@ func (ch *ChatHandler) ListMessagesByProjectId(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	paginationParams := utils.PaginationBeforeParams{
+		Limit:  limit,
+		Before: beforeTime,
+		Id:     beforeIdUUID,
+	}
+
 	serviceRequest := service.ListMessagesByProjectIdRequest{
 		ProjectId: parsedProjectId,
 		UserId:    userId,
-		Params: utils.PaginationBeforeParams{
-			Limit:  10,
-			Before: &beforeTime,
-		},
+		Params:    paginationParams,
 	}
 
 	messages, err := ch.chatService.ListMessagesByProjectId(r.Context(), serviceRequest)

@@ -7,8 +7,8 @@ INSERT INTO chat_members (user_id, chat_id, last_seen_at, joined_at) VALUES ($1,
 -- name: UpdateChatMemberLastSeenAt :exec
 UPDATE chat_members SET last_seen_at = $1 WHERE user_id = $2 AND chat_id = $3;
 
--- name: CreateChatMessage :exec
-INSERT INTO chat_messages (chat_id, user_id, content, created_at, updated_at, message_type) VALUES ($1, $2, $3, $4, $5, $6);
+-- name: CreateChatMessage :one
+INSERT INTO chat_messages (chat_id, user_id, content, created_at, updated_at, message_type) VALUES ($1, $2, $3, $4, $5, $6) returning id;
 
 -- name: GetChatById :one
 with chat_members_cte as (
@@ -89,6 +89,6 @@ select
 from chat_messages cm
 left join users u on u.id = cm.user_id
 where cm.chat_id = $1
-and cm.created_at <= coalesce($2, CURRENT_TIMESTAMP)
-order by cm.created_at asc
-limit $3;
+and (cm.created_at, cm.id) < ($2, $3::uuid)
+order by cm.created_at desc, cm.id desc
+limit $4;
