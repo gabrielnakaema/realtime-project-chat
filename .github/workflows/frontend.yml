@@ -53,4 +53,5 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            ln -sfn ${{ secrets.FRONTEND_DIR }}/releases/${{ github.run_id }} ${{ secrets.FRONTEND_DIR }}/current
+            cd ${{ secrets.FRONTEND_DIR }}
+            ln -sfn releases/${{ github.run_id }} current
