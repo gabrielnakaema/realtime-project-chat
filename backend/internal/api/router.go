@@ -26,7 +26,6 @@ func (a *Api) Router() http.Handler {
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
-		Debug:            true,
 	}))
 
 	r.Use(middleware.RequestID)
