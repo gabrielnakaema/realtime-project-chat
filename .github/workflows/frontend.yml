@@ -26,6 +26,7 @@ jobs:
         with:
           node-version: 22
           cache: "pnpm"
+          cache-dependency-path: "frontend/pnpm-lock.yaml"
       - name: Install dependencies
         run: pnpm install
       - name: Build
@@ -51,4 +52,4 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            ln -sfn ${${{ secrets.FRONTEND_DIR }}/releases/${{ github.run_id }} ${${{ secrets.FRONTEND_DIR }}/current
+            ln -sfn ${{ secrets.FRONTEND_DIR }}/releases/${{ github.run_id }} ${{ secrets.FRONTEND_DIR }}/current
