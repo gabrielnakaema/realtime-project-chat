@@ -32,6 +32,7 @@ jobs:
       - name: Build
         run: pnpm build
         env:
+          NODE_ENV: production
           VITE_API_URL: ${{ secrets.API_URL }}
 
       - name: Upload build to server

@@ -1,18 +1,17 @@
+import { RouterProvider, createRouter } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
-import { RouterProvider, createRouter } from '@tanstack/react-router';
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
 
-import './styles.css';
-import reportWebVitals from './reportWebVitals.ts';
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { handleError } from './utils/handle-error.ts';
 import { ToastContainer } from 'react-toastify';
 import { AuthProvider } from './contexts/auth-context.tsx';
 import { ThemeProvider } from './contexts/theme-context.tsx';
+import reportWebVitals from './reportWebVitals.ts';
+import './styles.css';
+import { handleError } from './utils/handle-error.ts';
 
 // Create a new router instance
 const router = createRouter({
@@ -61,7 +60,6 @@ if (rootElement && !rootElement.innerHTML) {
             <RouterProvider router={router} />
           </AuthProvider>
           <ToastContainer position="top-right" autoClose={4000} theme={theme} />
-          <ReactQueryDevtools initialIsOpen={false} />
         </QueryClientProvider>
       </ThemeProvider>
     </StrictMode>,
