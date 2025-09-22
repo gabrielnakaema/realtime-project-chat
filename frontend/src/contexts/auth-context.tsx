@@ -6,7 +6,6 @@ import { getMe } from '@/services/users';
 import type { LoginResponse } from '@/types/auth';
 import type { User } from '@/types/user';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
 import { createContext, useEffect, useState } from 'react';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'error';
