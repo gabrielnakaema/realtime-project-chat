@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: postgres_projectmanagement
+    env_file: .env.prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 2
+      timeout: 10s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - project_management_network
+
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka_projectmanagement
+    env_file: .env.prod
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_LOG_RETENTION_HOURS=168
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/opt/kafka/bin/kafka-topics.sh",
+          "--list",
+          "--bootstrap-server",
+          "localhost:9092",
+        ]
+      interval: 10s
+      retries: 2
+      timeout: 10s
+    restart: always
+    networks:
+      - project_management_network
+
+  api:
+    image: ${REGISTRY}/${IMAGE_NAME}
+    env_file: .env.prod
+    ports:
+      - "127.0.0.1:${API_PORT}:${API_PORT}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: always
+    networks:
+      - project_management_network
+
+volumes:
+  postgres_data:
+  kafka_data:
+
+networks:
+  project_management_network:

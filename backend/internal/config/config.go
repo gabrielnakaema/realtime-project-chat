@@ -17,17 +17,18 @@ type Config struct {
 }
 
 func New() (*Config, error) {
-	err := godotenv.Load()
-	if err != nil {
-		return nil, err
-	}
+	godotenv.Load()
+
+	env := getEnv("ENV", "development")
+
+	port := getEnv("API_PORT", "3333")
 
 	config := Config{
-		Port:          "3333",
+		Port:          port,
 		DSN:           getEnv("DB_DSN", ""),
 		PubsubBrokers: strings.Split(getEnv("PUBSUB_BROKERS", ""), ","),
 		JwtSecret:     getEnv("JWT_SECRET", "SECRET"),
-		Environment:   getEnv("ENV", "development"),
+		Environment:   env,
 		CORSOrigins:   strings.Split(getEnv("CORS_ORIGINS", "http://localhost:3000"), ","),
 	}
 

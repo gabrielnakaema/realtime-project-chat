@@ -1,0 +1,63 @@
+name: backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{secrets.GH_ACTOR}}/project-chat:latest
+
+jobs:
+  publish:
+    name: Publish Image
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: login
+        run: echo ${{secrets.GH_SECRET}} | docker login ghcr.io -u ${{ secrets.GH_ACTOR }} --password-stdin
+      - name: Build and Publish
+        run: |
+          docker build backend/. --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+  deploy:
+    needs: publish
+    name: Deploy Image
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Copy docker-compose to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          source: "backend/docker-compose-prod.yml"
+          target: "${{ secrets.WORK_DIR }}"
+          strip_components: 1
+
+      - name: SSH and Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            echo "Connected to VPS"
+            cd ${{ secrets.WORK_DIR }}
+            echo ${{secrets.GH_SECRET}} | docker login ghcr.io -u ${{ secrets.GH_ACTOR }} --password-stdin
+            export REGISTRY=${{ env.REGISTRY }}
+            export IMAGE_NAME=${{ env.IMAGE_NAME }}
+            docker compose -f docker-compose-prod.yml down api
+            docker compose -f docker-compose-prod.yml up api -d
