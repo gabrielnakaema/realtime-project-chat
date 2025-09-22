@@ -42,7 +42,8 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           source: "frontend/dist/*"
-          target: "${{ secrets.FRONTEND_DIR }}/releases/${{ github.run_id }}"
+          target: "${{ secrets.FRONTEND_DIR }}/releases/${{ github.run_id }}/"
+          strip_components: 2
 
       - name: Update symlink
         uses: appleboy/ssh-action@master
