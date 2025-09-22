@@ -17,6 +17,8 @@ import (
 func (a *Api) Router() http.Handler {
 	r := chi.NewRouter()
 
+	a.logger.Info("CORS Origins", "origins", a.config.CORSOrigins)
+
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   a.config.CORSOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
@@ -24,6 +26,7 @@ func (a *Api) Router() http.Handler {
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
+		Debug:            true,
 	}))
 
 	r.Use(middleware.RequestID)
@@ -74,7 +77,6 @@ func (a *Api) Router() http.Handler {
 	})
 
 	r.Route("/ws", func(r chi.Router) {
-		fmt.Println("ws route")
 		r.Get("/", a.Ws.Handler)
 	})
 
