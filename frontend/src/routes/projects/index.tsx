@@ -71,10 +71,10 @@ function RouteComponent() {
                   key={project.id}
                   className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:shadow-lg transition-shadow cursor-pointer"
                 >
-                  <Link to={`/projects/$projectId`} params={{ projectId: project.id }}>
+                  <Link to="/projects/$projectId" params={{ projectId: project.id }}>
                     <div className="p-6">
                       <div className="flex items-center justify-between mb-4">
-                        <div className={`w-3 h-3 rounded-full `} />
+                        <div className="w-3 h-3 rounded-full" />
                         <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full">
                           {project?.members.length || 0} members
                         </span>

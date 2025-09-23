@@ -5,7 +5,7 @@ import type { Paginated } from '@/types/paginated';
 import type { Task } from '@/types/task';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { CreateTask } from './create-task';
 import { cn } from '@/lib/utils';
 
@@ -77,9 +77,22 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
     setDraggedTask(null);
   };
 
-  const getTasksByStatus = (status: TaskStatus) => {
-    return tasks?.filter((task) => task.status === status) || [];
-  };
+  const taksByStatus = useMemo(() => {
+    return tasks.reduce(
+      (acc, task) => {
+        return {
+          ...acc,
+          [task.status]: [...acc[task.status], task],
+        };
+      },
+      {
+        pending: [],
+        doing: [],
+        done: [],
+        archived: [],
+      } as Record<TaskStatus, Task[]>,
+    );
+  }, [tasks]);
 
   return (
     <div className="h-full">
@@ -90,7 +103,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
         {columns.map((column) => {
-          const columnTasks = getTasksByStatus(column.status);
+          const columnTasks = taksByStatus[column.status];
           return (
             <div
               key={column.id}

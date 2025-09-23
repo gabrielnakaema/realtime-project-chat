@@ -21,9 +21,9 @@ function RouteComponent() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 ">
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between md:flex-row flex-col gap-4">
             <div className="flex items-center gap-4">
               <Link
                 to="/projects"
@@ -45,7 +45,7 @@ function RouteComponent() {
                 <MembersAvatarList names={project?.members.map((member) => member.user?.name) || []} max={4} />
               </div>
               <Link
-                to={`/projects/$projectId/chat`}
+                to="/projects/$projectId/chat"
                 className="inline-flex items-center px-3 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-md font-medium transition-colors"
                 params={{ projectId }}
               >
