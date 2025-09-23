@@ -40,7 +40,7 @@ function RouteComponent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
+      <main className="w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">Welcome back</h1>
           <p className="text-slate-600 dark:text-slate-400">Sign in to your account</p>
@@ -75,7 +75,7 @@ function RouteComponent() {
             </Link>
           </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

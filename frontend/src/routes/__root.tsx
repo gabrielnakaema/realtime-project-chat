@@ -23,7 +23,6 @@ export const Route = createRootRoute({
       <Outlet />
       {isDev && devComponents.TanStackDevtools && (
         <Suspense fallback={null}>
-          (
           <devComponents.TanStackDevtools
             config={{
               position: 'bottom-left',
@@ -40,7 +39,6 @@ export const Route = createRootRoute({
               },
             ]}
           />
-          )
         </Suspense>
       )}
     </>
