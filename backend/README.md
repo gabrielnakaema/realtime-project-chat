@@ -1,6 +1,6 @@
 # Backend - Go API Server
 
-A Go backend service implementing event-driven architecture with Kafka pub/sub messaging, WebSocket real-time communication, and clean architecture patterns.
+A Go backend service implementing event-driven patterns with Kafka pub/sub messaging and WebSocket real-time communication.
 
 ## 🎯 Learning Focus
 
@@ -13,7 +13,7 @@ This backend demonstrates:
 
 ## 🛠️ Technology Stack
 
-- **Go 1.25** with clean architecture patterns
+- **Go 1.25**
 - **Chi Router** for HTTP routing with middleware
 - **PostgreSQL** with pgx/v5 driver and connection pooling
 - **SQLC** for type-safe SQL query code generation

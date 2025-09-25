@@ -1,12 +1,12 @@
 # Realtime Project Chat
 
-A proof-of-concept project for learning event-driven architecture with Kafka, WebSockets, and real-time collaboration features
+A proof-of-concept project for learning event-driven patterns with Kafka, WebSockets, and real-time collaboration features
 
 ## 🎯 Learning Focus
 
 This is a **learning project** focused on:
 
-- **Kafka pub/sub messaging** for event-driven architecture
+- **Kafka pub/sub messaging**
 - **WebSocket real-time communication** for live chat
 - **Go backend**
 - **React TypeScript frontend**
@@ -18,7 +18,6 @@ This is a **learning project** focused on:
 - **Project Management** - Create projects and invite team members
 - **Task Management** - Kanban-style task organization
 - **Real-time Chat** - WebSocket-powered instant messaging between project members
-- **Event-driven Architecture** - Kafka integration for pub/sub messaging
 
 ## 🚀 Quick Start
 
@@ -63,7 +62,7 @@ This is a **learning project** focused on:
 
 ### Backend
 
-- **Go** with Chi router and clean architecture
+- **Go** with Chi router
 - **PostgreSQL** with pgx driver and SQLC for type-safe queries
 - **Kafka** with Sarama client for pub/sub messaging
 - **JWT** authentication with secure token handling
