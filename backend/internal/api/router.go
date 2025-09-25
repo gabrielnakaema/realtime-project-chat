@@ -94,9 +94,13 @@ func (a *Api) addLoggerMiddleware(next http.Handler) http.Handler {
 type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
+	hijacked   bool
 }
 
 func (rw *responseWriter) WriteHeader(code int) {
+	if rw.hijacked {
+		return
+	}
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
 }
@@ -106,6 +110,7 @@ func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if !ok {
 		return nil, nil, fmt.Errorf("ResponseWriter does not implement http.Hijacker")
 	}
+	rw.hijacked = true
 	return hijacker.Hijack()
 }
 

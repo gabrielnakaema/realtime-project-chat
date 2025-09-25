@@ -262,3 +262,27 @@ func (cs *ChatService) ListMessagesByProjectId(ctx context.Context, request List
 
 	return &cursorPaginated, nil
 }
+
+func (cs *ChatService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Chat, error) {
+	if userId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	chat, err := cs.chatRepository.GetById(ctx, id)
+	if err != nil {
+		return nil, domain.ServerError("failed to get chat", err)
+	}
+
+	hasPermission := false
+	for _, member := range chat.Members {
+		if member.UserId == userId {
+			hasPermission = true
+			break
+		}
+	}
+	if !hasPermission {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	return chat, nil
+}

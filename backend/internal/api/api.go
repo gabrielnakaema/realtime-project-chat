@@ -67,9 +67,13 @@ func NewApi() (*Api, error) {
 	taskRepo := repository.NewTaskRepository(pool)
 	userRepo := repository.NewUserRepository(pool)
 
-	ws := ws.NewServer(jwtProvider, logger, chatRepo, pub)
+	projectService := service.NewProjectService(projectRepo, userRepo, pub)
+	projectHandler := handlers.NewProjectHandler(projectService)
 
 	chatService := service.NewChatService(chatRepo, userRepo, pub)
+
+	ws := ws.NewServer(jwtProvider, logger, chatService, projectService, pub)
+
 	_, err = subscriber.NewChatSubscriber(config, logger, chatService, ws)
 	if err != nil {
 		return nil, err
@@ -79,9 +83,6 @@ func NewApi() (*Api, error) {
 
 	userService := service.NewUserService(jwtProvider, userRepo)
 	userHandler := handlers.NewUserHandler(userService)
-
-	projectService := service.NewProjectService(projectRepo, userRepo, pub)
-	projectHandler := handlers.NewProjectHandler(projectService)
 
 	taskService := service.NewTaskService(taskRepo, projectRepo, userRepo)
 	taskHandler := handlers.NewTaskHandler(taskService)
