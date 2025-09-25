@@ -12,6 +12,7 @@ import { ThemeProvider } from './contexts/theme-context.tsx';
 import reportWebVitals from './reportWebVitals.ts';
 import './styles.css';
 import { handleError } from './utils/handle-error.ts';
+import { SocketProvider } from './contexts/socket-context.tsx';
 
 // Create a new router instance
 const router = createRouter({
@@ -57,7 +58,9 @@ if (rootElement && !rootElement.innerHTML) {
       <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <RouterProvider router={router} />
+            <SocketProvider>
+              <RouterProvider router={router} />
+            </SocketProvider>
           </AuthProvider>
           <ToastContainer position="top-right" autoClose={4000} theme={theme} />
         </QueryClientProvider>

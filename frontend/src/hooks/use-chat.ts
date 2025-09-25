@@ -1,21 +1,21 @@
-import { tokenService } from '@/services/api';
 import { getChatByProjectId, listMessagesByProjectId } from '@/services/chat';
 import { getProject } from '@/services/projects';
 import { chatQueryKeys, projectQueryKeys } from '@/services/query-keys';
-import type { ChatMessage, SocketEvent } from '@/types/chat';
+import type { ChatMessage } from '@/types/chat';
 import type { CursorPaginated } from '@/types/paginated';
+import type { SocketEvent } from '@/types/websocket';
 import { handleError } from '@/utils/handle-error';
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
-import { useAuth } from './use-auth';
+import { useSocket } from './use-socket';
 
 export const useChat = (projectId: string) => {
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuth();
 
   const observedRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const socket = useRef<WebSocket>(null);
+
+  const { status, registerHandler, connectToRoom, disconnectFromRoom, unregisterHandlers } = useSocket();
 
   const { data: project } = useQuery({
     queryKey: projectQueryKeys.details(projectId),
@@ -72,46 +72,37 @@ export const useChat = (projectId: string) => {
     };
   }, [messagesData, fetchNextPage]);
 
-  useEffect(() => {
-    if (!isAuthenticated || !chatId) {
+  const handleSocketMessage = (event: SocketEvent) => {
+    if (event.type === 'error') {
+      handleError(event.data.message);
       return;
     }
 
-    const s = socket.current;
-
-    if (s && (s.readyState === WebSocket.OPEN || s.readyState === WebSocket.CONNECTING)) {
-      return;
-    }
-
-    const newSocket = new WebSocket(`${import.meta.env.VITE_API_URL}/ws?chat_id=${chatId}&jwt=${tokenService.token}`);
-
-    newSocket.onmessage = (event: MessageEvent) => {
-      const data = JSON.parse(event.data) as SocketEvent;
-
-      if (data.type === 'error') {
-        handleError(data.data.message);
+    if (event.type === 'message') {
+      const chatMessage = event.data;
+      if (!chatMessage) {
         return;
       }
 
-      if (data.type === 'message') {
-        const chatMessage = data.data;
-        if (!chatMessage) {
-          return;
-        }
+      addNewMessage(chatMessage);
+    }
+  };
 
-        handleNewMessage(chatMessage);
-      }
-    };
+  useEffect(() => {
+    if (!chatId || status !== 'connected') {
+      return;
+    }
 
-    socket.current = newSocket;
+    connectToRoom(chatId, 'chat');
+    registerHandler({ id: 'chat_message_handler', handler: handleSocketMessage });
 
     return () => {
-      newSocket.close();
-      socket.current = null;
+      disconnectFromRoom(chatId);
+      unregisterHandlers(['chat_message_handler']);
     };
-  }, [chatId, isAuthenticated]);
+  }, [chatId, status]);
 
-  const handleNewMessage = (message: ChatMessage) => {
+  const addNewMessage = (message: ChatMessage) => {
     queryClient.setQueryData(
       chatQueryKeys.listInfiniteMessagesByProjectId({ projectId }),
       (old: InfiniteData<CursorPaginated<ChatMessage>>) => {

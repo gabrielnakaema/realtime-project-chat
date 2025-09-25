@@ -2,14 +2,12 @@ import { TaskCard } from '@/components/task-card';
 import { taskQueryKeys } from '@/services/query-keys';
 import { listTasksByProjectId, updateTask } from '@/services/tasks';
 import type { Paginated } from '@/types/paginated';
-import type { Task } from '@/types/task';
+import type { Task, TaskStatus } from '@/types/task';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CreateTask } from './create-task';
 import { cn } from '@/lib/utils';
-
-type TaskStatus = 'pending' | 'doing' | 'done' | 'archived';
 
 interface Column {
   id: string;
@@ -77,7 +75,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
     setDraggedTask(null);
   };
 
-  const taksByStatus = useMemo(() => {
+  const tasksByStatus = useMemo(() => {
     return tasks.reduce(
       (acc, task) => {
         return {
@@ -103,7 +101,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
         {columns.map((column) => {
-          const columnTasks = taksByStatus[column.status];
+          const columnTasks = tasksByStatus[column.status];
           return (
             <div
               key={column.id}

@@ -30,15 +30,3 @@ export interface ChatMessage {
   updated_at: string;
   member: ChatMember | null;
 }
-
-export type SocketEvent =
-  | {
-      type: 'message';
-      data: ChatMessage;
-    }
-  | {
-      type: 'error';
-      data: {
-        message: string;
-      };
-    };

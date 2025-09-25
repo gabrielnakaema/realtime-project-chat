@@ -58,7 +58,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setAuthStatus('unauthenticated');
       tokenService.setToken('');
     } catch (error) {
-      console.error(error);
       setAuthStatus('unauthenticated');
       tokenService.setToken('');
     } finally {
