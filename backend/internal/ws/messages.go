@@ -23,6 +23,8 @@ const (
 	WebsocketMessageTypePong                   WebsocketMessageType = "pong"
 	WebsocketMessageTypeConnectUserToRoom      WebsocketMessageType = "connect_user_to_room"
 	WebsocketMessageTypeDisconnectUserFromRoom WebsocketMessageType = "disconnect_user_from_room"
+	WebsocketMessageTypeTaskCreated            WebsocketMessageType = "task_created"
+	WebsocketMessageTypeTaskUpdated            WebsocketMessageType = "task_updated"
 )
 
 type WebsocketMessage struct {

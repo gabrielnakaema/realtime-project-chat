@@ -79,12 +79,17 @@ func NewApi() (*Api, error) {
 		return nil, err
 	}
 
+	_, err = subscriber.NewTaskSubscriber(config, logger, ws)
+	if err != nil {
+		return nil, err
+	}
+
 	chatHandler := handlers.NewChatHandler(chatService)
 
 	userService := service.NewUserService(jwtProvider, userRepo)
 	userHandler := handlers.NewUserHandler(userService)
 
-	taskService := service.NewTaskService(taskRepo, projectRepo, userRepo)
+	taskService := service.NewTaskService(taskRepo, projectRepo, userRepo, pub)
 	taskHandler := handlers.NewTaskHandler(taskService)
 
 	handlers := Handlers{

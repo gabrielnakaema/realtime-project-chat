@@ -89,6 +89,26 @@ func (ws *Server) SendMessages(ctx context.Context, message *domain.ChatMessage)
 	return ws.sendMessageToRoom(ctx, message.ChatId, websocketMessage)
 }
 
+func (ws *Server) SendUpdatedTask(ctx context.Context, task *domain.Task) error {
+	websocketMessage := WebsocketMessage{
+		Type:   WebsocketMessageTypeTaskUpdated,
+		RoomId: task.ProjectId,
+		Data:   task,
+	}
+
+	return ws.sendMessageToRoom(ctx, websocketMessage.RoomId, websocketMessage)
+}
+
+func (ws *Server) SendCreatedTask(ctx context.Context, task *domain.Task) error {
+	websocketMessage := WebsocketMessage{
+		Type:   WebsocketMessageTypeTaskCreated,
+		RoomId: task.ProjectId,
+		Data:   task,
+	}
+
+	return ws.sendMessageToRoom(ctx, websocketMessage.RoomId, websocketMessage)
+}
+
 func (ws *Server) sendMessageToRoom(ctx context.Context, roomId uuid.UUID, message WebsocketMessage) error {
 	ws.mutex.Lock()
 	defer ws.mutex.Unlock()

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/google/uuid"
 )
 
@@ -27,17 +28,23 @@ type taskServiceUserRepository interface {
 	GetById(ctx context.Context, id uuid.UUID) (*domain.User, error)
 }
 
+type taskServicePublisher interface {
+	Publish(ctx context.Context, topic events.Topic, payload interface{}) error
+}
+
 type TaskService struct {
 	taskRepository    taskRepository
 	projectRepository taskServiceProjectRepository
 	userRepository    taskServiceUserRepository
+	publisher         taskServicePublisher
 }
 
-func NewTaskService(taskRepository taskRepository, projectRepository taskServiceProjectRepository, userRepository taskServiceUserRepository) *TaskService {
+func NewTaskService(taskRepository taskRepository, projectRepository taskServiceProjectRepository, userRepository taskServiceUserRepository, publisher taskServicePublisher) *TaskService {
 	return &TaskService{
 		taskRepository:    taskRepository,
 		projectRepository: projectRepository,
 		userRepository:    userRepository,
+		publisher:         publisher,
 	}
 }
 
@@ -111,6 +118,11 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 	}
 
 	task.Changes = append(task.Changes, taskChange)
+
+	err = ts.publisher.Publish(ctx, events.TaskCreated, task)
+	if err != nil {
+		return nil, domain.ServerError("failed to publish task created event", err)
+	}
 
 	return &task, nil
 }
@@ -207,6 +219,11 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 	}
 
 	updatedTask.Changes = append(task.Changes, newTaskChanges...)
+
+	err = ts.publisher.Publish(ctx, events.TaskUpdated, updatedTask)
+	if err != nil {
+		return nil, domain.ServerError("failed to publish task updated event", err)
+	}
 
 	return &updatedTask, nil
 }
