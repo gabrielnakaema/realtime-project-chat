@@ -8,16 +8,20 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
-	"github.com/gabrielnakaema/project-chat/internal/ws"
 )
+
+type TaskNotifier interface {
+	SendCreatedTask(context.Context, *domain.Task) error
+	SendUpdatedTask(context.Context, *domain.Task) error
+}
 
 type TaskSubscriber struct {
 	logger     *slog.Logger
 	subscriber *Subscriber
-	wsServer   *ws.Server
+	notifier   TaskNotifier
 }
 
-func NewTaskSubscriber(config *config.Config, logger *slog.Logger, wsServer *ws.Server) (*TaskSubscriber, error) {
+func NewTaskSubscriber(config *config.Config, logger *slog.Logger, notifier TaskNotifier) (*TaskSubscriber, error) {
 	subscriber, err := NewSubscriber(config, "task.subscriber")
 	if err != nil {
 		return nil, err
@@ -26,7 +30,7 @@ func NewTaskSubscriber(config *config.Config, logger *slog.Logger, wsServer *ws.
 	taskSubscriber := &TaskSubscriber{
 		logger:     logger,
 		subscriber: subscriber,
-		wsServer:   wsServer,
+		notifier:   notifier,
 	}
 
 	topics := []events.Topic{events.TaskCreated, events.TaskUpdated}
@@ -59,7 +63,7 @@ func (ts *TaskSubscriber) handleTaskCreated(ctx context.Context, message Message
 		return domain.ServerError("failed to unmarshal task", err)
 	}
 
-	err = ts.wsServer.SendCreatedTask(ctx, &task)
+	err = ts.notifier.SendCreatedTask(ctx, &task)
 	if err != nil {
 		return domain.ServerError("failed to send created task to ws server", err)
 	}
@@ -74,7 +78,7 @@ func (ts *TaskSubscriber) handleTaskUpdated(ctx context.Context, message Message
 		return domain.ServerError("failed to unmarshal task", err)
 	}
 
-	err = ts.wsServer.SendUpdatedTask(ctx, &task)
+	err = ts.notifier.SendUpdatedTask(ctx, &task)
 	if err != nil {
 		return domain.ServerError("failed to send updated task to ws server", err)
 	}

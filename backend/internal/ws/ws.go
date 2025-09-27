@@ -61,6 +61,7 @@ type Server struct {
 	tokenProvider  tokenProvider
 	chatService    chatService
 	projectService projectService
+	eventMapper    *DomainEventMapper
 }
 
 type publisher interface {
@@ -76,37 +77,30 @@ func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService cha
 		chatService:    chatService,
 		projectService: projectService,
 		users:          make(map[uuid.UUID]*WsUser),
+		eventMapper:    &DomainEventMapper{},
 	}
+}
+
+func (ws *Server) SendEvent(ctx context.Context, eventData EventData) error {
+	websocketMessage := WebsocketMessage{
+		Type:   eventData.Type,
+		RoomId: eventData.RoomId,
+		Data:   eventData.Data,
+	}
+
+	return ws.sendMessageToRoom(ctx, eventData.RoomId, websocketMessage)
 }
 
 func (ws *Server) SendMessages(ctx context.Context, message *domain.ChatMessage) error {
-	websocketMessage := WebsocketMessage{
-		Type:   WebsocketMessageTypeMessage,
-		RoomId: message.ChatId,
-		Data:   message,
-	}
-
-	return ws.sendMessageToRoom(ctx, message.ChatId, websocketMessage)
+	return ws.SendEvent(ctx, ws.eventMapper.MapChatMessage(message))
 }
 
 func (ws *Server) SendUpdatedTask(ctx context.Context, task *domain.Task) error {
-	websocketMessage := WebsocketMessage{
-		Type:   WebsocketMessageTypeTaskUpdated,
-		RoomId: task.ProjectId,
-		Data:   task,
-	}
-
-	return ws.sendMessageToRoom(ctx, websocketMessage.RoomId, websocketMessage)
+	return ws.SendEvent(ctx, ws.eventMapper.MapTaskUpdated(task))
 }
 
 func (ws *Server) SendCreatedTask(ctx context.Context, task *domain.Task) error {
-	websocketMessage := WebsocketMessage{
-		Type:   WebsocketMessageTypeTaskCreated,
-		RoomId: task.ProjectId,
-		Data:   task,
-	}
-
-	return ws.sendMessageToRoom(ctx, websocketMessage.RoomId, websocketMessage)
+	return ws.SendEvent(ctx, ws.eventMapper.MapTaskCreated(task))
 }
 
 func (ws *Server) sendMessageToRoom(ctx context.Context, roomId uuid.UUID, message WebsocketMessage) error {

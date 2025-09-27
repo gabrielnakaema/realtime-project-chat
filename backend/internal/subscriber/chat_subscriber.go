@@ -10,17 +10,20 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/gabrielnakaema/project-chat/internal/service"
-	"github.com/gabrielnakaema/project-chat/internal/ws"
 )
+
+type MessageNotifier interface {
+	SendMessages(ctx context.Context, message *domain.ChatMessage) error
+}
 
 type ChatSubscriber struct {
 	logger      *slog.Logger
 	subscriber  *Subscriber
 	chatService *service.ChatService
-	wsServer    *ws.Server
+	notifier    MessageNotifier
 }
 
-func NewChatSubscriber(config *config.Config, logger *slog.Logger, chatService *service.ChatService, wsServer *ws.Server) (*ChatSubscriber, error) {
+func NewChatSubscriber(config *config.Config, logger *slog.Logger, chatService *service.ChatService, notifier MessageNotifier) (*ChatSubscriber, error) {
 	subscriber, err := NewSubscriber(config, "chat.subscriber")
 	if err != nil {
 		return nil, domain.ServerError("failed to create chat subscriber", err)
@@ -30,7 +33,7 @@ func NewChatSubscriber(config *config.Config, logger *slog.Logger, chatService *
 		subscriber:  subscriber,
 		logger:      logger,
 		chatService: chatService,
-		wsServer:    wsServer,
+		notifier:    notifier,
 	}
 
 	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ChatMemberCreated, events.ChatMessageCreated}
@@ -130,7 +133,7 @@ func (cs *ChatSubscriber) handleChatMessageCreated(ctx context.Context, message 
 		return domain.ServerError("failed to unmarshal chat message", err)
 	}
 
-	err = cs.wsServer.SendMessages(ctx, &chatMessage)
+	err = cs.notifier.SendMessages(ctx, &chatMessage)
 	if err != nil {
 		return domain.ServerError("failed to send messages", err)
 	}

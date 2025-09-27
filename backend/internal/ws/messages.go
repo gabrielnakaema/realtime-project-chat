@@ -5,6 +5,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
+	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/google/uuid"
 )
 
@@ -75,4 +76,36 @@ type UserConnectedData struct {
 type UserDisconnectedData struct {
 	UserId uuid.UUID `json:"user_id"`
 	RoomId uuid.UUID `json:"room_id"`
+}
+
+type EventData struct {
+	Type   WebsocketMessageType
+	RoomId uuid.UUID
+	Data   interface{}
+}
+
+type DomainEventMapper struct{}
+
+func (m *DomainEventMapper) MapChatMessage(message *domain.ChatMessage) EventData {
+	return EventData{
+		Type:   WebsocketMessageTypeMessage,
+		RoomId: message.ChatId,
+		Data:   message,
+	}
+}
+
+func (m *DomainEventMapper) MapTaskCreated(task *domain.Task) EventData {
+	return EventData{
+		Type:   WebsocketMessageTypeTaskCreated,
+		RoomId: task.ProjectId,
+		Data:   task,
+	}
+}
+
+func (m *DomainEventMapper) MapTaskUpdated(task *domain.Task) EventData {
+	return EventData{
+		Type:   WebsocketMessageTypeTaskUpdated,
+		RoomId: task.ProjectId,
+		Data:   task,
+	}
 }
