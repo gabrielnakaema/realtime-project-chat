@@ -1,13 +1,13 @@
 import { TaskCard } from '@/components/task-card';
 import { taskQueryKeys } from '@/services/query-keys';
-import { listTasksByProjectId, updateTask } from '@/services/tasks';
-import type { Paginated } from '@/types/paginated';
+import { updateTask } from '@/services/tasks';
 import type { Task, TaskStatus } from '@/types/task';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CreateTask } from './create-task';
 import { cn } from '@/lib/utils';
+import { useProjectTasks } from '@/hooks/use-project-tasks';
 
 interface Column {
   id: string;
@@ -26,27 +26,10 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const queryClient = useQueryClient();
 
-  const { data } = useQuery({
-    queryKey: taskQueryKeys.listByProjectId(projectId),
-    queryFn: () => listTasksByProjectId(projectId),
-  });
-
-  const tasks = data?.data || [];
+  const { tasks } = useProjectTasks(projectId);
 
   const { mutate: mutateUpdateTask } = useMutation({
     mutationFn: updateTask,
-    onMutate: (task) => {
-      queryClient.setQueryData(taskQueryKeys.listByProjectId(projectId), (data: Paginated<Task>) => {
-        return data.data.map((t) =>
-          t.id === task.id
-            ? {
-                ...t,
-                status: task.status,
-              }
-            : t,
-        );
-      });
-    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.listByProjectId(projectId) });
     },

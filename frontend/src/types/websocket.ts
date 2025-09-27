@@ -1,4 +1,5 @@
 import type { ChatMessage } from './chat';
+import type { Task } from './task';
 
 export type MessageEvent = {
   type: 'message';
@@ -17,4 +18,14 @@ export type PingEvent = {
   data: null;
 };
 
-export type SocketEvent = MessageEvent | ErrorEvent | PingEvent;
+export type TaskCreatedEvent = {
+  type: 'task_created';
+  data: Task;
+};
+
+export type TaskUpdatedEvent = {
+  type: 'task_updated';
+  data: Task;
+};
+
+export type SocketEvent = MessageEvent | ErrorEvent | PingEvent | TaskCreatedEvent | TaskUpdatedEvent;
