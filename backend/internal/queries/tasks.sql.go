@@ -151,18 +151,37 @@ func (q *Queries) GetTaskById(ctx context.Context, id uuid.UUID) (GetTaskByIdRow
 }
 
 const listTasksByProjectId = `-- name: ListTasksByProjectId :many
-SELECT id, project_id, title, description, status, created_at, updated_at, author_id FROM tasks WHERE project_id = $1
+SELECT 
+  t.id, t.project_id, t.title, t.description, t.status, t.created_at, t.updated_at, t.author_id,
+  a.id as author_author_id,
+  a.name as author_name
+FROM tasks t
+LEFT JOIN users a ON a.id = t.author_id
+WHERE project_id = $1
 `
 
-func (q *Queries) ListTasksByProjectId(ctx context.Context, projectID uuid.UUID) ([]Task, error) {
+type ListTasksByProjectIdRow struct {
+	ID             uuid.UUID
+	ProjectID      uuid.UUID
+	Title          string
+	Description    string
+	Status         string
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+	AuthorID       uuid.UUID
+	AuthorAuthorID pgtype.UUID
+	AuthorName     pgtype.Text
+}
+
+func (q *Queries) ListTasksByProjectId(ctx context.Context, projectID uuid.UUID) ([]ListTasksByProjectIdRow, error) {
 	rows, err := q.db.Query(ctx, listTasksByProjectId, projectID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Task
+	var items []ListTasksByProjectIdRow
 	for rows.Next() {
-		var i Task
+		var i ListTasksByProjectIdRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ProjectID,
@@ -172,6 +191,8 @@ func (q *Queries) ListTasksByProjectId(ctx context.Context, projectID uuid.UUID)
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AuthorID,
+			&i.AuthorAuthorID,
+			&i.AuthorName,
 		); err != nil {
 			return nil, err
 		}

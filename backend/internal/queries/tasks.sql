@@ -62,7 +62,13 @@ WHERE t.id = $1
 GROUP BY t.id, a.name, a.email, a.created_at;
 
 -- name: ListTasksByProjectId :many
-SELECT * FROM tasks WHERE project_id = $1;
+SELECT 
+  t.*,
+  a.id as author_author_id,
+  a.name as author_name
+FROM tasks t
+LEFT JOIN users a ON a.id = t.author_id
+WHERE project_id = $1;
 
 -- name: UpdateTask :exec
 UPDATE tasks SET title = $1, description = $2, status = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4;

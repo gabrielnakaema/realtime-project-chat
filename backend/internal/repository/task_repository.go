@@ -98,7 +98,8 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 
 	tasks := []domain.Task{}
 	for _, result := range results {
-		tasks = append(tasks, domain.Task{
+
+		task := domain.Task{
 			Id:          result.ID,
 			ProjectId:   result.ProjectID,
 			AuthorId:    result.AuthorID,
@@ -107,7 +108,18 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 			Status:      domain.TaskStatus(result.Status),
 			CreatedAt:   result.CreatedAt.Time,
 			UpdatedAt:   result.UpdatedAt.Time,
-		})
+		}
+
+		if result.AuthorAuthorID.Valid {
+			user := domain.User{
+				Id:   result.AuthorID,
+				Name: result.AuthorName.String,
+			}
+
+			task.Author = &user
+		}
+
+		tasks = append(tasks, task)
 	}
 
 	return tasks, nil
