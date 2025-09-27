@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -103,6 +104,21 @@ func (ws *Server) SendCreatedTask(ctx context.Context, task *domain.Task) error 
 	return ws.SendEvent(ctx, ws.eventMapper.MapTaskCreated(task))
 }
 
+func (ws *Server) sendMessageToUser(userId uuid.UUID, message WebsocketMessage) error {
+	user, ok := ws.users[userId]
+	if !ok {
+		return nil
+	}
+
+	select {
+	case user.writer <- message:
+	default:
+		return errors.New("writer channel is full")
+	}
+
+	return nil
+}
+
 func (ws *Server) sendMessageToRoom(ctx context.Context, roomId uuid.UUID, message WebsocketMessage) error {
 	ws.mutex.Lock()
 	defer ws.mutex.Unlock()
@@ -179,23 +195,40 @@ func (ws *Server) disconnectUser(userId uuid.UUID) {
 	delete(ws.users, userId)
 }
 
-func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType WsRoomType) {
+func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType WsRoomType) error {
+	if roomType == WsRoomTypeChat {
+		_, err := ws.chatService.GetById(context.Background(), roomId, userId)
+		if err != nil {
+			return err
+		}
+	}
+
+	if roomType == WsRoomTypeProject {
+		_, err := ws.projectService.GetById(context.Background(), roomId, userId)
+		if err != nil {
+			return err
+		}
+	}
+
 	ws.mutex.Lock()
 	defer ws.mutex.Unlock()
 
 	room, ok := ws.rooms[roomId]
-	if !ok {
-		room = &WsRoom{
-			id:       roomId,
-			users:    make(map[uuid.UUID]bool),
-			mutex:    sync.Mutex{},
-			roomType: roomType,
-		}
-		ws.rooms[roomId] = room
+	if ok {
 		room.users[userId] = true
 		ws.users[userId].rooms[roomId] = true
-	} else {
-		room.users[userId] = true
-		ws.users[userId].rooms[roomId] = true
+		return nil
 	}
+
+	room = &WsRoom{
+		id:       roomId,
+		users:    make(map[uuid.UUID]bool),
+		mutex:    sync.Mutex{},
+		roomType: roomType,
+	}
+	ws.rooms[roomId] = room
+	room.users[userId] = true
+	ws.users[userId].rooms[roomId] = true
+
+	return nil
 }

@@ -47,7 +47,7 @@ func (ws *Server) Handler(w http.ResponseWriter, r *http.Request) {
 	readerChannel := make(chan interface{})
 	expiresAt := token.Claims.(jwt.MapClaims)["exp"].(float64)
 
-	chatRoomUser := &WsUser{
+	roomUser := &WsUser{
 		id:             userId,
 		tokenExpiresAt: time.Unix(int64(expiresAt), 0),
 		writer:         writerChannel,
@@ -58,7 +58,7 @@ func (ws *Server) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ws.mutex.Lock()
-	ws.users[userId] = chatRoomUser
+	ws.users[userId] = roomUser
 	ws.mutex.Unlock()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -188,7 +188,11 @@ func (ws *Server) Handler(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-					ws.connectUserToRoom(userId, data.RoomId, WsRoomType(data.Type))
+					err = ws.connectUserToRoom(userId, data.RoomId, WsRoomType(data.Type))
+					if err != nil {
+						return
+					}
+
 					ws.sendMessageToRoom(ctx, data.RoomId, WebsocketMessage{
 						Type:   WebsocketMessageTypeUserConnected,
 						RoomId: data.RoomId,
@@ -226,8 +230,6 @@ func (ws *Server) Handler(w http.ResponseWriter, r *http.Request) {
 					})
 					continue
 				}
-
-				ws.logger.Info("message", "receiving message from ws client", message)
 			}
 		}
 	}()
