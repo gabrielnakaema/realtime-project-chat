@@ -3,10 +3,10 @@ import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 
 // Import the generated route tree
-import { routeTree } from './routeTree.gen';
 
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastContainer } from 'react-toastify';
+import { routeTree } from './routeTree.gen';
 import { AuthProvider } from './contexts/auth-context.tsx';
 import { ThemeProvider } from './contexts/theme-context.tsx';
 import reportWebVitals from './reportWebVitals.ts';
@@ -47,7 +47,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const theme = window && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+const theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 
 // Render the app
 const rootElement = document.getElementById('app');

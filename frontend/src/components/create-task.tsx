@@ -1,12 +1,8 @@
-import { taskSchema, type ITaskForm } from '@/schemas/task-schema';
-import { taskQueryKeys } from '@/services/query-keys';
-import { createTask } from '@/services/tasks';
-import { handleSuccess } from '@/utils/handle-success';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import {  useForm } from 'react-hook-form';
 import { Button } from './button';
 import { Input } from './input';
 import { LoadingSpinner } from './loading';
@@ -20,6 +16,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from './ui/dialog';
+import type {SubmitHandler} from 'react-hook-form';
+import type {ITaskForm} from '@/schemas/task-schema';
+import { createTask } from '@/services/tasks';
+import { taskQueryKeys } from '@/services/query-keys';
+import {  taskSchema } from '@/schemas/task-schema';
+import { handleSuccess } from '@/utils/handle-success';
 
 interface CreateTaskModalProps {
   projectId: string;

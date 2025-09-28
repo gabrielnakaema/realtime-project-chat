@@ -1,7 +1,7 @@
+import { createContext, useCallback, useEffect, useRef, useState } from 'react';
+import type { SocketEvent } from '@/types/websocket';
 import { useAuth } from '@/hooks/use-auth';
 import { tokenService } from '@/services/api';
-import type { SocketEvent } from '@/types/websocket';
-import { createContext, useCallback, useEffect, useRef, useState } from 'react';
 
 type WebSocketStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 

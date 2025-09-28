@@ -1,6 +1,6 @@
+import { api } from './api';
 import type { ILoginForm } from '@/schemas/login-schema';
 import type { LoginResponse } from '@/types/auth';
-import { api } from './api';
 
 export const login = async (form: ILoginForm) => {
   const payload = {

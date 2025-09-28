@@ -1,16 +1,18 @@
 import { Plus } from 'lucide-react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {  useForm } from 'react-hook-form';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './input';
-import { projectMemberSchema, type IProjectMemberForm } from '@/schemas/project-member-schema';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, type SubmitHandler } from 'react-hook-form';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createProjectMember } from '@/services/projects';
-import { handleSuccess } from '@/utils/handle-success';
-import { useState } from 'react';
-import { projectQueryKeys } from '@/services/query-keys';
 import { LoadingSpinner } from './loading';
 import { Button } from './button';
+import type {SubmitHandler} from 'react-hook-form';
+import type {IProjectMemberForm} from '@/schemas/project-member-schema';
+import {  projectMemberSchema } from '@/schemas/project-member-schema';
+import { createProjectMember } from '@/services/projects';
+import { handleSuccess } from '@/utils/handle-success';
+import { projectQueryKeys } from '@/services/query-keys';
 
 interface AddProjectMemberProps {
   projectId: string;

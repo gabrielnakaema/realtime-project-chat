@@ -1,5 +1,5 @@
-import type { Task } from '@/types/task';
 import { api } from './api';
+import type { Task } from '@/types/task';
 import type { ITaskForm } from '@/schemas/task-schema';
 import type { Paginated } from '@/types/paginated';
 

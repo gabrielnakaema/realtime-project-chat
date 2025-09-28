@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSocket } from './use-socket';
 import type { Task } from '@/types/task';
 import type { SocketEvent } from '@/types/websocket';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Paginated } from '@/types/paginated';
 import { taskQueryKeys } from '@/services/query-keys';
 import { listTasksByProjectId } from '@/services/tasks';
-import type { Paginated } from '@/types/paginated';
 
 export const useProjectTasks = (projectId: string) => {
   const queryClient = useQueryClient();

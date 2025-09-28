@@ -1,5 +1,5 @@
-import { cn } from '@/lib/utils';
 import { LoaderCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface LoadingSpinnerProps {
   size?: string;

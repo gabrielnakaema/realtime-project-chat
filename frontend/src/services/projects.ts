@@ -1,5 +1,5 @@
-import type { Project } from '@/types/project';
 import { api } from './api';
+import type { Project } from '@/types/project';
 import type { IProjectForm } from '@/schemas/project-schema';
 
 export const listProjects = async () => {

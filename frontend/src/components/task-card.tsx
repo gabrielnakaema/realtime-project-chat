@@ -1,5 +1,5 @@
-import type { Task } from '@/types/task';
 import { Calendar } from 'lucide-react';
+import type { Task } from '@/types/task';
 
 interface TaskCardProps {
   task: Task;
@@ -24,7 +24,7 @@ export function TaskCard({ task, onDragStart }: TaskCardProps) {
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {task.author && (
+          {task.author.name && (
             <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
               {task.author.name.charAt(0).toUpperCase()}
             </div>

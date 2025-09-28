@@ -1,5 +1,5 @@
-import type { User } from '@/types/user';
 import { api } from './api';
+import type { User } from '@/types/user';
 import type { ISignUpForm } from '@/schemas/sign-up-schema';
 
 export const getMe = async () => {

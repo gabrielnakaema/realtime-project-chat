@@ -1,12 +1,12 @@
+import { useQuery } from '@tanstack/react-query';
+import { Link, createFileRoute } from '@tanstack/react-router';
+import { ArrowLeft, MessageSquare, Settings, Users } from 'lucide-react';
 import { AddProjectMember } from '@/components/add-project-member';
 import { KanbanBoard } from '@/components/kanban-board';
 import { MembersAvatarList } from '@/components/members-avatar-list';
 import { useOnlineUsers } from '@/hooks/use-online-users';
 import { getProject } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
-import { useQuery } from '@tanstack/react-query';
-import { createFileRoute, Link } from '@tanstack/react-router';
-import { ArrowLeft, MessageSquare, Settings, Users } from 'lucide-react';
 
 export const Route = createFileRoute('/projects/$projectId/')({
   component: RouteComponent,
@@ -48,7 +48,7 @@ function RouteComponent() {
                 <MembersAvatarList
                   onlineUserIds={onlineUserIds}
                   members={
-                    project?.members?.map((member) => ({ user_id: member.user_id, name: member.user.name })) || []
+                    project?.members.map((member) => ({ user_id: member.user_id, name: member.user.name })) || []
                   }
                   max={4}
                 />

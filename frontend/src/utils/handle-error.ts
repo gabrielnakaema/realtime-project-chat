@@ -25,7 +25,7 @@ export const getErrorMessage = async (error: unknown) => {
     }
 
     if (errorMessage === '') {
-      errorMessage = error?.message || 'An unknown error occurred';
+      errorMessage = error.message || 'An unknown error occurred';
     }
 
     return errorMessage;

@@ -1,11 +1,11 @@
-import { TaskCard } from '@/components/task-card';
-import { taskQueryKeys } from '@/services/query-keys';
-import { updateTask } from '@/services/tasks';
-import type { Task, TaskStatus } from '@/types/task';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CreateTask } from './create-task';
+import type { Task, TaskStatus } from '@/types/task';
+import { updateTask } from '@/services/tasks';
+import { taskQueryKeys } from '@/services/query-keys';
+import { TaskCard } from '@/components/task-card';
 import { cn } from '@/lib/utils';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 

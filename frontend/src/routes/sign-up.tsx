@@ -1,13 +1,15 @@
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation } from '@tanstack/react-query';
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
+import {  useForm } from 'react-hook-form';
+import type {SubmitHandler} from 'react-hook-form';
+import type {ISignUpForm} from '@/schemas/sign-up-schema';
 import { Button } from '@/components/button';
 import { Input } from '@/components/input';
 import { LoadingSpinner } from '@/components/loading';
-import { signUpSchema, type ISignUpForm } from '@/schemas/sign-up-schema';
+import {  signUpSchema } from '@/schemas/sign-up-schema';
 import { createUser } from '@/services/users';
 import { handleSuccess } from '@/utils/handle-success';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { useForm, type SubmitHandler } from 'react-hook-form';
 
 export const Route = createFileRoute('/sign-up')({
   component: RouteComponent,

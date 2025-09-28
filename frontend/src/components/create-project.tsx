@@ -1,18 +1,19 @@
-import { Button } from './button';
-import { DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Plus } from 'lucide-react';
-import { Dialog } from './ui/dialog';
 import { useState } from 'react';
-import { projectSchema, type IProjectForm } from '@/schemas/project-schema';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, type SubmitHandler } from 'react-hook-form';
-import { handleSuccess } from '@/utils/handle-success';
-import { createProject } from '@/services/projects';
+import {  useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { projectQueryKeys } from '@/services/query-keys';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger  } from './ui/dialog';
+import { Button } from './button';
 import { Input } from './input';
 import { Textarea } from './textarea';
 import { LoadingSpinner } from './loading';
+import type {SubmitHandler} from 'react-hook-form';
+import type {IProjectForm} from '@/schemas/project-schema';
+import { createProject } from '@/services/projects';
+import {  projectSchema } from '@/schemas/project-schema';
+import { handleSuccess } from '@/utils/handle-success';
+import { projectQueryKeys } from '@/services/query-keys';
 
 export const CreateProject = () => {
   const queryClient = useQueryClient();

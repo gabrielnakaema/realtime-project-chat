@@ -1,9 +1,11 @@
-import { loginSchema, type ILoginForm } from '@/schemas/login-schema';
-import { createFileRoute, Link, Navigate } from '@tanstack/react-router';
+import { Link, Navigate, createFileRoute } from '@tanstack/react-router';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, type SubmitHandler } from 'react-hook-form';
-import { Input } from '@/components/input';
+import {  useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
+import type {SubmitHandler} from 'react-hook-form';
+import type {ILoginForm} from '@/schemas/login-schema';
+import { Input } from '@/components/input';
+import {  loginSchema } from '@/schemas/login-schema';
 import { login } from '@/services/auth';
 import { LoadingSpinner } from '@/components/loading';
 import { useAuth } from '@/hooks/use-auth';

@@ -1,11 +1,11 @@
+import { useQuery } from '@tanstack/react-query';
+import { Link, createFileRoute } from '@tanstack/react-router';
+import { LogOut, Plus } from 'lucide-react';
 import { Button } from '@/components/button';
 import { CreateProject } from '@/components/create-project';
 import { useAuth } from '@/hooks/use-auth';
 import { listProjects } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
-import { useQuery } from '@tanstack/react-query';
-import { createFileRoute, Link } from '@tanstack/react-router';
-import { LogOut, Plus } from 'lucide-react';
 
 export const Route = createFileRoute('/projects/')({
   component: RouteComponent,
@@ -76,7 +76,7 @@ function RouteComponent() {
                       <div className="flex items-center justify-between mb-4">
                         <div className="w-3 h-3 rounded-full" />
                         <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full">
-                          {project?.members.length || 0} members
+                          {project.members.length || 0} members
                         </span>
                       </div>
                       <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">{project.name}</h3>

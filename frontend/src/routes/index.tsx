@@ -1,5 +1,5 @@
 import '@/styles/animations.css';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { Link, createFileRoute } from '@tanstack/react-router';
 import { ClipboardList, Kanban, MessageSquareMore, Users, Zap } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';

@@ -1,5 +1,5 @@
-import type { Chat, ChatMessage } from '@/types/chat';
 import { api } from './api';
+import type { Chat, ChatMessage } from '@/types/chat';
 import type { CursorPaginated } from '@/types/paginated';
 
 export const getChatByProjectId = async (projectId: string) => {

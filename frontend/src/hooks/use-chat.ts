@@ -1,14 +1,16 @@
-import { getChatByProjectId, listMessagesByProjectId } from '@/services/chat';
-import { getProject } from '@/services/projects';
-import { chatQueryKeys, projectQueryKeys } from '@/services/query-keys';
-import type { ChatMessage } from '@/types/chat';
-import type { CursorPaginated } from '@/types/paginated';
-import type { SocketEvent } from '@/types/websocket';
-import { handleError } from '@/utils/handle-error';
-import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+/* eslint-disable @typescript-eslint/no-unnecessary-condition */
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
 import { useSocket } from './use-socket';
 import { useOnlineUsers } from './use-online-users';
+import type { InfiniteData } from '@tanstack/react-query';
+import type { ChatMessage } from '@/types/chat';
+import type { CursorPaginated } from '@/types/paginated';
+import type { SocketEvent } from '@/types/websocket';
+import { getChatByProjectId, listMessagesByProjectId } from '@/services/chat';
+import { getProject } from '@/services/projects';
+import { chatQueryKeys, projectQueryKeys } from '@/services/query-keys';
+import { handleError } from '@/utils/handle-error';
 
 export const useChat = (projectId: string) => {
   const queryClient = useQueryClient();
@@ -32,7 +34,7 @@ export const useChat = (projectId: string) => {
     queryKey: chatQueryKeys.listInfiniteMessagesByProjectId({ projectId }),
     queryFn: ({ pageParam }) => listMessagesByProjectId({ projectId, ...pageParam }),
     getNextPageParam: (lastPage) => {
-      if (lastPage && !lastPage.has_next) {
+      if (!lastPage.has_next) {
         return undefined;
       }
 
@@ -83,9 +85,6 @@ export const useChat = (projectId: string) => {
 
     if (event.type === 'message') {
       const chatMessage = event.data;
-      if (!chatMessage) {
-        return;
-      }
 
       addNewMessage(chatMessage);
     }

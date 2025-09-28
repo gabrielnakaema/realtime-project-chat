@@ -15,7 +15,7 @@ export const useOnlineUsers = (roomId?: string) => {
     }
 
     if (event.type === 'users_online') {
-      setOnlineUserIds(event.data || []);
+      setOnlineUserIds(Array.isArray(event.data) ? event.data : []);
     }
 
     if (event.type === 'user_connected') {

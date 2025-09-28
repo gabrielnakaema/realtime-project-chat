@@ -1,12 +1,12 @@
+import { useQuery } from '@tanstack/react-query';
+import { createContext, useEffect, useState } from 'react';
+import type { LoginResponse } from '@/types/auth';
+import type { User } from '@/types/user';
 import { LoadingSpinner } from '@/components/loading';
 import { tokenService } from '@/services/api';
 import { attemptLogout, attemptRefreshToken } from '@/services/auth';
 import { userQueryKeys } from '@/services/query-keys';
 import { getMe } from '@/services/users';
-import type { LoginResponse } from '@/types/auth';
-import type { User } from '@/types/user';
-import { useQuery } from '@tanstack/react-query';
-import { createContext, useEffect, useState } from 'react';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'error';
 
