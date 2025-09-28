@@ -6,7 +6,7 @@ import type { CursorPaginated } from '@/types/paginated';
 import type { SocketEvent } from '@/types/websocket';
 import { handleError } from '@/utils/handle-error';
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useSocket } from './use-socket';
 import { useOnlineUsers } from './use-online-users';
 
