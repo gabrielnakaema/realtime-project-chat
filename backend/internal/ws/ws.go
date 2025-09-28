@@ -16,8 +16,8 @@ import (
 type WsUser struct {
 	id             uuid.UUID
 	tokenExpiresAt time.Time
-	writer         chan interface{}
-	reader         chan interface{}
+	writer         chan any
+	reader         chan any
 	rooms          map[uuid.UUID]bool
 	lastPong       time.Time
 	awaitingPong   bool
@@ -56,6 +56,10 @@ type projectService interface {
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Project, error)
 }
 
+type publisher interface {
+	Publish(ctx context.Context, event events.Topic, data any) error
+}
+
 type Server struct {
 	rooms          map[uuid.UUID]*WsRoom
 	users          map[uuid.UUID]*WsUser
@@ -64,11 +68,8 @@ type Server struct {
 	tokenProvider  tokenProvider
 	chatService    chatService
 	projectService projectService
+	publisher      publisher
 	eventMapper    *DomainEventMapper
-}
-
-type publisher interface {
-	Publish(ctx context.Context, event events.Topic, data interface{}) error
 }
 
 func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService chatService, projectService projectService, publisher publisher) *Server {
@@ -79,6 +80,7 @@ func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService cha
 		tokenProvider:  tokenProvider,
 		chatService:    chatService,
 		projectService: projectService,
+		publisher:      publisher,
 		users:          make(map[uuid.UUID]*WsUser),
 		eventMapper:    &DomainEventMapper{},
 	}
@@ -86,27 +88,23 @@ func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService cha
 	go func() {
 		usersOnlineTicker := time.NewTicker(usersOnlineInterval)
 
-		for {
-			select {
-			case <-usersOnlineTicker.C:
-				for _, room := range ws.rooms {
-					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-					defer cancel()
+		for range usersOnlineTicker.C {
+			for _, room := range ws.rooms {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
 
-					userIds := []uuid.UUID{}
-					for userId := range room.users {
-						userIds = append(userIds, userId)
-					}
-
-					message := WebsocketMessage{
-						Type:   WebsocketMessageTypeUsersOnline,
-						RoomId: room.id,
-						Data:   userIds,
-					}
-
-					ws.sendMessageToRoom(ctx, room.id, message)
+				userIds := []uuid.UUID{}
+				for userId := range room.users {
+					userIds = append(userIds, userId)
 				}
 
+				message := WebsocketMessage{
+					Type:   WebsocketMessageTypeUsersOnline,
+					RoomId: room.id,
+					Data:   userIds,
+				}
+
+				ws.sendMessageToRoom(ctx, room.id, message)
 			}
 
 		}
@@ -238,7 +236,6 @@ func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType
 
 		go func() {
 			ws.chatService.UpdateMemberLastSeenAt(context.Background(), userId, roomId)
-
 		}()
 	}
 
