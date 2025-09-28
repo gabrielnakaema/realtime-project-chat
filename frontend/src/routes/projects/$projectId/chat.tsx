@@ -34,7 +34,7 @@ function RouteComponent() {
     resolver: zodResolver(chatSchema),
   });
 
-  const { project, chatData, messages, observedRef, chatContainerRef } = useChat(projectId);
+  const { project, chatData, messages, observedRef, chatContainerRef, onlineUserIds } = useChat(projectId);
 
   const { mutate, isPending } = useMutation({
     mutationFn: createMessage,
@@ -102,7 +102,16 @@ function RouteComponent() {
               <div className="flex items-center gap-2">
                 <AddProjectMember projectId={projectId} />
                 <Users className="w-4 h-4 text-slate-500" />
-                <MembersAvatarList names={project?.members.map((member) => member.user?.name) || []} max={4} />
+                <MembersAvatarList
+                  onlineUserIds={onlineUserIds}
+                  members={
+                    project?.members.map((member) => ({
+                      user_id: member.user_id,
+                      name: member?.user?.name || '',
+                    })) || []
+                  }
+                  max={4}
+                />
               </div>
             </div>
           </div>

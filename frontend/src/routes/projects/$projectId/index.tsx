@@ -1,6 +1,7 @@
 import { AddProjectMember } from '@/components/add-project-member';
 import { KanbanBoard } from '@/components/kanban-board';
 import { MembersAvatarList } from '@/components/members-avatar-list';
+import { useOnlineUsers } from '@/hooks/use-online-users';
 import { getProject } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
 import { useQuery } from '@tanstack/react-query';
@@ -13,6 +14,8 @@ export const Route = createFileRoute('/projects/$projectId/')({
 
 function RouteComponent() {
   const { projectId } = Route.useParams();
+
+  const { onlineUserIds } = useOnlineUsers(projectId);
 
   const { data: project } = useQuery({
     queryKey: projectQueryKeys.details(projectId),
@@ -42,7 +45,13 @@ function RouteComponent() {
                 <AddProjectMember projectId={projectId} />
                 <Users className="w-4 h-4 text-slate-500" />
 
-                <MembersAvatarList names={project?.members.map((member) => member.user?.name) || []} max={4} />
+                <MembersAvatarList
+                  onlineUserIds={onlineUserIds}
+                  members={
+                    project?.members?.map((member) => ({ user_id: member.user_id, name: member.user.name })) || []
+                  }
+                  max={4}
+                />
               </div>
               <Link
                 to="/projects/$projectId/chat"

@@ -1,25 +1,51 @@
+import { useMemo } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { cn } from '@/lib/utils';
 
-interface MembersAvatarListProps {
-  names: string[];
-  max?: number;
+interface Member {
+  user_id: string;
+  name: string;
 }
 
-export const MembersAvatarList = ({ names, max = 4 }: MembersAvatarListProps) => {
-  const namesToShow = names.slice(0, max);
-  const remainingNames = names.slice(max);
-  const remaining = names.length - max;
+interface MembersAvatarListProps {
+  members: Member[];
+  max?: number;
+  onlineUserIds?: string[];
+}
+
+export const MembersAvatarList = ({ members = [], max = 4, onlineUserIds = [] }: MembersAvatarListProps) => {
+  const sortedMembers = useMemo(() => {
+    const membersCopy = members.map((member) => ({
+      ...member,
+      online: onlineUserIds.includes(member.user_id),
+    }));
+
+    const sorted = membersCopy.sort((a, b) => {
+      return Number(b.online) - Number(a.online);
+    });
+
+    return sorted;
+  }, [members, onlineUserIds]);
+
+  const membersToShow = sortedMembers.slice(0, max);
+  const remainingMembers = sortedMembers.slice(max);
+  const remaining = sortedMembers.length - max;
 
   return (
     <div className="flex -space-x-2">
-      {namesToShow.map((name, index) => (
-        <Tooltip key={`${name}-${index}`}>
+      {membersToShow.map((member) => (
+        <Tooltip key={member.user_id}>
           <TooltipTrigger>
-            <div className="w-8 h-8 bg-blue-600 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center text-white text-xs font-medium">
-              {name.charAt(0).toUpperCase()}
+            <div
+              className={cn(
+                'w-8 h-8 bg-blue-600 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center text-white text-xs font-medium',
+                member.online && 'border-green-500 dark:border-green-500',
+              )}
+            >
+              {member.name.charAt(0).toUpperCase()}
             </div>
           </TooltipTrigger>
-          <TooltipContent>{name}</TooltipContent>
+          <TooltipContent>{member.name}</TooltipContent>
         </Tooltip>
       ))}
       {remaining > 0 && (
@@ -30,8 +56,8 @@ export const MembersAvatarList = ({ names, max = 4 }: MembersAvatarListProps) =>
             </div>
           </TooltipTrigger>
           <TooltipContent>
-            {remainingNames.map((name) => (
-              <p key={name}>{name}</p>
+            {remainingMembers.map((member) => (
+              <p key={member.user_id}>{member.name}</p>
             ))}
           </TooltipContent>
         </Tooltip>
