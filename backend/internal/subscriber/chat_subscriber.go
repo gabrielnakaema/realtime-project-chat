@@ -36,7 +36,7 @@ func NewChatSubscriber(config *config.Config, logger *slog.Logger, chatService *
 		notifier:    notifier,
 	}
 
-	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ChatMemberCreated, events.ChatMessageCreated}
+	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ChatMemberCreated, events.ChatMessageCreated, events.ChatMemberViewed}
 
 	err = subscriber.Subscribe(context.Background(), topics, chatSubscriber.handleChatEvents, chatSubscriber.logger)
 	if err != nil {
@@ -56,6 +56,23 @@ func (cs *ChatSubscriber) handleChatEvents(ctx context.Context, message Message)
 		return cs.handleChatMemberCreated(ctx, message)
 	case events.ChatMessageCreated:
 		return cs.handleChatMessageCreated(ctx, message)
+	case events.ChatMemberViewed:
+		return cs.handleChatMemberViewed(ctx, message)
+	}
+
+	return nil
+}
+
+func (cs *ChatSubscriber) handleChatMemberViewed(ctx context.Context, message Message) error {
+	var member domain.ChatMember
+	err := json.Unmarshal(message.Value, &member)
+	if err != nil {
+		return domain.ServerError("failed to unmarshal chat member", err)
+	}
+
+	err = cs.chatService.UpdateMemberLastSeenAt(ctx, member.UserId, member.ChatId)
+	if err != nil {
+		return err
 	}
 
 	return nil

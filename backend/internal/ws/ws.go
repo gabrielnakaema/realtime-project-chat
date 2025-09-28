@@ -2,7 +2,6 @@ package ws
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -49,7 +48,6 @@ type tokenProvider interface {
 
 type chatService interface {
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Chat, error)
-	UpdateMemberLastSeenAt(ctx context.Context, userId uuid.UUID, chatId uuid.UUID) error
 }
 
 type projectService interface {
@@ -69,7 +67,6 @@ type Server struct {
 	chatService    chatService
 	projectService projectService
 	publisher      publisher
-	eventMapper    *DomainEventMapper
 }
 
 func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService chatService, projectService projectService, publisher publisher) *Server {
@@ -82,7 +79,6 @@ func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService cha
 		projectService: projectService,
 		publisher:      publisher,
 		users:          make(map[uuid.UUID]*WsUser),
-		eventMapper:    &DomainEventMapper{},
 	}
 
 	go func() {
@@ -91,7 +87,6 @@ func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService cha
 		for range usersOnlineTicker.C {
 			for _, room := range ws.rooms {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
 
 				userIds := []uuid.UUID{}
 				for userId := range room.users {
@@ -105,50 +100,35 @@ func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService cha
 				}
 
 				ws.sendMessageToRoom(ctx, room.id, message)
+
+				cancel()
 			}
-
 		}
-
 	}()
 
 	return ws
 }
 
-func (ws *Server) SendEvent(ctx context.Context, eventData EventData) error {
+func (ws *Server) SendEvent(ctx context.Context, wsMessage WebsocketMessage) error {
 	websocketMessage := WebsocketMessage{
-		Type:   eventData.Type,
-		RoomId: eventData.RoomId,
-		Data:   eventData.Data,
+		Type:   wsMessage.Type,
+		RoomId: wsMessage.RoomId,
+		Data:   wsMessage.Data,
 	}
 
-	return ws.sendMessageToRoom(ctx, eventData.RoomId, websocketMessage)
+	return ws.sendMessageToRoom(ctx, wsMessage.RoomId, websocketMessage)
 }
 
 func (ws *Server) SendMessages(ctx context.Context, message *domain.ChatMessage) error {
-	return ws.SendEvent(ctx, ws.eventMapper.MapChatMessage(message))
+	return ws.SendEvent(ctx, MapChatMessage(message))
 }
 
 func (ws *Server) SendUpdatedTask(ctx context.Context, task *domain.Task) error {
-	return ws.SendEvent(ctx, ws.eventMapper.MapTaskUpdated(task))
+	return ws.SendEvent(ctx, MapTaskUpdated(task))
 }
 
 func (ws *Server) SendCreatedTask(ctx context.Context, task *domain.Task) error {
-	return ws.SendEvent(ctx, ws.eventMapper.MapTaskCreated(task))
-}
-
-func (ws *Server) sendMessageToUser(userId uuid.UUID, message WebsocketMessage) error {
-	user, ok := ws.users[userId]
-	if !ok {
-		return nil
-	}
-
-	select {
-	case user.writer <- message:
-	default:
-		return errors.New("writer channel is full")
-	}
-
-	return nil
+	return ws.SendEvent(ctx, MapTaskCreated(task))
 }
 
 func (ws *Server) sendMessageToRoom(ctx context.Context, roomId uuid.UUID, message WebsocketMessage) error {
@@ -234,8 +214,14 @@ func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType
 			return err
 		}
 
+		chatMember := domain.ChatMember{
+			ChatId:     roomId,
+			UserId:     userId,
+			LastSeenAt: time.Now(),
+		}
+
 		go func() {
-			ws.chatService.UpdateMemberLastSeenAt(context.Background(), userId, roomId)
+			ws.publisher.Publish(context.Background(), events.ChatMemberViewed, chatMember)
 		}()
 	}
 

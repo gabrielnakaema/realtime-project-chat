@@ -52,7 +52,7 @@ func (p *Publisher) handleSuccesses() {
 	for {
 		select {
 		case success := <-p.producer.Successes():
-			p.logger.Info("message sent successfully", "topic", success.Topic, "partition", success.Partition, "offset", success.Offset)
+			p.logger.Debug("message sent successfully", "topic", success.Topic, "partition", success.Partition, "offset", success.Offset)
 		case <-p.done:
 			return
 		}

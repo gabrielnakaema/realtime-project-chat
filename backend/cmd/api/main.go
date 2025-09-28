@@ -9,7 +9,7 @@ import (
 func main() {
 	a, err := api.NewApi()
 	if err != nil {
-		log.Fatalf("error while starting api", "error", err.Error())
+		log.Fatal("error while starting api", "error", err.Error())
 		return
 	}
 
@@ -17,7 +17,7 @@ func main() {
 
 	err = a.Serve()
 	if err != nil {
-		log.Fatalf("received error from api serve", "error", err.Error())
+		log.Fatal("received error from api serve", "error", err.Error())
 		return
 	}
 }

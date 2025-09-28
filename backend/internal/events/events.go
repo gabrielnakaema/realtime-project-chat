@@ -12,6 +12,7 @@ const (
 	ProjectMemberRemoved Topic = "project.member.removed"
 
 	ChatMemberCreated  Topic = "chat.member.created"
+	ChatMemberViewed   Topic = "chat.member.viewed"
 	ChatMessageCreated Topic = "chat.message.created"
 
 	TaskCreated Topic = "task.created"
@@ -30,6 +31,7 @@ func (t Topic) Valid() bool {
 		ProjectMemberRemoved,
 		ChatMemberCreated,
 		ChatMessageCreated,
+		ChatMemberViewed,
 		TaskCreated,
 		TaskUpdated,
 	}
