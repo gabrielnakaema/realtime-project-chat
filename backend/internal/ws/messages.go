@@ -26,6 +26,7 @@ const (
 	WebsocketMessageTypeDisconnectUserFromRoom WebsocketMessageType = "disconnect_user_from_room"
 	WebsocketMessageTypeTaskCreated            WebsocketMessageType = "task_created"
 	WebsocketMessageTypeTaskUpdated            WebsocketMessageType = "task_updated"
+	WebsocketMessageTypeUsersOnline            WebsocketMessageType = "users_online"
 )
 
 type WebsocketMessage struct {

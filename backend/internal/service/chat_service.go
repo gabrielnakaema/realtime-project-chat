@@ -286,3 +286,22 @@ func (cs *ChatService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UU
 
 	return chat, nil
 }
+
+func (cs *ChatService) UpdateMemberLastSeenAt(ctx context.Context, userId uuid.UUID, chatId uuid.UUID) error {
+	if userId == uuid.Nil {
+		return domain.UnauthorizedError("unauthorized")
+	}
+
+	chatMember := &domain.ChatMember{
+		UserId:     userId,
+		ChatId:     chatId,
+		LastSeenAt: time.Now(),
+	}
+
+	err := cs.chatRepository.UpdateMemberLastSeenAt(ctx, chatMember)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

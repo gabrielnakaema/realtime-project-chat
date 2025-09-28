@@ -74,7 +74,6 @@ func (cs *ChatSubscriber) handleProjectCreated(ctx context.Context, message Mess
 		if errors.As(err, &domainErr) {
 			if domainErr.Code == domain.ServerErrorCode && domainErr.Cause != nil {
 				cs.logger.Error("failed to create chat from project", "error", domainErr.Cause.Error())
-				cs.logger.Error("project", "project", project)
 				return nil
 			}
 			return err

@@ -169,7 +169,6 @@ func (ws *Server) Handler(w http.ResponseWriter, r *http.Request) {
 					select {
 					case writerChannel <- pongMessage:
 					default:
-						ws.logger.Error("failed to send pong response", "error", "writer channel full", "user_id", userId)
 					}
 					continue
 				}

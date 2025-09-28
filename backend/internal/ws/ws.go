@@ -31,8 +31,9 @@ const (
 )
 
 const (
-	pingInterval = 30 * time.Second
-	pongTimeout  = 10 * time.Second
+	pingInterval        = 30 * time.Second
+	pongTimeout         = 10 * time.Second
+	usersOnlineInterval = 10 * time.Second
 )
 
 type WsRoom struct {
@@ -48,6 +49,7 @@ type tokenProvider interface {
 
 type chatService interface {
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Chat, error)
+	UpdateMemberLastSeenAt(ctx context.Context, userId uuid.UUID, chatId uuid.UUID) error
 }
 
 type projectService interface {
@@ -70,7 +72,7 @@ type publisher interface {
 }
 
 func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService chatService, projectService projectService, publisher publisher) *Server {
-	return &Server{
+	ws := &Server{
 		rooms:          make(map[uuid.UUID]*WsRoom),
 		logger:         logger,
 		mutex:          sync.Mutex{},
@@ -80,6 +82,38 @@ func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService cha
 		users:          make(map[uuid.UUID]*WsUser),
 		eventMapper:    &DomainEventMapper{},
 	}
+
+	go func() {
+		usersOnlineTicker := time.NewTicker(usersOnlineInterval)
+
+		for {
+			select {
+			case <-usersOnlineTicker.C:
+				for _, room := range ws.rooms {
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+
+					userIds := []uuid.UUID{}
+					for userId := range room.users {
+						userIds = append(userIds, userId)
+					}
+
+					message := WebsocketMessage{
+						Type:   WebsocketMessageTypeUsersOnline,
+						RoomId: room.id,
+						Data:   userIds,
+					}
+
+					ws.sendMessageToRoom(ctx, room.id, message)
+				}
+
+			}
+
+		}
+
+	}()
+
+	return ws
 }
 
 func (ws *Server) SendEvent(ctx context.Context, eventData EventData) error {
@@ -128,7 +162,7 @@ func (ws *Server) sendMessageToRoom(ctx context.Context, roomId uuid.UUID, messa
 		return nil
 	}
 
-	for userId, _ := range room.users {
+	for userId := range room.users {
 		user, ok := ws.users[userId]
 		if !ok {
 			continue
@@ -139,7 +173,7 @@ func (ws *Server) sendMessageToRoom(ctx context.Context, roomId uuid.UUID, messa
 		case <-ctx.Done():
 			return nil
 		default:
-			ws.logger.Error("failed to send message", "error", "channel is full", "user_id", user.id, "room_id", roomId)
+			ws.logger.Debug("failed to send message", "error", "channel is full", "user_id", user.id, "room_id", roomId)
 			return nil
 		}
 	}
@@ -201,6 +235,11 @@ func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType
 		if err != nil {
 			return err
 		}
+
+		go func() {
+			ws.chatService.UpdateMemberLastSeenAt(context.Background(), userId, roomId)
+
+		}()
 	}
 
 	if roomType == WsRoomTypeProject {

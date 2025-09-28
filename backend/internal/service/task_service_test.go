@@ -172,8 +172,9 @@ func TestTaskService_Create(t *testing.T) {
 			mockRepo := &mockTaskRepository{}
 			mockProjectRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
+
 			tt.mockSetup(mockRepo, mockProjectRepo, mockUserRepo)
-			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
 			ctx := context.Background()
 
 			task, err := service.Create(ctx, tt.request)
@@ -348,7 +349,7 @@ func TestTaskService_Update(t *testing.T) {
 			mockProjectRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
 			tt.mockSetup(mockRepo, mockProjectRepo, mockUserRepo)
-			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
 			ctx := context.Background()
 
 			task, err := service.Update(ctx, tt.request)
