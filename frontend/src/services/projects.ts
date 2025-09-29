@@ -26,17 +26,38 @@ export const createProject = async (form: IProjectForm) => {
   return json;
 };
 
+interface UpdateProjectRequest {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export const updateProject = async (request: UpdateProjectRequest) => {
+  const payload = {
+    name: request.name,
+    description: request.description,
+  };
+
+  const response = await api.put(`projects/${request.id}`, {
+    json: payload,
+  });
+
+  const json = await response.json<Project>();
+
+  return json;
+};
+
 interface CreateProjectMemberRequest {
   projectId: string;
   email: string;
 }
 
-export const createProjectMember = async (form: CreateProjectMemberRequest) => {
+export const createProjectMember = async (request: CreateProjectMemberRequest) => {
   const payload = {
-    email: form.email,
+    email: request.email,
   };
 
-  const response = await api.post(`projects/${form.projectId}/members`, {
+  const response = await api.post(`projects/${request.projectId}/members`, {
     json: payload,
   });
 

@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { ArrowLeft, MessageSquare, Settings, Users } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Users } from 'lucide-react';
 import { AddProjectMember } from '@/components/add-project-member';
 import { KanbanBoard } from '@/components/kanban-board';
 import { MembersAvatarList } from '@/components/members-avatar-list';
+import { ProjectSettings } from '@/components/project-settings';
 import { useOnlineUsers } from '@/hooks/use-online-users';
 import { getProject } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
@@ -23,7 +24,7 @@ function RouteComponent() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen h-fit bg-slate-50 dark:bg-slate-900">
       <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 ">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between md:flex-row flex-col gap-4">
@@ -61,10 +62,7 @@ function RouteComponent() {
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Chat
               </Link>
-              <button className="inline-flex items-center px-3 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-md font-medium transition-colors">
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
-              </button>
+              <ProjectSettings projectId={projectId} />
             </div>
           </div>
         </div>

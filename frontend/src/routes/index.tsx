@@ -112,7 +112,7 @@ function App() {
                 <div ref={activityRef} className="space-y-4">
                   <div
                     className={cn(
-                      'bg-slate-100 dark:bg-slate-700 rounded-lg p-6 animate-slide-in-1',
+                      'bg-slate-100 dark:bg-slate-700 rounded-lg p-6 animate-slide-in animate-slide-in-1',
                       isVisible && 'visible',
                     )}
                   >
@@ -126,7 +126,7 @@ function App() {
                   </div>
                   <div
                     className={cn(
-                      'bg-slate-100 dark:bg-slate-700 rounded-lg p-6 animate-slide-in-2',
+                      'bg-slate-100 dark:bg-slate-700 rounded-lg p-6 animate-slide-in animate-slide-in-2',
                       isVisible && 'visible',
                     )}
                   >
@@ -140,7 +140,7 @@ function App() {
                   </div>
                   <div
                     className={cn(
-                      'bg-slate-100 dark:bg-slate-700 rounded-lg p-6 animate-slide-in-3',
+                      'bg-slate-100 dark:bg-slate-700 rounded-lg p-6 animate-slide-in animate-slide-in-3',
                       isVisible && 'visible',
                     )}
                   >
@@ -151,7 +151,7 @@ function App() {
                   </div>
                   <div
                     className={cn(
-                      'bg-slate-100 dark:bg-slate-700 rounded-lg p-6 animate-slide-in-4',
+                      'bg-slate-100 dark:bg-slate-700 rounded-lg p-6 animate-slide-in animate-slide-in-4',
                       isVisible && 'visible',
                     )}
                   >

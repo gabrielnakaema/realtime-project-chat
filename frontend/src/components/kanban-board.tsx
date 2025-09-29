@@ -88,7 +88,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
           return (
             <div
               key={column.id}
-              className={cn(column.color, 'rounded-lg p-4 flex flex-col')}
+              className={cn(column.color, 'rounded-lg p-4 flex flex-col overflow-auto')}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, column.status)}
             >

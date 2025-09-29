@@ -33,16 +33,16 @@
 }
 
 .animate-slide-in-1 {
-  --delay: 0.5s;
+  --delay: 0.25s;
 }
 .animate-slide-in-2 {
-  --delay: 1s;
+  --delay: 0.5s;
 }
 .animate-slide-in-3 {
-  --delay: 1.5s;
+  --delay: 0.75s;
 }
 .animate-slide-in-4 {
-  --delay: 2s;
+  --delay: 1s;
 }
 
 .animate-pulse-dot {
