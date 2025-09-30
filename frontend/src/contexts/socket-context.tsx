@@ -47,6 +47,9 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!isAuthenticated) {
       setStatus('disconnected');
+      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+        socket.current.close();
+      }
       return;
     }
 
