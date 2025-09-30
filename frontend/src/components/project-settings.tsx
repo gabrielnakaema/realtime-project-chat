@@ -42,7 +42,7 @@ export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
     mutationFn: updateProject,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectQueryKeys.all });
-      handleSuccess('Project created successfully');
+      handleSuccess('Project saved successfully');
       setOpen(false);
       reset();
     },

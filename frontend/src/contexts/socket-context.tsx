@@ -92,7 +92,16 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       newSocket.close();
       socket.current = null;
     };
-  }, [isAuthenticated]);
+  }, [status, isAuthenticated]);
+
+  const send = useCallback(
+    (payload: SocketPayload<any>) => {
+      if (status === 'connected' && socket.current) {
+        socket.current.send(JSON.stringify(payload));
+      }
+    },
+    [status],
+  );
 
   useEffect(() => {
     if (status === 'connected' && socket.current) {
@@ -111,7 +120,13 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         }
       };
     }
-  }, [handlers, status]);
+
+    return () => {
+      if (socket.current) {
+        socket.current.onmessage = null;
+      }
+    };
+  }, [handlers, status, send]);
 
   const registerHandler = useCallback((handler: HandlerItem) => {
     setHandlers((prev) => {
@@ -126,15 +141,6 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const unregisterHandlers = useCallback((ids: string[]) => {
     setHandlers((prev) => prev.filter((item) => !ids.includes(item.id)));
   }, []);
-
-  const send = useCallback(
-    (payload: SocketPayload<any>) => {
-      if (status === 'connected' && socket.current) {
-        socket.current.send(JSON.stringify(payload));
-      }
-    },
-    [status],
-  );
 
   const connectToRoom = useCallback(
     (roomId: string, type: SocketRoomType) => {
