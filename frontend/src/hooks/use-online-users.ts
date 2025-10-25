@@ -1,15 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { useSocket } from './use-socket';
 import type { SocketEvent } from '@/types/websocket';
 
 export const useOnlineUsers = (roomId?: string) => {
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
 
-  const { status, registerHandler, unregisterHandlers } = useSocket();
+  const { status, subscribe } = useSocket();
 
-  const handlerId = `online-users-handler-${roomId}`;
-
-  const handleOnlineUsers = (event: SocketEvent) => {
+  const handleSocketEvent = useEffectEvent((event: SocketEvent) => {
     if (event.room_id !== roomId) {
       return;
     }
@@ -31,22 +29,19 @@ export const useOnlineUsers = (roomId?: string) => {
     if (event.type === 'user_disconnected') {
       setOnlineUserIds((prev) => prev.filter((u) => u !== event.data.user_id));
     }
-  };
+  });
 
   useEffect(() => {
     if (status !== 'connected' || !roomId) {
       return;
     }
 
-    registerHandler({
-      id: handlerId,
-      handler: handleOnlineUsers,
-    });
+    const unsubscribe = subscribe(roomId, '', handleSocketEvent);
 
     return () => {
-      unregisterHandlers([handlerId]);
+      unsubscribe();
     };
-  }, [status, roomId]);
+  }, [status, roomId, subscribe]);
 
   return {
     onlineUserIds,

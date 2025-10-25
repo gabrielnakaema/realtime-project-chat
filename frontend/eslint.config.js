@@ -7,7 +7,10 @@ import reactHooks from 'eslint-plugin-react-hooks';
 export default [
   ...tanstackConfig,
   ...pluginQuery.configs['flat/recommended'],
-  reactHooks.configs['recommended-latest'],
+  reactHooks.configs.flat.recommended,
+  {
+    ignores: ['**/prettier.config.js', '**/eslint.config.js'],
+  },
   {
     rules: {
       '@typescript-eslint/array-type': 'off',

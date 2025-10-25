@@ -1,21 +1,11 @@
-import { createContext, useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { SocketEvent } from '@/types/websocket';
 import { useAuth } from '@/hooks/use-auth';
 import { tokenService } from '@/services/api';
 
-type WebSocketStatus = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+type WebSocketStatus = 'disconnected' | 'connected';
 
-type SocketRoomType = 'chat' | 'project';
-
-interface SocketRoom {
-  id: string;
-  type: SocketRoomType;
-}
-
-interface HandlerItem {
-  id: string;
-  handler: SocketHandler;
-}
+type SocketRoomType = 'chat' | 'project' | '';
 
 type SocketHandler = (event: SocketEvent) => void;
 
@@ -25,77 +15,79 @@ interface SocketPayload<T> {
   data: T;
 }
 
+interface Subscription {
+  roomId: string;
+  type: SocketRoomType;
+  handler: SocketHandler;
+  id: string;
+}
+
 interface SocketContextData {
   status: WebSocketStatus;
-  socket: WebSocket | null;
-  send: (payload: SocketPayload<any>) => void;
-  registerHandler: (handler: HandlerItem) => void;
-  unregisterHandlers: (ids: string[]) => void;
-  connectToRoom: (roomId: string, type: SocketRoomType) => void;
-  disconnectFromRoom: (roomId: string) => void;
+  subscribe: (roomId: string, type: SocketRoomType, handler: SocketHandler) => () => void;
 }
 
 export const SocketContext = createContext<SocketContextData>({} as SocketContextData);
 
 export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
-  const [status, setStatus] = useState<WebSocketStatus>('disconnected');
   const socket = useRef<WebSocket>(null);
-  const [handlers, setHandlers] = useState<HandlerItem[]>([]);
-  const [rooms, setRooms] = useState<SocketRoom[]>([]);
+
+  const [status, setStatus] = useState<WebSocketStatus>('disconnected');
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+
+  const handleOpen = useEffectEvent(() => {
+    socket.current?.send(JSON.stringify({ type: 'ping', data: null }));
+    setStatus('connected');
+  });
+
+  const handleClose = useEffectEvent(() => {
+    setStatus('disconnected');
+  });
+
+  const handleError = useEffectEvent(() => {
+    setStatus('disconnected');
+  });
+
+  const handleMessage = useEffectEvent((event: MessageEvent) => {
+    if (socket.current?.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    try {
+      const data = JSON.parse(event.data) as SocketEvent;
+
+      if (data.type === 'ping') {
+        socket.current.send(JSON.stringify({ type: 'pong', data: null }));
+        return;
+      }
+
+      subscriptions.forEach((subscription) => subscription.handler(data));
+    } catch (error) {
+      return;
+    }
+  });
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setStatus('disconnected');
-      if (socket.current && socket.current.readyState === WebSocket.OPEN) {
-        socket.current.close();
-      }
+      socket.current?.close();
       return;
     }
 
-    if (status === 'connected' || status === 'connecting') {
-      return;
-    }
-
-    const currentSocket = socket.current;
-
-    if (
-      currentSocket &&
-      (currentSocket.readyState === WebSocket.OPEN || currentSocket.readyState === WebSocket.CONNECTING)
-    ) {
-      return;
-    }
-
-    setStatus('connecting');
     const newSocket = new WebSocket(`${import.meta.env.VITE_API_URL}/ws?jwt=${tokenService.token}`);
 
-    newSocket.onopen = () => {
-      newSocket.send(JSON.stringify({ type: 'ping', data: null }));
-      setStatus('connected');
-    };
-
-    newSocket.onclose = () => {
-      setStatus('disconnected');
-    };
-
-    newSocket.onerror = () => {
-      setStatus('disconnected');
-    };
+    newSocket.onopen = handleOpen;
+    newSocket.onclose = handleClose;
+    newSocket.onerror = handleError;
+    newSocket.onmessage = handleMessage;
 
     socket.current = newSocket;
 
     return () => {
-      if (
-        socket.current &&
-        (socket.current.readyState === WebSocket.OPEN || socket.current.readyState === WebSocket.CONNECTING)
-      ) {
-        return;
-      }
-
-      newSocket.close();
+      socket.current?.close();
       socket.current = null;
     };
-  }, [status, isAuthenticated]);
+  }, [isAuthenticated]);
 
   const send = useCallback(
     (payload: SocketPayload<any>) => {
@@ -106,76 +98,42 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     [status],
   );
 
-  useEffect(() => {
-    if (status === 'connected' && socket.current) {
-      socket.current.onmessage = (event: MessageEvent) => {
-        try {
-          const data = JSON.parse(event.data) as SocketEvent;
+  const subscribe = useCallback(
+    (roomId: string, type: SocketRoomType, handler: SocketHandler) => {
+      const subscriptionId = crypto.randomUUID();
 
-          if (data.type === 'ping') {
-            send({ type: 'pong', data: null });
-            return;
+      const newSubscription: Subscription = {
+        id: subscriptionId,
+        roomId,
+        type,
+        handler,
+      };
+
+      setSubscriptions((prev) => {
+        const existingSubToRoom = prev.find((sub) => sub.roomId === roomId);
+
+        if (!existingSubToRoom) {
+          send({ type: 'connect_user_to_room', data: { room_id: roomId, type } });
+        }
+
+        return [...prev, newSubscription];
+      });
+
+      return () => {
+        setSubscriptions((prev) => {
+          const updated = prev.filter((sub) => sub.id !== subscriptionId);
+          const remaining = updated.filter((sub) => sub.roomId !== roomId);
+
+          if (!remaining.length) {
+            send({ type: 'disconnect_user_from_room', data: { room_id: roomId } });
           }
 
-          handlers.forEach((item) => item.handler(data));
-        } catch (error) {
-          return;
-        }
+          return updated;
+        });
       };
-    }
-
-    return () => {
-      if (socket.current) {
-        socket.current.onmessage = null;
-      }
-    };
-  }, [handlers, status, send]);
-
-  const registerHandler = useCallback((handler: HandlerItem) => {
-    setHandlers((prev) => {
-      if (prev.find((item) => item.id === handler.id)) {
-        return prev.map((item) => (item.id === handler.id ? handler : item));
-      }
-
-      return [...prev, handler];
-    });
-  }, []);
-
-  const unregisterHandlers = useCallback((ids: string[]) => {
-    setHandlers((prev) => prev.filter((item) => !ids.includes(item.id)));
-  }, []);
-
-  const connectToRoom = useCallback(
-    (roomId: string, type: SocketRoomType) => {
-      if (rooms.find((room) => room.id === roomId && room.type === type)) {
-        return;
-      }
-
-      send({ type: 'connect_user_to_room', data: { room_id: roomId, type } });
-
-      setRooms((prev) => {
-        return [...prev, { id: roomId, type }];
-      });
-    },
-    [send, rooms],
-  );
-
-  const disconnectFromRoom = useCallback(
-    (roomId: string) => {
-      send({ type: 'disconnect_user_from_room', data: { room_id: roomId } });
-
-      setRooms((prev) => prev.filter((room) => room.id !== roomId));
     },
     [send],
   );
 
-  const s = socket.current;
-
-  return (
-    <SocketContext.Provider
-      value={{ status, socket: s, send, registerHandler, connectToRoom, disconnectFromRoom, unregisterHandlers }}
-    >
-      {children}
-    </SocketContext.Provider>
-  );
+  return <SocketContext.Provider value={{ status, subscribe }}>{children}</SocketContext.Provider>;
 };

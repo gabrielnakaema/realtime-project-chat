@@ -1,12 +1,11 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-condition */
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef } from 'react';
-import { useSocket } from './use-socket';
+import { useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import { useOnlineUsers } from './use-online-users';
-import type { InfiniteData } from '@tanstack/react-query';
+import { useSocket } from './use-socket';
 import type { ChatMessage } from '@/types/chat';
 import type { CursorPaginated } from '@/types/paginated';
 import type { SocketEvent } from '@/types/websocket';
+import type { InfiniteData } from '@tanstack/react-query';
 import { getChatByProjectId, listMessagesByProjectId } from '@/services/chat';
 import { getProject } from '@/services/projects';
 import { chatQueryKeys, projectQueryKeys } from '@/services/query-keys';
@@ -18,7 +17,7 @@ export const useChat = (projectId: string) => {
   const observedRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const { status, registerHandler, connectToRoom, disconnectFromRoom, unregisterHandlers } = useSocket();
+  const { status, subscribe } = useSocket();
 
   const { data: project } = useQuery({
     queryKey: projectQueryKeys.details(projectId),
@@ -77,45 +76,11 @@ export const useChat = (projectId: string) => {
     };
   }, [messagesData, fetchNextPage]);
 
-  const handleSocketMessage = (event: SocketEvent) => {
-    if (event.type === 'error') {
-      handleError(event.data.message);
-      return;
-    }
-
-    if (event.type === 'message') {
-      const chatMessage = event.data;
-
-      addNewMessage(chatMessage);
-    }
-  };
-
-  useEffect(() => {
-    if (!chatId || status !== 'connected') {
-      return;
-    }
-
-    connectToRoom(chatId, 'chat');
-    registerHandler({ id: 'chat_message_handler', handler: handleSocketMessage });
-
-    return () => {
-      disconnectFromRoom(chatId);
-      unregisterHandlers(['chat_message_handler']);
-    };
-  }, [chatId, status]);
-
   const addNewMessage = (message: ChatMessage) => {
     queryClient.setQueryData(
       chatQueryKeys.listInfiniteMessagesByProjectId({ projectId }),
       (old: InfiniteData<CursorPaginated<ChatMessage>>) => {
-        const firstPage = old?.pages?.[0];
-
-        if (!firstPage) {
-          return {
-            pages: [{ data: [message], has_next: false }],
-            pageParams: old.pageParams,
-          };
-        }
+        const firstPage = old.pages[0];
 
         const hasMorePages = old.pages.length > 1;
 
@@ -134,13 +99,38 @@ export const useChat = (projectId: string) => {
     );
   };
 
+  const handleSocketMessage = useEffectEvent((event: SocketEvent) => {
+    if (event.type === 'error') {
+      handleError(event.data.message);
+      return;
+    }
+
+    if (event.type === 'message') {
+      const chatMessage = event.data;
+
+      addNewMessage(chatMessage);
+    }
+  });
+
+  useEffect(() => {
+    if (!chatId || status !== 'connected') {
+      return;
+    }
+
+    const unsubscribe = subscribe(chatId, 'chat', handleSocketMessage);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [chatId, status, subscribe]);
+
   const messages = useMemo(() => {
     const pages = messagesData?.pages || [];
 
     const m: ChatMessage[] = [];
 
     for (let i = pages.length - 1; i >= 0; i--) {
-      for (const message of pages[i].data || []) {
+      for (const message of pages[i].data) {
         m.push(message);
       }
     }

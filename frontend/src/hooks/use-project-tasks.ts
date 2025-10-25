@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSocket } from './use-socket';
 import type { Task } from '@/types/task';
@@ -17,9 +17,9 @@ export const useProjectTasks = (projectId: string) => {
 
   const tasks = data?.data || [];
 
-  const { connectToRoom, status, registerHandler, disconnectFromRoom, unregisterHandlers } = useSocket();
+  const { status, subscribe } = useSocket();
 
-  const handleTaskUpdate = (event: SocketEvent) => {
+  const handleSocketEvent = useEffectEvent((event: SocketEvent) => {
     if (event.type === 'task_updated') {
       const task = event.data;
 
@@ -32,9 +32,7 @@ export const useProjectTasks = (projectId: string) => {
         };
       });
     }
-  };
 
-  const handleTaskCreation = (event: SocketEvent) => {
     if (event.type === 'task_created') {
       const task = event.data;
 
@@ -45,28 +43,19 @@ export const useProjectTasks = (projectId: string) => {
         };
       });
     }
-  };
+  });
 
   useEffect(() => {
     if (!projectId || status !== 'connected') {
       return;
     }
 
-    connectToRoom(projectId, 'project');
-    registerHandler({
-      id: 'task_update_handler',
-      handler: handleTaskUpdate,
-    });
-    registerHandler({
-      id: 'task_creation_handler',
-      handler: handleTaskCreation,
-    });
+    const unsubscribe = subscribe(projectId, 'project', handleSocketEvent);
 
     return () => {
-      disconnectFromRoom(projectId);
-      unregisterHandlers(['task_update_handler', 'task_creation_handler']);
+      unsubscribe();
     };
-  }, [projectId, status]);
+  }, [projectId, status, subscribe]);
 
   return {
     tasks,

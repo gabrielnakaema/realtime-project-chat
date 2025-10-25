@@ -68,7 +68,7 @@ function RouteComponent() {
         behavior: 'smooth',
       });
     }
-  }, [messages]);
+  }, [messages, chatContainerRef]);
 
   const onSubmit: SubmitHandler<IChatForm> = (form) => {
     if (!chatData?.id) {
