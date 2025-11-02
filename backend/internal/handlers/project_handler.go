@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/service"
@@ -19,6 +20,8 @@ type projectService interface {
 	ListByUserId(ctx context.Context, request service.ListProjectsByUserIdRequest) ([]domain.Project, error)
 	Update(ctx context.Context, request service.UpdateProjectRequest) (*domain.Project, error)
 	CreateMember(ctx context.Context, request service.CreateMemberRequest) (*domain.ProjectMember, error)
+	ListActivitiesByProject(ctx context.Context, request service.ListActivitiesByProjectRequest) (*utils.CursorPaginated[domain.ProjectActivity], error)
+	ListUsersProjectActivities(ctx context.Context, request service.ListUsersProjectActivitiesRequest) (*utils.CursorPaginated[domain.ProjectActivity], error)
 }
 
 type ProjectHandler struct {
@@ -74,7 +77,11 @@ func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	v := validator.New()
 	if memberRole != "" {
-		v.Check("member_role", "member_role is required", memberRole == string(domain.ProjectMemberRoleMember) || memberRole == string(domain.ProjectMemberRoleCreator))
+		v.Check("member_role", "member_role is invalid", memberRole == string(domain.ProjectMemberRoleMember) || memberRole == string(domain.ProjectMemberRoleCreator))
+	}
+	if !v.Valid() {
+		ValidationFailedResponse(w, v)
+		return
 	}
 
 	serviceRequest := service.ListProjectsByUserIdRequest{
@@ -200,6 +207,128 @@ func (h *ProjectHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = utils.WriteJSON(w, http.StatusCreated, member, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *ProjectHandler) ListActivitiesByProject(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+
+	id := chi.URLParam(r, "id")
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		BadRequestResponse(w, errors.New("invalid project id"))
+		return
+	}
+
+	limit := utils.GetQueryInt(r, "limit", 10)
+	before := utils.GetQueryString(r, "before", "")
+	beforeId := utils.GetQueryString(r, "id", "")
+
+	v := validator.New()
+
+	v.Check("limit", "limit must be greater than 0", limit > 0)
+	v.Check("limit", "limit must be less than or equal to 50", limit <= 50)
+
+	beforeTime := time.Now()
+	if before != "" {
+		date, err := time.Parse(time.RFC3339, before)
+		if err != nil {
+			v.Add("before", "invalid before date")
+		} else {
+			beforeTime = date
+		}
+	}
+
+	beforeIdUUID := uuid.Nil
+	if beforeId != "" {
+		parsedBeforeId, err := uuid.Parse(beforeId)
+		if err != nil {
+			v.Add("id", "invalid before id")
+		} else {
+			beforeIdUUID = parsedBeforeId
+		}
+	}
+
+	if !v.Valid() {
+		ValidationFailedResponse(w, v)
+		return
+	}
+
+	serviceRequest := service.ListActivitiesByProjectRequest{
+		ProjectId:       parsed,
+		UserId:          userId,
+		BeforeCreatedAt: beforeTime,
+		BeforeId:        beforeIdUUID,
+		Limit:           int32(limit),
+	}
+
+	activities, err := h.projectService.ListActivitiesByProject(r.Context(), serviceRequest)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, activities, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *ProjectHandler) ListUsersProjectActivities(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+
+	limit := utils.GetQueryInt(r, "limit", 10)
+	before := utils.GetQueryString(r, "before", "")
+	beforeId := utils.GetQueryString(r, "id", "")
+
+	v := validator.New()
+
+	v.Check("limit", "limit must be greater than 0", limit > 0)
+	v.Check("limit", "limit must be less than or equal to 50", limit <= 50)
+
+	beforeTime := time.Now()
+	if before != "" {
+		date, err := time.Parse(time.RFC3339, before)
+		if err != nil {
+			v.Add("before", "invalid before date")
+		} else {
+			beforeTime = date
+		}
+	}
+
+	beforeIdUUID := uuid.Nil
+	if beforeId != "" {
+		parsedBeforeId, err := uuid.Parse(beforeId)
+		if err != nil {
+			v.Add("id", "invalid before id")
+		} else {
+			beforeIdUUID = parsedBeforeId
+		}
+	}
+
+	if !v.Valid() {
+		ValidationFailedResponse(w, v)
+		return
+	}
+
+	serviceRequest := service.ListUsersProjectActivitiesRequest{
+		UserId:          userId,
+		BeforeCreatedAt: beforeTime,
+		BeforeId:        beforeIdUUID,
+		Limit:           int32(limit),
+	}
+
+	activities, err := h.projectService.ListUsersProjectActivities(r.Context(), serviceRequest)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, activities, nil)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

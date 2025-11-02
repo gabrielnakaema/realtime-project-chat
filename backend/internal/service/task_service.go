@@ -29,7 +29,7 @@ type taskServiceUserRepository interface {
 }
 
 type taskServicePublisher interface {
-	Publish(ctx context.Context, topic events.Topic, payload interface{}) error
+	Publish(ctx context.Context, topic events.Topic, payload events.Payload) error
 }
 
 type TaskService struct {
@@ -119,7 +119,12 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 
 	task.Changes = append(task.Changes, taskChange)
 
-	err = ts.publisher.Publish(ctx, events.TaskCreated, task)
+	err = ts.publisher.Publish(ctx, events.TaskCreated, &events.TaskCreatedPayload{
+		Task: task,
+		User: domain.User{
+			Id: request.RequestUserId,
+		},
+	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish task created event", err)
 	}
@@ -220,7 +225,12 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 
 	updatedTask.Changes = append(task.Changes, newTaskChanges...)
 
-	err = ts.publisher.Publish(ctx, events.TaskUpdated, updatedTask)
+	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
+		Task: updatedTask,
+		User: domain.User{
+			Id: request.RequestUserId,
+		},
+	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish task updated event", err)
 	}

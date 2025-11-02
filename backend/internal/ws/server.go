@@ -55,7 +55,7 @@ type projectService interface {
 }
 
 type publisher interface {
-	Publish(ctx context.Context, event events.Topic, data any) error
+	Publish(ctx context.Context, event events.Topic, data events.Payload) error
 }
 
 type Server struct {

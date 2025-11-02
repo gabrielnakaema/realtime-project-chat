@@ -28,7 +28,7 @@ type chatUserRepository interface {
 }
 
 type publisher interface {
-	Publish(ctx context.Context, topic events.Topic, payload interface{}) error
+	Publish(ctx context.Context, topic events.Topic, payload events.Payload) error
 }
 
 type ChatService struct {
@@ -94,7 +94,12 @@ func (cs *ChatService) CreateMemberFromProjectMember(ctx context.Context, projec
 		return domain.ServerError("failed to create member", err)
 	}
 
-	err = cs.publisher.Publish(ctx, events.ChatMemberCreated, member)
+	err = cs.publisher.Publish(ctx, events.ChatMemberCreated, &events.ChatMemberCreatedPayload{
+		ChatMember: member,
+		User: domain.User{
+			Id: projectMember.UserId,
+		},
+	})
 	if err != nil {
 		fmt.Println("failed to publish chat member created event", err)
 		return domain.ServerError("failed to publish chat member created event", err)
@@ -123,7 +128,12 @@ func (cs *ChatService) CreateJoinedMessage(ctx context.Context, chatMember *doma
 		return domain.ServerError("failed to create joined message", err)
 	}
 
-	err = cs.publisher.Publish(ctx, events.ChatMessageCreated, message)
+	err = cs.publisher.Publish(ctx, events.ChatMessageCreated, &events.ChatMessageCreatedPayload{
+		ChatMessage: message,
+		User: domain.User{
+			Id: chatMember.UserId,
+		},
+	})
 	if err != nil {
 		return domain.ServerError("failed to create publisher event", err)
 	}
@@ -182,7 +192,12 @@ func (cs *ChatService) CreateMessage(ctx context.Context, request CreateChatMess
 		return nil, domain.ServerError("failed to create message", err)
 	}
 
-	err = cs.publisher.Publish(ctx, events.ChatMessageCreated, message)
+	err = cs.publisher.Publish(ctx, events.ChatMessageCreated, &events.ChatMessageCreatedPayload{
+		ChatMessage: message,
+		User: domain.User{
+			Id: request.UserId,
+		},
+	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish chat message created event", err)
 	}

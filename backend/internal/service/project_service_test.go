@@ -8,7 +8,9 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/repository"
 	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,7 +25,11 @@ type mockPublisher struct {
 	mock.Mock
 }
 
-func (m *mockPublisher) Publish(ctx context.Context, topic events.Topic, payload interface{}) error {
+type mockActivityRepository struct {
+	mock.Mock
+}
+
+func (m *mockPublisher) Publish(ctx context.Context, topic events.Topic, payload events.Payload) error {
 	return nil
 }
 
@@ -81,6 +87,14 @@ func (m *mockProjectRepository) GetMemberByUserIdAndProjectId(ctx context.Contex
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.ProjectMember), args.Error(1)
+}
+
+func (m *mockActivityRepository) List(ctx context.Context, params repository.ListProjectActivityLogsParams) (*utils.CursorPaginated[domain.ProjectActivity], error) {
+	args := m.Called(ctx, params)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*utils.CursorPaginated[domain.ProjectActivity]), args.Error(1)
 }
 
 func TestProjectService_Create(t *testing.T) {
@@ -158,8 +172,9 @@ func TestProjectService_Create(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
 			mockPublisher := &mockPublisher{}
+			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo, mockUserRepo)
-			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher)
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
 			ctx := context.Background()
 
 			project, err := service.Create(ctx, tt.request)
@@ -268,8 +283,9 @@ func TestProjectService_GetById(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
 			mockPublisher := &mockPublisher{}
+			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo, mockUserRepo)
-			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher)
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
 			ctx := context.Background()
 
 			project, err := service.GetById(ctx, tt.id, tt.userId)
@@ -357,9 +373,10 @@ func TestProjectService_ListByUserId(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
 			mockPublisher := &mockPublisher{}
+			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo, mockUserRepo)
 
-			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher)
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
 			ctx := context.Background()
 
 			projects, err := service.ListByUserId(ctx, tt.request)
@@ -481,9 +498,10 @@ func TestProjectService_Update(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
 			mockPublisher := &mockPublisher{}
+			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo, mockUserRepo)
 
-			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher)
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
 			ctx := context.Background()
 
 			project, err := service.Update(ctx, tt.request)
@@ -693,9 +711,10 @@ func TestProjectService_CreateMember(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
 			mockPublisher := &mockPublisher{}
+			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo, mockUserRepo)
 
-			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher)
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
 			ctx := context.Background()
 
 			member, err := service.CreateMember(ctx, tt.request)

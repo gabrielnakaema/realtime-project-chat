@@ -57,13 +57,13 @@ func (ts *TaskSubscriber) handleTaskEvents(ctx context.Context, message Message)
 }
 
 func (ts *TaskSubscriber) handleTaskCreated(ctx context.Context, message Message) error {
-	var task domain.Task
-	err := json.Unmarshal(message.Value, &task)
+	var payload events.TaskCreatedPayload
+	err := json.Unmarshal(message.Value, &payload)
 	if err != nil {
 		return domain.ServerError("failed to unmarshal task", err)
 	}
 
-	err = ts.notifier.SendCreatedTask(ctx, &task)
+	err = ts.notifier.SendCreatedTask(ctx, &payload.Task)
 	if err != nil {
 		return domain.ServerError("failed to send created task to ws server", err)
 	}
@@ -72,13 +72,13 @@ func (ts *TaskSubscriber) handleTaskCreated(ctx context.Context, message Message
 }
 
 func (ts *TaskSubscriber) handleTaskUpdated(ctx context.Context, message Message) error {
-	var task domain.Task
-	err := json.Unmarshal(message.Value, &task)
+	var payload events.TaskUpdatedPayload
+	err := json.Unmarshal(message.Value, &payload)
 	if err != nil {
 		return domain.ServerError("failed to unmarshal task", err)
 	}
 
-	err = ts.notifier.SendUpdatedTask(ctx, &task)
+	err = ts.notifier.SendUpdatedTask(ctx, &payload.Task)
 	if err != nil {
 		return domain.ServerError("failed to send updated task to ws server", err)
 	}

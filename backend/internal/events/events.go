@@ -5,7 +5,6 @@ import "slices"
 type Topic string
 
 const (
-	// Project
 	ProjectCreated       Topic = "project.created"
 	ProjectUpdated       Topic = "project.updated"
 	ProjectMemberCreated Topic = "project.member.created"

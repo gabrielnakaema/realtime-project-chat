@@ -100,7 +100,12 @@ func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType
 		}
 
 		go func() {
-			ws.publisher.Publish(context.Background(), events.ChatMemberViewed, chatMember)
+			ws.publisher.Publish(context.Background(), events.ChatMemberViewed, &events.ChatMemberViewedPayload{
+				ChatMember: chatMember,
+				User: domain.User{
+					Id: userId,
+				},
+			})
 		}()
 	}
 

@@ -7,6 +7,8 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/repository"
+	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 )
 
@@ -20,25 +22,31 @@ type projectRepository interface {
 	GetMemberByUserIdAndProjectId(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) (*domain.ProjectMember, error)
 }
 
+type projectServiceActivityRepository interface {
+	List(ctx context.Context, params repository.ListProjectActivityLogsParams) (*utils.CursorPaginated[domain.ProjectActivity], error)
+}
+
 type projectServiceUserRepository interface {
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 }
 
 type projectServicePublisher interface {
-	Publish(ctx context.Context, topic events.Topic, payload interface{}) error
+	Publish(ctx context.Context, topic events.Topic, payload events.Payload) error
 }
 
 type ProjectService struct {
-	projectRepository projectRepository
-	userRepository    projectServiceUserRepository
-	publisher         projectServicePublisher
+	activityRepository projectServiceActivityRepository
+	projectRepository  projectRepository
+	userRepository     projectServiceUserRepository
+	publisher          projectServicePublisher
 }
 
-func NewProjectService(projectRepository projectRepository, userRepository projectServiceUserRepository, publisher projectServicePublisher) *ProjectService {
+func NewProjectService(projectRepository projectRepository, userRepository projectServiceUserRepository, publisher projectServicePublisher, activityRepository projectServiceActivityRepository) *ProjectService {
 	return &ProjectService{
-		projectRepository: projectRepository,
-		userRepository:    userRepository,
-		publisher:         publisher,
+		projectRepository:  projectRepository,
+		userRepository:     userRepository,
+		publisher:          publisher,
+		activityRepository: activityRepository,
 	}
 }
 
@@ -72,7 +80,12 @@ func (ps *ProjectService) Create(ctx context.Context, request CreateProjectReque
 		return nil, domain.ServerError("failed to create project", err)
 	}
 
-	err = ps.publisher.Publish(ctx, events.ProjectCreated, project)
+	err = ps.publisher.Publish(ctx, events.ProjectCreated, &events.ProjectCreatedPayload{
+		Project: project,
+		User: domain.User{
+			Id: request.UserId,
+		},
+	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish project created event", err)
 	}
@@ -174,7 +187,12 @@ func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectReque
 		return nil, domain.ServerError("failed to update project", err)
 	}
 
-	err = ps.publisher.Publish(ctx, events.ProjectUpdated, project)
+	err = ps.publisher.Publish(ctx, events.ProjectUpdated, &events.ProjectUpdatedPayload{
+		Project: *project,
+		User: domain.User{
+			Id: request.UserId,
+		},
+	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish project updated event", err)
 	}
@@ -254,10 +272,88 @@ func (ps *ProjectService) CreateMember(ctx context.Context, request CreateMember
 		return nil, domain.ServerError("failed to create member", err)
 	}
 
-	err = ps.publisher.Publish(ctx, events.ProjectMemberCreated, member)
+	err = ps.publisher.Publish(ctx, events.ProjectMemberCreated, &events.ProjectMemberCreatedPayload{
+		ProjectMember: member,
+		User: domain.User{
+			Id: request.RequestUserId,
+		},
+	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish project member created event", err)
 	}
 
 	return &member, nil
+}
+
+type ListActivitiesByProjectRequest struct {
+	ProjectId       uuid.UUID
+	UserId          uuid.UUID
+	BeforeCreatedAt time.Time
+	BeforeId        uuid.UUID
+	Limit           int32
+}
+
+func (ps *ProjectService) ListActivitiesByProject(ctx context.Context, request ListActivitiesByProjectRequest) (*utils.CursorPaginated[domain.ProjectActivity], error) {
+	if request.UserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	project, err := ps.projectRepository.GetById(ctx, request.ProjectId)
+	if err != nil {
+		return nil, domain.ServerError("failed to get project", err)
+	}
+
+	hasPermission := false
+	for _, member := range project.Members {
+		if member.UserId == request.UserId {
+			hasPermission = true
+			break
+		}
+	}
+	if !hasPermission {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	params := repository.ListProjectActivityLogsParams{
+		ProjectId:       request.ProjectId,
+		BeforeCreatedAt: request.BeforeCreatedAt,
+		BeforeId:        request.BeforeId,
+		Limit:           request.Limit,
+		UserId:          uuid.Nil,
+	}
+
+	activities, err := ps.activityRepository.List(ctx, params)
+	if err != nil {
+		return nil, domain.ServerError("failed to list activities", err)
+	}
+
+	return activities, nil
+}
+
+type ListUsersProjectActivitiesRequest struct {
+	UserId          uuid.UUID
+	BeforeCreatedAt time.Time
+	BeforeId        uuid.UUID
+	Limit           int32
+}
+
+func (ps *ProjectService) ListUsersProjectActivities(ctx context.Context, request ListUsersProjectActivitiesRequest) (*utils.CursorPaginated[domain.ProjectActivity], error) {
+	if request.UserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	params := repository.ListProjectActivityLogsParams{
+		UserId:          request.UserId,
+		BeforeCreatedAt: request.BeforeCreatedAt,
+		BeforeId:        request.BeforeId,
+		Limit:           request.Limit,
+		ProjectId:       uuid.Nil,
+	}
+
+	activities, err := ps.activityRepository.List(ctx, params)
+	if err != nil {
+		return nil, domain.ServerError("failed to list activities", err)
+	}
+
+	return activities, nil
 }

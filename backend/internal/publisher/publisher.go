@@ -2,7 +2,6 @@ package publisher
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"sync"
@@ -71,12 +70,12 @@ func (p *Publisher) handleErrors() {
 	}
 }
 
-func (p *Publisher) Publish(ctx context.Context, topic events.Topic, payload interface{}) error {
+func (p *Publisher) Publish(ctx context.Context, topic events.Topic, payload events.Payload) error {
 	if !topic.Valid() {
 		return errors.New("invalid topic provided")
 	}
 
-	bytes, err := json.Marshal(payload)
+	bytes, err := payload.ToMessage()
 	if err != nil {
 		return errors.New("failed to marshal payload")
 	}

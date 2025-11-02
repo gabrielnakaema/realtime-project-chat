@@ -42,6 +42,18 @@ type Project struct {
 	UpdatedAt   pgtype.Timestamptz
 }
 
+type ProjectActivityLog struct {
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	ActorID      uuid.UUID
+	ActivityType string
+	ActivityData []byte
+	EntityType   pgtype.Text
+	EntityID     pgtype.UUID
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
 type ProjectMember struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
