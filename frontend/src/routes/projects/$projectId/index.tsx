@@ -31,14 +31,14 @@ function RouteComponent() {
             <div className="flex items-center gap-4">
               <Link
                 to="/projects"
-                className="inline-flex items-center px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md font-medium transition-colors"
+                className="inline-flex items-center px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md font-medium transition-colors whitespace-nowrap"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Go back
               </Link>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{project?.name}</h1>
-                <p className="text-slate-600 dark:text-slate-400">{project?.description}</p>
+                <p className="text-slate-600 dark:text-slate-400 line-clamp-1">{project?.description}</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
