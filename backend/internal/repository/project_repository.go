@@ -229,3 +229,9 @@ func (pr *ProjectRepository) GetMemberByUserIdAndProjectId(ctx context.Context, 
 
 	return &member, nil
 }
+
+func (pr *ProjectRepository) MarkUpdatedAt(ctx context.Context, projectId uuid.UUID) error {
+	q := queries.New(pr.pool)
+
+	return q.MarkProjectUpdatedAt(ctx, projectId)
+}

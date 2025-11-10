@@ -85,7 +85,7 @@ func NewApi() (*Api, error) {
 		return nil, err
 	}
 
-	_, err = subscriber.NewProjectActivitySubscriber(config, logger, activityRepo)
+	_, err = subscriber.NewProjectActivitySubscriber(config, logger, activityRepo, projectRepo)
 	if err != nil {
 		return nil, err
 	}

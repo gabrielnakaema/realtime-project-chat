@@ -269,6 +269,17 @@ func (q *Queries) ListProjectsByUserId(ctx context.Context, arg ListProjectsByUs
 	return items, nil
 }
 
+const markProjectUpdatedAt = `-- name: MarkProjectUpdatedAt :exec
+UPDATE projects
+SET updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+func (q *Queries) MarkProjectUpdatedAt(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markProjectUpdatedAt, id)
+	return err
+}
+
 const removeProjectMember = `-- name: RemoveProjectMember :exec
 DELETE FROM project_members
 WHERE user_id = $1

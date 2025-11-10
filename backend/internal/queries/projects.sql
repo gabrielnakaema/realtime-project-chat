@@ -153,3 +153,8 @@ WHERE user_id = $1
 SELECT * FROM project_members
 WHERE user_id = $1
   AND project_id = $2;
+
+-- name: MarkProjectUpdatedAt :exec
+UPDATE projects
+SET updated_at = CURRENT_TIMESTAMP
+WHERE id = $1;

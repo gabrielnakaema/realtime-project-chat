@@ -9,24 +9,31 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/gabrielnakaema/project-chat/internal/repository"
+	"github.com/google/uuid"
 )
 
-type ProjectActivitySubscriber struct {
-	logger     *slog.Logger
-	subscriber *Subscriber
-	repository *repository.ProjectActivityRepository
+type ProjectRepository interface {
+	MarkUpdatedAt(ctx context.Context, projectId uuid.UUID) error
 }
 
-func NewProjectActivitySubscriber(config *config.Config, logger *slog.Logger, repository *repository.ProjectActivityRepository) (*ProjectActivitySubscriber, error) {
+type ProjectActivitySubscriber struct {
+	logger            *slog.Logger
+	subscriber        *Subscriber
+	repository        *repository.ProjectActivityRepository
+	projectRepository ProjectRepository
+}
+
+func NewProjectActivitySubscriber(config *config.Config, logger *slog.Logger, repository *repository.ProjectActivityRepository, projectRepository ProjectRepository) (*ProjectActivitySubscriber, error) {
 	subscriber, err := NewSubscriber(config, "project_activity.subscriber")
 	if err != nil {
 		return nil, err
 	}
 
 	projectActivitySubscriber := &ProjectActivitySubscriber{
-		logger:     logger,
-		subscriber: subscriber,
-		repository: repository,
+		logger:            logger,
+		subscriber:        subscriber,
+		repository:        repository,
+		projectRepository: projectRepository,
 	}
 
 	topics := []events.Topic{events.ProjectCreated, events.ProjectUpdated, events.ProjectMemberCreated, events.ProjectMemberRemoved, events.TaskCreated, events.TaskUpdated}
@@ -68,6 +75,11 @@ func (pas *ProjectActivitySubscriber) handleProjectCreated(ctx context.Context, 
 		return domain.ServerError("failed to create project created activity", err)
 	}
 
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.Project.Id)
+	if err != nil {
+		return domain.ServerError("failed to mark project updated at", err)
+	}
+
 	return nil
 }
 
@@ -82,6 +94,11 @@ func (pas *ProjectActivitySubscriber) handleProjectUpdated(ctx context.Context, 
 	err = pas.repository.Create(ctx, &activity)
 	if err != nil {
 		return domain.ServerError("failed to create project updated activity", err)
+	}
+
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.Project.Id)
+	if err != nil {
+		return domain.ServerError("failed to mark project updated at", err)
 	}
 
 	return nil
@@ -102,6 +119,11 @@ func (pas *ProjectActivitySubscriber) handleProjectMemberCreated(ctx context.Con
 		return domain.ServerError("failed to create project member created activity", err)
 	}
 
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.ProjectMember.ProjectId)
+	if err != nil {
+		return domain.ServerError("failed to mark project updated at", err)
+	}
+
 	return nil
 }
 
@@ -120,6 +142,11 @@ func (pas *ProjectActivitySubscriber) handleTaskCreated(ctx context.Context, mes
 		return domain.ServerError("failed to create task created activity", err)
 	}
 
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.Task.ProjectId)
+	if err != nil {
+		return domain.ServerError("failed to mark project updated at", err)
+	}
+
 	return nil
 }
 
@@ -136,6 +163,11 @@ func (pas *ProjectActivitySubscriber) handleTaskUpdated(ctx context.Context, mes
 	err = pas.repository.Create(ctx, &activity)
 	if err != nil {
 		return domain.ServerError("failed to create task updated activity", err)
+	}
+
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.Task.ProjectId)
+	if err != nil {
+		return domain.ServerError("failed to mark project updated at", err)
 	}
 
 	return nil
