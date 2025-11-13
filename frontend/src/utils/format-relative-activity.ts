@@ -8,32 +8,19 @@ export const formatRelativeActivityDateString = (isoString: string) => {
     return 'Just now';
   }
 
-  if (days > 6) {
-    return date.toLocaleDateString([], {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  if (days === 0) {
+    return 'Today at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-
-  const divisions = [
-    { amount: 60, name: 'second' },
-    { amount: 60, name: 'minute' },
-    { amount: 24, name: 'hour' },
-    { amount: 7, name: 'day' },
-  ];
-
-  let duration = seconds;
-  for (const division of divisions) {
-    if (Math.abs(duration) < division.amount) {
-      return rtf.format(Math.round(-duration), division.name as Intl.RelativeTimeFormatUnit);
-    }
-    duration /= division.amount;
+  if (days === 1) {
+    return 'Yesterday at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  return rtf.format(-Math.round(duration), 'day');
+  return date.toLocaleDateString([], {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };

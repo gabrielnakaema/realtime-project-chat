@@ -51,3 +51,10 @@ export const updateTask = async (request: UpdateTaskRequest) => {
   const json = await response.json<Task>();
   return json;
 };
+
+export const getTask = async (taskId: string) => {
+  const response = await api.get(`tasks/${taskId}`);
+
+  const json = await response.json<Task>();
+  return json;
+};
