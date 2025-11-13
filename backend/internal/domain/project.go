@@ -17,6 +17,15 @@ type Project struct {
 	Members []ProjectMember `json:"members,omitempty"`
 }
 
+func (p *Project) IsMember(userId uuid.UUID) bool {
+	for _, member := range p.Members {
+		if member.UserId == userId {
+			return true
+		}
+	}
+	return false
+}
+
 type ProjectMemberRole string
 
 var (

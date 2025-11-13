@@ -252,15 +252,7 @@ func (ts *TaskService) List(ctx context.Context, projectId uuid.UUID, userId uui
 		return nil, domain.ServerError("failed to get project", err)
 	}
 
-	hasPermission := false
-	for _, member := range project.Members {
-		if member.UserId == userId {
-			hasPermission = true
-			break
-		}
-	}
-
-	if !hasPermission {
+	if !project.IsMember(userId) {
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
@@ -277,7 +269,19 @@ func (ts *TaskService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UU
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
 
-	project, err := ts.projectRepository.GetById(ctx, id)
+	task, err := ts.taskRepository.GetById(ctx, id)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("task not found")
+			}
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to get task", err)
+	}
+
+	project, err := ts.projectRepository.GetById(ctx, task.ProjectId)
 	if err != nil {
 		var domainErr domain.DomainError
 		if errors.As(err, &domainErr) {
@@ -289,28 +293,8 @@ func (ts *TaskService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UU
 		return nil, domain.ServerError("failed to get project", err)
 	}
 
-	hasPermission := false
-	for _, member := range project.Members {
-		if member.UserId == userId {
-			hasPermission = true
-			break
-		}
-	}
-
-	if !hasPermission {
+	if !project.IsMember(userId) {
 		return nil, domain.ForbiddenError("forbidden")
-	}
-
-	task, err := ts.taskRepository.GetById(ctx, id)
-	if err != nil {
-		var domainErr domain.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("task not found")
-			}
-			return nil, domainErr
-		}
-		return nil, domain.ServerError("failed to get task", err)
 	}
 
 	return task, nil
