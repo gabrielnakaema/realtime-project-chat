@@ -30,8 +30,8 @@ func (m *mockTaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain
 	return args.Get(0).(*domain.Task), args.Error(1)
 }
 
-func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.Task, error) {
-	args := m.Called(ctx, projectId)
+func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, limit int) ([]domain.Task, error) {
+	args := m.Called(ctx, projectId, statuses, taskOrder, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -46,8 +46,8 @@ func (m *mockTaskRepository) Update(ctx context.Context, task *domain.Task) erro
 	return args.Error(0)
 }
 
-func (m *mockTaskRepository) CreateChanges(ctx context.Context, task *domain.Task, changes []domain.TaskChange) error {
-	args := m.Called(ctx, task, changes)
+func (m *mockTaskRepository) CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error {
+	args := m.Called(ctx, task, updates)
 	if args.Get(0) == nil {
 		return args.Error(0)
 	}
@@ -90,7 +90,7 @@ func TestTaskService_Create(t *testing.T) {
 		Status:      domain.TaskStatusPending,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
-		Changes:     []domain.TaskChange{},
+		Updates:     []domain.TaskUpdate{},
 	}
 
 	type testCase struct {
@@ -111,11 +111,15 @@ func TestTaskService_Create(t *testing.T) {
 				Title:         "Test Task",
 				Description:   "Test Description",
 				RequestUserId: validUserId,
+				Priority:      string(domain.TaskPriorityLow),
+				Order:         0,
+				ResponsibleId: nil,
+				DueDate:       nil,
+				Tags:          []string{},
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 				repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
-				repo.On("CreateChanges", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskChange")).Return(nil)
 				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 			},
 			expectedTask:  &validTask,
@@ -239,7 +243,7 @@ func TestTaskService_Update(t *testing.T) {
 		Status:      domain.TaskStatusPending,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
-		Changes:     []domain.TaskChange{},
+		Updates:     []domain.TaskUpdate{},
 	}
 
 	type testCase struct {
@@ -250,7 +254,7 @@ func TestTaskService_Update(t *testing.T) {
 		expectedError             error
 		expectedErrorCode         string
 		shouldSucceed             bool
-		expectedTaskChangesLength int
+		expectedTaskUpdatesLength int
 	}
 
 	tests := []testCase{
@@ -259,21 +263,26 @@ func TestTaskService_Update(t *testing.T) {
 			request: service.UpdateTaskRequest{
 				TaskId:        validTaskId,
 				Title:         "Updated Task",
-				Description:   "Updated Description",
-				Status:        domain.TaskStatusDoing,
+				Description:   "Updated Deascription",
+				Status:        domain.TaskStatusDone,
 				RequestUserId: validUserId,
+				Priority:      domain.TaskPriorityHigh,
+				Order:         1,
+				ResponsibleId: nil,
+				DueDate:       nil,
+				Tags:          []string{},
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
 				repo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
-				repo.On("CreateChanges", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskChange")).Return(nil)
+				repo.On("CreateUpdates", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskUpdate")).Return(nil)
 				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 			},
 			expectedTask:              &validTask,
 			shouldSucceed:             true,
 			expectedError:             nil,
-			expectedTaskChangesLength: 3,
+			expectedTaskUpdatesLength: 1,
 		},
 		{
 			name: "unauthorized error",
@@ -361,7 +370,7 @@ func TestTaskService_Update(t *testing.T) {
 				assert.Equal(t, tt.request.Title, task.Title)
 				assert.Equal(t, tt.request.Description, task.Description)
 				assert.Equal(t, tt.request.Status, task.Status)
-				assert.Equal(t, tt.expectedTaskChangesLength, len(task.Changes))
+				assert.Equal(t, tt.expectedTaskUpdatesLength, len(task.Updates))
 			} else {
 				require.Error(t, err)
 				require.Nil(t, task)

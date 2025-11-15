@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
@@ -14,10 +13,9 @@ import (
 type taskRepository interface {
 	Create(ctx context.Context, task *domain.Task) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
-	ListByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.Task, error)
+	ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, limit int) ([]domain.Task, error)
 	Update(ctx context.Context, task *domain.Task) error
-
-	CreateChanges(ctx context.Context, task *domain.Task, changes []domain.TaskChange) error
+	CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error
 }
 
 type taskServiceProjectRepository interface {
@@ -53,6 +51,11 @@ type CreateTaskRequest struct {
 	Title         string
 	Description   string
 	RequestUserId uuid.UUID
+	Priority      string
+	DueDate       *time.Time
+	ResponsibleId *uuid.UUID
+	Tags          []string
+	Order         int
 }
 
 func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*domain.Task, error) {
@@ -72,14 +75,7 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		return nil, domain.ServerError("failed to get project", err)
 	}
 
-	hasPermission := false
-	for _, member := range project.Members {
-		if member.UserId == request.RequestUserId {
-			hasPermission = true
-			break
-		}
-	}
-	if !hasPermission {
+	if !project.IsMember(request.RequestUserId) {
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
@@ -89,35 +85,28 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 	}
 
 	task := domain.Task{
-		ProjectId:   request.ProjectId,
-		Title:       request.Title,
-		Description: request.Description,
-		AuthorId:    request.RequestUserId,
-		Status:      domain.TaskStatusPending,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-		Author:      user,
-		Changes:     []domain.TaskChange{},
+		ProjectId:     request.ProjectId,
+		Title:         request.Title,
+		Description:   request.Description,
+		AuthorId:      request.RequestUserId,
+		Status:        domain.TaskStatusPending,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+		Author:        user,
+		Priority:      domain.TaskPriority(request.Priority),
+		Order:         request.Order,
+		ResponsibleId: request.ResponsibleId,
+		DueDate:       request.DueDate,
+		Tags:          request.Tags,
+		Updates:       []domain.TaskUpdate{},
 	}
+
+	task.Updates = append(task.Updates, domain.NewTaskCreatedUpdate(&task, user))
 
 	err = ts.taskRepository.Create(ctx, &task)
 	if err != nil {
 		return nil, domain.ServerError("failed to create task", err)
 	}
-
-	taskChange := domain.TaskChange{
-		TaskId:            task.Id,
-		AuthorId:          request.RequestUserId,
-		CreatedAt:         time.Now(),
-		ChangeDescription: fmt.Sprintf("Task created by %s", user.Name),
-	}
-
-	err = ts.taskRepository.CreateChanges(ctx, &task, []domain.TaskChange{taskChange})
-	if err != nil {
-		return nil, domain.ServerError("failed to create task changes", err)
-	}
-
-	task.Changes = append(task.Changes, taskChange)
 
 	err = ts.publisher.Publish(ctx, events.TaskCreated, &events.TaskCreatedPayload{
 		Task: task,
@@ -138,6 +127,12 @@ type UpdateTaskRequest struct {
 	Description   string
 	Status        domain.TaskStatus
 	RequestUserId uuid.UUID
+	Priority      domain.TaskPriority
+	DueDate       *time.Time
+	ResponsibleId *uuid.UUID
+	Tags          []string
+	Order         int
+	DoneAt        *time.Time
 }
 
 func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*domain.Task, error) {
@@ -169,29 +164,33 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		return nil, domain.ServerError("failed to get project", err)
 	}
 
-	hasPermission := false
-	for _, member := range project.Members {
-		if member.UserId == request.RequestUserId {
-			hasPermission = true
-			break
-		}
-	}
-
-	if !hasPermission {
+	if !project.IsMember(request.RequestUserId) {
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
+	if request.ResponsibleId != nil && *request.ResponsibleId != uuid.Nil {
+		if !project.IsMember(*request.ResponsibleId) {
+			return nil, domain.BusinessValidationError("responsible is not a member of the project")
+		}
+	}
+
 	updatedTask := domain.Task{
-		Id:          task.Id,
-		ProjectId:   task.ProjectId,
-		Title:       request.Title,
-		Description: request.Description,
-		Status:      task.Status,
-		UpdatedAt:   time.Now(),
-		Changes:     task.Changes,
-		AuthorId:    task.AuthorId,
-		CreatedAt:   task.CreatedAt,
-		Author:      task.Author,
+		Id:            task.Id,
+		ProjectId:     task.ProjectId,
+		Status:        task.Status,
+		AuthorId:      task.AuthorId,
+		CreatedAt:     task.CreatedAt,
+		Author:        task.Author,
+		Title:         request.Title,
+		Description:   request.Description,
+		Priority:      request.Priority,
+		Order:         request.Order,
+		ResponsibleId: request.ResponsibleId,
+		DueDate:       request.DueDate,
+		DoneAt:        request.DoneAt,
+		Tags:          request.Tags,
+		UpdatedAt:     time.Now(),
+		Updates:       []domain.TaskUpdate{},
 	}
 
 	err = updatedTask.ChangeStatus(request.Status)
@@ -216,14 +215,17 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		return nil, domain.ServerError("failed to update task", err)
 	}
 
-	newTaskChanges := domain.NewTaskChanges(task, &updatedTask, user)
+	newTaskUpdate := domain.NewTaskUpdate(task, &updatedTask, user)
+	updates := []domain.TaskUpdate{newTaskUpdate}
 
-	err = ts.taskRepository.CreateChanges(ctx, &updatedTask, newTaskChanges)
-	if err != nil {
-		return nil, domain.ServerError("failed to create task changes", err)
+	if len(newTaskUpdate.Changes) > 0 {
+		err = ts.taskRepository.CreateUpdates(ctx, &updatedTask, updates)
+		if err != nil {
+			return nil, domain.ServerError("failed to create task updates", err)
+		}
+
+		updatedTask.Updates = append(task.Updates, updates...)
 	}
-
-	updatedTask.Changes = append(task.Changes, newTaskChanges...)
 
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
 		Task: updatedTask,
@@ -238,25 +240,33 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 	return &updatedTask, nil
 }
 
-func (ts *TaskService) List(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) ([]domain.Task, error) {
-	if projectId == uuid.Nil {
-		return nil, domain.BusinessValidationError("project_id is required")
-	}
+type ListTasksRequest struct {
+	ProjectId     uuid.UUID
+	RequestUserId uuid.UUID
+	Statuses      []string
+	TaskOrder     int
+	Limit         int
+}
 
-	if userId == uuid.Nil {
+func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) ([]domain.Task, error) {
+	if request.RequestUserId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
 
-	project, err := ts.projectRepository.GetById(ctx, projectId)
+	if request.ProjectId == uuid.Nil {
+		return nil, domain.BusinessValidationError("project_id is required")
+	}
+
+	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
 	if err != nil {
 		return nil, domain.ServerError("failed to get project", err)
 	}
 
-	if !project.IsMember(userId) {
+	if !project.IsMember(request.RequestUserId) {
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
-	tasks, err := ts.taskRepository.ListByProjectId(ctx, projectId)
+	tasks, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, request.Statuses, request.TaskOrder, request.Limit)
 	if err != nil {
 		return nil, domain.ServerError("failed to list tasks", err)
 	}

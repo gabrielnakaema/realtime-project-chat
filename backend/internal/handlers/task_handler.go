@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/service"
@@ -15,7 +18,7 @@ import (
 
 type taskService interface {
 	Create(ctx context.Context, request service.CreateTaskRequest) (*domain.Task, error)
-	List(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) ([]domain.Task, error)
+	List(ctx context.Context, request service.ListTasksRequest) ([]domain.Task, error)
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error)
 	Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error)
 }
@@ -53,6 +56,11 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Title:         request.Title,
 		Description:   request.Description,
 		RequestUserId: userId,
+		Priority:      request.Priority,
+		Order:         request.Order,
+		ResponsibleId: request.ResponsibleId,
+		DueDate:       request.DueDate,
+		Tags:          request.Tags,
 	}
 
 	task, err := h.taskService.Create(r.Context(), serviceRequest)
@@ -69,7 +77,6 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
-
 	projectId := utils.GetQueryString(r, "project_id", "")
 	if projectId == "" {
 		BadRequestResponse(w, errors.New("project_id is required"))
@@ -82,9 +89,42 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	statuses := utils.GetQueryString(r, "statuses", "")
+	statusesArray := strings.Split(statuses, ",")
+	if statuses == "" {
+		statusesArray = []string{}
+	}
+
+	for _, status := range statusesArray {
+		if !slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(status)) {
+			BadRequestResponse(w, errors.New("invalid status"))
+			return
+		}
+
+		if status == string(domain.TaskStatusArchived) {
+			BadRequestResponse(w, errors.New("archived status is not allowed"))
+			return
+		}
+	}
+
+	taskOrder := utils.GetQueryString(r, "task_order", "0")
+	taskOrderInt, err := strconv.Atoi(taskOrder)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
 	userId := UserIdFromContext(r.Context())
 
-	tasks, err := h.taskService.List(r.Context(), parsedProjectId, userId)
+	serviceRequest := service.ListTasksRequest{
+		ProjectId:     parsedProjectId,
+		RequestUserId: userId,
+		Statuses:      statusesArray,
+		TaskOrder:     taskOrderInt,
+		Limit:         15,
+	}
+
+	tasks, err := h.taskService.List(r.Context(), serviceRequest)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return
@@ -155,6 +195,12 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Description:   request.Description,
 		Status:        domain.TaskStatus(request.Status),
 		RequestUserId: userId,
+		Priority:      domain.TaskPriority(request.Priority),
+		Order:         request.Order,
+		ResponsibleId: request.ResponsibleId,
+		DueDate:       request.DueDate,
+		Tags:          request.Tags,
+		DoneAt:        request.DoneAt,
 	}
 
 	task, err := h.taskService.Update(r.Context(), serviceRequest)

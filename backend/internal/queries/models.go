@@ -71,22 +71,43 @@ type RefreshToken struct {
 }
 
 type Task struct {
-	ID          uuid.UUID
-	ProjectID   uuid.UUID
-	Title       string
-	Description string
-	Status      string
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
-	AuthorID    uuid.UUID
+	ID            uuid.UUID
+	ProjectID     uuid.UUID
+	Title         string
+	Description   string
+	Status        string
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	AuthorID      uuid.UUID
+	Priority      string
+	DueDate       pgtype.Timestamptz
+	DoneAt        pgtype.Timestamptz
+	ResponsibleID pgtype.UUID
+	TaskOrder     int32
 }
 
 type TaskChange struct {
-	ID          uuid.UUID
-	TaskID      uuid.UUID
-	UserID      pgtype.UUID
-	Description string
-	CreatedAt   pgtype.Timestamptz
+	ID        uuid.UUID
+	CreatedAt pgtype.Timestamptz
+	UpdateID  pgtype.UUID
+	Field     string
+	OldValue  string
+	NewValue  string
+	SubjectID pgtype.UUID
+}
+
+type TaskTag struct {
+	TaskID    uuid.UUID
+	Name      string
+	CreatedAt pgtype.Timestamptz
+}
+
+type TaskUpdate struct {
+	ID         uuid.UUID
+	TaskID     uuid.UUID
+	UserID     uuid.UUID
+	UpdateType string
+	CreatedAt  pgtype.Timestamptz
 }
 
 type User struct {

@@ -25,22 +25,74 @@ func NewTaskRepository(pool *pgxpool.Pool) *TaskRepository {
 
 func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 	q := queries.New(tr.pool)
+
+	tx, err := tr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := q.WithTx(tx)
+
 	params := queries.CreateTaskParams{
 		ProjectID:   task.ProjectId,
 		Title:       task.Title,
 		Description: task.Description,
 		Status:      string(task.Status),
 		AuthorID:    task.AuthorId,
+		Priority:    string(task.Priority),
+		TaskOrder:   int32(task.Order),
 	}
 
-	id, err := q.CreateTask(ctx, params)
+	if task.ResponsibleId != nil {
+		params.ResponsibleID = pgtype.UUID{
+			Bytes: *task.ResponsibleId,
+			Valid: true,
+		}
+	}
+
+	if task.DueDate != nil {
+		params.DueDate = pgtype.Timestamptz{
+			Time:  *task.DueDate,
+			Valid: true,
+		}
+	}
+
+	id, err := qtx.CreateTask(ctx, params)
 	if err != nil {
 		return err
 	}
 
 	task.Id = id
 
-	return nil
+	for idx, update := range task.Updates {
+		params := queries.CreateTaskUpdateParams{
+			TaskID:     task.Id,
+			UserID:     update.UserId,
+			UpdateType: string(update.UpdateType),
+		}
+
+		id, err = qtx.CreateTaskUpdate(ctx, params)
+		if err != nil {
+			return err
+		}
+
+		task.Updates[idx].Id = id
+	}
+
+	if len(task.Tags) > 0 {
+		for _, tag := range task.Tags {
+			err = qtx.CreateTaskTag(ctx, queries.CreateTaskTagParams{
+				TaskID: task.Id,
+				Name:   tag,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error) {
@@ -61,6 +113,8 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 		Title:       result.TaskTitle,
 		Description: result.TaskDescription,
 		Status:      domain.TaskStatus(result.TaskStatus),
+		Priority:    domain.TaskPriority(result.TaskPriority),
+		Order:       int(result.TaskOrder),
 		CreatedAt:   result.TaskCreatedAt.Time,
 		UpdatedAt:   result.TaskUpdatedAt.Time,
 	}
@@ -74,12 +128,42 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 		}
 	}
 
-	if result.TaskChanges != nil {
-		bytes, err := json.Marshal(result.TaskChanges)
+	if result.TaskResponsibleID.Valid {
+		task.ResponsibleId = (*uuid.UUID)(result.TaskResponsibleID.Bytes[:])
+
+		task.Responsible = &domain.User{
+			Id:        *task.ResponsibleId,
+			Name:      result.TaskResponsibleName.String,
+			Email:     result.TaskResponsibleEmail.String,
+			CreatedAt: result.TaskResponsibleCreatedAt.Time,
+		}
+	}
+
+	if result.TaskDueDate.Valid {
+		task.DueDate = &result.TaskDueDate.Time
+	}
+
+	if result.TaskDoneAt.Valid {
+		task.DoneAt = &result.TaskDoneAt.Time
+	}
+
+	if result.Tags != nil {
+		bytes, err := json.Marshal(result.Tags)
 		if err != nil {
 			return nil, err
 		}
-		err = json.Unmarshal(bytes, &task.Changes)
+		err = json.Unmarshal(bytes, &task.Tags)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if result.Updates != nil {
+		bytes, err := json.Marshal(result.Updates)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(bytes, &task.Updates)
 		if err != nil {
 			return nil, err
 		}
@@ -88,10 +172,24 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 	return &task, nil
 }
 
-func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.Task, error) {
+func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, limit int) ([]domain.Task, error) {
 	q := queries.New(tr.pool)
 
-	results, err := q.ListTasksByProjectId(ctx, projectId)
+	params := queries.ListTasksByProjectIdParams{
+		ProjectID: projectId,
+		Statuses:  nil,
+		TaskOrder: pgtype.Int4{
+			Int32: int32(taskOrder),
+			Valid: taskOrder != 0,
+		},
+		Limit: int32(limit),
+	}
+
+	if len(statuses) > 0 {
+		params.Statuses = statuses
+	}
+
+	results, err := q.ListTasksByProjectId(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -106,6 +204,8 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 			Title:       result.Title,
 			Description: result.Description,
 			Status:      domain.TaskStatus(result.Status),
+			Priority:    domain.TaskPriority(result.Priority),
+			Order:       int(result.TaskOrder),
 			CreatedAt:   result.CreatedAt.Time,
 			UpdatedAt:   result.UpdatedAt.Time,
 		}
@@ -119,6 +219,33 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 			task.Author = &user
 		}
 
+		if result.ResponsibleResponsibleID.Valid {
+			task.ResponsibleId = (*uuid.UUID)(result.ResponsibleResponsibleID.Bytes[:])
+			task.Responsible = &domain.User{
+				Id:   *task.ResponsibleId,
+				Name: result.ResponsibleName.String,
+			}
+		}
+
+		if result.Tags != nil {
+			bytes, err := json.Marshal(result.Tags)
+			if err != nil {
+				return nil, err
+			}
+			err = json.Unmarshal(bytes, &task.Tags)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if result.DueDate.Valid {
+			task.DueDate = &result.DueDate.Time
+		}
+
+		if result.DoneAt.Valid {
+			task.DoneAt = &result.DoneAt.Time
+		}
+
 		tasks = append(tasks, task)
 	}
 
@@ -128,17 +255,70 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 	q := queries.New(tr.pool)
 
+	tx, err := tr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := q.WithTx(tx)
+
 	params := queries.UpdateTaskParams{
 		Title:       task.Title,
 		Description: task.Description,
 		Status:      string(task.Status),
 		ID:          task.Id,
+		TaskOrder:   int32(task.Order),
+		Priority:    string(task.Priority),
 	}
 
-	return q.UpdateTask(ctx, params)
+	if task.ResponsibleId != nil {
+		params.ResponsibleID = pgtype.UUID{
+			Bytes: *task.ResponsibleId,
+			Valid: true,
+		}
+	}
+
+	if task.DueDate != nil {
+		params.DueDate = pgtype.Timestamptz{
+			Time:  *task.DueDate,
+			Valid: true,
+		}
+	}
+
+	if task.DoneAt != nil {
+		params.DoneAt = pgtype.Timestamptz{
+			Time:  *task.DoneAt,
+			Valid: true,
+		}
+	}
+
+	err = qtx.DeleteAllTaskTags(ctx, task.Id)
+	if err != nil {
+		return err
+	}
+
+	if len(task.Tags) > 0 {
+		for _, tag := range task.Tags {
+			err = qtx.CreateTaskTag(ctx, queries.CreateTaskTagParams{
+				TaskID: task.Id,
+				Name:   tag,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	err = qtx.UpdateTask(ctx, params)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
-func (tr *TaskRepository) CreateChanges(ctx context.Context, task *domain.Task, changes []domain.TaskChange) error {
+func (tr *TaskRepository) CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error {
 	tx, err := tr.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -148,19 +328,47 @@ func (tr *TaskRepository) CreateChanges(ctx context.Context, task *domain.Task, 
 	q := queries.New(tr.pool)
 	qtx := q.WithTx(tx)
 
-	for i, change := range changes {
-		params := queries.CreateTaskChangeParams{
-			TaskID:      task.Id,
-			UserID:      pgtype.UUID{Bytes: change.AuthorId, Valid: true},
-			Description: change.ChangeDescription,
+	for idx, update := range updates {
+		params := queries.CreateTaskUpdateParams{
+			TaskID:     task.Id,
+			UserID:     update.UserId,
+			UpdateType: string(update.UpdateType),
 		}
 
-		id, err := qtx.CreateTaskChange(ctx, params)
+		id, err := qtx.CreateTaskUpdate(ctx, params)
 		if err != nil {
 			return err
 		}
 
-		changes[i].Id = id
+		updates[idx].Id = id
+
+		if len(update.Changes) > 0 {
+			for changeIdx, change := range update.Changes {
+				params := queries.CreateTaskChangeParams{
+					UpdateID: pgtype.UUID{
+						Bytes: id,
+						Valid: true,
+					},
+					Field:    change.Field,
+					OldValue: change.OldValue,
+					NewValue: change.NewValue,
+				}
+
+				if change.SubjectId != nil {
+					params.SubjectID = pgtype.UUID{
+						Bytes: *change.SubjectId,
+						Valid: true,
+					}
+				}
+
+				id, err := qtx.CreateTaskChange(ctx, params)
+				if err != nil {
+					return err
+				}
+
+				updates[idx].Changes[changeIdx].Id = id
+			}
+		}
 	}
 
 	return tx.Commit(ctx)

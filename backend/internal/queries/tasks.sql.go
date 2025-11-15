@@ -13,15 +13,19 @@ import (
 )
 
 const createTask = `-- name: CreateTask :one
-INSERT INTO tasks (project_id, title, description, status, author_id) VALUES ($1, $2, $3, $4, $5) returning id
+INSERT INTO tasks (project_id, title, description, status, author_id, responsible_id, priority, due_date, task_order) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id
 `
 
 type CreateTaskParams struct {
-	ProjectID   uuid.UUID
-	Title       string
-	Description string
-	Status      string
-	AuthorID    uuid.UUID
+	ProjectID     uuid.UUID
+	Title         string
+	Description   string
+	Status        string
+	AuthorID      uuid.UUID
+	ResponsibleID pgtype.UUID
+	Priority      string
+	DueDate       pgtype.Timestamptz
+	TaskOrder     int32
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (uuid.UUID, error) {
@@ -31,6 +35,10 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (uuid.UU
 		arg.Description,
 		arg.Status,
 		arg.AuthorID,
+		arg.ResponsibleID,
+		arg.Priority,
+		arg.DueDate,
+		arg.TaskOrder,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)
@@ -38,96 +46,204 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (uuid.UU
 }
 
 const createTaskChange = `-- name: CreateTaskChange :one
-INSERT INTO task_changes (task_id, user_id, description) VALUES ($1, $2, $3) returning id
+INSERT INTO task_changes (update_id, field, old_value, new_value, subject_id) VALUES ($1, $2, $3, $4, $5) returning id
 `
 
 type CreateTaskChangeParams struct {
-	TaskID      uuid.UUID
-	UserID      pgtype.UUID
-	Description string
+	UpdateID  pgtype.UUID
+	Field     string
+	OldValue  string
+	NewValue  string
+	SubjectID pgtype.UUID
 }
 
 func (q *Queries) CreateTaskChange(ctx context.Context, arg CreateTaskChangeParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, createTaskChange, arg.TaskID, arg.UserID, arg.Description)
+	row := q.db.QueryRow(ctx, createTaskChange,
+		arg.UpdateID,
+		arg.Field,
+		arg.OldValue,
+		arg.NewValue,
+		arg.SubjectID,
+	)
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
 }
 
+const createTaskTag = `-- name: CreateTaskTag :exec
+INSERT INTO task_tags (task_id, name) VALUES ($1, $2)
+`
+
+type CreateTaskTagParams struct {
+	TaskID uuid.UUID
+	Name   string
+}
+
+func (q *Queries) CreateTaskTag(ctx context.Context, arg CreateTaskTagParams) error {
+	_, err := q.db.Exec(ctx, createTaskTag, arg.TaskID, arg.Name)
+	return err
+}
+
+const createTaskUpdate = `-- name: CreateTaskUpdate :one
+INSERT INTO task_updates (task_id, user_id, update_type) VALUES ($1, $2, $3) returning id
+`
+
+type CreateTaskUpdateParams struct {
+	TaskID     uuid.UUID
+	UserID     uuid.UUID
+	UpdateType string
+}
+
+func (q *Queries) CreateTaskUpdate(ctx context.Context, arg CreateTaskUpdateParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createTaskUpdate, arg.TaskID, arg.UserID, arg.UpdateType)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const deleteAllTaskTags = `-- name: DeleteAllTaskTags :exec
+DELETE FROM task_tags WHERE task_id = $1
+`
+
+func (q *Queries) DeleteAllTaskTags(ctx context.Context, taskID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAllTaskTags, taskID)
+	return err
+}
+
+const deleteTaskTag = `-- name: DeleteTaskTag :exec
+DELETE FROM task_tags WHERE task_id = $1 AND name = $2
+`
+
+type DeleteTaskTagParams struct {
+	TaskID uuid.UUID
+	Name   string
+}
+
+func (q *Queries) DeleteTaskTag(ctx context.Context, arg DeleteTaskTagParams) error {
+	_, err := q.db.Exec(ctx, deleteTaskTag, arg.TaskID, arg.Name)
+	return err
+}
+
 const getTaskById = `-- name: GetTaskById :one
-WITH task_changes_cte AS (
-  SELECT 
+WITH task_tags_cte AS (
+  SELECT
+    tt.name as task_tag_name
+  from task_tags tt
+  WHERE tt.task_id = $1
+), task_changes_cte AS (
+  SELECT
     tc.id as task_change_id,
-    tc.task_id as task_change_task_id,
-    tc.user_id as task_change_user_id,
-    tc.description as task_change_description,
+    tc.update_id as task_change_update_id,
+    tc.subject_id as task_change_subject_id,
+    tc.field as task_change_field,
+    tc.old_value as task_change_old_value,
+    tc.new_value as task_change_new_value,
     tc.created_at as task_change_created_at,
-    a.id as task_change_author_id,
-    a.name as task_change_author_name,
-    a.email as task_change_author_email,
-    a.created_at as task_change_author_created_at
+    s.name as task_change_subject_name,
+    s.email as task_change_subject_email,
+    s.created_at as task_change_subject_created_at
    FROM task_changes tc
-   JOIN users a ON a.id = tc.user_id
-   WHERE tc.task_id = $1
-  ORDER BY tc.created_at ASC
+   LEFT JOIN users s ON s.id = tc.subject_id
+   ORDER BY tc.created_at DESC
+), task_updates_cte AS (
+  SELECT
+    tu.id as task_update_id,
+    tu.task_id as task_update_task_id,
+    tu.user_id as task_update_user_id,
+    tu.update_type as task_update_update_type,
+    tu.created_at as task_update_created_at,
+    u.name as task_update_user_name,
+    u.email as task_update_user_email,
+    u.created_at as task_update_user_created_at,
+    coalesce(jsonb_agg(
+      jsonb_build_object(
+        'id', tc.task_change_id,
+        'update_id', tc.task_change_update_id,
+        'subject_id', tc.task_change_subject_id,
+        'field', tc.task_change_field,
+        'old_value', tc.task_change_old_value,
+        'new_value', tc.task_change_new_value,
+        'created_at', tc.task_change_created_at,
+        'subject', jsonb_build_object(
+          'id', tc.task_change_subject_id,
+          'name', tc.task_change_subject_name,
+          'email', tc.task_change_subject_email,
+          'created_at', tc.task_change_subject_created_at
+        )
+      )
+    ) filter (where tc.task_change_id is not null), '[]'::jsonb) as task_changes
+   FROM task_updates tu
+   LEFT JOIN users u ON u.id = tu.user_id
+   LEFT JOIN task_changes_cte tc ON tc.task_change_update_id = tu.id
+   WHERE tu.task_id = $1 
+   GROUP BY tu.id, u.name, u.email, u.created_at
+   ORDER BY tu.created_at DESC
 )
-SELECT 
+SELECT
   t.id as task_id,
   t.project_id as task_project_id,
   t.title as task_title,
   t.description as task_description,
   t.status as task_status,
+  t.priority as task_priority,
+  t.responsible_id as task_responsible_id,
+  t.due_date as task_due_date,
+  t.done_at as task_done_at,
+  t.task_order as task_order,
   t.created_at as task_created_at,
   t.updated_at as task_updated_at,
   t.author_id as task_author_id,
   a.name as task_author_name,
   a.email as task_author_email,
   a.created_at as task_author_created_at,
-  coalesce(jsonb_agg(
+  r.name as task_responsible_name,
+  r.email as task_responsible_email,
+  r.created_at as task_responsible_created_at,
+  (select coalesce(jsonb_agg(tt.task_tag_name) filter (where tt.task_tag_name is not null), '[]') from task_tags_cte tt) as tags,
+  (select coalesce(jsonb_agg(
     jsonb_build_object(
-      'id',
-      tc.task_change_id,
-      'task_id',
-      tc.task_change_task_id,
-      'author_id',
-      tc.task_change_author_id,
-      'change_description',
-      tc.task_change_description,
-      'created_at',
-      tc.task_change_created_at,
-      'author',
-      jsonb_build_object(
-        'id',
-        tc.task_change_author_id,
-        'name',
-        tc.task_change_author_name,
-        'email',
-        tc.task_change_author_email,
-        'created_at',
-        tc.task_change_author_created_at
-      )
+      'id', tu.task_update_id,
+      'task_id', tu.task_update_task_id,
+      'user_id', tu.task_update_user_id,
+      'update_type', tu.task_update_update_type,
+      'created_at', tu.task_update_created_at,
+      'user', jsonb_build_object(
+        'id', tu.task_update_user_id,
+        'name', tu.task_update_user_name,
+        'email', tu.task_update_user_email,
+        'created_at', tu.task_update_user_created_at
+      ),
+      'changes', tu.task_changes
     )
-  ) filter (where tc.task_change_id is not null), '[]'::jsonb) as task_changes
+  ) filter (where tu.task_update_id is not null), '[]'::jsonb) from task_updates_cte tu) as updates
 FROM tasks t
-LEFT JOIN task_changes_cte tc ON tc.task_change_task_id = t.id
 LEFT JOIN users a ON a.id = t.author_id
+LEFT JOIN users r ON r.id = t.responsible_id
 WHERE t.id = $1
-GROUP BY t.id, a.name, a.email, a.created_at
 `
 
 type GetTaskByIdRow struct {
-	TaskID              uuid.UUID
-	TaskProjectID       uuid.UUID
-	TaskTitle           string
-	TaskDescription     string
-	TaskStatus          string
-	TaskCreatedAt       pgtype.Timestamptz
-	TaskUpdatedAt       pgtype.Timestamptz
-	TaskAuthorID        uuid.UUID
-	TaskAuthorName      pgtype.Text
-	TaskAuthorEmail     pgtype.Text
-	TaskAuthorCreatedAt pgtype.Timestamptz
-	TaskChanges         interface{}
+	TaskID                   uuid.UUID
+	TaskProjectID            uuid.UUID
+	TaskTitle                string
+	TaskDescription          string
+	TaskStatus               string
+	TaskPriority             string
+	TaskResponsibleID        pgtype.UUID
+	TaskDueDate              pgtype.Timestamptz
+	TaskDoneAt               pgtype.Timestamptz
+	TaskOrder                int32
+	TaskCreatedAt            pgtype.Timestamptz
+	TaskUpdatedAt            pgtype.Timestamptz
+	TaskAuthorID             uuid.UUID
+	TaskAuthorName           pgtype.Text
+	TaskAuthorEmail          pgtype.Text
+	TaskAuthorCreatedAt      pgtype.Timestamptz
+	TaskResponsibleName      pgtype.Text
+	TaskResponsibleEmail     pgtype.Text
+	TaskResponsibleCreatedAt pgtype.Timestamptz
+	Tags                     interface{}
+	Updates                  interface{}
 }
 
 func (q *Queries) GetTaskById(ctx context.Context, id uuid.UUID) (GetTaskByIdRow, error) {
@@ -139,42 +255,84 @@ func (q *Queries) GetTaskById(ctx context.Context, id uuid.UUID) (GetTaskByIdRow
 		&i.TaskTitle,
 		&i.TaskDescription,
 		&i.TaskStatus,
+		&i.TaskPriority,
+		&i.TaskResponsibleID,
+		&i.TaskDueDate,
+		&i.TaskDoneAt,
+		&i.TaskOrder,
 		&i.TaskCreatedAt,
 		&i.TaskUpdatedAt,
 		&i.TaskAuthorID,
 		&i.TaskAuthorName,
 		&i.TaskAuthorEmail,
 		&i.TaskAuthorCreatedAt,
-		&i.TaskChanges,
+		&i.TaskResponsibleName,
+		&i.TaskResponsibleEmail,
+		&i.TaskResponsibleCreatedAt,
+		&i.Tags,
+		&i.Updates,
 	)
 	return i, err
 }
 
 const listTasksByProjectId = `-- name: ListTasksByProjectId :many
 SELECT 
-  t.id, t.project_id, t.title, t.description, t.status, t.created_at, t.updated_at, t.author_id,
+  t.id, t.project_id, t.title, t.description, t.status, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order,
   a.id as author_author_id,
-  a.name as author_name
+  a.name as author_name,
+  r.id as responsible_responsible_id,
+  r.name as responsible_name,
+  coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
 FROM tasks t
 LEFT JOIN users a ON a.id = t.author_id
+LEFT JOIN users r ON r.id = t.responsible_id
+LEFT JOIN task_tags tt ON tt.task_id = t.id
 WHERE project_id = $1
+AND (
+  cardinality($3::text[]) = 0
+  OR t.status = ANY($3::text[])
+)
+AND (t.task_order >= $4 OR $4 IS NULL)
+GROUP BY t.id, a.name, a.id, r.name, r.id
+ORDER BY t.task_order ASC, t.updated_at DESC
+LIMIT $2
 `
 
-type ListTasksByProjectIdRow struct {
-	ID             uuid.UUID
-	ProjectID      uuid.UUID
-	Title          string
-	Description    string
-	Status         string
-	CreatedAt      pgtype.Timestamptz
-	UpdatedAt      pgtype.Timestamptz
-	AuthorID       uuid.UUID
-	AuthorAuthorID pgtype.UUID
-	AuthorName     pgtype.Text
+type ListTasksByProjectIdParams struct {
+	ProjectID uuid.UUID
+	Limit     int32
+	Statuses  []string
+	TaskOrder pgtype.Int4
 }
 
-func (q *Queries) ListTasksByProjectId(ctx context.Context, projectID uuid.UUID) ([]ListTasksByProjectIdRow, error) {
-	rows, err := q.db.Query(ctx, listTasksByProjectId, projectID)
+type ListTasksByProjectIdRow struct {
+	ID                       uuid.UUID
+	ProjectID                uuid.UUID
+	Title                    string
+	Description              string
+	Status                   string
+	CreatedAt                pgtype.Timestamptz
+	UpdatedAt                pgtype.Timestamptz
+	AuthorID                 uuid.UUID
+	Priority                 string
+	DueDate                  pgtype.Timestamptz
+	DoneAt                   pgtype.Timestamptz
+	ResponsibleID            pgtype.UUID
+	TaskOrder                int32
+	AuthorAuthorID           pgtype.UUID
+	AuthorName               pgtype.Text
+	ResponsibleResponsibleID pgtype.UUID
+	ResponsibleName          pgtype.Text
+	Tags                     interface{}
+}
+
+func (q *Queries) ListTasksByProjectId(ctx context.Context, arg ListTasksByProjectIdParams) ([]ListTasksByProjectIdRow, error) {
+	rows, err := q.db.Query(ctx, listTasksByProjectId,
+		arg.ProjectID,
+		arg.Limit,
+		arg.Statuses,
+		arg.TaskOrder,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -191,8 +349,16 @@ func (q *Queries) ListTasksByProjectId(ctx context.Context, projectID uuid.UUID)
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AuthorID,
+			&i.Priority,
+			&i.DueDate,
+			&i.DoneAt,
+			&i.ResponsibleID,
+			&i.TaskOrder,
 			&i.AuthorAuthorID,
 			&i.AuthorName,
+			&i.ResponsibleResponsibleID,
+			&i.ResponsibleName,
+			&i.Tags,
 		); err != nil {
 			return nil, err
 		}
@@ -205,14 +371,19 @@ func (q *Queries) ListTasksByProjectId(ctx context.Context, projectID uuid.UUID)
 }
 
 const updateTask = `-- name: UpdateTask :exec
-UPDATE tasks SET title = $1, description = $2, status = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4
+UPDATE tasks SET title = $1, description = $2, status = $3, task_order = $4, priority = $5, due_date = $6, responsible_id = $7, done_at = $8, updated_at = CURRENT_TIMESTAMP WHERE id = $9
 `
 
 type UpdateTaskParams struct {
-	Title       string
-	Description string
-	Status      string
-	ID          uuid.UUID
+	Title         string
+	Description   string
+	Status        string
+	TaskOrder     int32
+	Priority      string
+	DueDate       pgtype.Timestamptz
+	ResponsibleID pgtype.UUID
+	DoneAt        pgtype.Timestamptz
+	ID            uuid.UUID
 }
 
 func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
@@ -220,7 +391,26 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 		arg.Title,
 		arg.Description,
 		arg.Status,
+		arg.TaskOrder,
+		arg.Priority,
+		arg.DueDate,
+		arg.ResponsibleID,
+		arg.DoneAt,
 		arg.ID,
 	)
+	return err
+}
+
+const updateTaskOrder = `-- name: UpdateTaskOrder :exec
+UPDATE tasks SET task_order = $1 WHERE id = $2
+`
+
+type UpdateTaskOrderParams struct {
+	TaskOrder int32
+	ID        uuid.UUID
+}
+
+func (q *Queries) UpdateTaskOrder(ctx context.Context, arg UpdateTaskOrderParams) error {
+	_, err := q.db.Exec(ctx, updateTaskOrder, arg.TaskOrder, arg.ID)
 	return err
 }
