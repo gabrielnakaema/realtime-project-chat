@@ -1,10 +1,25 @@
+import { parse } from 'date-fns';
 import { api } from './api';
-import type { Task } from '@/types/task';
+import type { ListTasksRequest, Task } from '@/types/task';
 import type { ITaskForm } from '@/schemas/task-schema';
 import type { Paginated } from '@/types/paginated';
 
-export const listTasksByProjectId = async (projectId: string) => {
-  const response = await api.get(`tasks?project_id=${projectId}`);
+export const listTasksByProjectId = async (request: ListTasksRequest) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('project_id', request.projectId);
+  if (request.statuses.length > 0) {
+    searchParams.set('statuses', request.statuses.join(','));
+  }
+  if (request.taskOrder) {
+    searchParams.set('task_order', request.taskOrder.toString());
+  }
+  if (request.limit) {
+    searchParams.set('limit', request.limit.toString());
+  }
+
+  const response = await api.get('tasks', {
+    searchParams,
+  });
 
   const json = await response.json<Paginated<Task>>();
   return json;
@@ -16,10 +31,21 @@ interface CreateTaskRequest {
 }
 
 export const createTask = async (request: CreateTaskRequest) => {
+  const formattedDueDate = request.form.due_date
+    ? parse(request.form.due_date, 'yyyy-MM-dd', new Date()).toISOString()
+    : null;
+
+  const formTags = request.form.tags ? request.form.tags.split(',').map((tag) => tag.trim()) : null;
+  const uniqueTags = formTags?.length ? Array.from(new Set(formTags)) : null;
+
   const payload = {
     project_id: request.projectId,
     title: request.form.title,
     description: request.form.description,
+    priority: request.form.priority,
+    responsible_id: request.form.responsible_id,
+    due_date: formattedDueDate,
+    tags: uniqueTags,
   };
 
   const response = await api.post('tasks', {
@@ -35,6 +61,13 @@ interface UpdateTaskRequest {
   title: string;
   description: string;
   status: string;
+
+  order: number;
+  priority: string;
+  due_date: string | null;
+  responsible_id: string | null;
+  done_at: string | null;
+  tags: string[];
 }
 
 export const updateTask = async (request: UpdateTaskRequest) => {
@@ -42,6 +75,12 @@ export const updateTask = async (request: UpdateTaskRequest) => {
     title: request.title,
     description: request.description,
     status: request.status,
+    order: request.order,
+    priority: request.priority,
+    due_date: request.due_date,
+    responsible_id: request.responsible_id,
+    done_at: request.done_at,
+    tags: request.tags,
   };
 
   const response = await api.put(`tasks/${request.id}`, {

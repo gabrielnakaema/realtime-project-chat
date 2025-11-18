@@ -1,3 +1,5 @@
+import type { ListTasksRequest } from '@/types/task';
+
 export const userQueryKeys = {
   me: ['users', 'me'],
 } as const;
@@ -12,6 +14,7 @@ export const taskQueryKeys = {
   all: ['tasks'],
   listByProjectId: (projectId: string) => ['tasks', 'list', { projectId }],
   details: (id: string) => ['tasks', 'details', id],
+  list: (request: ListTasksRequest) => ['tasks', 'list', request],
 } as const;
 
 export const chatQueryKeys = {

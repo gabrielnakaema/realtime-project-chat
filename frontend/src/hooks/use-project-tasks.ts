@@ -10,9 +10,16 @@ import { listTasksByProjectId } from '@/services/tasks';
 export const useProjectTasks = (projectId: string) => {
   const queryClient = useQueryClient();
 
+  const params = {
+    projectId,
+    statuses: ['pending', 'doing', 'done'],
+    taskOrder: 0,
+    limit: 50,
+  };
+
   const { data } = useQuery({
-    queryKey: taskQueryKeys.listByProjectId(projectId),
-    queryFn: () => listTasksByProjectId(projectId),
+    queryKey: taskQueryKeys.list(params),
+    queryFn: () => listTasksByProjectId(params),
   });
 
   const tasks = data?.data || [];

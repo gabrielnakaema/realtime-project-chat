@@ -3,6 +3,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CreateTask } from './create-task';
 import type { Task, TaskStatus } from '@/types/task';
+import type { Project } from '@/types/project';
 import { updateTask } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
 import { TaskCard } from '@/components/task-card';
@@ -22,9 +23,10 @@ const columns: Column[] = [
   { id: 'done', title: 'Done', status: 'done', color: 'bg-emerald-50 dark:bg-emerald-950' },
 ];
 
-export function KanbanBoard({ projectId }: { projectId: string }) {
+export const KanbanBoard = ({ project }: { project: Project }) => {
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const queryClient = useQueryClient();
+  const projectId = project.id;
 
   const { tasks } = useProjectTasks(projectId);
 
@@ -52,6 +54,12 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
         status: newStatus,
         title: draggedTask.title,
         description: draggedTask.description,
+        order: draggedTask.order,
+        priority: draggedTask.priority,
+        due_date: draggedTask.due_date,
+        responsible_id: draggedTask.responsible_id,
+        done_at: draggedTask.done_at,
+        tags: draggedTask.tags || [],
       });
     }
 
@@ -79,28 +87,28 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
     <div className="h-full">
       <div className="flex items-center justify-between pb-6">
         <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Task Board</h2>
-        <CreateTask projectId={projectId} />
+        <CreateTask projectId={projectId} projectMembers={project.members} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+      <div className="grid h-[calc(100vh-200px)] grid-cols-1 gap-6 md:grid-cols-3">
         {columns.map((column) => {
           const columnTasks = tasksByStatus[column.status];
           return (
             <div
               key={column.id}
-              className={cn(column.color, 'rounded-lg p-4 flex flex-col overflow-auto')}
+              className={cn(column.color, 'flex flex-col overflow-auto rounded-lg p-4')}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, column.status)}
             >
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold text-slate-900 dark:text-slate-100">{column.title}</h3>
-                  <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-full">
+                  <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-300">
                     {columnTasks.length}
                   </span>
                 </div>
-                <button className="p-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded">
-                  <MoreHorizontal className="w-4 h-4" />
+                <button className="rounded p-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                  <MoreHorizontal className="h-4 w-4" />
                 </button>
               </div>
 
@@ -115,4 +123,4 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
       </div>
     </div>
   );
-}
+};

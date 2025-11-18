@@ -7,7 +7,7 @@ interface InputProps extends React.ComponentPropsWithoutRef<'input'> {
 
 export const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
   return (
-    <div className="space-y-2">
+    <div className="w-full space-y-2">
       <label htmlFor={props.id} className="block text-sm font-medium text-slate-700 dark:text-slate-300">
         {props.label}
       </label>
@@ -15,7 +15,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
         id={props.id}
         type={props.type}
         placeholder={props.placeholder}
-        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-500 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder-slate-400"
         {...props}
         ref={ref}
       />
