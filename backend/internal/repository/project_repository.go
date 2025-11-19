@@ -235,3 +235,31 @@ func (pr *ProjectRepository) MarkUpdatedAt(ctx context.Context, projectId uuid.U
 
 	return q.MarkProjectUpdatedAt(ctx, projectId)
 }
+
+func (pr *ProjectRepository) ListMembersByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.ProjectMember, error) {
+	q := queries.New(pr.pool)
+
+	membersResult, err := q.ListProjectMembersByProjectId(ctx, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	members := make([]domain.ProjectMember, len(membersResult))
+
+	for i, member := range membersResult {
+		members[i] = domain.ProjectMember{
+			Id:        member.ID,
+			UserId:    member.UserID,
+			ProjectId: member.ProjectMemberProjectID,
+			Role:      domain.ProjectMemberRole(member.ProjectMemberRole),
+			User: &domain.User{
+				Id:        member.UserID,
+				Name:      member.UserName,
+				Email:     member.UserEmail,
+				CreatedAt: member.UserCreatedAt.Time,
+			},
+		}
+	}
+
+	return members, nil
+}

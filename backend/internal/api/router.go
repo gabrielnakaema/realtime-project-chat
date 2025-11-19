@@ -60,6 +60,7 @@ func (a *Api) Router() http.Handler {
 		r.Put("/{id}", a.handlers.Project.Update)
 		r.Get("/{id}/activities", a.handlers.Project.ListActivitiesByProject)
 		r.Post("/{id}/members", a.handlers.Project.CreateMember)
+		r.Get("/{id}/members", a.handlers.Project.ListMembersByProjectId)
 		r.Get("/{id}/chat", a.handlers.Chat.GetChatByProjectId)
 		r.Get("/{id}/chat/messages", a.handlers.Chat.ListMessagesByProjectId)
 	})

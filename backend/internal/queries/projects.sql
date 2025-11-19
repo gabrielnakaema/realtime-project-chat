@@ -158,3 +158,19 @@ WHERE user_id = $1
 UPDATE projects
 SET updated_at = CURRENT_TIMESTAMP
 WHERE id = $1;
+
+-- name: ListProjectMembersByProjectId :many
+SELECT
+  pm.id,
+  pm.user_id as project_member_user_id,
+  pm.project_id as project_member_project_id,
+  pm.role as project_member_role,
+  u.id as user_id,
+  u.name as user_name,
+  u.email as user_email,
+  u.created_at as user_created_at,
+  u.updated_at as user_updated_at
+FROM project_members pm
+JOIN users u ON u.id = pm.user_id
+WHERE pm.project_id = $1
+ORDER BY u.name ASC;

@@ -22,6 +22,7 @@ type projectService interface {
 	CreateMember(ctx context.Context, request service.CreateMemberRequest) (*domain.ProjectMember, error)
 	ListActivitiesByProject(ctx context.Context, request service.ListActivitiesByProjectRequest) (*utils.CursorPaginated[domain.ProjectActivity], error)
 	ListUsersProjectActivities(ctx context.Context, request service.ListUsersProjectActivitiesRequest) (*utils.CursorPaginated[domain.ProjectActivity], error)
+	ListMembersByProjectId(ctx context.Context, projectId uuid.UUID, requestUserId uuid.UUID) ([]domain.ProjectMember, error)
 }
 
 type ProjectHandler struct {
@@ -329,6 +330,29 @@ func (h *ProjectHandler) ListUsersProjectActivities(w http.ResponseWriter, r *ht
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, activities, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *ProjectHandler) ListMembersByProjectId(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+
+	id := chi.URLParam(r, "id")
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		BadRequestResponse(w, errors.New("invalid project id"))
+		return
+	}
+
+	members, err := h.projectService.ListMembersByProjectId(r.Context(), parsed, userId)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, members, nil)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

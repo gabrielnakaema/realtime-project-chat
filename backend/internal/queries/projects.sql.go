@@ -160,6 +160,65 @@ func (q *Queries) GetProjectMemberByUserIdAndProjectId(ctx context.Context, arg 
 	return i, err
 }
 
+const listProjectMembersByProjectId = `-- name: ListProjectMembersByProjectId :many
+SELECT
+  pm.id,
+  pm.user_id as project_member_user_id,
+  pm.project_id as project_member_project_id,
+  pm.role as project_member_role,
+  u.id as user_id,
+  u.name as user_name,
+  u.email as user_email,
+  u.created_at as user_created_at,
+  u.updated_at as user_updated_at
+FROM project_members pm
+JOIN users u ON u.id = pm.user_id
+WHERE pm.project_id = $1
+ORDER BY u.name ASC
+`
+
+type ListProjectMembersByProjectIdRow struct {
+	ID                     uuid.UUID
+	ProjectMemberUserID    uuid.UUID
+	ProjectMemberProjectID uuid.UUID
+	ProjectMemberRole      string
+	UserID                 uuid.UUID
+	UserName               string
+	UserEmail              string
+	UserCreatedAt          pgtype.Timestamptz
+	UserUpdatedAt          pgtype.Timestamptz
+}
+
+func (q *Queries) ListProjectMembersByProjectId(ctx context.Context, projectID uuid.UUID) ([]ListProjectMembersByProjectIdRow, error) {
+	rows, err := q.db.Query(ctx, listProjectMembersByProjectId, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProjectMembersByProjectIdRow
+	for rows.Next() {
+		var i ListProjectMembersByProjectIdRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectMemberUserID,
+			&i.ProjectMemberProjectID,
+			&i.ProjectMemberRole,
+			&i.UserID,
+			&i.UserName,
+			&i.UserEmail,
+			&i.UserCreatedAt,
+			&i.UserUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProjectsByUserId = `-- name: ListProjectsByUserId :many
 WITH project_members_cte AS (
   SELECT

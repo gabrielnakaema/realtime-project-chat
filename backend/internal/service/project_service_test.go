@@ -41,6 +41,14 @@ func (m *mockProjectRepository) Create(ctx context.Context, project *domain.Proj
 	return args.Error(0)
 }
 
+func (m *mockProjectRepository) ListMembersByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.ProjectMember, error) {
+	args := m.Called(ctx, projectId)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.ProjectMember), args.Error(1)
+}
+
 func (m *mockProjectRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Project, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {

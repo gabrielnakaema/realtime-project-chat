@@ -20,6 +20,7 @@ type projectRepository interface {
 	CreateMember(ctx context.Context, member *domain.ProjectMember) error
 	RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) error
 	GetMemberByUserIdAndProjectId(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) (*domain.ProjectMember, error)
+	ListMembersByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.ProjectMember, error)
 }
 
 type projectServiceActivityRepository interface {
@@ -356,4 +357,28 @@ func (ps *ProjectService) ListUsersProjectActivities(ctx context.Context, reques
 	}
 
 	return activities, nil
+}
+
+func (ps *ProjectService) ListMembersByProjectId(ctx context.Context, projectId uuid.UUID, requestUserId uuid.UUID) ([]domain.ProjectMember, error) {
+	if requestUserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	members, err := ps.projectRepository.ListMembersByProjectId(ctx, projectId)
+	if err != nil {
+		return nil, domain.ServerError("failed to list members", err)
+	}
+
+	hasPermission := false
+	for _, member := range members {
+		if member.UserId == requestUserId {
+			hasPermission = true
+			break
+		}
+	}
+	if !hasPermission {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	return members, nil
 }
