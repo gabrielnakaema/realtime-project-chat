@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { Project } from '@/types/project';
+import type { Member, Project } from '@/types/project';
 import type { IProjectForm } from '@/schemas/project-schema';
 
 export const listProjects = async () => {
@@ -62,5 +62,12 @@ export const createProjectMember = async (request: CreateProjectMemberRequest) =
   });
 
   const json = await response.json();
+  return json;
+};
+
+export const listMembersByProjectId = async (projectId: string) => {
+  const response = await api.get(`projects/${projectId}/members`);
+
+  const json = await response.json<Member[]>();
   return json;
 };

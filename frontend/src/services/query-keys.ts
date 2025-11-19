@@ -8,6 +8,7 @@ export const projectQueryKeys = {
   all: ['projects'],
   list: ['projects', 'list'],
   details: (id: string) => ['projects', 'details', id],
+  members: (id: string) => ['projects', 'members', id],
 } as const;
 
 export const taskQueryKeys = {

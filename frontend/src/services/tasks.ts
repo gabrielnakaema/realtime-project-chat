@@ -25,15 +25,27 @@ export const listTasksByProjectId = async (request: ListTasksRequest) => {
   return json;
 };
 
+const formatDateForApi = (date: string | null | undefined) => {
+  if (!date) return null;
+
+  try {
+    if (date.includes('T')) {
+      return date;
+    }
+
+    return parse(date, 'yyyy-MM-dd', new Date()).toISOString();
+  } catch (error) {
+    return null;
+  }
+};
+
 interface CreateTaskRequest {
   projectId: string;
   form: ITaskForm;
 }
 
 export const createTask = async (request: CreateTaskRequest) => {
-  const formattedDueDate = request.form.due_date
-    ? parse(request.form.due_date, 'yyyy-MM-dd', new Date()).toISOString()
-    : null;
+  const formattedDueDate = formatDateForApi(request.form.due_date);
 
   const formTags = request.form.tags ? request.form.tags.split(',').map((tag) => tag.trim()) : null;
   const uniqueTags = formTags?.length ? Array.from(new Set(formTags)) : null;
@@ -71,15 +83,19 @@ interface UpdateTaskRequest {
 }
 
 export const updateTask = async (request: UpdateTaskRequest) => {
+  const formattedDueDate = formatDateForApi(request.due_date);
+
+  const formattedDoneAt = formatDateForApi(request.done_at);
+
   const payload = {
     title: request.title,
     description: request.description,
     status: request.status,
     order: request.order,
     priority: request.priority,
-    due_date: request.due_date,
-    responsible_id: request.responsible_id,
-    done_at: request.done_at,
+    due_date: formattedDueDate,
+    responsible_id: request.responsible_id || null,
+    done_at: formattedDoneAt,
     tags: request.tags,
   };
 

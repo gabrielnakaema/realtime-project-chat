@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Avatar } from './avatar';
 import { TaskDetails } from './task-details';
 import { TaskPriorityBadge } from './task-priority-badge';
+import { EditTask } from './edit-task';
 import type { Task } from '@/types/task';
 
 interface TaskCardProps {
@@ -12,7 +13,10 @@ interface TaskCardProps {
 
 export const TaskCard = ({ task, onDragStart }: TaskCardProps) => {
   const [open, setOpen] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
 
+  console.log('openEdit', openEdit);
+  console.log('open', open);
   return (
     <>
       <div
@@ -55,7 +59,16 @@ export const TaskCard = ({ task, onDragStart }: TaskCardProps) => {
           )}
         </div>
       </div>
-      <TaskDetails taskId={task.id} open={open} onOpenChange={setOpen} />
+      <TaskDetails
+        taskId={task.id}
+        open={open}
+        onOpenChange={setOpen}
+        onEdit={() => {
+          setOpenEdit(true);
+          setOpen(false);
+        }}
+      />
+      <EditTask taskId={task.id} open={openEdit} onOpenChange={setOpenEdit} />
     </>
   );
 };

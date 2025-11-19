@@ -1,33 +1,26 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { format, parseISO } from 'date-fns';
+import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Button } from './button';
 import { Input } from './input';
 import { LoadingSpinner } from './loading';
 import { Select } from './select';
 import { Textarea } from './textarea';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import type { SubmitHandler } from 'react-hook-form';
-import type { Member } from '@/types/project';
 import type { ITaskForm } from '@/schemas/task-schema';
 import { handleSuccess } from '@/utils/handle-success';
-import { createTask } from '@/services/tasks';
-import { taskQueryKeys } from '@/services/query-keys';
+import { getTask, updateTask } from '@/services/tasks';
+import { projectQueryKeys, taskQueryKeys } from '@/services/query-keys';
+import { listMembersByProjectId } from '@/services/projects';
 import { taskSchema } from '@/schemas/task-schema';
 
-interface CreateTaskModalProps {
-  projectId: string;
-  projectMembers: Member[];
+interface EditTaskProps {
+  taskId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 const priorityOptions = [
@@ -36,50 +29,100 @@ const priorityOptions = [
   { label: 'High', value: 'high' },
 ];
 
-export const CreateTask = ({ projectId, projectMembers }: CreateTaskModalProps) => {
-  const [open, setOpen] = useState(false);
+export const EditTask = ({ taskId, open, onOpenChange }: EditTaskProps) => {
   const queryClient = useQueryClient();
 
-  const memberOptions = projectMembers.map((member) => ({
+  const { data: task, isLoading } = useQuery({
+    queryKey: taskQueryKeys.details(taskId),
+    queryFn: () => getTask(taskId),
+    enabled: open,
+  });
+
+  const { data: projectMembers, isLoading: isProjectMembersLoading } = useQuery({
+    queryKey: projectQueryKeys.members(task?.project_id ?? ''),
+    queryFn: () => listMembersByProjectId(task?.project_id ?? ''),
+    enabled: open && !!task?.project_id,
+  });
+
+  const memberOptions = projectMembers?.map((member) => ({
     label: member.user.name,
     value: member.user.id,
   }));
 
   const {
-    control,
     register,
+    control,
     handleSubmit,
-    formState: { errors },
     reset,
+    formState: { errors },
   } = useForm<ITaskForm>({
     resolver: zodResolver(taskSchema),
   });
 
   const { mutate, isPending } = useMutation({
-    mutationFn: createTask,
+    mutationFn: updateTask,
     onSuccess: () => {
-      handleSuccess('Task created successfully');
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.listByProjectId(projectId) });
-      setOpen(false);
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+      handleSuccess('Task updated successfully');
+      onOpenChange(false);
       reset();
     },
   });
 
-  const onSubmit: SubmitHandler<ITaskForm> = (form) => {
+  useEffect(() => {
+    if (task) {
+      reset({
+        title: task.title,
+        description: task.description,
+        due_date: task.due_date ? format(parseISO(task.due_date), 'yyyy-MM-dd') : undefined,
+        priority: task.priority,
+        responsible_id: task.responsible_id,
+        tags: task.tags?.join(',') || undefined,
+      });
+    }
+  }, [task, reset]);
+
+  const onSubmit: SubmitHandler<ITaskForm> = (data) => {
     mutate({
-      projectId,
-      form,
+      id: taskId,
+      description: data.description,
+      title: data.title,
+      priority: data.priority,
+      due_date: data.due_date ?? null,
+      responsible_id: data.responsible_id ?? null,
+      tags: data.tags?.split(',').map((tag) => tag.trim()) || [],
+      done_at: null,
+      order: task?.order ?? 0,
+      status: task?.status ?? 'pending',
     });
   };
 
+  if (isLoading || isProjectMembersLoading) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <div className="flex min-h-50 flex-col items-center justify-center">
+            <LoadingSpinner size="3rem" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (!task) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <div className="flex min-h-50 flex-col items-center justify-center">
+            <p className="text-sm text-slate-500 dark:text-slate-400">Task not found</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button type="button" className="flex w-fit items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Create task
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="md:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Create task</DialogTitle>
@@ -99,7 +142,7 @@ export const CreateTask = ({ projectId, projectMembers }: CreateTaskModalProps) 
             name="responsible_id"
             render={({ field }) => (
               <Select
-                options={memberOptions}
+                options={memberOptions ?? []}
                 value={field.value ?? ''}
                 onChange={field.onChange}
                 label="Responsible"
@@ -190,7 +233,7 @@ export const CreateTask = ({ projectId, projectMembers }: CreateTaskModalProps) 
               </Button>
             </DialogClose>
             <Button type="submit" disabled={isPending}>
-              {isPending ? <LoadingSpinner size="1.5em" /> : 'Create task'}
+              {isPending ? <LoadingSpinner size="1.5em" /> : 'Save changes'}
             </Button>
           </div>
         </form>

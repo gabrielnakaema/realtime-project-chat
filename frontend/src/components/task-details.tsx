@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Activity, Calendar, CircleCheck, ClockArrowUp, Tag, User, X } from 'lucide-react';
+import { Activity, Calendar, CircleCheck, ClockArrowUp, Pencil, Tag, User, X } from 'lucide-react';
 import { LoadingSpinner } from './loading';
 import { TaskDetailsUpdate } from './task-details-update';
 import { TaskPriorityBadge } from './task-priority-badge';
@@ -14,9 +14,10 @@ interface TaskDetailsProps {
   taskId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEdit: () => void;
 }
 
-export const TaskDetails = ({ taskId, open, onOpenChange }: TaskDetailsProps) => {
+export const TaskDetails = ({ taskId, open, onOpenChange, onEdit }: TaskDetailsProps) => {
   const { data: task, isLoading } = useQuery({
     queryKey: taskQueryKeys.details(taskId),
     queryFn: () => getTask(taskId),
@@ -57,11 +58,23 @@ export const TaskDetails = ({ taskId, open, onOpenChange }: TaskDetailsProps) =>
       <DialogContent className="pr-0 md:max-w-2xl" autoFocus={false} showCloseButton={false}>
         <DialogHeader className="position-sticky bg-background top-0 mr-4 flex flex-row items-center justify-between gap-2 border-b border-slate-200 pb-4 dark:border-slate-700">
           <DialogTitle className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{task.title}</DialogTitle>
-          <DialogClose asChild>
-            <button type="button" className="w-fit rounded-md px-2 py-1 font-medium transition-colors">
-              <X className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="w-fit rounded-md p-2 font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+              onClick={onEdit}
+            >
+              <Pencil className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             </button>
-          </DialogClose>
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="w-fit rounded-md p-2 font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              </button>
+            </DialogClose>
+          </div>
         </DialogHeader>
 
         <ScrollArea className="max-h-[50vh] pr-4">
