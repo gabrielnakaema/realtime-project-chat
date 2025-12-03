@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/queries"
@@ -372,4 +373,128 @@ func (tr *TaskRepository) CreateUpdates(ctx context.Context, task *domain.Task, 
 	}
 
 	return tx.Commit(ctx)
+}
+
+func (tr *TaskRepository) GetSmallestOrderProjectTask(ctx context.Context, projectId uuid.UUID) (*domain.Task, error) {
+	q := queries.New(tr.pool)
+
+	result, err := q.GetSmallestOrderProjectTask(ctx, projectId)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.NotFoundError("no tasks found for project")
+		}
+		return nil, err
+	}
+
+	fmt.Println("result order smallest task", result.TaskOrder)
+
+	task := domain.Task{
+		Id:          result.ID,
+		ProjectId:   result.ProjectID,
+		AuthorId:    result.AuthorID,
+		Title:       result.Title,
+		Description: result.Description,
+		Status:      domain.TaskStatus(result.Status),
+		Priority:    domain.TaskPriority(result.Priority),
+		Order:       int(result.TaskOrder),
+		CreatedAt:   result.CreatedAt.Time,
+		UpdatedAt:   result.UpdatedAt.Time,
+	}
+
+	return &task, nil
+}
+
+func (tr *TaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.UUID, projectId uuid.UUID) (*domain.Task, error) {
+	q := queries.New(tr.pool)
+
+	params := queries.GetProjectTaskAfterIdParams{
+		ID:        id,
+		ProjectID: projectId,
+	}
+
+	result, err := q.GetProjectTaskAfterId(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.NotFoundError("task not found")
+		}
+		return nil, err
+	}
+
+	task := domain.Task{
+		Id:          result.ID,
+		ProjectId:   result.ProjectID,
+		AuthorId:    result.AuthorID,
+		Title:       result.Title,
+		Description: result.Description,
+		Status:      domain.TaskStatus(result.Status),
+		Priority:    domain.TaskPriority(result.Priority),
+		Order:       int(result.TaskOrder),
+		CreatedAt:   result.CreatedAt.Time,
+		UpdatedAt:   result.UpdatedAt.Time,
+	}
+
+	return &task, nil
+}
+
+func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID) (*domain.Task, error) {
+	q := queries.New(tr.pool)
+	tx, err := tr.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := q.WithTx(tx)
+
+	params := queries.MoveTaskParams{
+		TaskOrder: int32(task.Order),
+		Status:    string(task.Status),
+		UserID:    userId,
+		ID:        task.Id,
+	}
+
+	result, err := qtx.MoveTask(ctx, params)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.NotFoundError("task not found")
+		}
+		return nil, err
+	}
+
+	task.Id = result.ID
+	task.Order = int(result.TaskOrder)
+	task.Status = domain.TaskStatus(result.Status)
+
+	task, err = tr.GetById(ctx, result.ID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.NotFoundError("task not found")
+		}
+		return nil, err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
+func (tr *TaskRepository) NormalizeProjectTaskOrders(ctx context.Context, projectId uuid.UUID) error {
+	const multiplier = 1000
+
+	query := `
+		UPDATE tasks t
+			set task_order = (t2.seqnum + 1) * $2
+			from (select t2.id, row_number() over(ORDER BY t2.task_order ASC, t2.updated_at DESC) as seqnum from tasks t2 where t2.project_id = $1) t2
+		where t.id = t2.id
+	`
+
+	_, err := tr.pool.Exec(ctx, query, projectId, multiplier)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

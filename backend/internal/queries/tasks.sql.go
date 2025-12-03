@@ -124,6 +124,67 @@ func (q *Queries) DeleteTaskTag(ctx context.Context, arg DeleteTaskTagParams) er
 	return err
 }
 
+const getProjectTaskAfterId = `-- name: GetProjectTaskAfterId :one
+SELECT t.id, t.project_id, t.title, t.description, t.status, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order 
+FROM tasks t
+WHERE t.task_order >= (SELECT task_order FROM tasks t2 WHERE t2.id = $1 AND t2.project_id = $2)
+  AND t.project_id = $2
+  AND t.id != $1
+ORDER BY t.task_order ASC, t.updated_at DESC
+LIMIT 1
+`
+
+type GetProjectTaskAfterIdParams struct {
+	ID        uuid.UUID
+	ProjectID uuid.UUID
+}
+
+func (q *Queries) GetProjectTaskAfterId(ctx context.Context, arg GetProjectTaskAfterIdParams) (Task, error) {
+	row := q.db.QueryRow(ctx, getProjectTaskAfterId, arg.ID, arg.ProjectID)
+	var i Task
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AuthorID,
+		&i.Priority,
+		&i.DueDate,
+		&i.DoneAt,
+		&i.ResponsibleID,
+		&i.TaskOrder,
+	)
+	return i, err
+}
+
+const getSmallestOrderProjectTask = `-- name: GetSmallestOrderProjectTask :one
+SELECT id, project_id, title, description, status, created_at, updated_at, author_id, priority, due_date, done_at, responsible_id, task_order FROM tasks WHERE project_id = $1 ORDER BY task_order ASC, updated_at DESC LIMIT 1
+`
+
+func (q *Queries) GetSmallestOrderProjectTask(ctx context.Context, projectID uuid.UUID) (Task, error) {
+	row := q.db.QueryRow(ctx, getSmallestOrderProjectTask, projectID)
+	var i Task
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AuthorID,
+		&i.Priority,
+		&i.DueDate,
+		&i.DoneAt,
+		&i.ResponsibleID,
+		&i.TaskOrder,
+	)
+	return i, err
+}
+
 const getTaskById = `-- name: GetTaskById :one
 WITH task_tags_cte AS (
   SELECT
@@ -368,6 +429,43 @@ func (q *Queries) ListTasksByProjectId(ctx context.Context, arg ListTasksByProje
 		return nil, err
 	}
 	return items, nil
+}
+
+const moveTask = `-- name: MoveTask :one
+UPDATE tasks t
+SET task_order = $1,
+    status = $2,
+    updated_at = CURRENT_TIMESTAMP
+FROM projects p
+JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $3
+WHERE t.id = $4
+  AND p.id = t.project_id
+RETURNING t.id, t.task_order, t.status
+`
+
+type MoveTaskParams struct {
+	TaskOrder int32
+	Status    string
+	UserID    uuid.UUID
+	ID        uuid.UUID
+}
+
+type MoveTaskRow struct {
+	ID        uuid.UUID
+	TaskOrder int32
+	Status    string
+}
+
+func (q *Queries) MoveTask(ctx context.Context, arg MoveTaskParams) (MoveTaskRow, error) {
+	row := q.db.QueryRow(ctx, moveTask,
+		arg.TaskOrder,
+		arg.Status,
+		arg.UserID,
+		arg.ID,
+	)
+	var i MoveTaskRow
+	err := row.Scan(&i.ID, &i.TaskOrder, &i.Status)
+	return i, err
 }
 
 const updateTask = `-- name: UpdateTask :exec

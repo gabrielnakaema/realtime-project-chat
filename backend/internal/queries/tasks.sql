@@ -140,3 +140,26 @@ INSERT INTO task_updates (task_id, user_id, update_type) VALUES ($1, $2, $3) ret
 
 -- name: CreateTaskChange :one
 INSERT INTO task_changes (update_id, field, old_value, new_value, subject_id) VALUES ($1, $2, $3, $4, $5) returning id;
+
+-- name: GetSmallestOrderProjectTask :one
+SELECT id, project_id, title, description, status, created_at, updated_at, author_id, priority, due_date, done_at, responsible_id, task_order FROM tasks WHERE project_id = $1 ORDER BY task_order ASC, updated_at DESC LIMIT 1;
+
+-- name: GetProjectTaskAfterId :one
+SELECT t.* 
+FROM tasks t
+WHERE t.task_order >= (SELECT task_order FROM tasks t2 WHERE t2.id = $1)
+  AND t.project_id = $2
+  AND t.id != $1
+ORDER BY t.task_order ASC, t.updated_at DESC
+LIMIT 1;
+
+-- name: MoveTask :one
+UPDATE tasks t
+SET task_order = $1,
+    status = $2,
+    updated_at = CURRENT_TIMESTAMP
+FROM projects p
+JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $3
+WHERE t.id = $4
+  AND p.id = t.project_id
+RETURNING t.id, t.task_order, t.status;

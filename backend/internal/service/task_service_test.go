@@ -54,6 +54,38 @@ func (m *mockTaskRepository) CreateUpdates(ctx context.Context, task *domain.Tas
 	return args.Error(0)
 }
 
+func (m *mockTaskRepository) GetSmallestOrderProjectTask(ctx context.Context, projectId uuid.UUID) (*domain.Task, error) {
+	args := m.Called(ctx, projectId)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Task), args.Error(1)
+}
+
+func (m *mockTaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.UUID, projectId uuid.UUID) (*domain.Task, error) {
+	args := m.Called(ctx, id, projectId)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Task), args.Error(1)
+}
+
+func (m *mockTaskRepository) MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID) (*domain.Task, error) {
+	args := m.Called(ctx, task, userId)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Task), args.Error(1)
+}
+
+func (m *mockTaskRepository) NormalizeProjectTaskOrders(ctx context.Context, projectId uuid.UUID) error {
+	args := m.Called(ctx, projectId)
+	if args.Get(0) == nil {
+		return args.Error(0)
+	}
+	return args.Error(0)
+}
+
 func TestTaskService_Create(t *testing.T) {
 	validUserId := uuid.New()
 	validProjectId := uuid.New()
@@ -112,13 +144,13 @@ func TestTaskService_Create(t *testing.T) {
 				Description:   "Test Description",
 				RequestUserId: validUserId,
 				Priority:      string(domain.TaskPriorityLow),
-				Order:         0,
 				ResponsibleId: nil,
 				DueDate:       nil,
 				Tags:          []string{},
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				repo.On("GetSmallestOrderProjectTask", mock.Anything, validProjectId).Return(nil, domain.NotFoundError("not found"))
 				repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 			},
@@ -267,7 +299,6 @@ func TestTaskService_Update(t *testing.T) {
 				Status:        domain.TaskStatusDone,
 				RequestUserId: validUserId,
 				Priority:      domain.TaskPriorityHigh,
-				Order:         1,
 				ResponsibleId: nil,
 				DueDate:       nil,
 				Tags:          []string{},

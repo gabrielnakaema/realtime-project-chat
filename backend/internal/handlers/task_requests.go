@@ -14,7 +14,6 @@ type CreateTaskRequest struct {
 	Title         string     `json:"title"`
 	Description   string     `json:"description"`
 	Priority      string     `json:"priority"`
-	Order         int        `json:"order"`
 	ResponsibleId *uuid.UUID `json:"responsible_id"`
 	DueDate       *time.Time `json:"due_date"`
 	Tags          []string   `json:"tags"`
@@ -39,7 +38,6 @@ type UpdateTaskRequest struct {
 	Description   string     `json:"description"`
 	Status        string     `json:"status"`
 	Priority      string     `json:"priority"`
-	Order         int        `json:"order"`
 	ResponsibleId *uuid.UUID `json:"responsible_id"`
 	DueDate       *time.Time `json:"due_date"`
 	Tags          []string   `json:"tags"`
@@ -66,4 +64,17 @@ func (r *UpdateTaskRequest) Validate(v *validator.Validator) {
 		v.Check("due_date", "due_date is required", r.DueDate != nil)
 	}
 
+}
+
+type MoveTaskRequest struct {
+	AfterTaskId *uuid.UUID `json:"after_task_id"`
+	ProjectId   uuid.UUID  `json:"project_id"`
+	Status      string     `json:"status"`
+}
+
+func (r *MoveTaskRequest) Validate(v *validator.Validator) {
+	v.Check("status", "status is required", validator.NotBlank(r.Status))
+	v.Check("status", "status is invalid", slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(r.Status)))
+
+	v.Check("project_id", "project_id is required", r.ProjectId != uuid.Nil)
 }

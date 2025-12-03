@@ -16,6 +16,10 @@ type taskRepository interface {
 	ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, limit int) ([]domain.Task, error)
 	Update(ctx context.Context, task *domain.Task) error
 	CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error
+	GetSmallestOrderProjectTask(ctx context.Context, projectId uuid.UUID) (*domain.Task, error)
+	GetProjectTaskAfterId(ctx context.Context, id uuid.UUID, projectId uuid.UUID) (*domain.Task, error)
+	MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID) (*domain.Task, error)
+	NormalizeProjectTaskOrders(ctx context.Context, projectId uuid.UUID) error
 }
 
 type taskServiceProjectRepository interface {
@@ -55,7 +59,6 @@ type CreateTaskRequest struct {
 	DueDate       *time.Time
 	ResponsibleId *uuid.UUID
 	Tags          []string
-	Order         int
 }
 
 func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*domain.Task, error) {
@@ -84,6 +87,32 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		return nil, domain.ServerError("failed to get user", err)
 	}
 
+	orderTask, err := ts.taskRepository.GetSmallestOrderProjectTask(ctx, request.ProjectId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code != domain.NotFoundErrorCode {
+				return nil, domain.ServerError("failed to get smallest project task order", err)
+			}
+		} else {
+			return nil, domain.ServerError("failed to get smallest project task order", err)
+		}
+	}
+
+	order := 1000
+
+	if orderTask == nil {
+		order = 1000
+	} else {
+		order = order / 2
+		if order < 50 {
+			err = ts.taskRepository.NormalizeProjectTaskOrders(ctx, request.ProjectId)
+			if err != nil {
+				return nil, domain.ServerError("failed to normalize project task orders", err)
+			}
+		}
+	}
+
 	task := domain.Task{
 		ProjectId:     request.ProjectId,
 		Title:         request.Title,
@@ -94,7 +123,7 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		UpdatedAt:     time.Now(),
 		Author:        user,
 		Priority:      domain.TaskPriority(request.Priority),
-		Order:         request.Order,
+		Order:         int(order),
 		ResponsibleId: request.ResponsibleId,
 		DueDate:       request.DueDate,
 		Tags:          request.Tags,
@@ -131,7 +160,6 @@ type UpdateTaskRequest struct {
 	DueDate       *time.Time
 	ResponsibleId *uuid.UUID
 	Tags          []string
-	Order         int
 	DoneAt        *time.Time
 }
 
@@ -181,10 +209,10 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		AuthorId:      task.AuthorId,
 		CreatedAt:     task.CreatedAt,
 		Author:        task.Author,
+		Order:         task.Order,
 		Title:         request.Title,
 		Description:   request.Description,
 		Priority:      request.Priority,
-		Order:         request.Order,
 		ResponsibleId: request.ResponsibleId,
 		DueDate:       request.DueDate,
 		DoneAt:        request.DoneAt,
@@ -308,4 +336,115 @@ func (ts *TaskService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UU
 	}
 
 	return task, nil
+}
+
+type MoveTaskRequest struct {
+	TaskId        uuid.UUID
+	RequestUserId uuid.UUID
+	AfterTaskId   *uuid.UUID
+	ProjectId     uuid.UUID
+	Status        domain.TaskStatus
+}
+
+func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*domain.Task, error) {
+	if request.RequestUserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	newOrder, prevOrder, err := ts.calculateOrder(ctx, request)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("task not found")
+			}
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to calculate order", err)
+	}
+
+	needsNormalization := false
+	if request.AfterTaskId == nil {
+		if newOrder < 1 {
+			needsNormalization = true
+		}
+	} else {
+		if newOrder <= prevOrder {
+			needsNormalization = true
+		}
+	}
+
+	if needsNormalization {
+		err = ts.taskRepository.NormalizeProjectTaskOrders(ctx, request.ProjectId)
+		if err != nil {
+			return nil, domain.ServerError("failed to normalize project task orders", err)
+		}
+
+		newOrder, _, err = ts.calculateOrder(ctx, request)
+		if err != nil {
+			return nil, domain.ServerError("failed to recalculate order", err)
+		}
+	}
+
+	task := domain.Task{
+		Id:        request.TaskId,
+		ProjectId: request.ProjectId,
+		Order:     newOrder,
+		Status:    request.Status,
+	}
+
+	updatedTask, err := ts.taskRepository.MoveTask(ctx, &task, request.RequestUserId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("task not found")
+			}
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to move task", err)
+	}
+
+	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
+		Task: *updatedTask,
+		User: domain.User{
+			Id: request.RequestUserId,
+		},
+	})
+	if err != nil {
+		return nil, domain.ServerError("failed to publish task moved event", err)
+	}
+
+	return updatedTask, nil
+}
+
+// Returns the new, previous order and an error if any
+func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskRequest) (int, int, error) {
+	if request.AfterTaskId == nil {
+		smallestTask, err := ts.taskRepository.GetSmallestOrderProjectTask(ctx, request.ProjectId)
+		if err != nil {
+			var domainErr domain.DomainError
+			if errors.As(err, &domainErr) && domainErr.Code == domain.NotFoundErrorCode {
+				return 1000, 0, nil
+			}
+			return 0, 0, err
+		}
+		return int(smallestTask.Order / 2), 0, nil
+	}
+
+	prevTask, err := ts.taskRepository.GetById(ctx, *request.AfterTaskId)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	nextTask, err := ts.taskRepository.GetProjectTaskAfterId(ctx, *request.AfterTaskId, request.ProjectId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) && domainErr.Code == domain.NotFoundErrorCode {
+			return prevTask.Order + 1000, prevTask.Order, nil
+		}
+		return 0, 0, err
+	}
+
+	return int((prevTask.Order + nextTask.Order) / 2), prevTask.Order, nil
 }

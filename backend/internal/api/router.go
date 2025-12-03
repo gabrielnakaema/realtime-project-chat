@@ -76,6 +76,7 @@ func (a *Api) Router() http.Handler {
 		r.Post("/", a.handlers.Task.Create)
 		r.Get("/{id}", a.handlers.Task.Get)
 		r.Put("/{id}", a.handlers.Task.Update)
+		r.Patch("/{id}/move", a.handlers.Task.Move)
 	})
 
 	r.Route("/ws", func(r chi.Router) {

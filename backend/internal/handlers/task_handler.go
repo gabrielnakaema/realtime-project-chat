@@ -21,6 +21,7 @@ type taskService interface {
 	List(ctx context.Context, request service.ListTasksRequest) ([]domain.Task, error)
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error)
 	Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error)
+	Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error)
 }
 
 type TaskHandler struct {
@@ -57,7 +58,6 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Description:   request.Description,
 		RequestUserId: userId,
 		Priority:      request.Priority,
-		Order:         request.Order,
 		ResponsibleId: request.ResponsibleId,
 		DueDate:       request.DueDate,
 		Tags:          request.Tags,
@@ -196,7 +196,6 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Status:        domain.TaskStatus(request.Status),
 		RequestUserId: userId,
 		Priority:      domain.TaskPriority(request.Priority),
-		Order:         request.Order,
 		ResponsibleId: request.ResponsibleId,
 		DueDate:       request.DueDate,
 		Tags:          request.Tags,
@@ -204,6 +203,51 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	task, err := h.taskService.Update(r.Context(), serviceRequest)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, task, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *TaskHandler) Move(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	parsedId, err := uuid.Parse(id)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	var request MoveTaskRequest
+	err = utils.ReadJSON(w, r, &request)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	v := validator.New()
+	request.Validate(v)
+	if !v.Valid() {
+		ValidationFailedResponse(w, v)
+		return
+	}
+
+	userId := UserIdFromContext(r.Context())
+
+	serviceRequest := service.MoveTaskRequest{
+		TaskId:        parsedId,
+		RequestUserId: userId,
+		AfterTaskId:   request.AfterTaskId,
+		ProjectId:     request.ProjectId,
+		Status:        domain.TaskStatus(request.Status),
+	}
+
+	task, err := h.taskService.Move(r.Context(), serviceRequest)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return
