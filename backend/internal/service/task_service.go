@@ -7,13 +7,14 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 )
 
 type taskRepository interface {
 	Create(ctx context.Context, task *domain.Task) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
-	ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, limit int) ([]domain.Task, error)
+	ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, limit int) (*utils.CursorPaginated[domain.Task], error)
 	Update(ctx context.Context, task *domain.Task) error
 	CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error
 	GetSmallestOrderProjectTask(ctx context.Context, projectId uuid.UUID) (*domain.Task, error)
@@ -276,7 +277,7 @@ type ListTasksRequest struct {
 	Limit         int
 }
 
-func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) ([]domain.Task, error) {
+func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
 	if request.RequestUserId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
@@ -336,6 +337,46 @@ func (ts *TaskService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UU
 	}
 
 	return task, nil
+}
+
+type GroupByStatusRequest struct {
+	ProjectId uuid.UUID
+	UserId    uuid.UUID
+	Statuses  []domain.TaskStatus
+	TaskOrder int
+	Limit     int
+}
+
+func (ts *TaskService) GroupByStatus(ctx context.Context, request GroupByStatusRequest) (map[domain.TaskStatus]utils.CursorPaginated[domain.Task], error) {
+	if request.UserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
+	if err != nil {
+		return nil, domain.ServerError("failed to get project", err)
+	}
+
+	if !project.IsMember(request.UserId) {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	stringStatuses := []string{}
+	for _, status := range request.Statuses {
+		stringStatuses = append(stringStatuses, string(status))
+	}
+
+	results := map[domain.TaskStatus]utils.CursorPaginated[domain.Task]{}
+
+	for _, status := range stringStatuses {
+		result, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, []string{status}, request.TaskOrder, request.Limit)
+		if err != nil {
+			return nil, domain.ServerError("failed to list tasks", err)
+		}
+		results[domain.TaskStatus(status)] = *result
+	}
+
+	return results, nil
 }
 
 type MoveTaskRequest struct {

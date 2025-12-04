@@ -18,10 +18,11 @@ import (
 
 type taskService interface {
 	Create(ctx context.Context, request service.CreateTaskRequest) (*domain.Task, error)
-	List(ctx context.Context, request service.ListTasksRequest) ([]domain.Task, error)
+	List(ctx context.Context, request service.ListTasksRequest) (*utils.CursorPaginated[domain.Task], error)
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error)
 	Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error)
 	Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error)
+	GroupByStatus(ctx context.Context, request service.GroupByStatusRequest) (map[domain.TaskStatus]utils.CursorPaginated[domain.Task], error)
 }
 
 type TaskHandler struct {
@@ -95,6 +96,17 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		statusesArray = []string{}
 	}
 
+	limit := utils.GetQueryInt(r, "limit", 15)
+	if limit <= 0 {
+		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		return
+	}
+
+	if limit > 100 {
+		BadRequestResponse(w, errors.New("limit must be less than 100"))
+		return
+	}
+
 	for _, status := range statusesArray {
 		if !slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(status)) {
 			BadRequestResponse(w, errors.New("invalid status"))
@@ -121,20 +133,95 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		RequestUserId: userId,
 		Statuses:      statusesArray,
 		TaskOrder:     taskOrderInt,
-		Limit:         15,
+		Limit:         int(limit),
 	}
 
-	tasks, err := h.taskService.List(r.Context(), serviceRequest)
+	result, err := h.taskService.List(r.Context(), serviceRequest)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return
 	}
 
-	type response struct {
-		Data []domain.Task `json:"data"`
+	err = utils.WriteJSON(w, http.StatusOK, result, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
+	projectId := utils.GetQueryString(r, "project_id", "")
+	if projectId == "" {
+		BadRequestResponse(w, errors.New("project_id is required"))
+		return
 	}
 
-	err = utils.WriteJSON(w, http.StatusOK, response{Data: tasks}, nil)
+	parsedProjectId, err := uuid.Parse(projectId)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	limit := utils.GetQueryString(r, "limit", "15")
+	limitInt, err := strconv.Atoi(limit)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	if limitInt < 1 {
+		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		return
+	}
+
+	if limitInt > 100 {
+		BadRequestResponse(w, errors.New("limit must be less than 100"))
+		return
+	}
+
+	taskOrder := utils.GetQueryString(r, "task_order", "0")
+	taskOrderInt, err := strconv.Atoi(taskOrder)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+	if taskOrderInt < 0 {
+		BadRequestResponse(w, errors.New("task_order must be greater than 0"))
+		return
+	}
+
+	statuses := utils.GetQueryString(r, "statuses", "")
+	statusesArray := []domain.TaskStatus{}
+	for _, status := range strings.Split(statuses, ",") {
+		if !slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(status)) {
+			BadRequestResponse(w, errors.New("invalid status"))
+			return
+		}
+
+		if status == string(domain.TaskStatusArchived) {
+			BadRequestResponse(w, errors.New("archived status is not allowed"))
+			return
+		}
+		statusesArray = append(statusesArray, domain.TaskStatus(status))
+	}
+
+	userId := UserIdFromContext(r.Context())
+
+	serviceRequest := service.GroupByStatusRequest{
+		ProjectId: parsedProjectId,
+		UserId:    userId,
+		Statuses:  statusesArray,
+		TaskOrder: taskOrderInt,
+		Limit:     limitInt,
+	}
+
+	result, err := h.taskService.GroupByStatus(r.Context(), serviceRequest)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, result, nil)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/queries"
+	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -173,7 +174,7 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 	return &task, nil
 }
 
-func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, limit int) ([]domain.Task, error) {
+func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, limit int) (*utils.CursorPaginated[domain.Task], error) {
 	q := queries.New(tr.pool)
 
 	params := queries.ListTasksByProjectIdParams{
@@ -183,7 +184,7 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 			Int32: int32(taskOrder),
 			Valid: taskOrder != 0,
 		},
-		Limit: int32(limit),
+		Limit: int32(limit + 1),
 	}
 
 	if len(statuses) > 0 {
@@ -250,7 +251,17 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 		tasks = append(tasks, task)
 	}
 
-	return tasks, nil
+	fmt.Println("tasks length", len(tasks))
+	fmt.Println("limit", limit)
+
+	minLen := min(len(tasks), int(limit))
+
+	paginated := utils.CursorPaginated[domain.Task]{
+		Data:    tasks[:minLen],
+		HasNext: len(tasks) > int(limit),
+	}
+
+	return &paginated, nil
 }
 
 func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
