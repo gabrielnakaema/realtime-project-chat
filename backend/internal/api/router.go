@@ -73,6 +73,7 @@ func (a *Api) Router() http.Handler {
 	r.Route("/tasks", func(r chi.Router) {
 		r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
 		r.Get("/group-by-status", a.handlers.Task.GroupByStatus)
+		r.Get("/count-by-status", a.handlers.Task.CountByStatus)
 		r.Get("/", a.handlers.Task.List)
 		r.Post("/", a.handlers.Task.Create)
 		r.Get("/{id}", a.handlers.Task.Get)

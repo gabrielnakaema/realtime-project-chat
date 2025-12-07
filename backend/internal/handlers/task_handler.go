@@ -23,6 +23,7 @@ type taskService interface {
 	Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error)
 	Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error)
 	GroupByStatus(ctx context.Context, request service.GroupByStatusRequest) (map[domain.TaskStatus]utils.CursorPaginated[domain.Task], error)
+	CountByStatus(ctx context.Context, projectId uuid.UUID, statuses []domain.TaskStatus, requestUserId uuid.UUID) (map[domain.TaskStatus]int, error)
 }
 
 type TaskHandler struct {
@@ -216,6 +217,49 @@ func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.taskService.GroupByStatus(r.Context(), serviceRequest)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, result, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *TaskHandler) CountByStatus(w http.ResponseWriter, r *http.Request) {
+	projectId := utils.GetQueryString(r, "project_id", "")
+	if projectId == "" {
+		BadRequestResponse(w, errors.New("project_id is required"))
+		return
+	}
+
+	parsedProjectId, err := uuid.Parse(projectId)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	userId := UserIdFromContext(r.Context())
+
+	statuses := utils.GetQueryString(r, "statuses", "")
+	statusesArray := []domain.TaskStatus{}
+	for _, status := range strings.Split(statuses, ",") {
+		if !slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(status)) {
+			BadRequestResponse(w, errors.New("invalid status"))
+			return
+		}
+		statusesArray = append(statusesArray, domain.TaskStatus(status))
+	}
+
+	if len(statusesArray) == 0 {
+		BadRequestResponse(w, errors.New("statuses are required"))
+		return
+	}
+
+	result, err := h.taskService.CountByStatus(r.Context(), parsedProjectId, statusesArray, userId)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

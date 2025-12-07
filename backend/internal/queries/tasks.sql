@@ -163,3 +163,10 @@ JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $3
 WHERE t.id = $4
   AND p.id = t.project_id
 RETURNING t.id, t.task_order, t.status;
+
+-- name: CountTasksByProjectIdAndStatus :many
+SELECT t.status, COUNT(*) AS count
+FROM tasks t
+WHERE t.project_id = $1
+  AND ($2::text[] IS NULL OR t.status = ANY($2::text[]))
+GROUP BY t.status;

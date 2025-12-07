@@ -12,6 +12,44 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countTasksByProjectIdAndStatus = `-- name: CountTasksByProjectIdAndStatus :many
+SELECT t.status, COUNT(*) AS count
+FROM tasks t
+WHERE t.project_id = $1
+  AND ($2::text[] IS NULL OR t.status = ANY($2::text[]))
+GROUP BY t.status
+`
+
+type CountTasksByProjectIdAndStatusParams struct {
+	ProjectID uuid.UUID
+	Column2   []string
+}
+
+type CountTasksByProjectIdAndStatusRow struct {
+	Status string
+	Count  int64
+}
+
+func (q *Queries) CountTasksByProjectIdAndStatus(ctx context.Context, arg CountTasksByProjectIdAndStatusParams) ([]CountTasksByProjectIdAndStatusRow, error) {
+	rows, err := q.db.Query(ctx, countTasksByProjectIdAndStatus, arg.ProjectID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountTasksByProjectIdAndStatusRow
+	for rows.Next() {
+		var i CountTasksByProjectIdAndStatusRow
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (project_id, title, description, status, author_id, responsible_id, priority, due_date, task_order) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id
 `
@@ -127,7 +165,7 @@ func (q *Queries) DeleteTaskTag(ctx context.Context, arg DeleteTaskTagParams) er
 const getProjectTaskAfterId = `-- name: GetProjectTaskAfterId :one
 SELECT t.id, t.project_id, t.title, t.description, t.status, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order 
 FROM tasks t
-WHERE t.task_order >= (SELECT task_order FROM tasks t2 WHERE t2.id = $1 AND t2.project_id = $2)
+WHERE t.task_order >= (SELECT task_order FROM tasks t2 WHERE t2.id = $1)
   AND t.project_id = $2
   AND t.id != $1
 ORDER BY t.task_order ASC, t.updated_at DESC

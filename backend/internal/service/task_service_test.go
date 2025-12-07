@@ -87,6 +87,14 @@ func (m *mockTaskRepository) NormalizeProjectTaskOrders(ctx context.Context, pro
 	return args.Error(0)
 }
 
+func (m *mockTaskRepository) CountTasksByProjectIdAndStatus(ctx context.Context, projectId uuid.UUID, statuses []string) (map[string]int, error) {
+	args := m.Called(ctx, projectId, statuses)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]int), args.Error(1)
+}
+
 func TestTaskService_Create(t *testing.T) {
 	validUserId := uuid.New()
 	validProjectId := uuid.New()

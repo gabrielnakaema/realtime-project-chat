@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
@@ -21,6 +22,7 @@ type taskRepository interface {
 	GetProjectTaskAfterId(ctx context.Context, id uuid.UUID, projectId uuid.UUID) (*domain.Task, error)
 	MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID) (*domain.Task, error)
 	NormalizeProjectTaskOrders(ctx context.Context, projectId uuid.UUID) error
+	CountTasksByProjectIdAndStatus(ctx context.Context, projectId uuid.UUID, statuses []string) (map[string]int, error)
 }
 
 type taskServiceProjectRepository interface {
@@ -377,6 +379,39 @@ func (ts *TaskService) GroupByStatus(ctx context.Context, request GroupByStatusR
 	}
 
 	return results, nil
+}
+
+func (ts *TaskService) CountByStatus(ctx context.Context, projectId uuid.UUID, statuses []domain.TaskStatus, requestUserId uuid.UUID) (map[domain.TaskStatus]int, error) {
+	if requestUserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	project, err := ts.projectRepository.GetById(ctx, projectId)
+	if err != nil {
+		return nil, domain.ServerError("failed to get project", err)
+	}
+
+	if !project.IsMember(requestUserId) {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	stringStatuses := []string{}
+	for _, status := range statuses {
+		if !slices.Contains(domain.AllowedTaskStatuses, status) {
+			return nil, domain.BusinessValidationError("invalid status")
+		}
+		stringStatuses = append(stringStatuses, string(status))
+	}
+	results, err := ts.taskRepository.CountTasksByProjectIdAndStatus(ctx, projectId, stringStatuses)
+	if err != nil {
+		return nil, domain.ServerError("failed to count tasks", err)
+	}
+
+	result := map[domain.TaskStatus]int{}
+	for status, count := range results {
+		result[domain.TaskStatus(status)] = count
+	}
+	return result, nil
 }
 
 type MoveTaskRequest struct {

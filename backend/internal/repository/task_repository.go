@@ -509,3 +509,24 @@ func (tr *TaskRepository) NormalizeProjectTaskOrders(ctx context.Context, projec
 
 	return nil
 }
+
+func (tr *TaskRepository) CountTasksByProjectIdAndStatus(ctx context.Context, projectId uuid.UUID, statuses []string) (map[string]int, error) {
+	q := queries.New(tr.pool)
+
+	params := queries.CountTasksByProjectIdAndStatusParams{
+		ProjectID: projectId,
+		Statuses:  statuses,
+	}
+
+	results, err := q.CountTasksByProjectIdAndStatus(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	result := map[string]int{}
+	for _, r := range results {
+		result[r.Status] = int(r.Count)
+	}
+
+	return result, nil
+}
