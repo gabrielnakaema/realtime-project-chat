@@ -1,28 +1,87 @@
+import { attachClosestEdge, extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+import { DropIndicator } from '@atlaskit/pragmatic-drag-and-drop-react-drop-indicator/box';
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Calendar } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Avatar } from './avatar';
+import { EditTask } from './edit-task';
 import { TaskDetails } from './task-details';
 import { TaskPriorityBadge } from './task-priority-badge';
-import { EditTask } from './edit-task';
+import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import type { Task } from '@/types/task';
+import { cn } from '@/lib/utils';
 
 interface TaskCardProps {
   task: Task;
-  onDragStart: () => void;
+  onDrop: (edge: Edge | null, droppedTaskId: string) => void;
 }
 
-export const TaskCard = ({ task, onDragStart }: TaskCardProps) => {
+export const TaskCard = ({ task, onDrop }: TaskCardProps) => {
   const [open, setOpen] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [closestEdge, setClosestEdge] = useState<Edge | null>(null);
 
-  console.log('openEdit', openEdit);
-  console.log('open', open);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) {
+      return () => {};
+    }
+
+    return combine(
+      draggable({
+        element: el,
+        getInitialData: () => ({ type: 'task', taskId: task.id, status: task.status, title: task.title }),
+        onDragStart: () => setIsDragging(true),
+        onDrop: () => setIsDragging(false),
+      }),
+      dropTargetForElements({
+        element: el,
+        canDrop: () => true,
+        getData: ({ input, element }) => {
+          const data = { type: 'task', taskId: task.id, status: task.status, title: task.title };
+          return attachClosestEdge(data, {
+            input,
+            element,
+            allowedEdges: ['top', 'bottom'],
+          });
+        },
+        getIsSticky: () => true,
+        onDragEnter: ({ source, self }) => {
+          if (source.data.taskId !== task.id) {
+            setClosestEdge(extractClosestEdge(self.data));
+          }
+        },
+        onDrag: ({ source, self }) => {
+          if (source.data.taskId !== task.id) {
+            setClosestEdge(extractClosestEdge(self.data));
+          }
+        },
+        onDragLeave: () => {
+          setClosestEdge(null);
+        },
+        onDrop: ({ source, self }) => {
+          const draggedTaskId = source.data.taskId as string;
+          const edge = extractClosestEdge(self.data);
+
+          onDrop(edge, draggedTaskId);
+
+          setClosestEdge(null);
+        },
+      }),
+    );
+  }, [task, onDrop]);
+
   return (
-    <>
+    <div className="relative px-0.5">
       <div
-        className="cursor-pointer rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
-        draggable
-        onDragStart={onDragStart}
+        ref={ref}
+        className={cn(
+          'cursor-pointer rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900',
+          isDragging && 'opacity-40 transition-opacity',
+        )}
         onClick={() => setOpen(true)}
       >
         <div className="pb-3">
@@ -58,6 +117,7 @@ export const TaskCard = ({ task, onDragStart }: TaskCardProps) => {
             </div>
           )}
         </div>
+        {closestEdge && <DropIndicator edge={closestEdge} gap="12px" />}
       </div>
       <TaskDetails
         taskId={task.id}
@@ -69,6 +129,6 @@ export const TaskCard = ({ task, onDragStart }: TaskCardProps) => {
         }}
       />
       <EditTask taskId={task.id} open={openEdit} onOpenChange={setOpenEdit} />
-    </>
+    </div>
   );
 };

@@ -1,13 +1,8 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { MoreHorizontal } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { BoardColumn } from './board-column';
 import { CreateTask } from './create-task';
-import type { Task, TaskStatus } from '@/types/task';
+import type { TaskStatus } from '@/types/task';
 import type { Project } from '@/types/project';
-import { updateTask } from '@/services/tasks';
-import { taskQueryKeys } from '@/services/query-keys';
-import { TaskCard } from '@/components/task-card';
-import { cn } from '@/lib/utils';
 import { useProjectTasks } from '@/hooks/use-project-tasks';
 
 interface Column {
@@ -24,64 +19,21 @@ const columns: Column[] = [
 ];
 
 export const KanbanBoard = ({ project }: { project: Project }) => {
-  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
-  const queryClient = useQueryClient();
   const projectId = project.id;
 
-  const { tasks } = useProjectTasks(projectId);
+  const { data, countData } = useProjectTasks(projectId);
 
-  const { mutate: mutateUpdateTask } = useMutation({
-    mutationFn: updateTask,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.listByProjectId(projectId) });
-    },
-  });
-
-  const handleDragStart = (task: Task) => {
-    setDraggedTask(task);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent, newStatus: TaskStatus) => {
-    e.preventDefault();
-
-    if (draggedTask) {
-      mutateUpdateTask({
-        id: draggedTask.id,
-        status: newStatus,
-        title: draggedTask.title,
-        description: draggedTask.description,
-        order: draggedTask.order,
-        priority: draggedTask.priority,
-        due_date: draggedTask.due_date,
-        responsible_id: draggedTask.responsible_id,
-        done_at: draggedTask.done_at,
-        tags: draggedTask.tags || [],
-      });
-    }
-
-    setDraggedTask(null);
-  };
-
-  const tasksByStatus = useMemo(() => {
-    return tasks.reduce(
-      (acc, task) => {
-        return {
-          ...acc,
-          [task.status]: [...acc[task.status], task],
-        };
-      },
-      {
-        pending: [],
-        doing: [],
-        done: [],
-        archived: [],
-      } as Record<TaskStatus, Task[]>,
-    );
-  }, [tasks]);
+  const columnTasks = useMemo(() => {
+    return columns.map((column) => ({
+      id: column.id,
+      color: column.color,
+      title: column.title,
+      tasks: data?.[column.status]?.data || [],
+      status: column.status,
+      project_id: project.id,
+      total: countData?.[column.status] || 0,
+    }));
+  }, [data, project.id, countData]);
 
   return (
     <div className="h-full">
@@ -91,35 +43,9 @@ export const KanbanBoard = ({ project }: { project: Project }) => {
       </div>
 
       <div className="grid h-[calc(100vh-200px)] grid-cols-1 gap-6 md:grid-cols-3">
-        {columns.map((column) => {
-          const columnTasks = tasksByStatus[column.status];
-          return (
-            <div
-              key={column.id}
-              className={cn(column.color, 'flex flex-col overflow-auto rounded-lg p-4')}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, column.status)}
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-slate-900 dark:text-slate-100">{column.title}</h3>
-                  <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-                    {columnTasks.length}
-                  </span>
-                </div>
-                <button className="rounded p-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="flex-1 space-y-3 overflow-y-auto">
-                {columnTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} onDragStart={() => handleDragStart(task)} />
-                ))}
-              </div>
-            </div>
-          );
-        })}
+        {columnTasks.map((column) => (
+          <BoardColumn column={column} key={column.id} />
+        ))}
       </div>
     </div>
   );

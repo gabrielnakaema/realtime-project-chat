@@ -59,7 +59,7 @@ export const CreateTask = ({ projectId, projectMembers }: CreateTaskModalProps) 
     mutationFn: createTask,
     onSuccess: () => {
       handleSuccess('Task created successfully');
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.listByProjectId(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
       setOpen(false);
       reset();
     },

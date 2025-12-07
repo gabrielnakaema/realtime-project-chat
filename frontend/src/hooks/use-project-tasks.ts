@@ -1,11 +1,11 @@
-import { useEffect, useEffectEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useEffectEvent } from 'react';
 import { useSocket } from './use-socket';
+import type { Paginated } from '@/types/paginated';
 import type { Task } from '@/types/task';
 import type { SocketEvent } from '@/types/websocket';
-import type { Paginated } from '@/types/paginated';
+import { countTasksByStatus, listGroupedTasksByProjectId } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
-import { listTasksByProjectId } from '@/services/tasks';
 
 export const useProjectTasks = (projectId: string) => {
   const queryClient = useQueryClient();
@@ -17,12 +17,15 @@ export const useProjectTasks = (projectId: string) => {
     limit: 50,
   };
 
-  const { data } = useQuery({
-    queryKey: taskQueryKeys.list(params),
-    queryFn: () => listTasksByProjectId(params),
+  const { data, isLoading } = useQuery({
+    queryKey: taskQueryKeys.listGroupedByProjectId(params),
+    queryFn: () => listGroupedTasksByProjectId(params),
   });
 
-  const tasks = data?.data || [];
+  const { data: countData, isLoading: isCountLoading } = useQuery({
+    queryKey: taskQueryKeys.countByStatus(projectId, ['pending', 'doing', 'done']),
+    queryFn: () => countTasksByStatus(projectId, ['pending', 'doing', 'done']),
+  });
 
   const { status, subscribe } = useSocket();
 
@@ -65,6 +68,9 @@ export const useProjectTasks = (projectId: string) => {
   }, [projectId, status, subscribe]);
 
   return {
-    tasks,
+    data,
+    isLoading,
+    countData,
+    isCountLoading,
   };
 };

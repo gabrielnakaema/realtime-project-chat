@@ -13,6 +13,9 @@
     "check": "prettier --write . && eslint --fix"
   },
   "dependencies": {
+    "@atlaskit/pragmatic-drag-and-drop": "^1.7.7",
+    "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
+    "@atlaskit/pragmatic-drag-and-drop-react-drop-indicator": "^3.2.9",
     "@hookform/resolvers": "5.2.0",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -49,6 +52,7 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.0",
     "jsdom": "^26.0.0",
     "prettier": "^3.5.3",

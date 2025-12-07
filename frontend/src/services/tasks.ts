@@ -1,8 +1,45 @@
 import { parse } from 'date-fns';
 import { api } from './api';
-import type { ListTasksRequest, Task } from '@/types/task';
+import type { ListTasksRequest, Task, TaskStatus } from '@/types/task';
 import type { ITaskForm } from '@/schemas/task-schema';
 import type { Paginated } from '@/types/paginated';
+
+export const countTasksByStatus = async (projectId: string, statuses: TaskStatus[]) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('project_id', projectId);
+  if (statuses.length > 0) {
+    searchParams.set('statuses', statuses.join(','));
+  }
+
+  const response = await api.get('tasks/count-by-status', {
+    searchParams,
+  });
+
+  const json = await response.json<Record<TaskStatus, number>>();
+  return json;
+};
+
+export const listGroupedTasksByProjectId = async (request: ListTasksRequest) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('project_id', request.projectId);
+  if (request.statuses.length > 0) {
+    searchParams.set('statuses', request.statuses.join(','));
+  }
+  if (request.taskOrder) {
+    searchParams.set('task_order', request.taskOrder.toString());
+  }
+
+  if (request.limit) {
+    searchParams.set('limit', request.limit.toString());
+  }
+
+  const response = await api.get('tasks/group-by-status', {
+    searchParams,
+  });
+
+  const json = await response.json<Record<TaskStatus, Paginated<Task>>>();
+  return json;
+};
 
 export const listTasksByProjectId = async (request: ListTasksRequest) => {
   const searchParams = new URLSearchParams();
@@ -109,6 +146,28 @@ export const updateTask = async (request: UpdateTaskRequest) => {
 
 export const getTask = async (taskId: string) => {
   const response = await api.get(`tasks/${taskId}`);
+
+  const json = await response.json<Task>();
+  return json;
+};
+
+interface MoveTaskRequest {
+  taskId: string;
+  projectId: string;
+  status: TaskStatus;
+  afterTaskId: string | null;
+}
+
+export const moveTask = async (request: MoveTaskRequest) => {
+  const payload = {
+    after_task_id: request.afterTaskId,
+    project_id: request.projectId,
+    status: request.status,
+  };
+
+  const response = await api.patch(`tasks/${request.taskId}/move`, {
+    json: payload,
+  });
 
   const json = await response.json<Task>();
   return json;
