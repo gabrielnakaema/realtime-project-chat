@@ -101,7 +101,6 @@ func (cs *ChatService) CreateMemberFromProjectMember(ctx context.Context, projec
 		},
 	})
 	if err != nil {
-		fmt.Println("failed to publish chat member created event", err)
 		return domain.ServerError("failed to publish chat member created event", err)
 	}
 

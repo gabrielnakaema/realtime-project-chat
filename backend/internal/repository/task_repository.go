@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/queries"
@@ -251,9 +250,6 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 		tasks = append(tasks, task)
 	}
 
-	fmt.Println("tasks length", len(tasks))
-	fmt.Println("limit", limit)
-
 	minLen := min(len(tasks), int(limit))
 
 	paginated := utils.CursorPaginated[domain.Task]{
@@ -397,8 +393,6 @@ func (tr *TaskRepository) GetSmallestOrderProjectTask(ctx context.Context, proje
 		return nil, err
 	}
 
-	fmt.Println("result order smallest task", result.TaskOrder)
-
 	task := domain.Task{
 		Id:          result.ID,
 		ProjectId:   result.ProjectID,
@@ -515,7 +509,7 @@ func (tr *TaskRepository) CountTasksByProjectIdAndStatus(ctx context.Context, pr
 
 	params := queries.CountTasksByProjectIdAndStatusParams{
 		ProjectID: projectId,
-		Statuses:  statuses,
+		Column2:   statuses,
 	}
 
 	results, err := q.CountTasksByProjectIdAndStatus(ctx, params)
