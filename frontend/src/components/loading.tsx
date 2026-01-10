@@ -7,7 +7,7 @@ interface LoadingSpinnerProps {
 
 export const LoadingSpinner = ({ size = '1em' }: LoadingSpinnerProps) => {
   return (
-    <div className={cn('flex-1 flex justify-center items-center text-inherit')}>
+    <div className={cn('flex flex-1 items-center justify-center text-inherit')}>
       <LoaderCircle className="animate-spin" size={size} />
     </div>
   );

@@ -18,11 +18,11 @@ export const ProjectActivity = ({ activity }: { activity: ProjectActivityType })
 };
 
 const activityIcons: Partial<Record<ProjectActivityType['activity_type'], React.ReactNode>> = {
-  'project.member.created': <UserPlusIcon className="w-5 h-5" />,
-  'project.member.deleted': <UserMinusIcon className="w-5 h-5" />,
-  'task.created': <CheckIcon className="w-5 h-5" />,
-  'task.updated': <PencilIcon className="w-5 h-5" />,
-  'task.deleted': <TrashIcon className="w-5 h-5" />,
-  'project.created': <PlusIcon className="w-5 h-5" />,
-  'project.updated': <PencilIcon className="w-5 h-5" />,
+  'project.member.created': <UserPlusIcon className="h-5 w-5" />,
+  'project.member.deleted': <UserMinusIcon className="h-5 w-5" />,
+  'task.created': <CheckIcon className="h-5 w-5" />,
+  'task.updated': <PencilIcon className="h-5 w-5" />,
+  'task.deleted': <TrashIcon className="h-5 w-5" />,
+  'project.created': <PlusIcon className="h-5 w-5" />,
+  'project.updated': <PencilIcon className="h-5 w-5" />,
 };

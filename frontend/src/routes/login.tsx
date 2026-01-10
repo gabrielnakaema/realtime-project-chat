@@ -1,11 +1,11 @@
 import { Link, Navigate, createFileRoute } from '@tanstack/react-router';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {  useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
-import type {SubmitHandler} from 'react-hook-form';
-import type {ILoginForm} from '@/schemas/login-schema';
+import type { SubmitHandler } from 'react-hook-form';
+import type { ILoginForm } from '@/schemas/login-schema';
 import { Input } from '@/components/input';
-import {  loginSchema } from '@/schemas/login-schema';
+import { loginSchema } from '@/schemas/login-schema';
 import { login } from '@/services/auth';
 import { LoadingSpinner } from '@/components/loading';
 import { useAuth } from '@/hooks/use-auth';
@@ -41,10 +41,10 @@ function RouteComponent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
-      <main className="w-full max-w-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">Welcome back</h1>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4 dark:from-slate-900 dark:to-slate-800">
+      <main className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+        <div className="mb-6 text-center">
+          <h1 className="mb-2 text-2xl font-bold text-slate-900 dark:text-slate-100">Welcome back</h1>
           <p className="text-slate-600 dark:text-slate-400">Sign in to your account</p>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -72,7 +72,7 @@ function RouteComponent() {
         <div className="mt-6 text-center">
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Don't have an account?{' '}
-            <Link to="/sign-up" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link to="/sign-up" className="font-medium text-blue-600 hover:text-blue-700">
               Sign up
             </Link>
           </p>

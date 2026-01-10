@@ -1,15 +1,15 @@
 import { Plus } from 'lucide-react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {  useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './input';
 import { LoadingSpinner } from './loading';
 import { Button } from './button';
-import type {SubmitHandler} from 'react-hook-form';
-import type {IProjectMemberForm} from '@/schemas/project-member-schema';
-import {  projectMemberSchema } from '@/schemas/project-member-schema';
+import type { SubmitHandler } from 'react-hook-form';
+import type { IProjectMemberForm } from '@/schemas/project-member-schema';
+import { projectMemberSchema } from '@/schemas/project-member-schema';
 import { createProjectMember } from '@/services/projects';
 import { handleSuccess } from '@/utils/handle-success';
 import { projectQueryKeys } from '@/services/query-keys';
@@ -52,9 +52,9 @@ export const AddProjectMember = ({ projectId }: AddProjectMemberProps) => {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="w-fit flex items-center gap-2 p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
+          className="flex w-fit items-center gap-2 rounded-md p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-700"
         >
-          <Plus className="w-6 h-6 text-slate-500" />
+          <Plus className="h-6 w-6 text-slate-500" />
         </button>
       </DialogTrigger>
       <DialogContent>
@@ -63,7 +63,7 @@ export const AddProjectMember = ({ projectId }: AddProjectMemberProps) => {
           <DialogDescription>Add a new member to the project</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="gap-8 flex flex-col">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-8">
           <Input
             label="Email"
             id="email"

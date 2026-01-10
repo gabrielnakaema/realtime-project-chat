@@ -45,7 +45,7 @@ export const ProjectActivityText = ({ activity }: { activity: ProjectActivity })
 };
 
 const GeneralText = ({ children }: { children: React.ReactNode }) => {
-  return <p className="text-sm text-foreground">{children}</p>;
+  return <p className="text-foreground text-sm">{children}</p>;
 };
 
 const Actor = ({ children }: { children: React.ReactNode }) => {

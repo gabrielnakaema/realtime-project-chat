@@ -68,8 +68,8 @@ export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="inline-flex items-center px-3 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 rounded-md font-medium transition-colors">
-          <Settings className="w-4 h-4 mr-2" />
+        <button className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600">
+          <Settings className="mr-2 h-4 w-4" />
           Settings
         </button>
       </DialogTrigger>
@@ -80,7 +80,7 @@ export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
         </DialogHeader>
 
         {isLoading && (
-          <div className="min-h-50 flex flex-col items-center justify-center">
+          <div className="flex min-h-50 flex-col items-center justify-center">
             <LoadingSpinner size="3rem" />
           </div>
         )}

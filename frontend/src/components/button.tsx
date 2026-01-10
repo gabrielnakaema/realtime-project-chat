@@ -18,7 +18,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
         ref={ref}
         className={cn(
-          'w-fit px-4 py-2 rounded-md font-medium transition-colors flex items-center justify-center gap-2',
+          'flex w-fit items-center justify-center gap-2 rounded-md px-4 py-2 font-medium transition-colors',
           variantClassnames[variant],
           className,
         )}

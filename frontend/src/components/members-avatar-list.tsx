@@ -38,7 +38,7 @@ export const MembersAvatarList = ({ members = [], max = 4, onlineUserIds = [] }:
           <TooltipTrigger>
             <div
               className={cn(
-                'w-8 h-8 bg-blue-600 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center text-white text-xs font-medium',
+                'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-xs font-medium text-white dark:border-slate-800',
                 member.online && 'border-green-500 dark:border-green-500',
               )}
             >
@@ -51,7 +51,7 @@ export const MembersAvatarList = ({ members = [], max = 4, onlineUserIds = [] }:
       {remaining > 0 && (
         <Tooltip>
           <TooltipTrigger>
-            <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 border-2 border-white dark:border-slate-800 flex items-center justify-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-slate-200 dark:border-slate-800 dark:bg-slate-700">
               <span className="text-xs font-medium text-slate-600 dark:text-slate-400">+{remaining}</span>
             </div>
           </TooltipTrigger>

@@ -1,17 +1,17 @@
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {  useForm } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger  } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Button } from './button';
 import { Input } from './input';
 import { Textarea } from './textarea';
 import { LoadingSpinner } from './loading';
-import type {SubmitHandler} from 'react-hook-form';
-import type {IProjectForm} from '@/schemas/project-schema';
+import type { SubmitHandler } from 'react-hook-form';
+import type { IProjectForm } from '@/schemas/project-schema';
 import { createProject } from '@/services/projects';
-import {  projectSchema } from '@/schemas/project-schema';
+import { projectSchema } from '@/schemas/project-schema';
 import { handleSuccess } from '@/utils/handle-success';
 import { projectQueryKeys } from '@/services/query-keys';
 
@@ -46,8 +46,8 @@ export const CreateProject = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" className="w-fit flex items-center gap-2">
-          <Plus className="w-4 h-4" />
+        <Button type="button" className="flex w-fit items-center gap-2">
+          <Plus className="h-4 w-4" />
           Create project
         </Button>
       </DialogTrigger>
