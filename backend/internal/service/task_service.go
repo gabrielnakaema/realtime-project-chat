@@ -15,7 +15,7 @@ import (
 type taskRepository interface {
 	Create(ctx context.Context, task *domain.Task) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
-	ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, limit int) (*utils.CursorPaginated[domain.Task], error)
+	ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 	Update(ctx context.Context, task *domain.Task) error
 	CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error
 	GetSmallestOrderProjectTask(ctx context.Context, projectId uuid.UUID) (*domain.Task, error)
@@ -205,6 +205,9 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		}
 	}
 
+	// Capture old status for event payload
+	oldStatus := task.Status
+
 	updatedTask := domain.Task{
 		Id:            task.Id,
 		ProjectId:     task.ProjectId,
@@ -258,11 +261,18 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		updatedTask.Updates = append(task.Updates, updates...)
 	}
 
+	// Only include previous status if it changed
+	var previousStatus *domain.TaskStatus
+	if oldStatus != updatedTask.Status {
+		previousStatus = &oldStatus
+	}
+
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
 		Task: updatedTask,
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
+		PreviousStatus: previousStatus,
 	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish task updated event", err)
@@ -272,11 +282,12 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 }
 
 type ListTasksRequest struct {
-	ProjectId     uuid.UUID
-	RequestUserId uuid.UUID
-	Statuses      []string
-	TaskOrder     int
-	Limit         int
+	ProjectId       uuid.UUID
+	RequestUserId   uuid.UUID
+	Statuses        []string
+	TaskOrder       int
+	Limit           int
+	CursorUpdatedAt *time.Time
 }
 
 func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
@@ -297,7 +308,7 @@ func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) (*uti
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
-	tasks, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, request.Statuses, request.TaskOrder, request.Limit)
+	tasks, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, request.Statuses, request.TaskOrder, request.CursorUpdatedAt, request.Limit)
 	if err != nil {
 		return nil, domain.ServerError("failed to list tasks", err)
 	}
@@ -342,11 +353,12 @@ func (ts *TaskService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UU
 }
 
 type GroupByStatusRequest struct {
-	ProjectId uuid.UUID
-	UserId    uuid.UUID
-	Statuses  []domain.TaskStatus
-	TaskOrder int
-	Limit     int
+	ProjectId       uuid.UUID
+	UserId          uuid.UUID
+	Statuses        []domain.TaskStatus
+	TaskOrder       int
+	CursorUpdatedAt *time.Time
+	Limit           int
 }
 
 func (ts *TaskService) GroupByStatus(ctx context.Context, request GroupByStatusRequest) (map[domain.TaskStatus]utils.CursorPaginated[domain.Task], error) {
@@ -371,7 +383,7 @@ func (ts *TaskService) GroupByStatus(ctx context.Context, request GroupByStatusR
 	results := map[domain.TaskStatus]utils.CursorPaginated[domain.Task]{}
 
 	for _, status := range stringStatuses {
-		result, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, []string{status}, request.TaskOrder, request.Limit)
+		result, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, []string{status}, request.TaskOrder, request.CursorUpdatedAt, request.Limit)
 		if err != nil {
 			return nil, domain.ServerError("failed to list tasks", err)
 		}
@@ -427,6 +439,20 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
 
+	// Get the task before moving to capture old status
+	oldTask, err := ts.taskRepository.GetById(ctx, request.TaskId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("task not found")
+			}
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to get task", err)
+	}
+	oldStatus := oldTask.Status
+
 	newOrder, prevOrder, err := ts.calculateOrder(ctx, request)
 	if err != nil {
 		var domainErr domain.DomainError
@@ -481,11 +507,18 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 		return nil, domain.ServerError("failed to move task", err)
 	}
 
+	// Only include previous status if it changed
+	var previousStatus *domain.TaskStatus
+	if oldStatus != updatedTask.Status {
+		previousStatus = &oldStatus
+	}
+
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
-		Task: *updatedTask,
-		User: domain.User{
+		Task:           *updatedTask,
+		User:           domain.User{
 			Id: request.RequestUserId,
 		},
+		PreviousStatus: previousStatus,
 	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish task moved event", err)

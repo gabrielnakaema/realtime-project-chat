@@ -123,8 +123,8 @@ func (ws *Server) SendMessages(ctx context.Context, message *domain.ChatMessage)
 	return ws.SendEvent(ctx, MapChatMessage(message))
 }
 
-func (ws *Server) SendUpdatedTask(ctx context.Context, task *domain.Task) error {
-	return ws.SendEvent(ctx, MapTaskUpdated(task))
+func (ws *Server) SendUpdatedTask(ctx context.Context, task *domain.Task, previousStatus *domain.TaskStatus) error {
+	return ws.SendEvent(ctx, MapTaskUpdated(task, previousStatus))
 }
 
 func (ws *Server) SendCreatedTask(ctx context.Context, task *domain.Task) error {

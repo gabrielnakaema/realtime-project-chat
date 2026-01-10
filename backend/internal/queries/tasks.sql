@@ -108,7 +108,7 @@ LEFT JOIN users r ON r.id = t.responsible_id
 WHERE t.id = $1;
 
 -- name: ListTasksByProjectId :many
-SELECT 
+SELECT
   t.*,
   a.id as author_author_id,
   a.name as author_name,
@@ -124,7 +124,11 @@ AND (
   cardinality(sqlc.slice('statuses')::text[]) = 0
   OR t.status = ANY(sqlc.slice('statuses')::text[])
 )
-AND (t.task_order >= sqlc.narg('task_order') OR sqlc.narg('task_order') IS NULL)
+AND (
+  sqlc.narg('cursor_updated_at')::timestamptz IS NULL
+  OR t.task_order > sqlc.narg('task_order')::integer
+  OR (t.task_order = sqlc.narg('task_order')::integer AND t.updated_at < sqlc.narg('cursor_updated_at')::timestamptz)
+)
 GROUP BY t.id, a.name, a.id, r.name, r.id
 ORDER BY t.task_order ASC, t.updated_at DESC
 LIMIT $2;

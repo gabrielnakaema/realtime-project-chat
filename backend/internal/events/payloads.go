@@ -20,8 +20,9 @@ func (t *TaskCreatedPayload) ToMessage() ([]byte, error) {
 }
 
 type TaskUpdatedPayload struct {
-	Task domain.Task `json:"task"`
-	User domain.User `json:"user"`
+	Task           domain.Task        `json:"task"`
+	User           domain.User        `json:"user"`
+	PreviousStatus *domain.TaskStatus `json:"previous_status,omitempty"`
 }
 
 func (t *TaskUpdatedPayload) ToMessage() ([]byte, error) {

@@ -375,7 +375,7 @@ func (q *Queries) GetTaskById(ctx context.Context, id uuid.UUID) (GetTaskByIdRow
 }
 
 const listTasksByProjectId = `-- name: ListTasksByProjectId :many
-SELECT 
+SELECT
   t.id, t.project_id, t.title, t.description, t.status, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order,
   a.id as author_author_id,
   a.name as author_name,
@@ -391,17 +391,22 @@ AND (
   cardinality($3::text[]) = 0
   OR t.status = ANY($3::text[])
 )
-AND (t.task_order >= $4 OR $4 IS NULL)
+AND (
+  $4::timestamptz IS NULL
+  OR t.task_order > $5::integer
+  OR (t.task_order = $5::integer AND t.updated_at < $4::timestamptz)
+)
 GROUP BY t.id, a.name, a.id, r.name, r.id
 ORDER BY t.task_order ASC, t.updated_at DESC
 LIMIT $2
 `
 
 type ListTasksByProjectIdParams struct {
-	ProjectID uuid.UUID
-	Limit     int32
-	Statuses  []string
-	TaskOrder pgtype.Int4
+	ProjectID       uuid.UUID
+	Limit           int32
+	Statuses        []string
+	CursorUpdatedAt pgtype.Timestamptz
+	TaskOrder       pgtype.Int4
 }
 
 type ListTasksByProjectIdRow struct {
@@ -430,6 +435,7 @@ func (q *Queries) ListTasksByProjectId(ctx context.Context, arg ListTasksByProje
 		arg.ProjectID,
 		arg.Limit,
 		arg.Statuses,
+		arg.CursorUpdatedAt,
 		arg.TaskOrder,
 	)
 	if err != nil {

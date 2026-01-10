@@ -12,7 +12,7 @@ import (
 
 type TaskNotifier interface {
 	SendCreatedTask(context.Context, *domain.Task) error
-	SendUpdatedTask(context.Context, *domain.Task) error
+	SendUpdatedTask(context.Context, *domain.Task, *domain.TaskStatus) error
 }
 
 type TaskSubscriber struct {
@@ -78,7 +78,7 @@ func (ts *TaskSubscriber) handleTaskUpdated(ctx context.Context, message Message
 		return domain.ServerError("failed to unmarshal task", err)
 	}
 
-	err = ts.notifier.SendUpdatedTask(ctx, &payload.Task)
+	err = ts.notifier.SendUpdatedTask(ctx, &payload.Task, payload.PreviousStatus)
 	if err != nil {
 		return domain.ServerError("failed to send updated task to ws server", err)
 	}

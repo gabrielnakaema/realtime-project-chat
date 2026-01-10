@@ -31,8 +31,8 @@ func (m *mockTaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain
 	return args.Get(0).(*domain.Task), args.Error(1)
 }
 
-func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, limit int) (*utils.CursorPaginated[domain.Task], error) {
-	args := m.Called(ctx, projectId, statuses, taskOrder, limit)
+func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+	args := m.Called(ctx, projectId, statuses, taskOrder, cursorUpdatedAt, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

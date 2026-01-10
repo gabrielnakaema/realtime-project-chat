@@ -40,6 +40,7 @@ func TestTaskService_Move(t *testing.T) {
 				Status:        domain.TaskStatusPending,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetSmallestOrderProjectTask", mock.Anything, validProjectId).Return(nil, domain.NotFoundError("not found"))
 				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
 					return t.Order == 1000
@@ -58,6 +59,7 @@ func TestTaskService_Move(t *testing.T) {
 				Status:        domain.TaskStatusPending,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetSmallestOrderProjectTask", mock.Anything, validProjectId).Return(&taskA, nil)
 				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
 					return t.Order == 500
@@ -76,6 +78,7 @@ func TestTaskService_Move(t *testing.T) {
 				Status:        domain.TaskStatusPending,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetById", mock.Anything, taskIdA).Return(&taskA, nil)
 				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdA, validProjectId).Return(&taskB, nil)
 				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
@@ -95,6 +98,7 @@ func TestTaskService_Move(t *testing.T) {
 				Status:        domain.TaskStatusPending,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetById", mock.Anything, taskIdB).Return(&taskB, nil)
 				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdB, validProjectId).Return(nil, domain.NotFoundError("not found"))
 				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
@@ -114,6 +118,7 @@ func TestTaskService_Move(t *testing.T) {
 				Status:        domain.TaskStatusPending,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetById", mock.Anything, taskIdA).Return(&domain.Task{Id: taskIdA, Order: 1000}, nil).Once()
 				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdA, validProjectId).Return(&domain.Task{Id: taskIdB, Order: 1001}, nil).Once()
 

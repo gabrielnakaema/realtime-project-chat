@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/service"
@@ -127,14 +128,26 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cursorUpdatedAt := utils.GetQueryString(r, "updated_at", "")
+	var updatedAt *time.Time
+	if cursorUpdatedAt != "" {
+		parsedTime, err := time.Parse(time.RFC3339, cursorUpdatedAt)
+		if err != nil {
+			BadRequestResponse(w, err)
+			return
+		}
+		updatedAt = &parsedTime
+	}
+
 	userId := UserIdFromContext(r.Context())
 
 	serviceRequest := service.ListTasksRequest{
-		ProjectId:     parsedProjectId,
-		RequestUserId: userId,
-		Statuses:      statusesArray,
-		TaskOrder:     taskOrderInt,
-		Limit:         int(limit),
+		ProjectId:       parsedProjectId,
+		RequestUserId:   userId,
+		Statuses:        statusesArray,
+		TaskOrder:       taskOrderInt,
+		Limit:           int(limit),
+		CursorUpdatedAt: updatedAt,
 	}
 
 	result, err := h.taskService.List(r.Context(), serviceRequest)
@@ -191,6 +204,17 @@ func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cursorUpdatedAt := utils.GetQueryString(r, "updated_at", "")
+	var updatedAt *time.Time
+	if cursorUpdatedAt != "" {
+		parsedTime, err := time.Parse(time.RFC3339, cursorUpdatedAt)
+		if err != nil {
+			BadRequestResponse(w, err)
+			return
+		}
+		updatedAt = &parsedTime
+	}
+
 	statuses := utils.GetQueryString(r, "statuses", "")
 	statusesArray := []domain.TaskStatus{}
 	for _, status := range strings.Split(statuses, ",") {
@@ -209,11 +233,12 @@ func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
 	userId := UserIdFromContext(r.Context())
 
 	serviceRequest := service.GroupByStatusRequest{
-		ProjectId: parsedProjectId,
-		UserId:    userId,
-		Statuses:  statusesArray,
-		TaskOrder: taskOrderInt,
-		Limit:     limitInt,
+		ProjectId:       parsedProjectId,
+		UserId:          userId,
+		Statuses:        statusesArray,
+		TaskOrder:       taskOrderInt,
+		Limit:           limitInt,
+		CursorUpdatedAt: updatedAt,
 	}
 
 	result, err := h.taskService.GroupByStatus(r.Context(), serviceRequest)

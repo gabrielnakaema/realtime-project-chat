@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/queries"
@@ -173,7 +174,7 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 	return &task, nil
 }
 
-func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, limit int) (*utils.CursorPaginated[domain.Task], error) {
+func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
 	q := queries.New(tr.pool)
 
 	params := queries.ListTasksByProjectIdParams{
@@ -181,9 +182,24 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 		Statuses:  nil,
 		TaskOrder: pgtype.Int4{
 			Int32: int32(taskOrder),
-			Valid: taskOrder != 0,
+			Valid: true,
 		},
 		Limit: int32(limit + 1),
+		CursorUpdatedAt: pgtype.Timestamptz{
+			Valid: cursorUpdatedAt != nil,
+		},
+	}
+
+	if cursorUpdatedAt != nil {
+		params.CursorUpdatedAt = pgtype.Timestamptz{
+			Time:  *cursorUpdatedAt,
+			Valid: true,
+		}
+	} else {
+		params.CursorUpdatedAt = pgtype.Timestamptz{
+			Valid: true,
+			Time:  time.Now().Add(1 * time.Hour),
+		}
 	}
 
 	if len(statuses) > 0 {

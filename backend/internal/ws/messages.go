@@ -95,10 +95,18 @@ func MapTaskCreated(task *domain.Task) WebsocketMessage {
 	}
 }
 
-func MapTaskUpdated(task *domain.Task) WebsocketMessage {
+type TaskUpdatedData struct {
+	Task           *domain.Task        `json:"task"`
+	PreviousStatus *domain.TaskStatus `json:"previous_status,omitempty"`
+}
+
+func MapTaskUpdated(task *domain.Task, previousStatus *domain.TaskStatus) WebsocketMessage {
 	return WebsocketMessage{
 		Type:   WebsocketMessageTypeTaskUpdated,
 		RoomId: task.ProjectId,
-		Data:   task,
+		Data: TaskUpdatedData{
+			Task:           task,
+			PreviousStatus: previousStatus,
+		},
 	}
 }
