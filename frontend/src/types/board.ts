@@ -1,4 +1,4 @@
-import type { Task, TaskStatus } from './task';
+import type { TaskStatus } from './task';
 
 export interface Board {
   columns: Column;
@@ -10,6 +10,5 @@ export interface Column {
   title: string;
   color: string;
   status: TaskStatus;
-  tasks: Task[];
   total: number;
 }

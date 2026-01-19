@@ -49,5 +49,6 @@ export interface ListTasksRequest {
   projectId: string;
   statuses: string[];
   taskOrder: number;
+  updatedAt: null | string;
   limit: number;
 }

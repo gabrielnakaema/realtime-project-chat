@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { moveTask } from '@/services/tasks';
+import { taskQueryKeys } from '@/services/query-keys';
 
 export const useMoveTask = () => {
   const queryClient = useQueryClient();
@@ -7,7 +8,7 @@ export const useMoveTask = () => {
   return useMutation({
     mutationFn: moveTask,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
     },
   });
 };

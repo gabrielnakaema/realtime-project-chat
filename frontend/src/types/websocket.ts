@@ -30,7 +30,10 @@ export type TaskCreatedEvent = {
 export type TaskUpdatedEvent = {
   type: 'task_updated';
   room_id: string;
-  data: Task;
+  data: {
+    task: Task;
+    previous_status?: string;
+  };
 };
 
 export type UsersOnlineEvent = {

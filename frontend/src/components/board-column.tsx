@@ -12,6 +12,8 @@ import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge
 import type { Column } from '@/types/board';
 import { cn } from '@/lib/utils';
 import { useMoveTask } from '@/hooks/use-move-task';
+import { useBoardColumnTasks } from '@/hooks/use-board-column-tasks';
+import { DEFAULT_TASK_LIMIT } from '@/constants/tasks';
 
 interface BoardColumnProps {
   column: Column;
@@ -23,6 +25,12 @@ export const BoardColumn = ({ column }: BoardColumnProps) => {
 
   const mutation = useMoveTask();
 
+  const { columnTasks: tasks, sentinelRef } = useBoardColumnTasks({
+    projectId: column.project_id,
+    status: column.status,
+    limit: DEFAULT_TASK_LIMIT,
+  });
+
   const handleColumnDrop = useCallback(
     (args: BaseEventPayload<ElementDragType> & DropTargetLocalizedData) => {
       const { dropTargets = [] } = args.location.current;
@@ -30,17 +38,17 @@ export const BoardColumn = ({ column }: BoardColumnProps) => {
         const { data: sourceData } = args.source;
 
         const sourceTaskId = sourceData.taskId as string;
-        const tasksLength = column.tasks.length || 0;
+        const tasksLength = tasks.length || 0;
 
         mutation.mutate({
-          afterTaskId: tasksLength > 0 ? column.tasks[tasksLength - 1].id : null,
+          afterTaskId: tasksLength > 0 ? tasks[tasksLength - 1].id : null,
           projectId: column.project_id,
           status: column.status,
           taskId: sourceTaskId,
         });
       }
     },
-    [column, mutation],
+    [column, mutation, tasks],
   );
 
   useEffect(() => {
@@ -62,7 +70,7 @@ export const BoardColumn = ({ column }: BoardColumnProps) => {
   const handleTaskDrop = useCallback(
     (edge: Edge | null, droppedTaskId: string, targetIndex: number) => {
       if (edge === 'bottom') {
-        const task = column.tasks[targetIndex];
+        const task = tasks[targetIndex];
         mutation.mutate({
           afterTaskId: task.id,
           projectId: task.project_id,
@@ -73,7 +81,7 @@ export const BoardColumn = ({ column }: BoardColumnProps) => {
 
       if (edge === 'top') {
         if (targetIndex > 0) {
-          const task = column.tasks[targetIndex - 1];
+          const task = tasks[targetIndex - 1];
           mutation.mutate({
             afterTaskId: task.id,
             projectId: task.project_id,
@@ -90,7 +98,7 @@ export const BoardColumn = ({ column }: BoardColumnProps) => {
         }
       }
     },
-    [column, mutation],
+    [column, mutation, tasks],
   );
 
   return (
@@ -108,13 +116,14 @@ export const BoardColumn = ({ column }: BoardColumnProps) => {
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto" ref={scrollableRef}>
-        {column.tasks.map((task, index) => (
+        {tasks.map((task, index) => (
           <TaskCard
             key={task.id}
             task={task}
             onDrop={(edge, droppedTaskId) => handleTaskDrop(edge, droppedTaskId, index)}
           />
         ))}
+        <div ref={sentinelRef} className="h-1" aria-hidden="true" />
       </div>
     </div>
   );

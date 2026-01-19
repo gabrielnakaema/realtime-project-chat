@@ -18,6 +18,9 @@ export const taskQueryKeys = {
   list: (request: ListTasksRequest) => ['tasks', 'list', request],
   listGroupedByProjectId: (request: ListTasksRequest) => ['tasks', 'list', 'grouped', request],
   countByStatus: (projectId: string, statuses: TaskStatus[]) => ['tasks', 'count', { projectId, statuses }],
+
+  _allGrouped: () => ['tasks', 'list', 'grouped'] as const,
+  _allCounts: () => ['tasks', 'count'] as const,
 } as const;
 
 export const chatQueryKeys = {

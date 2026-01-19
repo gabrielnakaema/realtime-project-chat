@@ -2,7 +2,7 @@ import { parse } from 'date-fns';
 import { api } from './api';
 import type { ListTasksRequest, Task, TaskStatus } from '@/types/task';
 import type { ITaskForm } from '@/schemas/task-schema';
-import type { Paginated } from '@/types/paginated';
+import type { CursorPaginated, Paginated } from '@/types/paginated';
 
 export const countTasksByStatus = async (projectId: string, statuses: TaskStatus[]) => {
   const searchParams = new URLSearchParams();
@@ -33,11 +33,15 @@ export const listGroupedTasksByProjectId = async (request: ListTasksRequest) => 
     searchParams.set('limit', request.limit.toString());
   }
 
+  if (request.updatedAt) {
+    searchParams.set('updated_at', request.updatedAt);
+  }
+
   const response = await api.get('tasks/group-by-status', {
     searchParams,
   });
 
-  const json = await response.json<Record<TaskStatus, Paginated<Task>>>();
+  const json = await response.json<Record<TaskStatus, CursorPaginated<Task>>>();
   return json;
 };
 

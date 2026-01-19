@@ -1,9 +1,13 @@
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { BoardColumn } from './board-column';
 import { CreateTask } from './create-task';
 import type { TaskStatus } from '@/types/task';
 import type { Project } from '@/types/project';
-import { useProjectTasks } from '@/hooks/use-project-tasks';
+import { useRealtimeTaskSync } from '@/hooks/use-realtime-task-sync';
+import { countTasksByStatus } from '@/services/tasks';
+import { taskQueryKeys } from '@/services/query-keys';
+import { TASK_STATUSES } from '@/constants/tasks';
 
 interface Column {
   id: string;
@@ -12,7 +16,7 @@ interface Column {
   color: string;
 }
 
-const columns: Column[] = [
+const DEFAULT_COLUMNS: Column[] = [
   { id: 'pending', title: 'Pending', status: 'pending', color: 'bg-slate-100 dark:bg-slate-800' },
   { id: 'doing', title: 'Doing', status: 'doing', color: 'bg-blue-50 dark:bg-blue-950' },
   { id: 'done', title: 'Done', status: 'done', color: 'bg-emerald-50 dark:bg-emerald-950' },
@@ -21,19 +25,23 @@ const columns: Column[] = [
 export const KanbanBoard = ({ project }: { project: Project }) => {
   const projectId = project.id;
 
-  const { data, countData } = useProjectTasks(projectId);
+  useRealtimeTaskSync(projectId);
 
-  const columnTasks = useMemo(() => {
-    return columns.map((column) => ({
+  const { data: countData } = useQuery({
+    queryKey: taskQueryKeys.countByStatus(projectId, [...TASK_STATUSES]),
+    queryFn: () => countTasksByStatus(projectId, [...TASK_STATUSES]),
+  });
+
+  const columns = useMemo(() => {
+    return DEFAULT_COLUMNS.map((column) => ({
       id: column.id,
       color: column.color,
       title: column.title,
-      tasks: data?.[column.status]?.data || [],
       status: column.status,
       project_id: project.id,
       total: countData?.[column.status] || 0,
     }));
-  }, [data, project.id, countData]);
+  }, [project.id, countData]);
 
   return (
     <div className="h-full">
@@ -43,7 +51,7 @@ export const KanbanBoard = ({ project }: { project: Project }) => {
       </div>
 
       <div className="grid h-[calc(100vh-200px)] grid-cols-1 gap-6 md:grid-cols-3">
-        {columnTasks.map((column) => (
+        {columns.map((column) => (
           <BoardColumn column={column} key={column.id} />
         ))}
       </div>
