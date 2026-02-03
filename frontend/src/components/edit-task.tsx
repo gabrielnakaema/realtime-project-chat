@@ -92,7 +92,6 @@ export const EditTask = ({ taskId, open, onOpenChange }: EditTaskProps) => {
       responsible_id: data.responsible_id ?? null,
       tags: data.tags?.split(',').map((tag) => tag.trim()) || [],
       done_at: null,
-      order: task?.order ?? 0,
       status: task?.status ?? 'pending',
     });
   };

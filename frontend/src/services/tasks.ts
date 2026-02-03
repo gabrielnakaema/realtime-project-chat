@@ -115,7 +115,6 @@ interface UpdateTaskRequest {
   description: string;
   status: string;
 
-  order: number;
   priority: string;
   due_date: string | null;
   responsible_id: string | null;
@@ -132,7 +131,6 @@ export const updateTask = async (request: UpdateTaskRequest) => {
     title: request.title,
     description: request.description,
     status: request.status,
-    order: request.order,
     priority: request.priority,
     due_date: formattedDueDate,
     responsible_id: request.responsible_id || null,
