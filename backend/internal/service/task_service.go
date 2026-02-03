@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
@@ -116,6 +117,15 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		}
 	}
 
+	formattedTags := []string{}
+	for _, tag := range request.Tags {
+		if strings.TrimSpace(tag) == "" {
+			continue
+		}
+
+		formattedTags = append(formattedTags, tag)
+	}
+
 	task := domain.Task{
 		ProjectId:     request.ProjectId,
 		Title:         request.Title,
@@ -129,7 +139,7 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		Order:         int(order),
 		ResponsibleId: request.ResponsibleId,
 		DueDate:       request.DueDate,
-		Tags:          request.Tags,
+		Tags:          formattedTags,
 		Updates:       []domain.TaskUpdate{},
 	}
 
@@ -208,6 +218,14 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 	// Capture old status for event payload
 	oldStatus := task.Status
 
+	formattedTags := []string{}
+	for _, tag := range request.Tags {
+		if strings.TrimSpace(tag) == "" {
+			continue
+		}
+		formattedTags = append(formattedTags, tag)
+	}
+
 	updatedTask := domain.Task{
 		Id:            task.Id,
 		ProjectId:     task.ProjectId,
@@ -222,7 +240,7 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		ResponsibleId: request.ResponsibleId,
 		DueDate:       request.DueDate,
 		DoneAt:        request.DoneAt,
-		Tags:          request.Tags,
+		Tags:          formattedTags,
 		UpdatedAt:     time.Now(),
 		Updates:       []domain.TaskUpdate{},
 	}
@@ -514,8 +532,8 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 	}
 
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
-		Task:           *updatedTask,
-		User:           domain.User{
+		Task: *updatedTask,
+		User: domain.User{
 			Id: request.RequestUserId,
 		},
 		PreviousStatus: previousStatus,

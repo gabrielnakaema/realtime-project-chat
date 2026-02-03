@@ -142,6 +142,7 @@ func TestTaskService_Create(t *testing.T) {
 		expectedError     error
 		expectedErrorCode string
 		shouldSucceed     bool
+		checkFunc         func(t *testing.T, task *domain.Task) bool
 	}
 
 	tests := []testCase{
@@ -210,6 +211,28 @@ func TestTaskService_Create(t *testing.T) {
 			expectedErrorCode: string(domain.ForbiddenErrorCode),
 			expectedError:     domain.ForbiddenError("forbidden"),
 		},
+		{
+			name: "remove empty tags",
+			request: service.CreateTaskRequest{
+				ProjectId:     validProjectId,
+				Title:         "Test Task",
+				Description:   "Test Description",
+				RequestUserId: validUserId,
+				Tags:          []string{"", "tag1", "tag2", "", "tag3"},
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				repo.On("GetSmallestOrderProjectTask", mock.Anything, validProjectId).Return(nil, domain.NotFoundError("not found"))
+				repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
+			},
+			expectedTask:  &validTask,
+			shouldSucceed: true,
+			expectedError: nil,
+			checkFunc: func(t *testing.T, task *domain.Task) bool {
+				return assert.Equal(t, []string{"tag1", "tag2", "tag3"}, task.Tags)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -239,6 +262,10 @@ func TestTaskService_Create(t *testing.T) {
 				if assert.ErrorAs(t, err, &domainErr) {
 					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
 				}
+			}
+
+			if tt.checkFunc != nil {
+				assert.True(t, tt.checkFunc(t, task))
 			}
 
 			mockRepo.AssertExpectations(t)
@@ -285,6 +312,7 @@ func TestTaskService_Update(t *testing.T) {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 		Updates:     []domain.TaskUpdate{},
+		Tags:        []string{"tag1", "tag2", "tag3"},
 	}
 
 	type testCase struct {
@@ -296,6 +324,7 @@ func TestTaskService_Update(t *testing.T) {
 		expectedErrorCode         string
 		shouldSucceed             bool
 		expectedTaskUpdatesLength int
+		checkFunc                 func(t *testing.T, task *domain.Task) bool
 	}
 
 	tests := []testCase{
@@ -390,6 +419,31 @@ func TestTaskService_Update(t *testing.T) {
 			expectedErrorCode: string(domain.NotFoundErrorCode),
 			expectedError:     domain.NotFoundError("task not found"),
 		},
+		{
+			name: "remove empty tags",
+			request: service.UpdateTaskRequest{
+				TaskId:        validTaskId,
+				Title:         "Updated Task",
+				Description:   "Updated Description",
+				Status:        domain.TaskStatusDoing,
+				RequestUserId: validUserId,
+				Tags:          []string{"", "tag1", "tag2", "", "tag3"},
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				repo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+				repo.On("CreateUpdates", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskUpdate")).Return(nil)
+				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
+			},
+			expectedTask:              &validTask,
+			shouldSucceed:             true,
+			expectedError:             nil,
+			expectedTaskUpdatesLength: 1,
+			checkFunc: func(t *testing.T, task *domain.Task) bool {
+				return assert.Equal(t, []string{"tag1", "tag2", "tag3"}, task.Tags)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -419,6 +473,10 @@ func TestTaskService_Update(t *testing.T) {
 				if assert.ErrorAs(t, err, &domainErr) {
 					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
 				}
+			}
+
+			if tt.checkFunc != nil {
+				assert.True(t, tt.checkFunc(t, task))
 			}
 
 			mockRepo.AssertExpectations(t)
