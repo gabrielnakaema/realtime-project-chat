@@ -132,9 +132,11 @@ JOIN users actor ON al.actor_id = actor.id
 LEFT JOIN task_entities te ON al.entity_type = 'task' AND al.entity_id = te.id
 LEFT JOIN project_member_entities pme ON al.entity_type = 'project.member' AND al.entity_id = pme.id
 WHERE (al.project_id = $1::uuid OR $1::uuid IS NULL)
-AND ($2::timestamptz IS NULL OR al.created_at < $2::timestamptz)
-AND ($3::uuid IS NULL OR al.id != $3::uuid)
-ORDER BY al.created_at DESC
+AND (
+  $2::timestamptz IS NULL 
+  OR (al.created_at, al.id) < ($2::timestamptz, $3::uuid)
+)
+ORDER BY al.created_at DESC, al.id DESC
 LIMIT (COALESCE($4::integer, 0) + 1)
 `
 

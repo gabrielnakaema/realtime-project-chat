@@ -35,7 +35,11 @@ func (ws *Server) Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sub := token.Claims.(jwt.MapClaims)["sub"].(string)
+	sub, ok := token.Claims.(jwt.MapClaims)["sub"].(string)
+	if !ok {
+		WriteErrorAndClose(r.Context(), c, "invalid token")
+		return
+	}
 	userId, err := uuid.Parse(sub)
 	if err != nil {
 		WriteErrorAndClose(r.Context(), c, "invalid user_id")
@@ -44,7 +48,11 @@ func (ws *Server) Handler(w http.ResponseWriter, r *http.Request) {
 
 	writerChannel := make(chan interface{})
 	readerChannel := make(chan interface{})
-	expiresAt := token.Claims.(jwt.MapClaims)["exp"].(float64)
+	expiresAt, ok := token.Claims.(jwt.MapClaims)["exp"].(float64)
+	if !ok {
+		WriteErrorAndClose(r.Context(), c, "invalid token")
+		return
+	}
 
 	roomUser := &WsUser{
 		id:             userId,

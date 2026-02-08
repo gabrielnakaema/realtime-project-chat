@@ -94,7 +94,9 @@ JOIN users actor ON al.actor_id = actor.id
 LEFT JOIN task_entities te ON al.entity_type = 'task' AND al.entity_id = te.id
 LEFT JOIN project_member_entities pme ON al.entity_type = 'project.member' AND al.entity_id = pme.id
 WHERE (al.project_id = sqlc.narg('project_id')::uuid OR sqlc.narg('project_id')::uuid IS NULL)
-AND (sqlc.narg('before_created_at')::timestamptz IS NULL OR al.created_at < sqlc.narg('before_created_at')::timestamptz)
-AND (sqlc.narg('before_id')::uuid IS NULL OR al.id != sqlc.narg('before_id')::uuid)
-ORDER BY al.created_at DESC
+AND (
+  sqlc.narg('before_created_at')::timestamptz IS NULL 
+  OR (al.created_at, al.id) < (sqlc.narg('before_created_at')::timestamptz, sqlc.narg('before_id')::uuid)
+)
+ORDER BY al.created_at DESC, al.id DESC
 LIMIT (COALESCE(sqlc.narg('limit')::integer, 0) + 1);
