@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/handlers"
 	"github.com/gabrielnakaema/project-chat/internal/service"
@@ -184,7 +185,7 @@ func TestUserHandler_Create(t *testing.T) {
 			mockService := &mockUserService{}
 			tt.mockSetup(mockService)
 
-			handler := handlers.NewUserHandler(mockService)
+			handler := handlers.NewUserHandler(mockService, &config.Config{Environment: "development"})
 
 			var body bytes.Buffer
 			if str, ok := tt.requestBody.(string); ok {
@@ -303,7 +304,7 @@ func TestUserHandler_Login(t *testing.T) {
 			mockService := &mockUserService{}
 			tt.mockSetup(mockService)
 
-			handler := handlers.NewUserHandler(mockService)
+			handler := handlers.NewUserHandler(mockService, &config.Config{Environment: "development"})
 
 			var body bytes.Buffer
 			if str, ok := tt.requestBody.(string); ok {

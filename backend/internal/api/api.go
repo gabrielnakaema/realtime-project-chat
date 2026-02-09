@@ -106,7 +106,7 @@ func NewApi() (*Api, error) {
 	chatHandler := handlers.NewChatHandler(chatService)
 
 	userService := service.NewUserService(jwtProvider, userRepo)
-	userHandler := handlers.NewUserHandler(userService)
+	userHandler := handlers.NewUserHandler(userService, config)
 
 	taskService := service.NewTaskService(taskRepo, projectRepo, userRepo, pub)
 	taskHandler := handlers.NewTaskHandler(taskService)
@@ -125,7 +125,7 @@ func NewApi() (*Api, error) {
 		pool:        pool,
 		logger:      logger,
 		Ws:          ws,
-		Publisher:    pub,
+		Publisher:   pub,
 		subscribers: subscribers,
 		cancel:      cancel,
 	}
