@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -25,12 +26,14 @@ import (
 )
 
 type Api struct {
-	config    *config.Config
-	pool      *pgxpool.Pool
-	handlers  *Handlers
-	logger    *slog.Logger
-	Publisher *publisher.Publisher
-	Ws        *ws.Server
+	config      *config.Config
+	pool        *pgxpool.Pool
+	handlers    *Handlers
+	logger      *slog.Logger
+	Publisher   *publisher.Publisher
+	Ws          *ws.Server
+	subscribers []io.Closer
+	cancel      context.CancelFunc
 }
 
 type Handlers struct {
@@ -59,6 +62,8 @@ func NewApi() (*Api, error) {
 		return nil, err
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	jwtProvider := token.NewTokenProvider(config)
 	authMiddleware := handlers.NewAuthMiddleware(jwtProvider)
 
@@ -73,22 +78,30 @@ func NewApi() (*Api, error) {
 
 	chatService := service.NewChatService(chatRepo, userRepo, pub)
 
-	ws := ws.NewServer(jwtProvider, logger, chatService, projectService, pub)
+	ws := ws.NewServer(ctx, jwtProvider, logger, chatService, projectService, pub)
 
-	_, err = subscriber.NewChatSubscriber(config, logger, chatService, ws)
+	var subscribers []io.Closer
+
+	chatSub, err := subscriber.NewChatSubscriber(ctx, config, logger, chatService, ws)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
+	subscribers = append(subscribers, chatSub)
 
-	_, err = subscriber.NewTaskSubscriber(config, logger, ws)
+	taskSub, err := subscriber.NewTaskSubscriber(ctx, config, logger, ws)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
+	subscribers = append(subscribers, taskSub)
 
-	_, err = subscriber.NewProjectActivitySubscriber(config, logger, activityRepo, projectRepo)
+	activitySub, err := subscriber.NewProjectActivitySubscriber(ctx, config, logger, activityRepo, projectRepo)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
+	subscribers = append(subscribers, activitySub)
 
 	chatHandler := handlers.NewChatHandler(chatService)
 
@@ -107,15 +120,35 @@ func NewApi() (*Api, error) {
 	}
 
 	api := Api{
-		handlers:  &handlers,
-		config:    config,
-		pool:      pool,
-		logger:    logger,
-		Ws:        ws,
-		Publisher: pub,
+		handlers:    &handlers,
+		config:      config,
+		pool:        pool,
+		logger:      logger,
+		Ws:          ws,
+		Publisher:    pub,
+		subscribers: subscribers,
+		cancel:      cancel,
 	}
 
 	return &api, nil
+}
+
+func (a *Api) Close() {
+	a.cancel()
+
+	for _, s := range a.subscribers {
+		if err := s.Close(); err != nil {
+			a.logger.Error("error closing subscriber", "error", err)
+		}
+	}
+
+	if err := a.Publisher.Close(); err != nil {
+		a.logger.Error("error closing publisher", "error", err)
+	}
+
+	a.pool.Close()
+
+	a.logger.Info("all resources closed")
 }
 
 func (a *Api) Serve() error {

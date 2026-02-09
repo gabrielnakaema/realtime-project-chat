@@ -46,7 +46,7 @@ func (ws *Server) Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writerChannel := make(chan interface{})
+	writerChannel := make(chan interface{}, 32)
 	readerChannel := make(chan interface{})
 	expiresAt, ok := token.Claims.(jwt.MapClaims)["exp"].(float64)
 	if !ok {

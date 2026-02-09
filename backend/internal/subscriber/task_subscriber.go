@@ -21,7 +21,7 @@ type TaskSubscriber struct {
 	notifier   TaskNotifier
 }
 
-func NewTaskSubscriber(config *config.Config, logger *slog.Logger, notifier TaskNotifier) (*TaskSubscriber, error) {
+func NewTaskSubscriber(ctx context.Context, config *config.Config, logger *slog.Logger, notifier TaskNotifier) (*TaskSubscriber, error) {
 	subscriber, err := NewSubscriber(config, "task.subscriber")
 	if err != nil {
 		return nil, err
@@ -35,13 +35,16 @@ func NewTaskSubscriber(config *config.Config, logger *slog.Logger, notifier Task
 
 	topics := []events.Topic{events.TaskCreated, events.TaskUpdated}
 
-	err = subscriber.Subscribe(context.Background(), topics, taskSubscriber.handleTaskEvents, taskSubscriber.logger)
+	err = subscriber.Subscribe(ctx, topics, taskSubscriber.handleTaskEvents, taskSubscriber.logger)
 	if err != nil {
 		return nil, err
 	}
 
 	return taskSubscriber, nil
+}
 
+func (ts *TaskSubscriber) Close() error {
+	return ts.subscriber.Close()
 }
 
 func (ts *TaskSubscriber) handleTaskEvents(ctx context.Context, message Message) error {

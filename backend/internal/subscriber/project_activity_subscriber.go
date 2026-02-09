@@ -23,7 +23,7 @@ type ProjectActivitySubscriber struct {
 	projectRepository ProjectRepository
 }
 
-func NewProjectActivitySubscriber(config *config.Config, logger *slog.Logger, repository *repository.ProjectActivityRepository, projectRepository ProjectRepository) (*ProjectActivitySubscriber, error) {
+func NewProjectActivitySubscriber(ctx context.Context, config *config.Config, logger *slog.Logger, repository *repository.ProjectActivityRepository, projectRepository ProjectRepository) (*ProjectActivitySubscriber, error) {
 	subscriber, err := NewSubscriber(config, "project_activity.subscriber")
 	if err != nil {
 		return nil, err
@@ -37,12 +37,16 @@ func NewProjectActivitySubscriber(config *config.Config, logger *slog.Logger, re
 	}
 
 	topics := []events.Topic{events.ProjectCreated, events.ProjectUpdated, events.ProjectMemberCreated, events.ProjectMemberRemoved, events.TaskCreated, events.TaskUpdated}
-	err = subscriber.Subscribe(context.Background(), topics, projectActivitySubscriber.handleProjectActivityEvents, projectActivitySubscriber.logger)
+	err = subscriber.Subscribe(ctx, topics, projectActivitySubscriber.handleProjectActivityEvents, projectActivitySubscriber.logger)
 	if err != nil {
 		return nil, err
 	}
 
 	return projectActivitySubscriber, nil
+}
+
+func (pas *ProjectActivitySubscriber) Close() error {
+	return pas.subscriber.Close()
 }
 
 func (pas *ProjectActivitySubscriber) handleProjectActivityEvents(ctx context.Context, message Message) error {

@@ -45,14 +45,30 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic []events.Topic, handle
 
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				logger.Info("subscriber context cancelled, stopping consume loop", "topics", topics)
+				return
+			default:
+			}
+
 			err := s.consumer.Consume(ctx, topics, &consumerGroupHandler{handler: handler})
 			if err != nil {
 				logger.Error("error consuming topic", "error", err.Error())
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second):
+				}
 			}
 		}
 	}()
 
 	return nil
+}
+
+func (s *Subscriber) Close() error {
+	return s.consumer.Close()
 }
 
 type consumerGroupHandler struct {

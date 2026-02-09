@@ -23,7 +23,7 @@ type ChatSubscriber struct {
 	notifier    MessageNotifier
 }
 
-func NewChatSubscriber(config *config.Config, logger *slog.Logger, chatService *service.ChatService, notifier MessageNotifier) (*ChatSubscriber, error) {
+func NewChatSubscriber(ctx context.Context, config *config.Config, logger *slog.Logger, chatService *service.ChatService, notifier MessageNotifier) (*ChatSubscriber, error) {
 	subscriber, err := NewSubscriber(config, "chat.subscriber")
 	if err != nil {
 		return nil, domain.ServerError("failed to create chat subscriber", err)
@@ -38,12 +38,16 @@ func NewChatSubscriber(config *config.Config, logger *slog.Logger, chatService *
 
 	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ChatMemberCreated, events.ChatMessageCreated, events.ChatMemberViewed}
 
-	err = subscriber.Subscribe(context.Background(), topics, chatSubscriber.handleChatEvents, chatSubscriber.logger)
+	err = subscriber.Subscribe(ctx, topics, chatSubscriber.handleChatEvents, chatSubscriber.logger)
 	if err != nil {
 		return nil, domain.ServerError("failed to subscribe to chat events", err)
 	}
 
 	return chatSubscriber, nil
+}
+
+func (cs *ChatSubscriber) Close() error {
+	return cs.subscriber.Close()
 }
 
 func (cs *ChatSubscriber) handleChatEvents(ctx context.Context, message Message) error {

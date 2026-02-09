@@ -31,7 +31,6 @@ func (ws *Server) sendMessageToRoom(ctx context.Context, roomId uuid.UUID, messa
 			return nil
 		default:
 			ws.logger.Debug("failed to send message", "error", "channel is full", "user_id", user.id, "room_id", roomId)
-			return nil
 		}
 	}
 

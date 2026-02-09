@@ -69,7 +69,7 @@ type Server struct {
 	publisher      publisher
 }
 
-func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService chatService, projectService projectService, publisher publisher) *Server {
+func NewServer(ctx context.Context, tokenProvider tokenProvider, logger *slog.Logger, chatService chatService, projectService projectService, publisher publisher) *Server {
 	ws := &Server{
 		rooms:          make(map[uuid.UUID]*WsRoom),
 		logger:         logger,
@@ -83,25 +83,32 @@ func NewServer(tokenProvider tokenProvider, logger *slog.Logger, chatService cha
 
 	go func() {
 		usersOnlineTicker := time.NewTicker(usersOnlineInterval)
+		defer usersOnlineTicker.Stop()
 
-		for range usersOnlineTicker.C {
-			for _, room := range ws.rooms {
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Info("websocket server ticker stopped")
+				return
+			case <-usersOnlineTicker.C:
+				for _, room := range ws.rooms {
+					tickCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 
-				userIds := []uuid.UUID{}
-				for userId := range room.users {
-					userIds = append(userIds, userId)
+					userIds := []uuid.UUID{}
+					for userId := range room.users {
+						userIds = append(userIds, userId)
+					}
+
+					message := WebsocketMessage{
+						Type:   WebsocketMessageTypeUsersOnline,
+						RoomId: room.id,
+						Data:   userIds,
+					}
+
+					ws.sendMessageToRoom(tickCtx, room.id, message)
+
+					cancel()
 				}
-
-				message := WebsocketMessage{
-					Type:   WebsocketMessageTypeUsersOnline,
-					RoomId: room.id,
-					Data:   userIds,
-				}
-
-				ws.sendMessageToRoom(ctx, room.id, message)
-
-				cancel()
 			}
 		}
 	}()

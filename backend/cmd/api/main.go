@@ -13,7 +13,7 @@ func main() {
 		return
 	}
 
-	defer a.Publisher.Close()
+	defer a.Close()
 
 	err = a.Serve()
 	if err != nil {
