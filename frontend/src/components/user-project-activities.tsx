@@ -2,7 +2,7 @@ import { ProjectActivity } from './project-activity';
 import { useUserProjectActivities } from '@/hooks/use-user-project-activities';
 
 export const UserProjectActivities = () => {
-  const { data, queryResult } = useUserProjectActivities();
+  const { data, queryResult, sentinelRef } = useUserProjectActivities();
   const { isLoading } = queryResult;
 
   if (isLoading || !data.length) {
@@ -20,6 +20,7 @@ export const UserProjectActivities = () => {
         {data.map((activity) => (
           <ProjectActivity key={activity.id} activity={activity} />
         ))}
+        <div ref={sentinelRef} className="h-1" aria-hidden="true" />
       </div>
     </section>
   );

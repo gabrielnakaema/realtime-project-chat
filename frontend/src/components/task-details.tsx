@@ -83,7 +83,7 @@ export const TaskDetails = ({ taskId, open, onOpenChange, onEdit }: TaskDetailsP
               <h3 className="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
                 Description
               </h3>
-              <DialogDescription>{task.description}</DialogDescription>
+              <DialogDescription className="whitespace-pre-line">{task.description}</DialogDescription>
             </div>
             <div className="grid grid-cols-2 gap-6 border-b border-slate-200 pb-4 dark:border-slate-700">
               <div className="grid grid-cols-[1rem_1fr] items-center gap-2">

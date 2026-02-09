@@ -172,7 +172,7 @@ function RouteComponent() {
                             'border border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100',
                         )}
                       >
-                        <p className="text-sm leading-relaxed">{message.content}</p>
+                        <p className="text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
                       </div>
                       {isCurrentUser && (
                         <div className="mt-1">
