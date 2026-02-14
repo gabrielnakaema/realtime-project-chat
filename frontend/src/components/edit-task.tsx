@@ -7,7 +7,7 @@ import { Button } from './button';
 import { Input } from './input';
 import { LoadingSpinner } from './loading';
 import { Select } from './select';
-import { Textarea } from './textarea';
+import { TextEditor } from './text-editor';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import type { SubmitHandler } from 'react-hook-form';
 import type { ITaskForm } from '@/schemas/task-schema';
@@ -54,6 +54,7 @@ export const EditTask = ({ taskId, open, onOpenChange }: EditTaskProps) => {
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<ITaskForm>({
     resolver: zodResolver(taskSchema),
@@ -212,17 +213,12 @@ export const EditTask = ({ taskId, open, onOpenChange }: EditTaskProps) => {
               );
             }}
           />
-          <Textarea
+          <TextEditor
+            initialValue={task.description}
+            onChange={(html) => setValue('description', html)}
             label="Description"
             id="description"
             placeholder="Enter task description"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(onSubmit)();
-              }
-            }}
-            {...register('description')}
             error={errors.description?.message}
           />
           <div className="flex w-full items-center justify-end gap-4">

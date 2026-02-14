@@ -11,6 +11,7 @@ import { TaskPriorityBadge } from './task-priority-badge';
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import type { Task } from '@/types/task';
 import { cn } from '@/lib/utils';
+import { sanitizeHTML } from '@/utils/html';
 
 interface TaskCardProps {
   task: Task;
@@ -90,7 +91,10 @@ export const TaskCard = ({ task, onDrop }: TaskCardProps) => {
             <TaskPriorityBadge priority={task.priority} />
           </div>
           {task.description && (
-            <p className="mt-2 line-clamp-2 text-xs text-slate-600 dark:text-slate-400">{task.description}</p>
+            <div
+              className="mt-2 line-clamp-2 text-xs text-slate-600 dark:text-slate-400"
+              dangerouslySetInnerHTML={{ __html: sanitizeHTML(task.description) }}
+            />
           )}
 
           {!!task.tags?.length && (

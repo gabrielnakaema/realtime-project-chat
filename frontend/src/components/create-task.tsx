@@ -7,7 +7,7 @@ import { Button } from './button';
 import { Input } from './input';
 import { LoadingSpinner } from './loading';
 import { Select } from './select';
-import { Textarea } from './textarea';
+import { TextEditor } from './text-editor';
 import {
   Dialog,
   DialogClose,
@@ -51,6 +51,7 @@ export const CreateTask = ({ projectId, projectMembers }: CreateTaskModalProps) 
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
   } = useForm<ITaskForm>({
     resolver: zodResolver(taskSchema),
   });
@@ -170,17 +171,12 @@ export const CreateTask = ({ projectId, projectMembers }: CreateTaskModalProps) 
               );
             }}
           />
-          <Textarea
+          <TextEditor
+            initialValue=""
+            onChange={(html) => setValue('description', html)}
             label="Description"
             id="description"
             placeholder="Enter task description"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(onSubmit)();
-              }
-            }}
-            {...register('description')}
             error={errors.description?.message}
           />
           <div className="flex w-full items-center justify-end gap-4">
