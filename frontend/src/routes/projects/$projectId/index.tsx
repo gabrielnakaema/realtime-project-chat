@@ -8,6 +8,7 @@ import { ProjectSettings } from '@/components/project-settings';
 import { useOnlineUsers } from '@/hooks/use-online-users';
 import { getProject } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
+import { sanitizeHTML } from '@/utils/html';
 
 export const Route = createFileRoute('/projects/$projectId/')({
   component: RouteComponent,
@@ -38,7 +39,9 @@ function RouteComponent() {
               </Link>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{project?.name}</h1>
-                <p className="line-clamp-1 text-slate-600 dark:text-slate-400">{project?.description}</p>
+                <p className="line-clamp-1 max-h-8 overflow-hidden text-ellipsis text-slate-600 dark:text-slate-400">
+                  <div dangerouslySetInnerHTML={{ __html: sanitizeHTML(project?.description || '') }} />
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-4">

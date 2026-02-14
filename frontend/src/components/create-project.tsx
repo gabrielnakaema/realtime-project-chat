@@ -6,8 +6,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Button } from './button';
 import { Input } from './input';
-import { Textarea } from './textarea';
 import { LoadingSpinner } from './loading';
+import { TextEditor } from './text-editor';
 import type { SubmitHandler } from 'react-hook-form';
 import type { IProjectForm } from '@/schemas/project-schema';
 import { createProject } from '@/services/projects';
@@ -25,6 +25,7 @@ export const CreateProject = () => {
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
   } = useForm<IProjectForm>({
     resolver: zodResolver(projectSchema),
   });
@@ -65,18 +66,14 @@ export const CreateProject = () => {
             error={errors.name?.message}
             {...register('name')}
           />
-          <Textarea
-            id="description"
+
+          <TextEditor
+            initialValue=""
+            onChange={(html) => setValue('description', html)}
             label="Description"
-            placeholder="Enter project description"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(onSubmit)();
-              }
-            }}
+            id="description"
             error={errors.description?.message}
-            {...register('description')}
+            placeholder="Enter project description"
           />
           <Button type="submit" disabled={isPending} className="ml-auto">
             {isPending ? <LoadingSpinner size="1.5em" /> : 'Create project'}

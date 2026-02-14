@@ -5,6 +5,7 @@ import { CreateProject } from './create-project';
 import { listProjects } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
 import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
+import { sanitizeHTML } from '@/utils/html';
 
 export const ProjectList = () => {
   const { data: projects, isLoading } = useQuery({
@@ -53,8 +54,8 @@ export const ProjectList = () => {
                   </span>
                 </div>
 
-                <p className="line-clamp-3 min-h-16 text-sm text-slate-600 dark:text-slate-400">
-                  {project.description}
+                <p className="line-clamp-3 max-h-16 min-h-16 overflow-hidden text-sm text-ellipsis text-slate-600 dark:text-slate-400">
+                  <div dangerouslySetInnerHTML={{ __html: sanitizeHTML(project.description) }} />
                 </p>
                 <p className="mt-auto text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
                   Last activity:{' '}

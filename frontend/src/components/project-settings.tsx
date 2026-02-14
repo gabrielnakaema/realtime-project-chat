@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Input } from './input';
-import { Textarea } from './textarea';
+import { TextEditor } from './text-editor';
 import { Button } from './button';
 import { LoadingSpinner } from './loading';
 import type { SubmitHandler } from 'react-hook-form';
@@ -34,6 +34,7 @@ export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
   } = useForm<IProjectForm>({
     resolver: zodResolver(projectSchema),
   });
@@ -94,18 +95,13 @@ export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
               error={errors.name?.message}
               {...register('name')}
             />
-            <Textarea
-              id="description"
+            <TextEditor
+              initialValue={data?.description ?? ''}
+              onChange={(html) => setValue('description', html)}
               label="Description"
-              placeholder="Enter project description"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(onSubmit)();
-                }
-              }}
+              id="description"
               error={errors.description?.message}
-              {...register('description')}
+              placeholder="Enter project description"
             />
             <Button type="submit" disabled={isPending} className="ml-auto">
               {isPending ? <LoadingSpinner size="1.5em" /> : 'Save changes'}
