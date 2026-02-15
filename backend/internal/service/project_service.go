@@ -382,3 +382,69 @@ func (ps *ProjectService) ListMembersByProjectId(ctx context.Context, projectId 
 
 	return members, nil
 }
+
+type RemoveMemberRequest struct {
+	ProjectId     uuid.UUID
+	UserId        uuid.UUID
+	RequestUserId uuid.UUID
+}
+
+func (ps *ProjectService) RemoveMember(ctx context.Context, request RemoveMemberRequest) error {
+	if request.RequestUserId == uuid.Nil {
+		return domain.UnauthorizedError("unauthorized")
+	}
+
+	project, err := ps.projectRepository.GetById(ctx, request.ProjectId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return domain.NotFoundError("project not found")
+			}
+			return domainErr
+		}
+
+		return domain.ServerError("failed to get project", err)
+	}
+
+	member := domain.ProjectMember{}
+	var requestUserRole domain.ProjectMemberRole
+
+	for _, m := range project.Members {
+		if m.UserId == request.UserId {
+			if m.Role == domain.ProjectMemberRoleCreator {
+				return domain.BusinessValidationError("cannot remove creator from project")
+			}
+
+			member = m
+		}
+
+		if m.UserId == request.RequestUserId {
+			requestUserRole = m.Role
+		}
+	}
+
+	isCreator := requestUserRole == domain.ProjectMemberRoleCreator
+	isSelfRemoval := request.UserId == request.RequestUserId && requestUserRole == domain.ProjectMemberRoleMember
+
+	if !isCreator && !isSelfRemoval {
+		return domain.ForbiddenError("forbidden")
+	}
+
+	err = ps.projectRepository.RemoveMember(ctx, request.ProjectId, request.UserId)
+	if err != nil {
+		return domain.ServerError("failed to remove member", err)
+	}
+
+	err = ps.publisher.Publish(ctx, events.ProjectMemberRemoved, &events.ProjectMemberRemovedPayload{
+		ProjectMember: member,
+		User: domain.User{
+			Id: request.RequestUserId,
+		},
+	})
+	if err != nil {
+		return domain.ServerError("failed to publish project member removed event", err)
+	}
+
+	return nil
+}

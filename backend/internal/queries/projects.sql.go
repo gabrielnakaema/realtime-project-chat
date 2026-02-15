@@ -355,6 +355,23 @@ func (q *Queries) RemoveProjectMember(ctx context.Context, arg RemoveProjectMemb
 	return err
 }
 
+const removeProjectTasksResponsibleByUserId = `-- name: RemoveProjectTasksResponsibleByUserId :exec
+UPDATE tasks
+  SET responsible_id = NULL
+  WHERE responsible_id = $1
+  AND project_id = $2
+`
+
+type RemoveProjectTasksResponsibleByUserIdParams struct {
+	ResponsibleID pgtype.UUID
+	ProjectID     uuid.UUID
+}
+
+func (q *Queries) RemoveProjectTasksResponsibleByUserId(ctx context.Context, arg RemoveProjectTasksResponsibleByUserIdParams) error {
+	_, err := q.db.Exec(ctx, removeProjectTasksResponsibleByUserId, arg.ResponsibleID, arg.ProjectID)
+	return err
+}
+
 const updateProject = `-- name: UpdateProject :exec
 UPDATE
   projects

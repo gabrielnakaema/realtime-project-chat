@@ -23,6 +23,7 @@ type projectService interface {
 	ListActivitiesByProject(ctx context.Context, request service.ListActivitiesByProjectRequest) (*utils.CursorPaginated[domain.ProjectActivity], error)
 	ListUsersProjectActivities(ctx context.Context, request service.ListUsersProjectActivitiesRequest) (*utils.CursorPaginated[domain.ProjectActivity], error)
 	ListMembersByProjectId(ctx context.Context, projectId uuid.UUID, requestUserId uuid.UUID) ([]domain.ProjectMember, error)
+	RemoveMember(ctx context.Context, request service.RemoveMemberRequest) error
 }
 
 type ProjectHandler struct {
@@ -208,6 +209,42 @@ func (h *ProjectHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = utils.WriteJSON(w, http.StatusCreated, member, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *ProjectHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+
+	id := chi.URLParam(r, "id")
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		BadRequestResponse(w, errors.New("invalid project id"))
+		return
+	}
+
+	memberId := chi.URLParam(r, "member_id")
+	parsedMemberId, err := uuid.Parse(memberId)
+	if err != nil {
+		BadRequestResponse(w, errors.New("invalid member id"))
+		return
+	}
+
+	serviceRequest := service.RemoveMemberRequest{
+		ProjectId:     parsed,
+		UserId:        parsedMemberId,
+		RequestUserId: userId,
+	}
+
+	err = h.projectService.RemoveMember(r.Context(), serviceRequest)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusNoContent, nil, nil)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

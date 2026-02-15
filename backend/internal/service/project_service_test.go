@@ -747,3 +747,199 @@ func TestProjectService_CreateMember(t *testing.T) {
 		})
 	}
 }
+
+func TestProjectService_RemoveMember(t *testing.T) {
+	creatorUserId := uuid.New()
+	memberUserId := uuid.New()
+	otherMemberUserId := uuid.New()
+	validProjectId := uuid.New()
+
+	validProject := &domain.Project{
+		Id:          validProjectId,
+		Name:        "Test Project",
+		Description: "Test Description",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Members: []domain.ProjectMember{
+			{
+				UserId: creatorUserId,
+				Role:   domain.ProjectMemberRoleCreator,
+			},
+			{
+				UserId: memberUserId,
+				Role:   domain.ProjectMemberRoleMember,
+			},
+			{
+				UserId: otherMemberUserId,
+				Role:   domain.ProjectMemberRoleMember,
+			},
+		},
+		UserId: creatorUserId,
+	}
+
+	type testCase struct {
+		name              string
+		request           service.RemoveMemberRequest
+		mockSetup         func(*mockProjectRepository, *mockUserRepository)
+		expectedError     error
+		expectedErrorCode string
+		shouldSucceed     bool
+	}
+
+	tests := []testCase{
+		{
+			name: "successful member removal",
+			request: service.RemoveMemberRequest{
+				ProjectId:     validProjectId,
+				UserId:        memberUserId,
+				RequestUserId: creatorUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(validProject, nil)
+				repo.On("RemoveMember", mock.Anything, validProjectId, memberUserId).Return(nil)
+			},
+			shouldSucceed: true,
+			expectedError: nil,
+		},
+		{
+			name: "unauthorized error",
+			request: service.RemoveMemberRequest{
+				ProjectId:     validProjectId,
+				UserId:        memberUserId,
+				RequestUserId: uuid.Nil,
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.UnauthorizedErrorCode),
+			expectedError:     domain.UnauthorizedError("unauthorized"),
+		},
+		{
+			name: "server error on get project",
+			request: service.RemoveMemberRequest{
+				ProjectId:     validProjectId,
+				UserId:        memberUserId,
+				RequestUserId: creatorUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(nil, errors.New("database error"))
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.ServerErrorCode),
+			expectedError:     domain.ServerError("failed to get project", errors.New("database error")),
+		},
+		{
+			name: "project not found",
+			request: service.RemoveMemberRequest{
+				ProjectId:     uuid.New(),
+				UserId:        memberUserId,
+				RequestUserId: creatorUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, mock.Anything).Return(nil, domain.NotFoundError("project not found"))
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.NotFoundErrorCode),
+			expectedError:     domain.NotFoundError("project not found"),
+		},
+		{
+			name: "cannot remove creator from project",
+			request: service.RemoveMemberRequest{
+				ProjectId:     validProjectId,
+				UserId:        creatorUserId,
+				RequestUserId: creatorUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.BusinessValidationErrorCode),
+			expectedError:     domain.BusinessValidationError("cannot remove creator from project"),
+		},
+		{
+			name: "member removes themselves from project",
+			request: service.RemoveMemberRequest{
+				ProjectId:     validProjectId,
+				UserId:        memberUserId,
+				RequestUserId: memberUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(validProject, nil)
+				repo.On("RemoveMember", mock.Anything, validProjectId, memberUserId).Return(nil)
+			},
+			shouldSucceed: true,
+			expectedError: nil,
+		},
+		{
+			name: "forbidden - member trying to remove another member",
+			request: service.RemoveMemberRequest{
+				ProjectId:     validProjectId,
+				UserId:        otherMemberUserId,
+				RequestUserId: memberUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.ForbiddenErrorCode),
+			expectedError:     domain.ForbiddenError("forbidden"),
+		},
+		{
+			name: "forbidden - not project member",
+			request: service.RemoveMemberRequest{
+				ProjectId:     validProjectId,
+				UserId:        memberUserId,
+				RequestUserId: uuid.New(),
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.ForbiddenErrorCode),
+			expectedError:     domain.ForbiddenError("forbidden"),
+		},
+		{
+			name: "server error on remove member",
+			request: service.RemoveMemberRequest{
+				ProjectId:     validProjectId,
+				UserId:        memberUserId,
+				RequestUserId: creatorUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(validProject, nil)
+				repo.On("RemoveMember", mock.Anything, validProjectId, memberUserId).Return(errors.New("database error"))
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.ServerErrorCode),
+			expectedError:     domain.ServerError("failed to remove member", errors.New("database error")),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockProjectRepository{}
+			mockUserRepo := &mockUserRepository{}
+			mockPublisher := &mockPublisher{}
+			mockActivityRepo := &mockActivityRepository{}
+			tt.mockSetup(mockRepo, mockUserRepo)
+
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
+			ctx := context.Background()
+
+			err := service.RemoveMember(ctx, tt.request)
+
+			if tt.shouldSucceed {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+
+				var domainErr domain.DomainError
+				if assert.ErrorAs(t, err, &domainErr) {
+					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
+				}
+			}
+
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}

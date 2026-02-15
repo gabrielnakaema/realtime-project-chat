@@ -174,3 +174,9 @@ FROM project_members pm
 JOIN users u ON u.id = pm.user_id
 WHERE pm.project_id = $1
 ORDER BY u.name ASC;
+
+-- name: RemoveProjectTasksResponsibleByUserId :exec
+UPDATE tasks
+  SET responsible_id = NULL
+  WHERE responsible_id = $1
+  AND project_id = $2;

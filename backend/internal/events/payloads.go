@@ -82,3 +82,12 @@ type ChatMemberCreatedPayload struct {
 func (c *ChatMemberCreatedPayload) ToMessage() ([]byte, error) {
 	return json.Marshal(c)
 }
+
+type ProjectMemberRemovedPayload struct {
+	ProjectMember domain.ProjectMember `json:"project_member"`
+	User          domain.User          `json:"user"`
+}
+
+func (p *ProjectMemberRemovedPayload) ToMessage() ([]byte, error) {
+	return json.Marshal(p)
+}

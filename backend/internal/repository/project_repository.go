@@ -189,19 +189,44 @@ func (pr *ProjectRepository) CreateMember(ctx context.Context, member *domain.Pr
 }
 
 func (pr *ProjectRepository) RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) error {
+	tx, err := pr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
 	q := queries.New(pr.pool)
+	qtx := q.WithTx(tx)
 
 	params := queries.RemoveProjectMemberParams{
 		ProjectID: projectId,
 		UserID:    userId,
 	}
 
-	err := q.RemoveProjectMember(ctx, params)
+	err = qtx.RemoveProjectMember(ctx, params)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	err = qtx.MarkProjectUpdatedAt(ctx, projectId)
+	if err != nil {
+		return err
+	}
+
+	removeTasksResponsibleParams := queries.RemoveProjectTasksResponsibleByUserIdParams{
+		ResponsibleID: pgtype.UUID{
+			Bytes: userId,
+			Valid: true,
+		},
+		ProjectID: projectId,
+	}
+
+	err = qtx.RemoveProjectTasksResponsibleByUserId(ctx, removeTasksResponsibleParams)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (pr *ProjectRepository) GetMemberByUserIdAndProjectId(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) (*domain.ProjectMember, error) {
