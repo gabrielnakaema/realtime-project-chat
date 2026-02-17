@@ -14,6 +14,7 @@ import { useChat } from '@/hooks/use-chat';
 import { cn } from '@/lib/utils';
 import { chatSchema } from '@/schemas/chat-schema';
 import { createMessage } from '@/services/chat';
+import { ProjectMembersModal } from '@/components/project-members-modal';
 
 export const Route = createFileRoute('/projects/$projectId/chat')({
   component: RouteComponent,
@@ -103,7 +104,7 @@ function RouteComponent() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <AddProjectMember projectId={projectId} />
-                <Users className="h-4 w-4 text-slate-500" />
+                <ProjectMembersModal project={project} />
                 <MembersAvatarList
                   onlineUserIds={onlineUserIds}
                   members={

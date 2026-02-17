@@ -71,3 +71,14 @@ export const listMembersByProjectId = async (projectId: string) => {
   const json = await response.json<Member[]>();
   return json;
 };
+
+interface RemoveProjectMemberRequest {
+  projectId: string;
+  memberUserId: string;
+}
+
+export const removeProjectMember = async (request: RemoveProjectMemberRequest) => {
+  const response = await api.delete(`projects/${request.projectId}/members/${request.memberUserId}`);
+
+  return response.ok;
+};

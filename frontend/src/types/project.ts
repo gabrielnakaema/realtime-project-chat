@@ -17,3 +17,8 @@ export interface Member {
   project_id: string;
   role: string;
 }
+
+export enum ProjectMemberRole {
+  Creator = 'creator',
+  Member = 'member',
+}

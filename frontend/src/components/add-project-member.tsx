@@ -53,8 +53,9 @@ export const AddProjectMember = ({ projectId }: AddProjectMemberProps) => {
         <button
           type="button"
           className="flex w-fit items-center gap-2 rounded-md p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-700"
+          title="Add project member"
         >
-          <Plus className="h-6 w-6 text-slate-500" />
+          <Plus className="h-5 w-5 text-slate-500" />
         </button>
       </DialogTrigger>
       <DialogContent>
