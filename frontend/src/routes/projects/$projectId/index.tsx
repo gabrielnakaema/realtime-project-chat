@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { ArrowLeft, MessageSquare, Users } from 'lucide-react';
+import { ArrowLeft, MessageSquare } from 'lucide-react';
 import { AddProjectMember } from '@/components/add-project-member';
 import { KanbanBoard } from '@/components/kanban-board';
 import { MembersAvatarList } from '@/components/members-avatar-list';
+import { ProjectDetailsSheet, ProjectDetailsSheetTrigger } from '@/components/project-details-sheet';
 import { ProjectSettings } from '@/components/project-settings';
 import { useOnlineUsers } from '@/hooks/use-online-users';
 import { getProject } from '@/services/projects';
@@ -40,9 +41,26 @@ function RouteComponent() {
               </Link>
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{project?.name}</h1>
-                <p className="line-clamp-1 max-h-8 overflow-hidden text-ellipsis text-slate-600 dark:text-slate-400">
-                  <div dangerouslySetInnerHTML={{ __html: sanitizeHTML(project?.description || '') }} />
-                </p>
+                {project && (
+                  <ProjectDetailsSheet project={project}>
+                    <div className="flex items-center gap-1">
+                      {project.description && (
+                        <p
+                          className="line-clamp-1 text-sm text-slate-600 dark:text-slate-400"
+                          dangerouslySetInnerHTML={{ __html: sanitizeHTML(project.description) }}
+                        />
+                      )}
+                      <ProjectDetailsSheetTrigger asChild>
+                        <button
+                          type="button"
+                          className="shrink-0 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          View details
+                        </button>
+                      </ProjectDetailsSheetTrigger>
+                    </div>
+                  </ProjectDetailsSheet>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-4">
