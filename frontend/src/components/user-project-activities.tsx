@@ -1,9 +1,10 @@
+import { Loader2Icon } from 'lucide-react';
 import { ProjectActivity } from './project-activity';
 import { useUserProjectActivities } from '@/hooks/use-user-project-activities';
 
 export const UserProjectActivities = () => {
   const { data, queryResult, sentinelRef } = useUserProjectActivities();
-  const { isLoading } = queryResult;
+  const { isLoading, isFetchingNextPage } = queryResult;
 
   if (isLoading || !data.length) {
     return null;
@@ -16,11 +17,16 @@ export const UserProjectActivities = () => {
         <p className="text-sm text-slate-500 dark:text-slate-400">Latest updates from projects you're a member of</p>
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex max-h-96 flex-col gap-4 overflow-y-auto pr-1">
         {data.map((activity) => (
           <ProjectActivity key={activity.id} activity={activity} />
         ))}
         <div ref={sentinelRef} className="h-1" aria-hidden="true" />
+        {isFetchingNextPage && (
+          <div className="flex justify-center py-2">
+            <Loader2Icon className="h-4 w-4 animate-spin text-slate-400" />
+          </div>
+        )}
       </div>
     </section>
   );

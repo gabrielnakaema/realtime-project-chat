@@ -1,8 +1,10 @@
-import { Calendar, Crown, Users } from 'lucide-react';
+import { Calendar, Crown, Loader2, Users } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { ProjectActivity } from './project-activity';
 import type { Project } from '@/types/project';
 import { sanitizeHTML } from '@/utils/html';
 import { ProjectMemberRole } from '@/types/project';
+import { useProjectActivities } from '@/hooks/use-project-activities';
 
 interface ProjectDetailsSheetProps {
   project: Project;
@@ -18,6 +20,9 @@ export const ProjectDetailsSheet = ({ project, children }: ProjectDetailsSheetPr
     month: 'long',
     day: 'numeric',
   });
+
+  const { data: activities, queryResult, sentinelRef } = useProjectActivities(project.id);
+  const { isFetchingNextPage } = queryResult;
 
   return (
     <Sheet>
@@ -56,6 +61,23 @@ export const ProjectDetailsSheet = ({ project, children }: ProjectDetailsSheetPr
                 className="text-sm text-slate-700 dark:text-slate-300"
                 dangerouslySetInnerHTML={{ __html: sanitizeHTML(project.description) }}
               />
+            </div>
+          )}
+
+          {activities.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">Activity</h3>
+              <div className="flex max-h-72 flex-col gap-4 overflow-y-auto pr-1">
+                {activities.map((activity) => (
+                  <ProjectActivity key={activity.id} activity={activity} showProject={false} />
+                ))}
+                <div ref={sentinelRef} className="h-1" aria-hidden="true" />
+                {isFetchingNextPage && (
+                  <div className="flex justify-center py-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
