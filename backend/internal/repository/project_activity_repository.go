@@ -119,7 +119,7 @@ func (par *ProjectActivityRepository) List(ctx context.Context, params ListProje
 			ActivityData: result.ActivityData,
 		}
 
-		if activity.EntityType == domain.TaskEntityType {
+		if activity.EntityType == domain.TaskEntityType && len(result.Entity) > 0 {
 			var task domain.Task
 			err := json.Unmarshal(result.Entity, &task)
 			if err != nil {
@@ -129,12 +129,21 @@ func (par *ProjectActivityRepository) List(ctx context.Context, params ListProje
 		}
 
 		if activity.EntityType == domain.ProjectMemberEntityType {
-			var projectMember domain.ProjectMember
-			err := json.Unmarshal(result.Entity, &projectMember)
-			if err != nil {
-				return nil, domain.ServerError("failed to unmarshal project member", err)
+			if len(result.Entity) > 0 {
+				var projectMember domain.ProjectMember
+				err := json.Unmarshal(result.Entity, &projectMember)
+				if err != nil {
+					return nil, domain.ServerError("failed to unmarshal project member", err)
+				}
+				activity.ProjectMember = &projectMember
+			} else if len(result.ActivityData) > 0 {
+				var data struct {
+					ProjectMember *domain.ProjectMember `json:"project_member"`
+				}
+				if err := json.Unmarshal(result.ActivityData, &data); err == nil {
+					activity.ProjectMember = data.ProjectMember
+				}
 			}
-			activity.ProjectMember = &projectMember
 		}
 
 		activities[i] = activity

@@ -57,6 +57,8 @@ func (pas *ProjectActivitySubscriber) handleProjectActivityEvents(ctx context.Co
 		return pas.handleProjectUpdated(ctx, message)
 	case events.ProjectMemberCreated:
 		return pas.handleProjectMemberCreated(ctx, message)
+	case events.ProjectMemberRemoved:
+		return pas.handleProjectMemberRemoved(ctx, message)
 	case events.TaskCreated:
 		return pas.handleTaskCreated(ctx, message)
 	case events.TaskUpdated:
@@ -121,6 +123,29 @@ func (pas *ProjectActivitySubscriber) handleProjectMemberCreated(ctx context.Con
 	err = pas.repository.Create(ctx, &activity)
 	if err != nil {
 		return domain.ServerError("failed to create project member created activity", err)
+	}
+
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.ProjectMember.ProjectId)
+	if err != nil {
+		return domain.ServerError("failed to mark project updated at", err)
+	}
+
+	return nil
+}
+
+func (pas *ProjectActivitySubscriber) handleProjectMemberRemoved(ctx context.Context, message Message) error {
+	var payload events.ProjectMemberRemovedPayload
+	err := json.Unmarshal(message.Value, &payload)
+	if err != nil {
+		return domain.ServerError("failed to unmarshal project member removed payload", err)
+	}
+
+	activity := domain.ProjectMemberDeletedActivity(domain.Project{
+		Id: payload.ProjectMember.ProjectId,
+	}, payload.ProjectMember, payload.User)
+	err = pas.repository.Create(ctx, &activity)
+	if err != nil {
+		return domain.ServerError("failed to create project member deleted activity", err)
 	}
 
 	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.ProjectMember.ProjectId)

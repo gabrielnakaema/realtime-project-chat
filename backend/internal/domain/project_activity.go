@@ -92,6 +92,21 @@ func ProjectMemberCreatedActivity(project Project, projectMember ProjectMember, 
 	}
 }
 
+func ProjectMemberDeletedActivity(project Project, projectMember ProjectMember, actor User) ProjectActivity {
+	return ProjectActivity{
+		Project:      project,
+		ActivityType: ProjectMemberDeleted,
+		Actor:        actor,
+		ActivityData: map[string]interface{}{
+			"project_member": projectMember,
+		},
+		EntityType: ProjectMemberEntityType,
+		EntityId:   projectMember.Id,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+}
+
 func TaskUpdatedActivity(project Project, task Task, actor User) ProjectActivity {
 	return ProjectActivity{
 		Project:      project,
