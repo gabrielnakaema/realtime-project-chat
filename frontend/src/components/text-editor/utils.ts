@@ -13,11 +13,26 @@ export const removeStylesExportDOM = (editor: LexicalEditor, target: LexicalNode
   return output;
 };
 
+export const exportParagraphDOM = (editor: LexicalEditor, target: LexicalNode): DOMExportOutput => {
+  const output = target.exportDOM(editor);
+  if (isHTMLElement(output.element)) {
+    const textAlign = output.element.style.textAlign;
+    for (const el of [output.element, ...output.element.querySelectorAll('[style],[class]')]) {
+      el.removeAttribute('class');
+      el.removeAttribute('style');
+    }
+    if (textAlign) {
+      output.element.style.textAlign = textAlign;
+    }
+  }
+  return output;
+};
+
 export const exportMap: DOMExportOutputMap = new Map<
   Klass<LexicalNode>,
   (editor: LexicalEditor, target: LexicalNode) => DOMExportOutput
 >([
-  [ParagraphNode, removeStylesExportDOM],
+  [ParagraphNode, exportParagraphDOM],
   [TextNode, removeStylesExportDOM],
 ]);
 
