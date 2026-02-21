@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { ArrowLeft, Send, Users } from 'lucide-react';
+import { ArrowLeft, Send } from 'lucide-react';
 import { useLayoutEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import type { IChatForm } from '@/schemas/chat-schema';
@@ -9,12 +9,12 @@ import type { SubmitHandler } from 'react-hook-form';
 import { AddProjectMember } from '@/components/add-project-member';
 import { LoadingSpinner } from '@/components/loading';
 import { MembersAvatarList } from '@/components/members-avatar-list';
+import { ProjectMembersModal } from '@/components/project-members-modal';
 import { useAuth } from '@/hooks/use-auth';
 import { useChat } from '@/hooks/use-chat';
 import { cn } from '@/lib/utils';
 import { chatSchema } from '@/schemas/chat-schema';
 import { createMessage } from '@/services/chat';
-import { ProjectMembersModal } from '@/components/project-members-modal';
 
 export const Route = createFileRoute('/projects/$projectId/chat')({
   component: RouteComponent,
