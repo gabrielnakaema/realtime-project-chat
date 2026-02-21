@@ -1,13 +1,16 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { ArchivedTasksModal } from './archived-tasks-modal';
 import { BoardColumn } from './board-column';
 import { CreateTask } from './create-task';
 import type { TaskStatus } from '@/types/task';
 import type { Project } from '@/types/project';
+import { ProjectMemberRole } from '@/types/project';
 import { useRealtimeTaskSync } from '@/hooks/use-realtime-task-sync';
 import { countTasksByStatus } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
 import { TASK_STATUSES } from '@/constants/tasks';
+import { useAuth } from '@/hooks/use-auth';
 
 interface Column {
   id: string;
@@ -32,6 +35,8 @@ export const KanbanBoard = ({ project }: { project: Project }) => {
     queryFn: () => countTasksByStatus(projectId, [...TASK_STATUSES]),
   });
 
+  const { user } = useAuth();
+
   const columns = useMemo(() => {
     return DEFAULT_COLUMNS.map((column) => ({
       id: column.id,
@@ -43,10 +48,17 @@ export const KanbanBoard = ({ project }: { project: Project }) => {
     }));
   }, [project.id, countData]);
 
+  const isOwner = useMemo(() => {
+    return project.members.some((member) => member.user_id === user?.id && member.role === ProjectMemberRole.Creator);
+  }, [project.members, user?.id]);
+
   return (
     <div className="h-full">
       <div className="flex items-center justify-between pb-6">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Task Board</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Task Board</h2>
+          {isOwner && <ArchivedTasksModal project={project} />}
+        </div>
         <CreateTask projectId={projectId} projectMembers={project.members} />
       </div>
 

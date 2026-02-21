@@ -1,12 +1,13 @@
-import { useQuery } from '@tanstack/react-query';
-import { Activity, Calendar, CircleCheck, ClockArrowUp, Pencil, Tag, User, X } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Activity, Calendar, CircleCheck, ClockArrowUp, Pencil, Tag, Trash2, User, X } from 'lucide-react';
+import { useState } from 'react';
 import { LoadingSpinner } from './loading';
 import { TaskDetailsUpdate } from './task-details-update';
 import { TaskPriorityBadge } from './task-priority-badge';
 import { TaskStatusBadge } from './task-status-badge';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
-import { getTask } from '@/services/tasks';
+import { archiveTask, getTask } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
 import { cn } from '@/lib/utils';
 import { sanitizeHTML } from '@/utils/html';
@@ -19,10 +20,25 @@ interface TaskDetailsProps {
 }
 
 export const TaskDetails = ({ taskId, open, onOpenChange, onEdit }: TaskDetailsProps) => {
+  const queryClient = useQueryClient();
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
+
   const { data: task, isLoading } = useQuery({
     queryKey: taskQueryKeys.details(taskId),
     queryFn: () => getTask(taskId),
     enabled: open,
+  });
+
+  const { mutate: archive, isPending: isArchiving } = useMutation({
+    mutationFn: () => archiveTask(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys._allGrouped() });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys._allCounts() });
+      onOpenChange(false);
+    },
+    onSettled: () => {
+      setConfirmingArchive(false);
+    },
   });
 
   const updates = task?.updates || [];
@@ -55,18 +71,56 @@ export const TaskDetails = ({ taskId, open, onOpenChange, onEdit }: TaskDetailsP
   const infoValueClassNames = 'text-sm text-slate-500 dark:text-slate-400';
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (!value) setConfirmingArchive(false);
+        onOpenChange(value);
+      }}
+    >
       <DialogContent className="pr-0 md:max-w-2xl" autoFocus={false} showCloseButton={false}>
         <DialogHeader className="position-sticky bg-background top-0 mr-4 flex flex-row items-center justify-between gap-2 border-b border-slate-200 pb-4 dark:border-slate-700">
           <DialogTitle className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{task.title}</DialogTitle>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="w-fit rounded-md p-2 font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
-              onClick={onEdit}
-            >
-              <Pencil className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-            </button>
+            {confirmingArchive ? (
+              <>
+                <span className="text-xs text-slate-500 dark:text-slate-400">Archive task?</span>
+                <button
+                  type="button"
+                  className="rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+                  onClick={() => archive()}
+                  disabled={isArchiving}
+                >
+                  {isArchiving ? 'Archiving...' : 'Confirm'}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  onClick={() => setConfirmingArchive(false)}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="w-fit rounded-md p-2 font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+                  onClick={onEdit}
+                >
+                  <Pencil className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                </button>
+                {task.status !== 'archived' && (
+                  <button
+                    type="button"
+                    className="w-fit rounded-md p-2 font-medium transition-colors hover:bg-red-50 dark:hover:bg-red-950"
+                    onClick={() => setConfirmingArchive(true)}
+                  >
+                    <Trash2 className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                  </button>
+                )}
+              </>
+            )}
             <DialogClose asChild>
               <button
                 type="button"

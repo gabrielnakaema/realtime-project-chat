@@ -146,6 +146,13 @@ export const updateTask = async (request: UpdateTaskRequest) => {
   return json;
 };
 
+export const archiveTask = async (taskId: string) => {
+  const response = await api.delete(`tasks/${taskId}`);
+
+  const json = await response.json<Task>();
+  return json;
+};
+
 export const getTask = async (taskId: string) => {
   const response = await api.get(`tasks/${taskId}`);
 

@@ -122,7 +122,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       return () => {
         setSubscriptions((prev) => {
           const updated = prev.filter((sub) => sub.id !== subscriptionId);
-          const remaining = updated.filter((sub) => sub.roomId !== roomId);
+          const remaining = updated.filter((sub) => sub.roomId === roomId);
 
           if (!remaining.length) {
             send({ type: 'disconnect_user_from_room', data: { room_id: roomId } });

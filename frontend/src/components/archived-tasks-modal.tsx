@@ -1,0 +1,245 @@
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Archive, ArchiveRestore, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { EditTask } from './edit-task';
+import { TaskDetails } from './task-details';
+import { TaskPriorityBadge } from './task-priority-badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { ScrollArea } from './ui/scroll-area';
+import type { Task, TaskStatus } from '@/types/task';
+import type { Project } from '@/types/project';
+import { ProjectMemberRole } from '@/types/project';
+import { listGroupedTasksByProjectId, updateTask } from '@/services/tasks';
+import { taskQueryKeys } from '@/services/query-keys';
+import { useAuth } from '@/hooks/use-auth';
+import { DEFAULT_TASK_LIMIT } from '@/constants/tasks';
+
+const RESTORE_STATUSES: { status: TaskStatus; label: string; className: string }[] = [
+  {
+    status: 'pending',
+    label: 'Pending',
+    className:
+      'border-slate-400 bg-slate-500/10 text-slate-600 hover:bg-slate-500/20 dark:border-slate-500 dark:text-slate-300',
+  },
+  {
+    status: 'doing',
+    label: 'Doing',
+    className:
+      'border-blue-500 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 dark:border-blue-400 dark:text-blue-400',
+  },
+  {
+    status: 'done',
+    label: 'Done',
+    className:
+      'border-green-500 bg-green-500/10 text-green-600 hover:bg-green-500/20 dark:border-green-400 dark:text-green-400',
+  },
+];
+
+interface ArchivedTasksModalProps {
+  project: Project;
+}
+
+export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
+  const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const queryClient = useQueryClient();
+  const [pickingStatusForTaskId, setPickingStatusForTaskId] = useState<string | null>(null);
+
+  const isCreator = project.members.some((m) => m.user_id === user?.id && m.role === ProjectMemberRole.Creator);
+
+  const {
+    mutate: restore,
+    isPending: isRestoring,
+    variables: restoreVariables,
+  } = useMutation({
+    mutationFn: ({ task, status }: { task: Task; status: TaskStatus }) =>
+      updateTask({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status,
+        priority: task.priority,
+        due_date: task.due_date,
+        responsible_id: task.responsible_id,
+        done_at: status === 'done' ? new Date().toISOString() : null,
+        tags: task.tags ?? [],
+      }),
+    onSuccess: () => {
+      setPickingStatusForTaskId(null);
+      queryClient.invalidateQueries({
+        queryKey: taskQueryKeys.listGroupedByProjectId({
+          projectId: project.id,
+          statuses: ['archived'],
+          limit: DEFAULT_TASK_LIMIT,
+          taskOrder: 0,
+          updatedAt: null,
+        }),
+      });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys._allGrouped() });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys._allCounts() });
+    },
+  });
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: taskQueryKeys.listGroupedByProjectId({
+      projectId: project.id,
+      statuses: ['archived'],
+      limit: DEFAULT_TASK_LIMIT,
+      taskOrder: 0,
+      updatedAt: null,
+    }),
+    queryFn: ({ pageParam }) =>
+      listGroupedTasksByProjectId({
+        projectId: project.id,
+        statuses: ['archived'],
+        taskOrder: pageParam.taskOrder,
+        updatedAt: pageParam.updatedAt,
+        limit: DEFAULT_TASK_LIMIT,
+      }),
+    getNextPageParam: (lastPage) => {
+      const page = lastPage['archived'];
+      if (!page.has_next) return undefined;
+      const lastTask = page.data[page.data.length - 1];
+      return { taskOrder: lastTask.order, updatedAt: lastTask.updated_at };
+    },
+    initialPageParam: { taskOrder: 0, updatedAt: null as string | null },
+    enabled: open,
+  });
+
+  const archivedTasks = useMemo(() => data?.pages.flatMap((page) => page['archived'].data) ?? [], [data]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && hasNextPage) {
+            fetchNextPage();
+          }
+        });
+      },
+      { rootMargin: '200px', threshold: 0.1 },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage]);
+
+  if (!isCreator) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+      >
+        <Archive className="h-3.5 w-3.5" />
+        Archived
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="md:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Archive className="h-4 w-4 text-slate-400" />
+              Archived tasks
+            </DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[60vh]">
+            {archivedTasks.length === 0 && !isFetchingNextPage ? (
+              <p className="py-8 text-center text-sm text-slate-400 dark:text-slate-500">No archived tasks</p>
+            ) : (
+              <div className="flex flex-col gap-1 pr-3">
+                {archivedTasks.map((task) => {
+                  const isPicking = pickingStatusForTaskId === task.id;
+                  const isRestoringThis = isRestoring && restoreVariables.task.id === task.id;
+
+                  return (
+                    <div
+                      key={task.id}
+                      className="group flex w-full items-center gap-2 rounded-md px-3 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => !isPicking && setSelectedTaskId(task.id)}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <span className="truncate text-sm text-slate-700 dark:text-slate-300">{task.title}</span>
+                        {!isPicking && <TaskPriorityBadge priority={task.priority} />}
+                      </button>
+
+                      {isPicking ? (
+                        <div className="flex shrink-0 items-center gap-1">
+                          {RESTORE_STATUSES.map(({ status, label, className }) => (
+                            <button
+                              key={status}
+                              type="button"
+                              disabled={isRestoringThis}
+                              onClick={() => restore({ task, status })}
+                              className={`rounded border px-2 py-0.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+                            >
+                              {isRestoringThis && restoreVariables.status === status ? '...' : label}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setPickingStatusForTaskId(null)}
+                            className="ml-0.5 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          title="Restore task"
+                          onClick={() => setPickingStatusForTaskId(task.id)}
+                          className="shrink-0 rounded p-1 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                        >
+                          <ArchiveRestore className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                <div ref={sentinelRef} className="h-1" aria-hidden="true" />
+                {isFetchingNextPage && <p className="py-2 text-center text-xs text-slate-400">Loading...</p>}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {selectedTaskId && (
+        <TaskDetails
+          taskId={selectedTaskId}
+          open={!!selectedTaskId}
+          onOpenChange={(value) => {
+            if (!value) setSelectedTaskId(null);
+          }}
+          onEdit={() => {
+            setEditingTaskId(selectedTaskId);
+            setSelectedTaskId(null);
+          }}
+        />
+      )}
+      {editingTaskId && (
+        <EditTask
+          taskId={editingTaskId}
+          open={!!editingTaskId}
+          onOpenChange={(value) => {
+            if (!value) setEditingTaskId(null);
+          }}
+        />
+      )}
+    </>
+  );
+};
