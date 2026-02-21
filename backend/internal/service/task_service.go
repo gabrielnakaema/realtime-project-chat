@@ -326,6 +326,15 @@ func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) (*uti
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
+	for _, s := range request.Statuses {
+		if s == string(domain.TaskStatusArchived) {
+			if !project.IsCreator(request.RequestUserId) {
+				return nil, domain.ForbiddenError("only project owners can view archived tasks")
+			}
+			break
+		}
+	}
+
 	tasks, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, request.Statuses, request.TaskOrder, request.CursorUpdatedAt, request.Limit)
 	if err != nil {
 		return nil, domain.ServerError("failed to list tasks", err)
@@ -395,6 +404,11 @@ func (ts *TaskService) GroupByStatus(ctx context.Context, request GroupByStatusR
 
 	stringStatuses := []string{}
 	for _, status := range request.Statuses {
+		if status == domain.TaskStatusArchived {
+			if !project.IsCreator(request.UserId) {
+				return nil, domain.ForbiddenError("only project owners can view archived tasks")
+			}
+		}
 		stringStatuses = append(stringStatuses, string(status))
 	}
 
@@ -442,6 +456,85 @@ func (ts *TaskService) CountByStatus(ctx context.Context, projectId uuid.UUID, s
 		result[domain.TaskStatus(status)] = count
 	}
 	return result, nil
+}
+
+type ArchiveTaskRequest struct {
+	TaskId        uuid.UUID
+	RequestUserId uuid.UUID
+}
+
+func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) (*domain.Task, error) {
+	if request.RequestUserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	task, err := ts.taskRepository.GetById(ctx, request.TaskId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("task not found")
+			}
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to get task", err)
+	}
+
+	project, err := ts.projectRepository.GetById(ctx, task.ProjectId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("project not found")
+			}
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to get project", err)
+	}
+
+	if !project.IsMember(request.RequestUserId) {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	user, err := ts.userRepository.GetById(ctx, request.RequestUserId)
+	if err != nil {
+		return nil, domain.ServerError("failed to get user", err)
+	}
+
+	oldStatus := task.Status
+
+	archivedTask := *task
+	archivedTask.Status = domain.TaskStatusArchived
+	archivedTask.UpdatedAt = time.Now()
+	archivedTask.Updates = []domain.TaskUpdate{}
+
+	err = ts.taskRepository.Update(ctx, &archivedTask)
+	if err != nil {
+		return nil, domain.ServerError("failed to archive task", err)
+	}
+
+	newTaskUpdate := domain.NewTaskUpdate(task, &archivedTask, user)
+	if len(newTaskUpdate.Changes) > 0 {
+		err = ts.taskRepository.CreateUpdates(ctx, &archivedTask, []domain.TaskUpdate{newTaskUpdate})
+		if err != nil {
+			return nil, domain.ServerError("failed to create task updates", err)
+		}
+		archivedTask.Updates = append(task.Updates, newTaskUpdate)
+	}
+
+	previousStatus := &oldStatus
+	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
+		Task: archivedTask,
+		User: domain.User{
+			Id: request.RequestUserId,
+		},
+		PreviousStatus: previousStatus,
+	})
+	if err != nil {
+		return nil, domain.ServerError("failed to publish task archived event", err)
+	}
+
+	return &archivedTask, nil
 }
 
 type MoveTaskRequest struct {

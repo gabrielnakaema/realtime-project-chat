@@ -25,6 +25,7 @@ type taskService interface {
 	Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error)
 	GroupByStatus(ctx context.Context, request service.GroupByStatusRequest) (map[domain.TaskStatus]utils.CursorPaginated[domain.Task], error)
 	CountByStatus(ctx context.Context, projectId uuid.UUID, statuses []domain.TaskStatus, requestUserId uuid.UUID) (map[domain.TaskStatus]int, error)
+	Archive(ctx context.Context, request service.ArchiveTaskRequest) (*domain.Task, error)
 }
 
 type TaskHandler struct {
@@ -112,11 +113,6 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, status := range statusesArray {
 		if !slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(status)) {
 			BadRequestResponse(w, errors.New("invalid status"))
-			return
-		}
-
-		if status == string(domain.TaskStatusArchived) {
-			BadRequestResponse(w, errors.New("archived status is not allowed"))
 			return
 		}
 	}
@@ -220,11 +216,6 @@ func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
 	for _, status := range strings.Split(statuses, ",") {
 		if !slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(status)) {
 			BadRequestResponse(w, errors.New("invalid status"))
-			return
-		}
-
-		if status == string(domain.TaskStatusArchived) {
-			BadRequestResponse(w, errors.New("archived status is not allowed"))
 			return
 		}
 		statusesArray = append(statusesArray, domain.TaskStatus(status))
@@ -359,6 +350,34 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	task, err := h.taskService.Update(r.Context(), serviceRequest)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, task, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *TaskHandler) Archive(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	parsedId, err := uuid.Parse(id)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	userId := UserIdFromContext(r.Context())
+
+	serviceRequest := service.ArchiveTaskRequest{
+		TaskId:        parsedId,
+		RequestUserId: userId,
+	}
+
+	task, err := h.taskService.Archive(r.Context(), serviceRequest)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

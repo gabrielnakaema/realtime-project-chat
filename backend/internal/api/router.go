@@ -79,6 +79,7 @@ func (a *Api) Router() http.Handler {
 		r.Post("/", a.handlers.Task.Create)
 		r.Get("/{id}", a.handlers.Task.Get)
 		r.Put("/{id}", a.handlers.Task.Update)
+		r.Delete("/{id}", a.handlers.Task.Archive)
 		r.Patch("/{id}/move", a.handlers.Task.Move)
 	})
 

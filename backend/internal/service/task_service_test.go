@@ -485,3 +485,485 @@ func TestTaskService_Update(t *testing.T) {
 		})
 	}
 }
+
+func TestTaskService_Archive(t *testing.T) {
+	validUserId := uuid.New()
+	memberUserId := uuid.New()
+	validProjectId := uuid.New()
+	validTaskId := uuid.New()
+
+	validUser := domain.User{
+		Id:    validUserId,
+		Name:  "Test User",
+		Email: "user@example.com",
+	}
+
+	validProject := domain.Project{
+		Id:          validProjectId,
+		Name:        "Test Project",
+		Description: "Test Description",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Members: []domain.ProjectMember{
+			{UserId: validUserId, Role: domain.ProjectMemberRoleCreator},
+			{UserId: memberUserId, Role: domain.ProjectMemberRoleMember},
+		},
+		UserId: validUserId,
+	}
+
+	validTask := domain.Task{
+		Id:          validTaskId,
+		ProjectId:   validProjectId,
+		AuthorId:    validUserId,
+		Title:       "Test Task",
+		Description: "Test Description",
+		Status:      domain.TaskStatusPending,
+		Priority:    domain.TaskPriorityLow,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Updates:     []domain.TaskUpdate{},
+	}
+
+	type testCase struct {
+		name              string
+		request           service.ArchiveTaskRequest
+		mockSetup         func(*mockTaskRepository, *mockProjectRepository, *mockUserRepository)
+		expectedErrorCode string
+		shouldSucceed     bool
+	}
+
+	tests := []testCase{
+		{
+			name: "successful archive",
+			request: service.ArchiveTaskRequest{
+				TaskId:        validTaskId,
+				RequestUserId: validUserId,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
+				repo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+				repo.On("CreateUpdates", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskUpdate")).Return(nil)
+			},
+			shouldSucceed: true,
+		},
+		{
+			name: "member can archive task",
+			request: service.ArchiveTaskRequest{
+				TaskId:        validTaskId,
+				RequestUserId: memberUserId,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
+				memberUser := domain.User{Id: memberUserId, Name: "Member", Email: "member@example.com"}
+				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				userRepo.On("GetById", mock.Anything, memberUserId).Return(&memberUser, nil)
+				repo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+				repo.On("CreateUpdates", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskUpdate")).Return(nil)
+			},
+			shouldSucceed: true,
+		},
+		{
+			name: "archived task has archived status",
+			request: service.ArchiveTaskRequest{
+				TaskId:        validTaskId,
+				RequestUserId: validUserId,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
+				repo.On("Update", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
+					return t.Status == domain.TaskStatusArchived
+				})).Return(nil)
+				repo.On("CreateUpdates", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskUpdate")).Return(nil)
+			},
+			shouldSucceed: true,
+		},
+		{
+			name: "unauthorized",
+			request: service.ArchiveTaskRequest{
+				TaskId:        validTaskId,
+				RequestUserId: uuid.Nil,
+			},
+			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.UnauthorizedErrorCode),
+		},
+		{
+			name: "task not found",
+			request: service.ArchiveTaskRequest{
+				TaskId:        validTaskId,
+				RequestUserId: validUserId,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(nil, domain.NotFoundError("task not found"))
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.NotFoundErrorCode),
+		},
+		{
+			name: "project not found",
+			request: service.ArchiveTaskRequest{
+				TaskId:        validTaskId,
+				RequestUserId: validUserId,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(nil, domain.NotFoundError("project not found"))
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.NotFoundErrorCode),
+		},
+		{
+			name: "forbidden - not a project member",
+			request: service.ArchiveTaskRequest{
+				TaskId:        validTaskId,
+				RequestUserId: uuid.New(),
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.ForbiddenErrorCode),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockTaskRepository{}
+			mockProjectRepo := &mockProjectRepository{}
+			mockUserRepo := &mockUserRepository{}
+
+			tt.mockSetup(mockRepo, mockProjectRepo, mockUserRepo)
+			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+			ctx := context.Background()
+
+			task, err := svc.Archive(ctx, tt.request)
+
+			if tt.shouldSucceed {
+				assert.NoError(t, err)
+				assert.NotNil(t, task)
+				assert.Equal(t, domain.TaskStatusArchived, task.Status)
+			} else {
+				require.Error(t, err)
+				require.Nil(t, task)
+
+				var domainErr domain.DomainError
+				if assert.ErrorAs(t, err, &domainErr) {
+					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
+				}
+			}
+
+			mockRepo.AssertExpectations(t)
+			mockProjectRepo.AssertExpectations(t)
+			mockUserRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestTaskService_List(t *testing.T) {
+	validUserId := uuid.New()
+	memberUserId := uuid.New()
+	validProjectId := uuid.New()
+	validTaskId := uuid.New()
+
+	validProject := domain.Project{
+		Id:          validProjectId,
+		Name:        "Test Project",
+		Description: "Test Description",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Members: []domain.ProjectMember{
+			{UserId: validUserId, Role: domain.ProjectMemberRoleCreator},
+			{UserId: memberUserId, Role: domain.ProjectMemberRoleMember},
+		},
+		UserId: validUserId,
+	}
+
+	validTask := domain.Task{
+		Id:        validTaskId,
+		ProjectId: validProjectId,
+		Title:     "Test Task",
+		Status:    domain.TaskStatusPending,
+	}
+
+	emptyPage := &utils.CursorPaginated[domain.Task]{Data: []domain.Task{}, HasNext: false}
+	onePage := &utils.CursorPaginated[domain.Task]{Data: []domain.Task{validTask}, HasNext: false}
+
+	type testCase struct {
+		name              string
+		request           service.ListTasksRequest
+		mockSetup         func(*mockTaskRepository, *mockProjectRepository)
+		expectedErrorCode string
+		shouldSucceed     bool
+		expectedLen       int
+	}
+
+	tests := []testCase{
+		{
+			name: "successful list",
+			request: service.ListTasksRequest{
+				ProjectId:     validProjectId,
+				RequestUserId: validUserId,
+				Statuses:      []string{string(domain.TaskStatusPending)},
+				Limit:         15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(onePage, nil)
+			},
+			shouldSucceed: true,
+			expectedLen:   1,
+		},
+		{
+			name: "unauthorized",
+			request: service.ListTasksRequest{
+				ProjectId:     validProjectId,
+				RequestUserId: uuid.Nil,
+				Statuses:      []string{string(domain.TaskStatusPending)},
+				Limit:         15,
+			},
+			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.UnauthorizedErrorCode),
+		},
+		{
+			name: "forbidden - not a member",
+			request: service.ListTasksRequest{
+				ProjectId:     validProjectId,
+				RequestUserId: uuid.New(),
+				Statuses:      []string{string(domain.TaskStatusPending)},
+				Limit:         15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.ForbiddenErrorCode),
+		},
+		{
+			name: "creator can list archived tasks",
+			request: service.ListTasksRequest{
+				ProjectId:     validProjectId,
+				RequestUserId: validUserId,
+				Statuses:      []string{string(domain.TaskStatusArchived)},
+				Limit:         15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
+			},
+			shouldSucceed: true,
+			expectedLen:   0,
+		},
+		{
+			name: "non-creator forbidden from listing archived tasks",
+			request: service.ListTasksRequest{
+				ProjectId:     validProjectId,
+				RequestUserId: memberUserId,
+				Statuses:      []string{string(domain.TaskStatusArchived)},
+				Limit:         15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.ForbiddenErrorCode),
+		},
+		{
+			name: "non-creator can list non-archived tasks",
+			request: service.ListTasksRequest{
+				ProjectId:     validProjectId,
+				RequestUserId: memberUserId,
+				Statuses:      []string{string(domain.TaskStatusPending), string(domain.TaskStatusDoing)},
+				Limit:         15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
+			},
+			shouldSucceed: true,
+			expectedLen:   0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockTaskRepository{}
+			mockProjectRepo := &mockProjectRepository{}
+			mockUserRepo := &mockUserRepository{}
+
+			tt.mockSetup(mockRepo, mockProjectRepo)
+			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+			ctx := context.Background()
+
+			result, err := svc.List(ctx, tt.request)
+
+			if tt.shouldSucceed {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Len(t, result.Data, tt.expectedLen)
+			} else {
+				require.Error(t, err)
+				require.Nil(t, result)
+
+				var domainErr domain.DomainError
+				if assert.ErrorAs(t, err, &domainErr) {
+					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
+				}
+			}
+
+			mockRepo.AssertExpectations(t)
+			mockProjectRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestTaskService_GroupByStatus(t *testing.T) {
+	validUserId := uuid.New()
+	memberUserId := uuid.New()
+	validProjectId := uuid.New()
+
+	validProject := domain.Project{
+		Id:          validProjectId,
+		Name:        "Test Project",
+		Description: "Test Description",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Members: []domain.ProjectMember{
+			{UserId: validUserId, Role: domain.ProjectMemberRoleCreator},
+			{UserId: memberUserId, Role: domain.ProjectMemberRoleMember},
+		},
+		UserId: validUserId,
+	}
+
+	emptyPage := &utils.CursorPaginated[domain.Task]{Data: []domain.Task{}, HasNext: false}
+
+	type testCase struct {
+		name              string
+		request           service.GroupByStatusRequest
+		mockSetup         func(*mockTaskRepository, *mockProjectRepository)
+		expectedErrorCode string
+		shouldSucceed     bool
+	}
+
+	tests := []testCase{
+		{
+			name: "successful group by status",
+			request: service.GroupByStatusRequest{
+				ProjectId: validProjectId,
+				UserId:    validUserId,
+				Statuses:  []domain.TaskStatus{domain.TaskStatusPending, domain.TaskStatusDoing},
+				Limit:     15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusPending)}, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusDoing)}, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
+			},
+			shouldSucceed: true,
+		},
+		{
+			name: "unauthorized",
+			request: service.GroupByStatusRequest{
+				ProjectId: validProjectId,
+				UserId:    uuid.Nil,
+				Statuses:  []domain.TaskStatus{domain.TaskStatusPending},
+				Limit:     15,
+			},
+			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.UnauthorizedErrorCode),
+		},
+		{
+			name: "creator can group by archived status",
+			request: service.GroupByStatusRequest{
+				ProjectId: validProjectId,
+				UserId:    validUserId,
+				Statuses:  []domain.TaskStatus{domain.TaskStatusArchived},
+				Limit:     15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusArchived)}, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
+			},
+			shouldSucceed: true,
+		},
+		{
+			name: "non-creator forbidden from grouping by archived status",
+			request: service.GroupByStatusRequest{
+				ProjectId: validProjectId,
+				UserId:    memberUserId,
+				Statuses:  []domain.TaskStatus{domain.TaskStatusArchived},
+				Limit:     15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.ForbiddenErrorCode),
+		},
+		{
+			name: "non-creator can group by non-archived statuses",
+			request: service.GroupByStatusRequest{
+				ProjectId: validProjectId,
+				UserId:    memberUserId,
+				Statuses:  []domain.TaskStatus{domain.TaskStatusPending, domain.TaskStatusDone},
+				Limit:     15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusPending)}, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusDone)}, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
+			},
+			shouldSucceed: true,
+		},
+		{
+			name: "forbidden - not a project member",
+			request: service.GroupByStatusRequest{
+				ProjectId: validProjectId,
+				UserId:    uuid.New(),
+				Statuses:  []domain.TaskStatus{domain.TaskStatusPending},
+				Limit:     15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.ForbiddenErrorCode),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockTaskRepository{}
+			mockProjectRepo := &mockProjectRepository{}
+			mockUserRepo := &mockUserRepository{}
+
+			tt.mockSetup(mockRepo, mockProjectRepo)
+			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+			ctx := context.Background()
+
+			result, err := svc.GroupByStatus(ctx, tt.request)
+
+			if tt.shouldSucceed {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+			} else {
+				require.Error(t, err)
+				require.Nil(t, result)
+
+				var domainErr domain.DomainError
+				if assert.ErrorAs(t, err, &domainErr) {
+					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
+				}
+			}
+
+			mockRepo.AssertExpectations(t)
+			mockProjectRepo.AssertExpectations(t)
+		})
+	}
+}

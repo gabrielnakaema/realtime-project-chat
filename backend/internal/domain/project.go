@@ -26,6 +26,15 @@ func (p *Project) IsMember(userId uuid.UUID) bool {
 	return false
 }
 
+func (p *Project) IsCreator(userId uuid.UUID) bool {
+	for _, member := range p.Members {
+		if member.UserId == userId && member.Role == ProjectMemberRoleCreator {
+			return true
+		}
+	}
+	return false
+}
+
 type ProjectMemberRole string
 
 var (
