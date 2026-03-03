@@ -5,6 +5,7 @@ import { CreateProject } from '@/components/create-project';
 import { ProjectList } from '@/components/project-list';
 import { UserProjectActivities } from '@/components/user-project-activities';
 import { useAuth } from '@/hooks/use-auth';
+import { UserDueTasks } from '@/components/user-due-tasks';
 
 export const Route = createFileRoute('/projects/')({
   component: RouteComponent,
@@ -42,6 +43,8 @@ function RouteComponent() {
 
       <div className="space-y-8 px-6 py-12">
         <ProjectList />
+
+        <UserDueTasks />
 
         <UserProjectActivities />
       </div>

@@ -5,12 +5,12 @@ import { AddProjectMember } from '@/components/add-project-member';
 import { KanbanBoard } from '@/components/kanban-board';
 import { MembersAvatarList } from '@/components/members-avatar-list';
 import { ProjectDetailsSheet, ProjectDetailsSheetTrigger } from '@/components/project-details-sheet';
+import { ProjectMembersModal } from '@/components/project-members-modal';
 import { ProjectSettings } from '@/components/project-settings';
 import { useOnlineUsers } from '@/hooks/use-online-users';
 import { getProject } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
 import { sanitizeHTML } from '@/utils/html';
-import { ProjectMembersModal } from '@/components/project-members-modal';
 
 export const Route = createFileRoute('/projects/$projectId/')({
   component: RouteComponent,

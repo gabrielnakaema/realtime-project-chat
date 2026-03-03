@@ -1,3 +1,4 @@
+import type { Project } from './project';
 import type { User } from './user';
 
 export type TaskStatus = 'pending' | 'doing' | 'done' | 'archived';
@@ -22,6 +23,7 @@ export interface Task {
   author: User;
   responsible: User | null;
   updates: TaskUpdate[];
+  project: Project | null;
 }
 
 export interface TaskUpdate {
@@ -50,5 +52,11 @@ export interface ListTasksRequest {
   statuses: string[];
   taskOrder: number;
   updatedAt: null | string;
+  limit: number;
+}
+
+export interface ListUserDueTasksRequest {
+  cursorDueDate: null | string;
+  cursorUpdatedAt: null | string;
   limit: number;
 }

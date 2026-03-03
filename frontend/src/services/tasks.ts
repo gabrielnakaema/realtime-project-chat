@@ -1,6 +1,6 @@
 import { parse } from 'date-fns';
 import { api } from './api';
-import type { ListTasksRequest, Task, TaskStatus } from '@/types/task';
+import type { ListTasksRequest, ListUserDueTasksRequest, Task, TaskStatus } from '@/types/task';
 import type { ITaskForm } from '@/schemas/task-schema';
 import type { CursorPaginated, Paginated } from '@/types/paginated';
 
@@ -179,5 +179,25 @@ export const moveTask = async (request: MoveTaskRequest) => {
   });
 
   const json = await response.json<Task>();
+  return json;
+};
+
+export const listUserDueTasks = async (request: ListUserDueTasksRequest) => {
+  const searchParams = new URLSearchParams();
+  if (request.cursorDueDate) {
+    searchParams.set('due_date', request.cursorDueDate);
+  }
+  if (request.cursorUpdatedAt) {
+    searchParams.set('updated_at', request.cursorUpdatedAt);
+  }
+  if (request.limit) {
+    searchParams.set('limit', request.limit.toString());
+  }
+
+  const response = await api.get('tasks/user', {
+    searchParams,
+  });
+
+  const json = await response.json<CursorPaginated<Task>>();
   return json;
 };
