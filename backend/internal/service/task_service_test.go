@@ -95,6 +95,14 @@ func (m *mockTaskRepository) CountTasksByProjectIdAndStatus(ctx context.Context,
 	return args.Get(0).(map[string]int), args.Error(1)
 }
 
+func (m *mockTaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID, statuses []string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+	args := m.Called(ctx, userId, statuses, cursorDueDate, cursorUpdatedAt, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*utils.CursorPaginated[domain.Task]), args.Error(1)
+}
+
 func TestTaskService_Create(t *testing.T) {
 	validUserId := uuid.New()
 	validProjectId := uuid.New()

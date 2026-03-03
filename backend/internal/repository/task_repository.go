@@ -540,3 +540,104 @@ func (tr *TaskRepository) CountTasksByProjectIdAndStatus(ctx context.Context, pr
 
 	return result, nil
 }
+
+func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID, statuses []string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+	q := queries.New(tr.pool)
+
+	params := queries.ListUserDueTasksParams{
+		ResponsibleID: pgtype.UUID{
+			Bytes: userId,
+			Valid: true,
+		},
+		Statuses: statuses,
+		CursorDueDate: pgtype.Timestamptz{
+			Valid: cursorDueDate != nil,
+		},
+		CursorUpdatedAt: pgtype.Timestamptz{
+			Valid: cursorUpdatedAt != nil,
+		},
+		Limit: int32(limit + 1),
+	}
+
+	if cursorUpdatedAt != nil {
+		params.CursorUpdatedAt = pgtype.Timestamptz{
+			Time:  *cursorUpdatedAt,
+			Valid: true,
+		}
+	} else {
+		params.CursorUpdatedAt = pgtype.Timestamptz{
+			Valid: true,
+			Time:  time.Now().Add(1 * time.Hour),
+		}
+	}
+
+	if cursorDueDate != nil {
+		params.CursorDueDate = pgtype.Timestamptz{
+			Time:  *cursorDueDate,
+			Valid: true,
+		}
+	}
+
+	if len(statuses) > 0 {
+		params.Statuses = statuses
+	}
+
+	results, err := q.ListUserDueTasks(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := []domain.Task{}
+	for _, result := range results {
+		task := domain.Task{
+			Id:            result.ID,
+			ProjectId:     result.ProjectID,
+			ResponsibleId: (*uuid.UUID)(result.ResponsibleResponsibleID.Bytes[:]),
+			Title:         result.Title,
+			Description:   result.Description,
+			Status:        domain.TaskStatus(result.Status),
+			Priority:      domain.TaskPriority(result.Priority),
+			Order:         int(result.TaskOrder),
+			CreatedAt:     result.CreatedAt.Time,
+			UpdatedAt:     result.UpdatedAt.Time,
+			Project: &domain.Project{
+				Id:          result.ProjectProjectID,
+				Name:        result.ProjectName,
+				Description: result.ProjectDescription,
+				CreatedAt:   result.ProjectCreatedAt.Time,
+				UpdatedAt:   result.ProjectUpdatedAt.Time,
+				UserId:      result.ProjectUserID,
+			},
+		}
+
+		if result.Tags != nil {
+			bytes, err := json.Marshal(result.Tags)
+			if err != nil {
+				return nil, err
+			}
+			err = json.Unmarshal(bytes, &task.Tags)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if result.DueDate.Valid {
+			task.DueDate = &result.DueDate.Time
+		}
+
+		if result.DoneAt.Valid {
+			task.DoneAt = &result.DoneAt.Time
+		}
+
+		tasks = append(tasks, task)
+	}
+
+	minLen := min(len(tasks), int(limit))
+
+	paginated := utils.CursorPaginated[domain.Task]{
+		Data:    tasks[:minLen],
+		HasNext: len(tasks) > int(limit),
+	}
+
+	return &paginated, nil
+}

@@ -133,6 +133,37 @@ GROUP BY t.id, a.name, a.id, r.name, r.id
 ORDER BY t.task_order ASC, t.updated_at DESC
 LIMIT $2;
 
+-- name: ListUserDueTasks :many
+SELECT
+  t.*,
+  p.id as project_project_id,
+  p.name as project_name,
+  p.description as project_description,
+  p.created_at as project_created_at,
+  p.updated_at as project_updated_at,
+  p.user_id as project_user_id,
+  r.id as responsible_responsible_id,
+  r.name as responsible_name,
+  coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
+FROM tasks t
+LEFT JOIN users r ON r.id = t.responsible_id
+LEFT JOIN task_tags tt ON tt.task_id = t.id
+JOIN projects p ON p.id = t.project_id
+WHERE t.responsible_id = $1
+AND (
+  cardinality(sqlc.slice('statuses')::text[]) = 0
+  OR t.status = ANY(sqlc.slice('statuses')::text[])
+)
+AND (
+  sqlc.narg('cursor_due_date')::timestamptz IS NULL
+  OR sqlc.narg('cursor_updated_at')::timestamptz IS NULL
+  OR t.due_date > sqlc.narg('cursor_due_date')::timestamptz
+  OR (t.due_date = sqlc.narg('cursor_due_date')::timestamptz AND t.updated_at < sqlc.narg('cursor_updated_at')::timestamptz)
+)
+GROUP BY t.id, r.name, r.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id
+ORDER BY t.due_date ASC, t.updated_at DESC
+LIMIT $2;
+
 -- name: UpdateTask :exec
 UPDATE tasks SET title = $1, description = $2, status = $3, task_order = $4, priority = $5, due_date = $6, responsible_id = $7, done_at = $8, updated_at = CURRENT_TIMESTAMP WHERE id = $9;
 

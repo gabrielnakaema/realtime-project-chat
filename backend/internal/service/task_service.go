@@ -24,6 +24,7 @@ type taskRepository interface {
 	MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID) (*domain.Task, error)
 	NormalizeProjectTaskOrders(ctx context.Context, projectId uuid.UUID) error
 	CountTasksByProjectIdAndStatus(ctx context.Context, projectId uuid.UUID, statuses []string) (map[string]int, error)
+	ListUserDueTasks(ctx context.Context, userId uuid.UUID, statuses []string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 }
 
 type taskServiceProjectRepository interface {
@@ -535,6 +536,33 @@ func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) 
 	}
 
 	return &archivedTask, nil
+}
+
+type ListUserDueTasksRequest struct {
+	UserId          uuid.UUID
+	Limit           int
+	CursorDueDate   *time.Time
+	CursorUpdatedAt *time.Time
+}
+
+func (ts *TaskService) ListUserDueTasks(ctx context.Context, request ListUserDueTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
+	if request.UserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	dueStatuses := []domain.TaskStatus{domain.TaskStatusPending, domain.TaskStatusDoing}
+
+	stringDueStatuses := []string{}
+	for _, status := range dueStatuses {
+		stringDueStatuses = append(stringDueStatuses, string(status))
+	}
+
+	result, err := ts.taskRepository.ListUserDueTasks(ctx, request.UserId, stringDueStatuses, request.CursorDueDate, request.CursorUpdatedAt, request.Limit)
+	if err != nil {
+		return nil, domain.ServerError("failed to list user due tasks", err)
+	}
+
+	return result, nil
 }
 
 type MoveTaskRequest struct {

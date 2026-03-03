@@ -475,6 +475,120 @@ func (q *Queries) ListTasksByProjectId(ctx context.Context, arg ListTasksByProje
 	return items, nil
 }
 
+const listUserDueTasks = `-- name: ListUserDueTasks :many
+SELECT
+  t.id, t.project_id, t.title, t.description, t.status, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order,
+  p.id as project_project_id,
+  p.name as project_name,
+  p.description as project_description,
+  p.created_at as project_created_at,
+  p.updated_at as project_updated_at,
+  p.user_id as project_user_id,
+  r.id as responsible_responsible_id,
+  r.name as responsible_name,
+  coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
+FROM tasks t
+LEFT JOIN users r ON r.id = t.responsible_id
+LEFT JOIN task_tags tt ON tt.task_id = t.id
+JOIN projects p ON p.id = t.project_id
+WHERE t.responsible_id = $1
+AND (
+  cardinality($3::text[]) = 0
+  OR t.status = ANY($3::text[])
+)
+AND (
+  $4::timestamptz IS NULL
+  OR $5::timestamptz IS NULL
+  OR t.due_date > $4::timestamptz
+  OR (t.due_date = $4::timestamptz AND t.updated_at < $5::timestamptz)
+)
+GROUP BY t.id, r.name, r.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id
+ORDER BY t.due_date ASC, t.updated_at DESC
+LIMIT $2
+`
+
+type ListUserDueTasksParams struct {
+	ResponsibleID   pgtype.UUID
+	Limit           int32
+	Statuses        []string
+	CursorDueDate   pgtype.Timestamptz
+	CursorUpdatedAt pgtype.Timestamptz
+}
+
+type ListUserDueTasksRow struct {
+	ID                       uuid.UUID
+	ProjectID                uuid.UUID
+	Title                    string
+	Description              string
+	Status                   string
+	CreatedAt                pgtype.Timestamptz
+	UpdatedAt                pgtype.Timestamptz
+	AuthorID                 uuid.UUID
+	Priority                 string
+	DueDate                  pgtype.Timestamptz
+	DoneAt                   pgtype.Timestamptz
+	ResponsibleID            pgtype.UUID
+	TaskOrder                int32
+	ProjectProjectID         uuid.UUID
+	ProjectName              string
+	ProjectDescription       string
+	ProjectCreatedAt         pgtype.Timestamptz
+	ProjectUpdatedAt         pgtype.Timestamptz
+	ProjectUserID            uuid.UUID
+	ResponsibleResponsibleID pgtype.UUID
+	ResponsibleName          pgtype.Text
+	Tags                     interface{}
+}
+
+func (q *Queries) ListUserDueTasks(ctx context.Context, arg ListUserDueTasksParams) ([]ListUserDueTasksRow, error) {
+	rows, err := q.db.Query(ctx, listUserDueTasks,
+		arg.ResponsibleID,
+		arg.Limit,
+		arg.Statuses,
+		arg.CursorDueDate,
+		arg.CursorUpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUserDueTasksRow
+	for rows.Next() {
+		var i ListUserDueTasksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Title,
+			&i.Description,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AuthorID,
+			&i.Priority,
+			&i.DueDate,
+			&i.DoneAt,
+			&i.ResponsibleID,
+			&i.TaskOrder,
+			&i.ProjectProjectID,
+			&i.ProjectName,
+			&i.ProjectDescription,
+			&i.ProjectCreatedAt,
+			&i.ProjectUpdatedAt,
+			&i.ProjectUserID,
+			&i.ResponsibleResponsibleID,
+			&i.ResponsibleName,
+			&i.Tags,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const moveTask = `-- name: MoveTask :one
 UPDATE tasks t
 SET task_order = $1,

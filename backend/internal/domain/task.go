@@ -45,6 +45,7 @@ type Task struct {
 	Responsible *User        `json:"responsible,omitempty"`
 	Author      *User        `json:"author,omitempty"`
 	Updates     []TaskUpdate `json:"updates,omitempty"`
+	Project     *Project     `json:"project,omitempty"`
 }
 
 var AllowedTaskStatuses = []TaskStatus{TaskStatusPending, TaskStatusDoing, TaskStatusDone, TaskStatusArchived}

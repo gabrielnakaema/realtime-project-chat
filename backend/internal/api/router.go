@@ -77,6 +77,7 @@ func (a *Api) Router() http.Handler {
 		r.Get("/count-by-status", a.handlers.Task.CountByStatus)
 		r.Get("/", a.handlers.Task.List)
 		r.Post("/", a.handlers.Task.Create)
+		r.Get("/user", a.handlers.Task.ListUserDueTasks)
 		r.Get("/{id}", a.handlers.Task.Get)
 		r.Put("/{id}", a.handlers.Task.Update)
 		r.Delete("/{id}", a.handlers.Task.Archive)
