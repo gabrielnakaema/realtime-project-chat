@@ -36,13 +36,13 @@ export const ProjectList = () => {
       )}
 
       {!!projects?.length && (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="flex w-full max-w-full items-stretch gap-4 overflow-x-auto pb-3">
           {projects.map((project) => (
             <Link
               key={project.id}
               to="/projects/$projectId"
               params={{ projectId: project.id }}
-              className="cursor-pointer rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-lg dark:border-slate-700 dark:bg-slate-800"
+              className="w-full max-w-sm min-w-sm cursor-pointer rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-lg dark:border-slate-700 dark:bg-slate-800"
             >
               <div className="flex h-full flex-col gap-3 p-6">
                 <div className="flex items-center justify-between">

@@ -25,7 +25,12 @@ const DEFAULT_COLUMNS: Column[] = [
   { id: 'done', title: 'Done', status: 'done', color: 'bg-emerald-50 dark:bg-emerald-950' },
 ];
 
-export const KanbanBoard = ({ project }: { project: Project }) => {
+interface KanbanBoardProps {
+  project: Project;
+  onTaskClick?: (taskId: string) => void;
+}
+
+export const KanbanBoard = ({ project, onTaskClick }: KanbanBoardProps) => {
   const projectId = project.id;
 
   useRealtimeTaskSync(projectId);
@@ -64,7 +69,7 @@ export const KanbanBoard = ({ project }: { project: Project }) => {
 
       <div className="grid h-[calc(100vh-200px)] grid-cols-1 gap-6 md:grid-cols-3">
         {columns.map((column) => (
-          <BoardColumn column={column} key={column.id} />
+          <BoardColumn column={column} key={column.id} onTaskClick={onTaskClick} />
         ))}
       </div>
     </div>

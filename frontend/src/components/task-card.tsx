@@ -5,8 +5,6 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 import { Calendar } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from './avatar';
-import { EditTask } from './edit-task';
-import { TaskDetails } from './task-details';
 import { TaskPriorityBadge } from './task-priority-badge';
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import type { Task } from '@/types/task';
@@ -16,11 +14,10 @@ import { sanitizeHTML } from '@/utils/html';
 interface TaskCardProps {
   task: Task;
   onDrop: (edge: Edge | null, droppedTaskId: string) => void;
+  onTaskClick?: (taskId: string) => void;
 }
 
-export const TaskCard = ({ task, onDrop }: TaskCardProps) => {
-  const [open, setOpen] = useState(false);
-  const [openEdit, setOpenEdit] = useState(false);
+export const TaskCard = ({ task, onDrop, onTaskClick }: TaskCardProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null);
@@ -83,7 +80,7 @@ export const TaskCard = ({ task, onDrop }: TaskCardProps) => {
           'cursor-pointer rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900',
           isDragging && 'opacity-40 transition-opacity',
         )}
-        onClick={() => setOpen(true)}
+        onClick={() => onTaskClick?.(task.id)}
       >
         <div className="pb-3">
           <div className="flex items-start justify-between">
@@ -123,16 +120,6 @@ export const TaskCard = ({ task, onDrop }: TaskCardProps) => {
         </div>
         {closestEdge && <DropIndicator edge={closestEdge} gap="12px" />}
       </div>
-      <TaskDetails
-        taskId={task.id}
-        open={open}
-        onOpenChange={setOpen}
-        onEdit={() => {
-          setOpenEdit(true);
-          setOpen(false);
-        }}
-      />
-      <EditTask taskId={task.id} open={openEdit} onOpenChange={setOpenEdit} />
     </div>
   );
 };

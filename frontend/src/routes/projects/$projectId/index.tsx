@@ -1,12 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { useState } from 'react';
+import { z } from 'zod';
 import { AddProjectMember } from '@/components/add-project-member';
+import { EditTask } from '@/components/edit-task';
 import { KanbanBoard } from '@/components/kanban-board';
 import { MembersAvatarList } from '@/components/members-avatar-list';
 import { ProjectDetailsSheet, ProjectDetailsSheetTrigger } from '@/components/project-details-sheet';
 import { ProjectMembersModal } from '@/components/project-members-modal';
 import { ProjectSettings } from '@/components/project-settings';
+import { TaskDetails } from '@/components/task-details';
 import { useOnlineUsers } from '@/hooks/use-online-users';
 import { getProject } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
@@ -14,10 +18,16 @@ import { sanitizeHTML } from '@/utils/html';
 
 export const Route = createFileRoute('/projects/$projectId/')({
   component: RouteComponent,
+  validateSearch: z.object({
+    taskId: z.string().optional(),
+  }),
 });
 
 function RouteComponent() {
   const { projectId } = Route.useParams();
+  const { taskId } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const [isEditingTask, setIsEditingTask] = useState(false);
 
   const { onlineUserIds } = useOnlineUsers(projectId);
 
@@ -92,9 +102,43 @@ function RouteComponent() {
 
       {project && (
         <div className="p-6">
-          <KanbanBoard project={project} />
+          <KanbanBoard
+            project={project}
+            onTaskClick={(id) =>
+              navigate({
+                search: (prev) => ({ ...prev, taskId: id }),
+                replace: true,
+              })
+            }
+          />
         </div>
       )}
+
+      <TaskDetails
+        taskId={taskId ?? ''}
+        open={!!taskId && !isEditingTask}
+        onOpenChange={(open) => {
+          if (!open) {
+            navigate({
+              search: (prev) => ({ ...prev, taskId: undefined }),
+              replace: true,
+            });
+          }
+        }}
+        onEdit={() => {
+          setIsEditingTask(true);
+        }}
+      />
+
+      <EditTask
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsEditingTask(false);
+          }
+        }}
+        taskId={taskId ?? ''}
+        open={isEditingTask && !!taskId}
+      />
     </div>
   );
 }

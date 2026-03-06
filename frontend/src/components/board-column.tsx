@@ -17,9 +17,10 @@ import { DEFAULT_TASK_LIMIT } from '@/constants/tasks';
 
 interface BoardColumnProps {
   column: Column;
+  onTaskClick?: (taskId: string) => void;
 }
 
-export const BoardColumn = ({ column }: BoardColumnProps) => {
+export const BoardColumn = ({ column, onTaskClick }: BoardColumnProps) => {
   const columnRef = useRef<HTMLDivElement>(null);
   const scrollableRef = useRef<HTMLDivElement | null>(null);
 
@@ -121,6 +122,7 @@ export const BoardColumn = ({ column }: BoardColumnProps) => {
             key={task.id}
             task={task}
             onDrop={(edge, droppedTaskId) => handleTaskDrop(edge, droppedTaskId, index)}
+            onTaskClick={onTaskClick}
           />
         ))}
         <div ref={sentinelRef} className="h-1" aria-hidden="true" />

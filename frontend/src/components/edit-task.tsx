@@ -125,8 +125,8 @@ export const EditTask = ({ taskId, open, onOpenChange }: EditTaskProps) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="md:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Create task</DialogTitle>
-          <DialogDescription>Create a new task for the project</DialogDescription>
+          <DialogTitle>Edit task</DialogTitle>
+          <DialogDescription>Edit the task details</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex w-full flex-col gap-4">
