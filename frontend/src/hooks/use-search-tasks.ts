@@ -3,35 +3,43 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { CursorPaginated } from '@/types/paginated';
 import type { Task } from '@/types/task';
 import { taskQueryKeys } from '@/services/query-keys';
-import { listUserDueTasks } from '@/services/tasks';
+import { searchTasksForUser } from '@/services/tasks';
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 15;
 
-export const useUserDueTasks = () => {
+export const useSearchTasks = (query?: string) => {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const query = useInfiniteQuery({
-    queryKey: taskQueryKeys.listUserDueTasks,
-    initialPageParam: { cursorDueDate: null, cursorUpdatedAt: '' } as {
-      cursorDueDate: null | string;
-      cursorUpdatedAt: string;
-    },
+  const result = useInfiniteQuery({
+    queryKey: taskQueryKeys.search({
+      searchQuery: query || '',
+      limit: PAGE_SIZE,
+      cursorDueDate: null,
+      cursorUpdatedAt: null,
+    }),
     queryFn: ({ pageParam }) =>
-      listUserDueTasks({
+      searchTasksForUser({
+        searchQuery: query || '',
+        limit: PAGE_SIZE,
         cursorDueDate: pageParam.cursorDueDate,
         cursorUpdatedAt: pageParam.cursorUpdatedAt,
-        limit: PAGE_SIZE,
       }),
     getNextPageParam: (lastPage: CursorPaginated<Task>) => {
       if (!lastPage.has_next) return undefined;
       const last = lastPage.data[lastPage.data.length - 1];
       return { cursorDueDate: last.due_date, cursorUpdatedAt: last.updated_at };
     },
+    initialPageParam: {
+      cursorDueDate: null,
+      cursorUpdatedAt: '',
+    } as {
+      cursorDueDate: null | string;
+      cursorUpdatedAt: string;
+    },
   });
+  const { fetchNextPage, hasNextPage } = result;
 
-  const { fetchNextPage, hasNextPage } = query;
-
-  const data = useMemo(() => query.data?.pages.flatMap((p) => p.data) ?? [], [query.data]);
+  const data = useMemo(() => result.data?.pages.flatMap((p) => p.data) ?? [], [result.data]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -43,14 +51,15 @@ export const useUserDueTasks = () => {
       },
       { root: null, rootMargin: '200px', threshold: 0.1 },
     );
+
     observer.observe(el);
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, data.length]);
 
   return {
     data,
-    isLoading: query.isLoading,
-    isFetchingNextPage: query.isFetchingNextPage,
+    isLoading: result.isLoading,
+    isFetchingNextPage: result.isFetchingNextPage,
     sentinelRef,
   };
 };

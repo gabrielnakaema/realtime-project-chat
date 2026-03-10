@@ -3,9 +3,10 @@ import { LogOut } from 'lucide-react';
 import { Button } from '@/components/button';
 import { CreateProject } from '@/components/create-project';
 import { ProjectList } from '@/components/project-list';
+import { SearchBar } from '@/components/search-bar';
+import { UserDueTasks } from '@/components/user-due-tasks';
 import { UserProjectActivities } from '@/components/user-project-activities';
 import { useAuth } from '@/hooks/use-auth';
-import { UserDueTasks } from '@/components/user-due-tasks';
 
 export const Route = createFileRoute('/projects/')({
   component: RouteComponent,
@@ -27,6 +28,9 @@ function RouteComponent() {
               <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">TaskFlow</h1>
               <p className="text-slate-600 dark:text-slate-400">Welcome back, {user?.name}</p>
             </div>
+
+            <SearchBar action="/search" searchName="query" formClassName="w-full max-w-md" />
+
             <div className="flex items-center gap-4">
               <CreateProject />
               <Button onClick={handleLogout} variant="secondary">

@@ -1,8 +1,10 @@
+import { differenceInCalendarDays } from 'date-fns';
+
 export const formatRelativeActivityDateString = (isoString: string) => {
   const date = new Date(isoString);
   const now = new Date();
   const seconds = (now.getTime() - date.getTime()) / 1000;
-  const days = Math.floor(seconds / (60 * 60 * 24));
+  const days = differenceInCalendarDays(now, date);
 
   if (seconds <= 60) {
     return 'Just now';

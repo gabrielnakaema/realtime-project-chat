@@ -2,8 +2,15 @@ import { api } from './api';
 import type { Member, Project } from '@/types/project';
 import type { IProjectForm } from '@/schemas/project-schema';
 
-export const listProjects = async () => {
-  const response = await api.get('projects');
+export const listProjects = async (searchQuery?: string) => {
+  const searchParams = new URLSearchParams();
+  if (searchQuery) {
+    searchParams.set('query', searchQuery);
+  }
+
+  const response = await api.get('projects', {
+    searchParams,
+  });
 
   const json = await response.json<Project[]>();
   return json;

@@ -11,8 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as SearchRouteRouteImport } from './routes/search/route'
 import { Route as ProjectsRouteRouteImport } from './routes/projects/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SearchIndexRouteImport } from './routes/search/index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
 import { Route as ProjectsProjectIdChatRouteImport } from './routes/projects/$projectId/chat'
@@ -27,6 +29,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SearchRouteRoute = SearchRouteRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectsRouteRoute = ProjectsRouteRouteImport.update({
   id: '/projects',
   path: '/projects',
@@ -36,6 +43,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SearchIndexRoute = SearchIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SearchRouteRoute,
 } as any)
 const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   id: '/',
@@ -56,9 +68,11 @@ const ProjectsProjectIdChatRoute = ProjectsProjectIdChatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/projects': typeof ProjectsRouteRouteWithChildren
+  '/search': typeof SearchRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/sign-up': typeof SignUpRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/search/': typeof SearchIndexRoute
   '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
 }
@@ -67,6 +81,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/sign-up': typeof SignUpRoute
   '/projects': typeof ProjectsIndexRoute
+  '/search': typeof SearchIndexRoute
   '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
 }
@@ -74,9 +89,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/projects': typeof ProjectsRouteRouteWithChildren
+  '/search': typeof SearchRouteRouteWithChildren
   '/login': typeof LoginRoute
   '/sign-up': typeof SignUpRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/search/': typeof SearchIndexRoute
   '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
 }
@@ -85,9 +102,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/projects'
+    | '/search'
     | '/login'
     | '/sign-up'
     | '/projects/'
+    | '/search/'
     | '/projects/$projectId/chat'
     | '/projects/$projectId'
   fileRoutesByTo: FileRoutesByTo
@@ -96,15 +115,18 @@ export interface FileRouteTypes {
     | '/login'
     | '/sign-up'
     | '/projects'
+    | '/search'
     | '/projects/$projectId/chat'
     | '/projects/$projectId'
   id:
     | '__root__'
     | '/'
     | '/projects'
+    | '/search'
     | '/login'
     | '/sign-up'
     | '/projects/'
+    | '/search/'
     | '/projects/$projectId/chat'
     | '/projects/$projectId/'
   fileRoutesById: FileRoutesById
@@ -112,6 +134,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ProjectsRouteRoute: typeof ProjectsRouteRouteWithChildren
+  SearchRouteRoute: typeof SearchRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignUpRoute: typeof SignUpRoute
 }
@@ -132,6 +155,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects': {
       id: '/projects'
       path: '/projects'
@@ -145,6 +175,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/search/': {
+      id: '/search/'
+      path: '/'
+      fullPath: '/search/'
+      preLoaderRoute: typeof SearchIndexRouteImport
+      parentRoute: typeof SearchRouteRoute
     }
     '/projects/': {
       id: '/projects/'
@@ -186,9 +223,22 @@ const ProjectsRouteRouteWithChildren = ProjectsRouteRoute._addFileChildren(
   ProjectsRouteRouteChildren,
 )
 
+interface SearchRouteRouteChildren {
+  SearchIndexRoute: typeof SearchIndexRoute
+}
+
+const SearchRouteRouteChildren: SearchRouteRouteChildren = {
+  SearchIndexRoute: SearchIndexRoute,
+}
+
+const SearchRouteRouteWithChildren = SearchRouteRoute._addFileChildren(
+  SearchRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ProjectsRouteRoute: ProjectsRouteRouteWithChildren,
+  SearchRouteRoute: SearchRouteRouteWithChildren,
   LoginRoute: LoginRoute,
   SignUpRoute: SignUpRoute,
 }

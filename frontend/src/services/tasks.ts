@@ -201,3 +201,33 @@ export const listUserDueTasks = async (request: ListUserDueTasksRequest) => {
   const json = await response.json<CursorPaginated<Task>>();
   return json;
 };
+
+export interface SearchTasksForUserRequest {
+  cursorDueDate: null | string;
+  cursorUpdatedAt: null | string;
+  limit: number;
+  searchQuery: string;
+}
+
+export const searchTasksForUser = async (request: SearchTasksForUserRequest) => {
+  const searchParams = new URLSearchParams();
+  if (request.cursorDueDate) {
+    searchParams.set('due_date', request.cursorDueDate);
+  }
+  if (request.cursorUpdatedAt) {
+    searchParams.set('updated_at', request.cursorUpdatedAt);
+  }
+  if (request.limit) {
+    searchParams.set('limit', request.limit.toString());
+  }
+  if (request.searchQuery) {
+    searchParams.set('query', request.searchQuery);
+  }
+
+  const response = await api.get('tasks/search', {
+    searchParams,
+  });
+
+  const json = await response.json<CursorPaginated<Task>>();
+  return json;
+};

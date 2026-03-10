@@ -10,7 +10,7 @@ import { sanitizeHTML } from '@/utils/html';
 export const ProjectList = () => {
   const { data: projects, isLoading } = useQuery({
     queryKey: projectQueryKeys.list,
-    queryFn: listProjects,
+    queryFn: () => listProjects(),
   });
 
   if (isLoading) {

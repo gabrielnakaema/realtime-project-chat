@@ -8,9 +8,11 @@ interface InputProps extends React.ComponentPropsWithoutRef<'input'> {
 export const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
   return (
     <div className="w-full space-y-2">
-      <label htmlFor={props.id} className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-        {props.label}
-      </label>
+      {props.label && (
+        <label htmlFor={props.id} className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+          {props.label}
+        </label>
+      )}
       <input
         id={props.id}
         type={props.type}
