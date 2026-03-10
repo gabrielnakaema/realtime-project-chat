@@ -281,13 +281,16 @@ WHERE
       or role = $2::text
     )
   )
+  AND ($3::text IS NULL OR (p.name ILIKE '%' || $3::text || '%' OR p.description ILIKE '%' || $3::text || '%'))
 GROUP BY
   p.id
+ORDER BY p.updated_at DESC
 `
 
 type ListProjectsByUserIdParams struct {
 	UserID uuid.UUID
 	Role   pgtype.Text
+	Query  pgtype.Text
 }
 
 type ListProjectsByUserIdRow struct {
@@ -301,7 +304,7 @@ type ListProjectsByUserIdRow struct {
 }
 
 func (q *Queries) ListProjectsByUserId(ctx context.Context, arg ListProjectsByUserIdParams) ([]ListProjectsByUserIdRow, error) {
-	rows, err := q.db.Query(ctx, listProjectsByUserId, arg.UserID, arg.Role)
+	rows, err := q.db.Query(ctx, listProjectsByUserId, arg.UserID, arg.Role, arg.Query)
 	if err != nil {
 		return nil, err
 	}

@@ -626,6 +626,145 @@ func (q *Queries) MoveTask(ctx context.Context, arg MoveTaskParams) (MoveTaskRow
 	return i, err
 }
 
+const searchTasksForUser = `-- name: SearchTasksForUser :many
+WITH project_ids_cte AS (
+  SELECT DISTINCT pm.project_id
+  FROM project_members pm
+  WHERE pm.user_id = $1
+)
+SELECT t.id, t.project_id, t.title, t.description, t.status, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order,
+  p.id as project_project_id,
+  p.name as project_name,
+  p.description as project_description,
+  p.created_at as project_created_at,
+  p.updated_at as project_updated_at,
+  p.user_id as project_user_id,
+  r.id as responsible_responsible_id,
+  r.name as responsible_name,
+  r.email as responsible_email,
+  r.created_at as responsible_created_at,
+  a.id as author_author_id,
+  a.name as author_name,
+  a.email as author_email,
+  a.created_at as author_created_at,
+  coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
+FROM tasks t
+LEFT JOIN users r ON r.id = t.responsible_id
+LEFT JOIN users a ON a.id = t.author_id
+JOIN projects p ON p.id = t.project_id
+JOIN project_ids_cte pi ON pi.project_id = t.project_id
+LEFT JOIN task_tags tt ON tt.task_id = t.id
+WHERE ($3::text IS NULL OR (t.title ILIKE '%' || $3::text || '%' OR t.description ILIKE '%' || $3::text || '%'))
+AND (
+  $4::timestamptz IS NULL
+  OR $5::timestamptz IS NULL
+  OR t.due_date > $4::timestamptz
+  OR (t.due_date = $4::timestamptz AND t.updated_at < $5::timestamptz)
+) AND (
+  cardinality($6::text[]) = 0
+  OR t.status = ANY($6::text[])
+)
+GROUP BY t.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id, r.id, r.name, r.email, r.created_at, a.id, a.name, a.email, a.created_at
+ORDER BY t.due_date ASC, t.updated_at DESC
+LIMIT $2
+`
+
+type SearchTasksForUserParams struct {
+	UserID          uuid.UUID
+	Limit           int32
+	Query           pgtype.Text
+	CursorDueDate   pgtype.Timestamptz
+	CursorUpdatedAt pgtype.Timestamptz
+	Statuses        []string
+}
+
+type SearchTasksForUserRow struct {
+	ID                       uuid.UUID
+	ProjectID                uuid.UUID
+	Title                    string
+	Description              string
+	Status                   string
+	CreatedAt                pgtype.Timestamptz
+	UpdatedAt                pgtype.Timestamptz
+	AuthorID                 uuid.UUID
+	Priority                 string
+	DueDate                  pgtype.Timestamptz
+	DoneAt                   pgtype.Timestamptz
+	ResponsibleID            pgtype.UUID
+	TaskOrder                int32
+	ProjectProjectID         uuid.UUID
+	ProjectName              string
+	ProjectDescription       string
+	ProjectCreatedAt         pgtype.Timestamptz
+	ProjectUpdatedAt         pgtype.Timestamptz
+	ProjectUserID            uuid.UUID
+	ResponsibleResponsibleID pgtype.UUID
+	ResponsibleName          pgtype.Text
+	ResponsibleEmail         pgtype.Text
+	ResponsibleCreatedAt     pgtype.Timestamptz
+	AuthorAuthorID           pgtype.UUID
+	AuthorName               pgtype.Text
+	AuthorEmail              pgtype.Text
+	AuthorCreatedAt          pgtype.Timestamptz
+	Tags                     interface{}
+}
+
+func (q *Queries) SearchTasksForUser(ctx context.Context, arg SearchTasksForUserParams) ([]SearchTasksForUserRow, error) {
+	rows, err := q.db.Query(ctx, searchTasksForUser,
+		arg.UserID,
+		arg.Limit,
+		arg.Query,
+		arg.CursorDueDate,
+		arg.CursorUpdatedAt,
+		arg.Statuses,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchTasksForUserRow
+	for rows.Next() {
+		var i SearchTasksForUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.Title,
+			&i.Description,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AuthorID,
+			&i.Priority,
+			&i.DueDate,
+			&i.DoneAt,
+			&i.ResponsibleID,
+			&i.TaskOrder,
+			&i.ProjectProjectID,
+			&i.ProjectName,
+			&i.ProjectDescription,
+			&i.ProjectCreatedAt,
+			&i.ProjectUpdatedAt,
+			&i.ProjectUserID,
+			&i.ResponsibleResponsibleID,
+			&i.ResponsibleName,
+			&i.ResponsibleEmail,
+			&i.ResponsibleCreatedAt,
+			&i.AuthorAuthorID,
+			&i.AuthorName,
+			&i.AuthorEmail,
+			&i.AuthorCreatedAt,
+			&i.Tags,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateTask = `-- name: UpdateTask :exec
 UPDATE tasks SET title = $1, description = $2, status = $3, task_order = $4, priority = $5, due_date = $6, responsible_id = $7, done_at = $8, updated_at = CURRENT_TIMESTAMP WHERE id = $9
 `

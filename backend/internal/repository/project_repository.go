@@ -98,7 +98,7 @@ func (pr *ProjectRepository) GetById(ctx context.Context, id uuid.UUID) (*domain
 	return &project, nil
 }
 
-func (pr *ProjectRepository) ListByUserId(ctx context.Context, userId uuid.UUID, memberRole string) ([]domain.Project, error) {
+func (pr *ProjectRepository) ListByUserId(ctx context.Context, userId uuid.UUID, memberRole string, searchQuery string) ([]domain.Project, error) {
 	q := queries.New(pr.pool)
 
 	params := queries.ListProjectsByUserIdParams{
@@ -107,6 +107,10 @@ func (pr *ProjectRepository) ListByUserId(ctx context.Context, userId uuid.UUID,
 
 	if memberRole != "" {
 		params.Role = pgtype.Text{String: memberRole, Valid: true}
+	}
+
+	if searchQuery != "" {
+		params.Query = pgtype.Text{String: searchQuery, Valid: true}
 	}
 
 	projectResults, err := q.ListProjectsByUserId(ctx, params)

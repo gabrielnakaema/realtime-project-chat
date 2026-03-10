@@ -57,8 +57,8 @@ func (m *mockProjectRepository) GetById(ctx context.Context, id uuid.UUID) (*dom
 	return args.Get(0).(*domain.Project), args.Error(1)
 }
 
-func (m *mockProjectRepository) ListByUserId(ctx context.Context, userId uuid.UUID, memberRole string) ([]domain.Project, error) {
-	args := m.Called(ctx, userId, memberRole)
+func (m *mockProjectRepository) ListByUserId(ctx context.Context, userId uuid.UUID, memberRole string, searchQuery string) ([]domain.Project, error) {
+	args := m.Called(ctx, userId, memberRole, searchQuery)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -355,7 +355,7 @@ func TestProjectService_ListByUserId(t *testing.T) {
 				ShouldFilterByRole: true,
 			},
 			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
-				repo.On("ListByUserId", mock.Anything, validUserId, "creator").Return([]domain.Project{validProject}, nil)
+				repo.On("ListByUserId", mock.Anything, validUserId, "creator", "").Return([]domain.Project{validProject}, nil)
 			},
 			shouldSucceed: true,
 			expectedError: nil,
@@ -368,7 +368,7 @@ func TestProjectService_ListByUserId(t *testing.T) {
 				ShouldFilterByRole: true,
 			},
 			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
-				repo.On("ListByUserId", mock.Anything, validUserId, "creator").Return(nil, errors.New("server error"))
+				repo.On("ListByUserId", mock.Anything, validUserId, "creator", "").Return(nil, errors.New("server error"))
 			},
 			shouldSucceed:     false,
 			expectedErrorCode: string(domain.ServerErrorCode),

@@ -25,6 +25,7 @@ type taskRepository interface {
 	NormalizeProjectTaskOrders(ctx context.Context, projectId uuid.UUID) error
 	CountTasksByProjectIdAndStatus(ctx context.Context, projectId uuid.UUID, statuses []string) (map[string]int, error)
 	ListUserDueTasks(ctx context.Context, userId uuid.UUID, statuses []string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
+	SearchTasksForUser(ctx context.Context, userId uuid.UUID, statuses []string, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 }
 
 type taskServiceProjectRepository interface {
@@ -695,4 +696,31 @@ func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskReque
 	}
 
 	return int((prevTask.Order + nextTask.Order) / 2), prevTask.Order, nil
+}
+
+type SearchTasksForUserRequest struct {
+	UserId          uuid.UUID
+	Limit           int
+	CursorDueDate   *time.Time
+	CursorUpdatedAt *time.Time
+	SearchQuery     string
+}
+
+func (ts *TaskService) SearchTasksForUser(ctx context.Context, request SearchTasksForUserRequest) (*utils.CursorPaginated[domain.Task], error) {
+	if request.UserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	stringStatuses := []string{
+		string(domain.TaskStatusPending),
+		string(domain.TaskStatusDoing),
+		string(domain.TaskStatusDone),
+	}
+
+	result, err := ts.taskRepository.SearchTasksForUser(ctx, request.UserId, stringStatuses, request.SearchQuery, request.CursorDueDate, request.CursorUpdatedAt, request.Limit)
+	if err != nil {
+		return nil, domain.ServerError("failed to search tasks for user", err)
+	}
+
+	return result, nil
 }

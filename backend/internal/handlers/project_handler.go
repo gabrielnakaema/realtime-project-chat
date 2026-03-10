@@ -81,6 +81,12 @@ func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 	if memberRole != "" {
 		v.Check("member_role", "member_role is invalid", memberRole == string(domain.ProjectMemberRoleMember) || memberRole == string(domain.ProjectMemberRoleCreator))
 	}
+
+	searchQuery := utils.GetQueryString(r, "query", "")
+	if searchQuery != "" {
+		v.Check("query", "query must be less than 100 characters", len(searchQuery) <= 100)
+	}
+
 	if !v.Valid() {
 		ValidationFailedResponse(w, v)
 		return
@@ -90,6 +96,7 @@ func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 		UserId:             userId,
 		MemberRole:         domain.ProjectMemberRole(memberRole),
 		ShouldFilterByRole: memberRole != "",
+		SearchQuery:        searchQuery,
 	}
 
 	projects, err := h.projectService.ListByUserId(r.Context(), serviceRequest)

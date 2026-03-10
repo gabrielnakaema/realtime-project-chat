@@ -27,6 +27,7 @@ type taskService interface {
 	CountByStatus(ctx context.Context, projectId uuid.UUID, statuses []domain.TaskStatus, requestUserId uuid.UUID) (map[domain.TaskStatus]int, error)
 	Archive(ctx context.Context, request service.ArchiveTaskRequest) (*domain.Task, error)
 	ListUserDueTasks(ctx context.Context, request service.ListUserDueTasksRequest) (*utils.CursorPaginated[domain.Task], error)
+	SearchTasksForUser(ctx context.Context, request service.SearchTasksForUserRequest) (*utils.CursorPaginated[domain.Task], error)
 }
 
 type TaskHandler struct {
@@ -480,6 +481,69 @@ func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.taskService.ListUserDueTasks(r.Context(), serviceRequest)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, result, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *TaskHandler) SearchTasksForUser(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+
+	limit := utils.GetQueryInt(r, "limit", 15)
+	if limit <= 0 {
+		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		return
+	}
+
+	if limit > 100 {
+		BadRequestResponse(w, errors.New("limit must be less than 100"))
+		return
+	}
+
+	searchQuery := utils.GetQueryString(r, "query", "")
+	if searchQuery == "" {
+		BadRequestResponse(w, errors.New("query is required"))
+		return
+	}
+
+	cursorDueDate := utils.GetQueryString(r, "due_date", "")
+	var dueDate *time.Time
+	if cursorDueDate != "" {
+		parsedTime, err := time.Parse(time.RFC3339, cursorDueDate)
+		if err != nil {
+			BadRequestResponse(w, err)
+			return
+		}
+		dueDate = &parsedTime
+	}
+
+	cursorUpdatedAt := utils.GetQueryString(r, "updated_at", "")
+	var updatedAt *time.Time
+	if cursorUpdatedAt != "" {
+		parsedTime, err := time.Parse(time.RFC3339, cursorUpdatedAt)
+		if err != nil {
+			BadRequestResponse(w, err)
+			return
+		}
+		updatedAt = &parsedTime
+	}
+
+	serviceRequest := service.SearchTasksForUserRequest{
+		UserId:          userId,
+		Limit:           int(limit),
+		SearchQuery:     searchQuery,
+		CursorDueDate:   dueDate,
+		CursorUpdatedAt: updatedAt,
+	}
+
+	result, err := h.taskService.SearchTasksForUser(r.Context(), serviceRequest)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

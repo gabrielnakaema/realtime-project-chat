@@ -205,3 +205,45 @@ FROM tasks t
 WHERE t.project_id = $1
   AND ($2::text[] IS NULL OR t.status = ANY($2::text[]))
 GROUP BY t.status;
+
+-- name: SearchTasksForUser :many
+WITH project_ids_cte AS (
+  SELECT DISTINCT pm.project_id
+  FROM project_members pm
+  WHERE pm.user_id = $1
+)
+SELECT t.*,
+  p.id as project_project_id,
+  p.name as project_name,
+  p.description as project_description,
+  p.created_at as project_created_at,
+  p.updated_at as project_updated_at,
+  p.user_id as project_user_id,
+  r.id as responsible_responsible_id,
+  r.name as responsible_name,
+  r.email as responsible_email,
+  r.created_at as responsible_created_at,
+  a.id as author_author_id,
+  a.name as author_name,
+  a.email as author_email,
+  a.created_at as author_created_at,
+  coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
+FROM tasks t
+LEFT JOIN users r ON r.id = t.responsible_id
+LEFT JOIN users a ON a.id = t.author_id
+JOIN projects p ON p.id = t.project_id
+JOIN project_ids_cte pi ON pi.project_id = t.project_id
+LEFT JOIN task_tags tt ON tt.task_id = t.id
+WHERE (sqlc.narg('query')::text IS NULL OR (t.title ILIKE '%' || sqlc.narg('query')::text || '%' OR t.description ILIKE '%' || sqlc.narg('query')::text || '%'))
+AND (
+  sqlc.narg('cursor_due_date')::timestamptz IS NULL
+  OR sqlc.narg('cursor_updated_at')::timestamptz IS NULL
+  OR t.due_date > sqlc.narg('cursor_due_date')::timestamptz
+  OR (t.due_date = sqlc.narg('cursor_due_date')::timestamptz AND t.updated_at < sqlc.narg('cursor_updated_at')::timestamptz)
+) AND (
+  cardinality(sqlc.slice('statuses')::text[]) = 0
+  OR t.status = ANY(sqlc.slice('statuses')::text[])
+)
+GROUP BY t.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id, r.id, r.name, r.email, r.created_at, a.id, a.name, a.email, a.created_at
+ORDER BY t.due_date ASC, t.updated_at DESC
+LIMIT $2;

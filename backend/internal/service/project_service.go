@@ -15,7 +15,7 @@ import (
 type projectRepository interface {
 	Create(ctx context.Context, project *domain.Project) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Project, error)
-	ListByUserId(ctx context.Context, userId uuid.UUID, memberRole string) ([]domain.Project, error)
+	ListByUserId(ctx context.Context, userId uuid.UUID, memberRole string, searchQuery string) ([]domain.Project, error)
 	Update(ctx context.Context, project *domain.Project) error
 	CreateMember(ctx context.Context, member *domain.ProjectMember) error
 	RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) error
@@ -130,6 +130,7 @@ type ListProjectsByUserIdRequest struct {
 	UserId             uuid.UUID
 	MemberRole         domain.ProjectMemberRole
 	ShouldFilterByRole bool
+	SearchQuery        string
 }
 
 func (ps *ProjectService) ListByUserId(ctx context.Context, request ListProjectsByUserIdRequest) ([]domain.Project, error) {
@@ -142,7 +143,7 @@ func (ps *ProjectService) ListByUserId(ctx context.Context, request ListProjects
 		strRole = string(request.MemberRole)
 	}
 
-	projects, err := ps.projectRepository.ListByUserId(ctx, request.UserId, strRole)
+	projects, err := ps.projectRepository.ListByUserId(ctx, request.UserId, strRole, request.SearchQuery)
 	if err != nil {
 		return nil, domain.ServerError("failed to list projects", err)
 	}

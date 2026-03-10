@@ -131,8 +131,10 @@ WHERE
       or role = sqlc.narg('role')::text
     )
   )
+  AND (sqlc.narg('query')::text IS NULL OR (p.name ILIKE '%' || sqlc.narg('query')::text || '%' OR p.description ILIKE '%' || sqlc.narg('query')::text || '%'))
 GROUP BY
-  p.id;
+  p.id
+ORDER BY p.updated_at DESC;
 
 -- name: UpdateProject :exec
 UPDATE

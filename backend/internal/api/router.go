@@ -82,6 +82,7 @@ func (a *Api) Router() http.Handler {
 		r.Put("/{id}", a.handlers.Task.Update)
 		r.Delete("/{id}", a.handlers.Task.Archive)
 		r.Patch("/{id}/move", a.handlers.Task.Move)
+		r.Get("/search", a.handlers.Task.SearchTasksForUser)
 	})
 
 	r.Route("/ws", func(r chi.Router) {
