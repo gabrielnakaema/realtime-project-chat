@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { LogOut } from 'lucide-react';
-import { Button } from '@/components/button';
 import { CreateProject } from '@/components/create-project';
+import { HeaderUser } from '@/components/header-user';
 import { ProjectList } from '@/components/project-list';
 import { SearchBar } from '@/components/search-bar';
 import { UserDueTasks } from '@/components/user-due-tasks';
@@ -13,11 +12,7 @@ export const Route = createFileRoute('/projects/')({
 });
 
 function RouteComponent() {
-  const { user, logout } = useAuth();
-
-  const handleLogout = () => {
-    logout();
-  };
+  const { user } = useAuth();
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -33,13 +28,8 @@ function RouteComponent() {
 
             <div className="flex items-center gap-4">
               <CreateProject />
-              <Button onClick={handleLogout} variant="secondary">
-                <LogOut className="h-4 w-4" />
-                Logout
-              </Button>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 font-medium text-white">
-                {user?.name.charAt(0).toUpperCase()}
-              </div>
+
+              <HeaderUser />
             </div>
           </div>
         </div>

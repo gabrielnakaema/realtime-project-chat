@@ -1,10 +1,9 @@
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { ChevronRight, ListTodo, Loader2, LogOut, Package } from 'lucide-react';
+import { ChevronRight, ListTodo, Loader2, Package } from 'lucide-react';
 import { z } from 'zod';
-import { Button } from '@/components/button';
+import { HeaderUser } from '@/components/header-user';
 import { SearchBar } from '@/components/search-bar';
 import { TaskStatusBadge } from '@/components/task-status-badge';
-import { useAuth } from '@/hooks/use-auth';
 import { useSearchProjects } from '@/hooks/use-search-projects';
 import { useSearchTasks } from '@/hooks/use-search-tasks';
 import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
@@ -18,7 +17,6 @@ export const Route = createFileRoute('/search/')({
 });
 
 function RouteComponent() {
-  const { user, logout } = useAuth();
   const navigate = Route.useNavigate();
   const { query } = Route.useSearch();
 
@@ -30,10 +28,6 @@ function RouteComponent() {
     isFetchingNextPage: isFetchingNextPageTasks,
     sentinelRef: sentinelRefTasks,
   } = useSearchTasks(query);
-
-  const handleLogout = () => {
-    logout();
-  };
 
   const areTasksEmpty = !isLoadingTasks && !tasks.length;
   const areProjectsEmpty = !isLoadingProjects && !projects?.length;
@@ -49,13 +43,7 @@ function RouteComponent() {
 
             <SearchBar action="/search" searchName="query" formClassName="w-full max-w-md" initialValue={query} />
             <div className="flex items-center gap-4">
-              <Button onClick={handleLogout} variant="secondary">
-                <LogOut className="h-4 w-4" />
-                Logout
-              </Button>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 font-medium text-white">
-                {user?.name.charAt(0).toUpperCase()}
-              </div>
+              <HeaderUser />
             </div>
           </div>
         </div>
