@@ -40,6 +40,10 @@ export interface TaskChange {
   id: string;
   update_id: string;
   subject_id: string | null;
+  old_value_id: string | null;
+  new_value_id: string | null;
+  old_display_value?: string | null;
+  new_display_value?: string | null;
   field: string;
   old_value: string;
   new_value: string;

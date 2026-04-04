@@ -1,12 +1,11 @@
-import { useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Avatar } from './avatar';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import type { TaskUpdate } from '@/types/task';
+import { TaskPriorityBadge } from './task-priority-badge';
+import { TaskStatusBadge } from './task-status-badge';
+import type { TaskChange, TaskPriority, TaskStatus, TaskUpdate } from '@/types/task';
 import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
-import { cn } from '@/lib/utils';
 
-const taskFieldsLabels: Record<string, string> = {
+const fieldLabels: Record<string, string> = {
   title: 'Title',
   description: 'Description',
   status: 'Status',
@@ -14,118 +13,207 @@ const taskFieldsLabels: Record<string, string> = {
   responsible_id: 'Responsible',
   due_date: 'Due date',
   done_at: 'Done at',
-  created_at: 'Created at',
-  updated_at: 'Updated at',
-  tags: 'Tags',
-  author_id: 'Author',
 };
 
-export const TaskDetailsUpdate = ({ update }: { update: TaskUpdate }) => {
-  const [open, setOpen] = useState(false);
+const formatDateString = (date: string | null) => {
+  if (!date) {
+    return '-';
+  }
 
-  const dateClassNames = 'text-xs text-slate-500 dark:text-slate-400';
-  const changeTextClassNames = 'text-xs text-slate-500 dark:text-slate-400';
+  return new Date(date).toLocaleDateString([], {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
 
-  const hasChanges = !!update.changes?.length;
-
+export const TaskDetailsUpdate = ({ update, isLast }: { update: TaskUpdate; isLast: boolean }) => {
   return (
-    <Collapsible className="w-full" open={open} onOpenChange={setOpen} disabled={!hasChanges}>
-      <div key={update.id} className="flex w-full items-center gap-3">
-        {update.user.name && <Avatar name={update.user.name} size="sm" />}
-
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              'flex flex-1 items-center justify-between gap-8 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900',
-            )}
-          >
-            <div className="flex flex-col items-start gap-1">
-              <UpdateText update={update} />
-              <p className={dateClassNames}>{formatRelativeActivityDateString(update.created_at)}</p>
-            </div>
-            {update.update_type === 'updated' && !!update.changes?.length && (
-              <div
-                className={cn(
-                  'text-sm text-slate-500 transition-transform duration-200 dark:text-slate-400',
-                  open && 'rotate-90',
-                )}
-              >
-                <ChevronRight />
-              </div>
-            )}
-          </button>
-        </CollapsibleTrigger>
+    <div className="relative flex gap-3">
+      {!isLast && <div className="absolute top-6 bottom-0 left-[11px] w-px bg-slate-200 dark:bg-slate-700" />}
+      <div className="relative z-10 mt-0.5 shrink-0">
+        <Avatar name={update.user.name} size="sm" />
       </div>
-      <CollapsibleContent>
-        <div className="flex flex-col gap-0.5 pt-2 pl-12">
-          <p className={changeTextClassNames}>
-            Updated{' '}
-            <span>{update.changes?.map((change) => taskFieldsLabels[change.field] || change.field).join(', ')}</span>
-          </p>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 pb-5">
+        <UpdateSummary update={update} />
+        <span className="text-xs text-slate-400 dark:text-slate-500">
+          {formatRelativeActivityDateString(update.created_at)}
+        </span>
+        <UpdateChanges update={update} />
+      </div>
+    </div>
   );
 };
 
-const GeneralText = ({ children }: { children: React.ReactNode }) => {
-  return <p className="text-sm text-slate-500 dark:text-slate-400">{children}</p>;
-};
+const Actor = ({ name }: { name: string }) => (
+  <span className="font-medium text-slate-900 dark:text-slate-100">{name}</span>
+);
 
-const Actor = ({ children }: { children: React.ReactNode }) => {
-  return <span className="font-semibold">{children}</span>;
-};
+const UpdateSummary = ({ update }: { update: TaskUpdate }) => {
+  const changes = update.changes ?? [];
+  const responsibleChange = changes.find((change) => change.field === 'responsible_id');
 
-const Subject = ({ children }: { children: React.ReactNode }) => {
-  return <span className="font-semibold">{children}</span>;
-};
-
-const UpdateText = ({ update }: { update: TaskUpdate }) => {
   if (update.update_type === 'created') {
     return (
-      <GeneralText>
-        <Actor>{update.user.name}</Actor> created the task
-      </GeneralText>
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        <Actor name={update.user.name} /> created the task
+      </p>
     );
   }
 
   if (update.update_type === 'assigned') {
+    const subject = responsibleChange?.subject?.name ?? getDisplayValue(responsibleChange, 'new');
     return (
-      <GeneralText>
-        <Actor>{update.user.name}</Actor> assigned the task to{' '}
-        <Subject>{update.changes?.[0]?.subject?.name || 'someone'}</Subject>
-      </GeneralText>
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        <Actor name={update.user.name} /> assigned to{' '}
+        <span className="font-medium text-slate-900 dark:text-slate-100">{subject}</span>
+      </p>
     );
   }
 
   if (update.update_type === 'unassigned') {
     return (
-      <GeneralText>
-        <Actor>{update.user.name}</Actor> removed the current assignee
-      </GeneralText>
-    );
-  }
-
-  if (update.update_type === 'status') {
-    return (
-      <GeneralText>
-        <Actor>{update.user.name}</Actor> updated status to <Subject>{update.changes?.[0]?.new_value}</Subject>
-      </GeneralText>
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        <Actor name={update.user.name} /> removed the assignee
+      </p>
     );
   }
 
   if (update.update_type === 'done') {
     return (
-      <GeneralText>
-        <Actor>{update.user.name}</Actor> marked as done
-      </GeneralText>
+      <p className="text-sm text-slate-600 dark:text-slate-300">
+        <Actor name={update.user.name} /> marked as done
+      </p>
+    );
+  }
+
+  const isStatusOnly =
+    changes.length === 1 &&
+    changes[0].field === 'status' &&
+    (update.update_type === 'status' || update.update_type === 'updated');
+
+  if (isStatusOnly) {
+    return (
+      <p className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+        <Actor name={update.user.name} /> moved to <TaskStatusBadge status={changes[0].new_value as TaskStatus} />
+      </p>
+    );
+  }
+
+  const isPriorityOnly = changes.length === 1 && changes[0].field === 'priority' && update.update_type === 'updated';
+
+  if (isPriorityOnly) {
+    return (
+      <p className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+        <Actor name={update.user.name} /> set priority to{' '}
+        <TaskPriorityBadge priority={changes[0].new_value as TaskPriority} />
+      </p>
+    );
+  }
+
+  const fieldNames = changes.map((c) => fieldLabels[c.field] ?? c.field).join(', ');
+
+  return (
+    <p className="text-sm text-slate-600 dark:text-slate-300">
+      <Actor name={update.user.name} /> updated <span className="text-slate-700 dark:text-slate-200">{fieldNames}</span>
+    </p>
+  );
+};
+
+const UpdateChanges = ({ update }: { update: TaskUpdate }) => {
+  const changes = update.changes ?? [];
+
+  if (changes.length === 0) return null;
+
+  const skipTypes = new Set(['created', 'assigned', 'unassigned', 'done']);
+  if (skipTypes.has(update.update_type)) return null;
+
+  if (changes.length === 1 && (changes[0].field === 'status' || changes[0].field === 'priority')) return null;
+
+  return (
+    <div className="mt-1.5 flex flex-col gap-1.5">
+      {changes.map((change) => (
+        <ChangeRow key={change.id} change={change} />
+      ))}
+    </div>
+  );
+};
+
+const ChangeRow = ({ change }: { change: TaskChange }) => {
+  if (change.field === 'status') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="w-20 shrink-0 text-xs text-slate-400 dark:text-slate-500">{fieldLabels.status}</span>
+        <TaskStatusBadge status={change.old_value as TaskStatus} />
+        <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
+        <TaskStatusBadge status={change.new_value as TaskStatus} />
+      </div>
+    );
+  }
+
+  if (change.field === 'priority') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="w-20 shrink-0 text-xs text-slate-400 dark:text-slate-500">{fieldLabels.priority}</span>
+        <TaskPriorityBadge priority={change.old_value as TaskPriority} />
+        <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
+        <TaskPriorityBadge priority={change.new_value as TaskPriority} />
+      </div>
+    );
+  }
+
+  if (change.field === 'description') {
+    return (
+      <p className="text-xs text-slate-400 dark:text-slate-500">
+        <span className="w-20 shrink-0">{fieldLabels.description}</span> was updated
+      </p>
+    );
+  }
+
+  if (change.field === 'due_date') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="w-20 shrink-0 text-xs text-slate-400 dark:text-slate-500">{fieldLabels.due_date}</span>
+        <span className="text-xs text-slate-400 dark:text-slate-500">{formatDateString(change.old_value)}</span>
+        <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
+        <span className="text-xs text-slate-700 dark:text-slate-200">{formatDateString(change.new_value)}</span>
+      </div>
+    );
+  }
+
+  const label = fieldLabels[change.field] ?? change.field;
+  const oldValue = getDisplayValue(change, 'old');
+  const newValue = getDisplayValue(change, 'new');
+  const isLong = oldValue.length > 40 || newValue.length > 40;
+
+  if (isLong) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-xs text-slate-400 dark:text-slate-500">{label}</span>
+        <span className="text-xs text-slate-400 line-through">{oldValue || '—'}</span>
+        <span className="text-xs text-slate-700 dark:text-slate-200">{newValue || '—'}</span>
+      </div>
     );
   }
 
   return (
-    <GeneralText>
-      <Actor>{update.user.name}</Actor> {update.update_type} the task
-    </GeneralText>
+    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+      <span className="w-20 shrink-0">{label}</span>
+      <span className="line-through">{oldValue || '—'}</span>
+      <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
+      <span className="text-slate-700 dark:text-slate-200">{newValue || '—'}</span>
+    </div>
   );
+};
+
+const getDisplayValue = (change: TaskChange | undefined, direction: 'old' | 'new') => {
+  if (!change) {
+    return '';
+  }
+
+  if (direction === 'old') {
+    return change.old_display_value ?? change.old_value;
+  }
+
+  return change.new_display_value ?? change.new_value;
 };

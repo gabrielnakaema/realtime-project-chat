@@ -171,7 +171,15 @@ export const TaskDetails = ({ taskId, open, onOpenChange, onEdit }: TaskDetailsP
               <div className="grid grid-cols-[1rem_1fr] items-center gap-2">
                 <Calendar className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                 <p className={infoTitleClassNames}>Due date</p>
-                <p className={cn(infoValueClassNames, 'col-start-2')}>{formatDateString(task.due_date)}</p>
+                <p className={cn(infoValueClassNames, 'col-start-2')}>
+                  {task.due_date
+                    ? new Date(task.due_date).toLocaleDateString([], {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
+                    : '-'}
+                </p>
               </div>
               <div className="grid grid-cols-[1rem_1fr] items-center gap-2">
                 <Calendar className="h-4 w-4 text-slate-500 dark:text-slate-400" />
@@ -202,22 +210,21 @@ export const TaskDetails = ({ taskId, open, onOpenChange, onEdit }: TaskDetailsP
             </div>
           </div>
 
-          {
-            <div className="flex w-full flex-col gap-4 overflow-y-auto pt-4 pr-2">
+          {updates.length > 0 && (
+            <div className="flex w-full flex-col gap-3 pt-4 pr-2">
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Activity timeline{' '}
-                  <span className="text-xs text-slate-500 dark:text-slate-400">({updates.length})</span>
+                  Activity <span className="text-xs text-slate-500 dark:text-slate-400">({updates.length})</span>
                 </p>
               </div>
-              <div className="flex flex-col gap-3">
-                {updates.map((update) => (
-                  <TaskDetailsUpdate key={update.id} update={update} />
+              <div className="flex flex-col">
+                {updates.map((update, index) => (
+                  <TaskDetailsUpdate key={update.id} update={update} isLast={index === updates.length - 1} />
                 ))}
               </div>
             </div>
-          }
+          )}
         </ScrollArea>
       </DialogContent>
     </Dialog>

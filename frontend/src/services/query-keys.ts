@@ -1,4 +1,4 @@
-import type { ListTasksRequest, ListUserDueTasksRequest, TaskStatus } from '@/types/task';
+import type { ListTasksRequest, TaskStatus } from '@/types/task';
 import type { SearchTasksForUserRequest } from './tasks';
 
 export const userQueryKeys = {
