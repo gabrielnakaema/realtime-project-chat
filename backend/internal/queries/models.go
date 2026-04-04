@@ -87,13 +87,17 @@ type Task struct {
 }
 
 type TaskChange struct {
-	ID        uuid.UUID
-	CreatedAt pgtype.Timestamptz
-	UpdateID  pgtype.UUID
-	Field     string
-	OldValue  string
-	NewValue  string
-	SubjectID pgtype.UUID
+	ID              uuid.UUID
+	CreatedAt       pgtype.Timestamptz
+	UpdateID        pgtype.UUID
+	Field           string
+	OldValue        string
+	NewValue        string
+	SubjectID       pgtype.UUID
+	OldValueID      pgtype.UUID
+	NewValueID      pgtype.UUID
+	OldDisplayValue pgtype.Text
+	NewDisplayValue pgtype.Text
 }
 
 type TaskTag struct {

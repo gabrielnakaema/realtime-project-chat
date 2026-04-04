@@ -249,6 +249,25 @@ func TestTaskService_Create(t *testing.T) {
 				return assert.Equal(t, []string{"tag1", "tag2", "tag3"}, task.Tags)
 			},
 		},
+		{
+			name: "responsible must be a project member",
+			request: service.CreateTaskRequest{
+				ProjectId:     validProjectId,
+				Title:         "Test Task",
+				Description:   "Test Description",
+				RequestUserId: validUserId,
+				ResponsibleId: func() *uuid.UUID {
+					id := uuid.New()
+					return &id
+				}(),
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.BusinessValidationErrorCode),
+			expectedError:     domain.BusinessValidationError("responsible is not a member of the project"),
+		},
 	}
 
 	for _, tt := range tests {
@@ -361,13 +380,11 @@ func TestTaskService_Update(t *testing.T) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
 				repo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
-				repo.On("CreateUpdates", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskUpdate")).Return(nil)
-				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 			},
 			expectedTask:              &validTask,
 			shouldSucceed:             true,
 			expectedError:             nil,
-			expectedTaskUpdatesLength: 1,
+			expectedTaskUpdatesLength: 0,
 		},
 		{
 			name: "unauthorized error",
@@ -449,13 +466,11 @@ func TestTaskService_Update(t *testing.T) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 				repo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
-				repo.On("CreateUpdates", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskUpdate")).Return(nil)
-				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 			},
 			expectedTask:              &validTask,
 			shouldSucceed:             true,
 			expectedError:             nil,
-			expectedTaskUpdatesLength: 1,
+			expectedTaskUpdatesLength: 0,
 			checkFunc: func(t *testing.T, task *domain.Task) bool {
 				return assert.Equal(t, []string{"tag1", "tag2", "tag3"}, task.Tags)
 			},
@@ -508,12 +523,6 @@ func TestTaskService_Archive(t *testing.T) {
 	validProjectId := uuid.New()
 	validTaskId := uuid.New()
 
-	validUser := domain.User{
-		Id:    validUserId,
-		Name:  "Test User",
-		Email: "user@example.com",
-	}
-
 	validProject := domain.Project{
 		Id:          validProjectId,
 		Name:        "Test Project",
@@ -558,9 +567,7 @@ func TestTaskService_Archive(t *testing.T) {
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 				repo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
-				repo.On("CreateUpdates", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskUpdate")).Return(nil)
 			},
 			shouldSucceed: true,
 		},
@@ -571,12 +578,9 @@ func TestTaskService_Archive(t *testing.T) {
 				RequestUserId: memberUserId,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
-				memberUser := domain.User{Id: memberUserId, Name: "Member", Email: "member@example.com"}
 				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				userRepo.On("GetById", mock.Anything, memberUserId).Return(&memberUser, nil)
 				repo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
-				repo.On("CreateUpdates", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskUpdate")).Return(nil)
 			},
 			shouldSucceed: true,
 		},
@@ -589,11 +593,9 @@ func TestTaskService_Archive(t *testing.T) {
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 				repo.On("Update", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
 					return t.Status == domain.TaskStatusArchived
 				})).Return(nil)
-				repo.On("CreateUpdates", mock.Anything, mock.AnythingOfType("*domain.Task"), mock.AnythingOfType("[]domain.TaskUpdate")).Return(nil)
 			},
 			shouldSucceed: true,
 		},
@@ -678,6 +680,87 @@ func TestTaskService_Archive(t *testing.T) {
 			mockUserRepo.AssertExpectations(t)
 		})
 	}
+}
+
+func TestTaskService_Update_LoadsResponsibleDetailsForChangedAssignee(t *testing.T) {
+	validUserId := uuid.New()
+	newResponsibleID := uuid.New()
+	validProjectId := uuid.New()
+	validTaskId := uuid.New()
+
+	validUser := domain.User{
+		Id:    validUserId,
+		Name:  "Test User",
+		Email: "user@example.com",
+	}
+
+	newResponsible := domain.User{
+		Id:    newResponsibleID,
+		Name:  "Maria",
+		Email: "maria@example.com",
+	}
+
+	validProject := domain.Project{
+		Id:          validProjectId,
+		Name:        "Test Project",
+		Description: "Test Description",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Members: []domain.ProjectMember{
+			{
+				UserId: validUserId,
+				Role:   domain.ProjectMemberRoleCreator,
+			},
+			{
+				UserId: newResponsibleID,
+				Role:   domain.ProjectMemberRoleMember,
+			},
+		},
+		UserId: validUserId,
+	}
+
+	validTask := domain.Task{
+		Id:          validTaskId,
+		ProjectId:   validProjectId,
+		AuthorId:    validUserId,
+		Author:      &validUser,
+		Title:       "Test Task",
+		Description: "Test Description",
+		Status:      domain.TaskStatusPending,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	mockRepo := &mockTaskRepository{}
+	mockProjectRepo := &mockProjectRepository{}
+	mockUserRepo := &mockUserRepository{}
+
+	mockRepo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
+	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+	mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+	mockUserRepo.On("GetById", mock.Anything, newResponsibleID).Return(&newResponsible, nil)
+
+	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+	task, err := svc.Update(context.Background(), service.UpdateTaskRequest{
+		TaskId:        validTaskId,
+		Title:         "Test Task",
+		Description:   "Test Description",
+		Status:        domain.TaskStatusPending,
+		RequestUserId: validUserId,
+		Priority:      domain.TaskPriorityLow,
+		ResponsibleId: &newResponsibleID,
+		Tags:          []string{},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, task)
+	require.NotNil(t, task.Responsible)
+	assert.Equal(t, newResponsibleID, task.Responsible.Id)
+	assert.Equal(t, "Maria", task.Responsible.Name)
+
+	mockRepo.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+	mockUserRepo.AssertExpectations(t)
 }
 
 func TestTaskService_List(t *testing.T) {

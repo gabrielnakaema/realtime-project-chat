@@ -103,6 +103,13 @@ func NewApi() (*Api, error) {
 	}
 	subscribers = append(subscribers, activitySub)
 
+	taskUpdateSub, err := subscriber.NewTaskUpdateSubscriber(ctx, config, logger, taskRepo)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	subscribers = append(subscribers, taskUpdateSub)
+
 	chatHandler := handlers.NewChatHandler(chatService)
 
 	userService := service.NewUserService(jwtProvider, userRepo)

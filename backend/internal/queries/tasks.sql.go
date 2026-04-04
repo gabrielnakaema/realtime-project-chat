@@ -84,15 +84,19 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (uuid.UU
 }
 
 const createTaskChange = `-- name: CreateTaskChange :one
-INSERT INTO task_changes (update_id, field, old_value, new_value, subject_id) VALUES ($1, $2, $3, $4, $5) returning id
+INSERT INTO task_changes (update_id, field, old_value, new_value, subject_id, old_value_id, new_value_id, old_display_value, new_display_value) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id
 `
 
 type CreateTaskChangeParams struct {
-	UpdateID  pgtype.UUID
-	Field     string
-	OldValue  string
-	NewValue  string
-	SubjectID pgtype.UUID
+	UpdateID        pgtype.UUID
+	Field           string
+	OldValue        string
+	NewValue        string
+	SubjectID       pgtype.UUID
+	OldValueID      pgtype.UUID
+	NewValueID      pgtype.UUID
+	OldDisplayValue pgtype.Text
+	NewDisplayValue pgtype.Text
 }
 
 func (q *Queries) CreateTaskChange(ctx context.Context, arg CreateTaskChangeParams) (uuid.UUID, error) {
@@ -102,6 +106,10 @@ func (q *Queries) CreateTaskChange(ctx context.Context, arg CreateTaskChangePara
 		arg.OldValue,
 		arg.NewValue,
 		arg.SubjectID,
+		arg.OldValueID,
+		arg.NewValueID,
+		arg.OldDisplayValue,
+		arg.NewDisplayValue,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)
@@ -234,16 +242,23 @@ WITH task_tags_cte AS (
     tc.id as task_change_id,
     tc.update_id as task_change_update_id,
     tc.subject_id as task_change_subject_id,
+    tc.old_value_id as task_change_old_value_id,
+    tc.new_value_id as task_change_new_value_id,
     tc.field as task_change_field,
     tc.old_value as task_change_old_value,
     tc.new_value as task_change_new_value,
+    tc.old_display_value as task_change_old_display_value,
+    tc.new_display_value as task_change_new_display_value,
     tc.created_at as task_change_created_at,
     s.name as task_change_subject_name,
     s.email as task_change_subject_email,
-    s.created_at as task_change_subject_created_at
+    s.created_at as task_change_subject_created_at,
+    old_r.name as task_change_old_value_name,
+    new_r.name as task_change_new_value_name
    FROM task_changes tc
    LEFT JOIN users s ON s.id = tc.subject_id
-   ORDER BY tc.created_at DESC
+   LEFT JOIN users old_r ON tc.field = 'responsible_id' AND old_r.id::text = nullif(tc.old_value, '') AND tc.old_display_value IS NULL
+   LEFT JOIN users new_r ON tc.field = 'responsible_id' AND new_r.id::text = nullif(tc.new_value, '') AND tc.new_display_value IS NULL
 ), task_updates_cte AS (
   SELECT
     tu.id as task_update_id,
@@ -259,9 +274,21 @@ WITH task_tags_cte AS (
         'id', tc.task_change_id,
         'update_id', tc.task_change_update_id,
         'subject_id', tc.task_change_subject_id,
+        'old_value_id', tc.task_change_old_value_id,
+        'new_value_id', tc.task_change_new_value_id,
         'field', tc.task_change_field,
         'old_value', tc.task_change_old_value,
         'new_value', tc.task_change_new_value,
+        'old_display_value', CASE
+          WHEN tc.task_change_old_display_value IS NOT NULL THEN tc.task_change_old_display_value
+          WHEN tc.task_change_field = 'responsible_id' THEN tc.task_change_old_value_name
+          ELSE NULL
+        END,
+        'new_display_value', CASE
+          WHEN tc.task_change_new_display_value IS NOT NULL THEN tc.task_change_new_display_value
+          WHEN tc.task_change_field = 'responsible_id' THEN tc.task_change_new_value_name
+          ELSE NULL
+        END,
         'created_at', tc.task_change_created_at,
         'subject', jsonb_build_object(
           'id', tc.task_change_subject_id,
@@ -270,6 +297,7 @@ WITH task_tags_cte AS (
           'created_at', tc.task_change_subject_created_at
         )
       )
+      ORDER BY tc.task_change_created_at DESC, tc.task_change_id DESC
     ) filter (where tc.task_change_id is not null), '[]'::jsonb) as task_changes
    FROM task_updates tu
    LEFT JOIN users u ON u.id = tu.user_id
@@ -314,6 +342,7 @@ SELECT
       ),
       'changes', tu.task_changes
     )
+    ORDER BY tu.task_update_created_at DESC, tu.task_update_id DESC
   ) filter (where tu.task_update_id is not null), '[]'::jsonb) from task_updates_cte tu) as updates
 FROM tasks t
 LEFT JOIN users a ON a.id = t.author_id

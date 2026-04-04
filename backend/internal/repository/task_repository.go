@@ -385,6 +385,34 @@ func (tr *TaskRepository) CreateUpdates(ctx context.Context, task *domain.Task, 
 					}
 				}
 
+				if change.OldValueId != nil {
+					params.OldValueID = pgtype.UUID{
+						Bytes: *change.OldValueId,
+						Valid: true,
+					}
+				}
+
+				if change.NewValueId != nil {
+					params.NewValueID = pgtype.UUID{
+						Bytes: *change.NewValueId,
+						Valid: true,
+					}
+				}
+
+				if change.OldDisplayValue != nil {
+					params.OldDisplayValue = pgtype.Text{
+						String: *change.OldDisplayValue,
+						Valid:  true,
+					}
+				}
+
+				if change.NewDisplayValue != nil {
+					params.NewDisplayValue = pgtype.Text{
+						String: *change.NewDisplayValue,
+						Valid:  true,
+					}
+				}
+
 				id, err := qtx.CreateTaskChange(ctx, params)
 				if err != nil {
 					return err
@@ -482,20 +510,16 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 		return nil, err
 	}
 
-	task.Id = result.ID
-	task.Order = int(result.TaskOrder)
-	task.Status = domain.TaskStatus(result.Status)
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	task, err = tr.GetById(ctx, result.ID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.NotFoundError("task not found")
 		}
-		return nil, err
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
 		return nil, err
 	}
 

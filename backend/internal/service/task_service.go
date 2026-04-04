@@ -88,9 +88,23 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
+	if request.ResponsibleId != nil && *request.ResponsibleId != uuid.Nil {
+		if !project.IsMember(*request.ResponsibleId) {
+			return nil, domain.BusinessValidationError("responsible is not a member of the project")
+		}
+	}
+
 	user, err := ts.userRepository.GetById(ctx, request.RequestUserId)
 	if err != nil {
 		return nil, domain.ServerError("failed to get user", err)
+	}
+
+	var responsible *domain.User
+	if request.ResponsibleId != nil && *request.ResponsibleId != uuid.Nil {
+		responsible, err = ts.userRepository.GetById(ctx, *request.ResponsibleId)
+		if err != nil {
+			return nil, domain.ServerError("failed to get responsible user", err)
+		}
 	}
 
 	orderTask, err := ts.taskRepository.GetSmallestOrderProjectTask(ctx, request.ProjectId)
@@ -140,12 +154,11 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		Priority:      domain.TaskPriority(request.Priority),
 		Order:         int(order),
 		ResponsibleId: request.ResponsibleId,
+		Responsible:   responsible,
 		DueDate:       request.DueDate,
 		Tags:          formattedTags,
 		Updates:       []domain.TaskUpdate{},
 	}
-
-	task.Updates = append(task.Updates, domain.NewTaskCreatedUpdate(&task, user))
 
 	err = ts.taskRepository.Create(ctx, &task)
 	if err != nil {
@@ -217,6 +230,16 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		}
 	}
 
+	responsible := task.Responsible
+	if request.ResponsibleId == nil || *request.ResponsibleId == uuid.Nil {
+		responsible = nil
+	} else if task.ResponsibleId == nil || *task.ResponsibleId != *request.ResponsibleId || task.Responsible == nil {
+		responsible, err = ts.userRepository.GetById(ctx, *request.ResponsibleId)
+		if err != nil {
+			return nil, domain.ServerError("failed to get responsible user", err)
+		}
+	}
+
 	// Capture old status for event payload
 	oldStatus := task.Status
 
@@ -240,6 +263,7 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		Description:   request.Description,
 		Priority:      request.Priority,
 		ResponsibleId: request.ResponsibleId,
+		Responsible:   responsible,
 		DueDate:       request.DueDate,
 		DoneAt:        request.DoneAt,
 		Tags:          formattedTags,
@@ -252,33 +276,9 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		return nil, err
 	}
 
-	user, err := ts.userRepository.GetById(ctx, request.RequestUserId)
-	if err != nil {
-		var domainErr domain.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("user not found")
-			}
-			return nil, domainErr
-		}
-		return nil, domain.ServerError("failed to get user", err)
-	}
-
 	err = ts.taskRepository.Update(ctx, &updatedTask)
 	if err != nil {
 		return nil, domain.ServerError("failed to update task", err)
-	}
-
-	newTaskUpdate := domain.NewTaskUpdate(task, &updatedTask, user)
-	updates := []domain.TaskUpdate{newTaskUpdate}
-
-	if len(newTaskUpdate.Changes) > 0 {
-		err = ts.taskRepository.CreateUpdates(ctx, &updatedTask, updates)
-		if err != nil {
-			return nil, domain.ServerError("failed to create task updates", err)
-		}
-
-		updatedTask.Updates = append(task.Updates, updates...)
 	}
 
 	// Only include previous status if it changed
@@ -288,7 +288,8 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 	}
 
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
-		Task: updatedTask,
+		Task:         updatedTask,
+		PreviousTask: task,
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
@@ -498,11 +499,6 @@ func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) 
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
-	user, err := ts.userRepository.GetById(ctx, request.RequestUserId)
-	if err != nil {
-		return nil, domain.ServerError("failed to get user", err)
-	}
-
 	oldStatus := task.Status
 
 	archivedTask := *task
@@ -515,18 +511,10 @@ func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) 
 		return nil, domain.ServerError("failed to archive task", err)
 	}
 
-	newTaskUpdate := domain.NewTaskUpdate(task, &archivedTask, user)
-	if len(newTaskUpdate.Changes) > 0 {
-		err = ts.taskRepository.CreateUpdates(ctx, &archivedTask, []domain.TaskUpdate{newTaskUpdate})
-		if err != nil {
-			return nil, domain.ServerError("failed to create task updates", err)
-		}
-		archivedTask.Updates = append(task.Updates, newTaskUpdate)
-	}
-
 	previousStatus := &oldStatus
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
-		Task: archivedTask,
+		Task:         archivedTask,
+		PreviousTask: task,
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
@@ -654,7 +642,8 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 	}
 
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
-		Task: *updatedTask,
+		Task:         *updatedTask,
+		PreviousTask: oldTask,
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
