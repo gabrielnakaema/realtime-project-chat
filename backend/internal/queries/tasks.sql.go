@@ -63,7 +63,7 @@ type CreateTaskParams struct {
 	ResponsibleID pgtype.UUID
 	Priority      string
 	DueDate       pgtype.Timestamptz
-	TaskOrder     int32
+	TaskOrder     string
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (uuid.UUID, error) {
@@ -170,23 +170,22 @@ func (q *Queries) DeleteTaskTag(ctx context.Context, arg DeleteTaskTagParams) er
 	return err
 }
 
-const getProjectTaskAfterId = `-- name: GetProjectTaskAfterId :one
-SELECT t.id, t.project_id, t.title, t.description, t.status, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order 
-FROM tasks t
-WHERE t.task_order >= (SELECT task_order FROM tasks t2 WHERE t2.id = $1)
-  AND t.project_id = $2
-  AND t.id != $1
-ORDER BY t.task_order ASC, t.updated_at DESC
+const getFirstTaskInColumn = `-- name: GetFirstTaskInColumn :one
+SELECT id, project_id, title, description, status, created_at, updated_at, author_id, priority, due_date, done_at, responsible_id, task_order
+FROM tasks
+WHERE project_id = $1
+  AND status = $2
+ORDER BY task_order ASC, updated_at DESC
 LIMIT 1
 `
 
-type GetProjectTaskAfterIdParams struct {
-	ID        uuid.UUID
+type GetFirstTaskInColumnParams struct {
 	ProjectID uuid.UUID
+	Status    string
 }
 
-func (q *Queries) GetProjectTaskAfterId(ctx context.Context, arg GetProjectTaskAfterIdParams) (Task, error) {
-	row := q.db.QueryRow(ctx, getProjectTaskAfterId, arg.ID, arg.ProjectID)
+func (q *Queries) GetFirstTaskInColumn(ctx context.Context, arg GetFirstTaskInColumnParams) (Task, error) {
+	row := q.db.QueryRow(ctx, getFirstTaskInColumn, arg.ProjectID, arg.Status)
 	var i Task
 	err := row.Scan(
 		&i.ID,
@@ -206,12 +205,24 @@ func (q *Queries) GetProjectTaskAfterId(ctx context.Context, arg GetProjectTaskA
 	return i, err
 }
 
-const getSmallestOrderProjectTask = `-- name: GetSmallestOrderProjectTask :one
-SELECT id, project_id, title, description, status, created_at, updated_at, author_id, priority, due_date, done_at, responsible_id, task_order FROM tasks WHERE project_id = $1 ORDER BY task_order ASC, updated_at DESC LIMIT 1
+const getProjectTaskAfterId = `-- name: GetProjectTaskAfterId :one
+SELECT t.id, t.project_id, t.title, t.description, t.status, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order 
+FROM tasks t
+WHERE t.task_order >= (SELECT task_order FROM tasks t2 WHERE t2.id = $1)
+  AND t.project_id = $2
+  AND t.status = (SELECT status FROM tasks t2 WHERE t2.id = $1)
+  AND t.id != $1
+ORDER BY t.task_order ASC, t.updated_at DESC
+LIMIT 1
 `
 
-func (q *Queries) GetSmallestOrderProjectTask(ctx context.Context, projectID uuid.UUID) (Task, error) {
-	row := q.db.QueryRow(ctx, getSmallestOrderProjectTask, projectID)
+type GetProjectTaskAfterIdParams struct {
+	ID        uuid.UUID
+	ProjectID uuid.UUID
+}
+
+func (q *Queries) GetProjectTaskAfterId(ctx context.Context, arg GetProjectTaskAfterIdParams) (Task, error) {
+	row := q.db.QueryRow(ctx, getProjectTaskAfterId, arg.ID, arg.ProjectID)
 	var i Task
 	err := row.Scan(
 		&i.ID,
@@ -360,7 +371,7 @@ type GetTaskByIdRow struct {
 	TaskResponsibleID        pgtype.UUID
 	TaskDueDate              pgtype.Timestamptz
 	TaskDoneAt               pgtype.Timestamptz
-	TaskOrder                int32
+	TaskOrder                string
 	TaskCreatedAt            pgtype.Timestamptz
 	TaskUpdatedAt            pgtype.Timestamptz
 	TaskAuthorID             uuid.UUID
@@ -422,8 +433,8 @@ AND (
 )
 AND (
   $4::timestamptz IS NULL
-  OR t.task_order > $5::integer
-  OR (t.task_order = $5::integer AND t.updated_at < $4::timestamptz)
+  OR t.task_order > $5::text
+  OR (t.task_order = $5::text AND t.updated_at < $4::timestamptz)
 )
 GROUP BY t.id, a.name, a.id, r.name, r.id
 ORDER BY t.task_order ASC, t.updated_at DESC
@@ -435,7 +446,7 @@ type ListTasksByProjectIdParams struct {
 	Limit           int32
 	Statuses        []string
 	CursorUpdatedAt pgtype.Timestamptz
-	TaskOrder       pgtype.Int4
+	TaskOrder       pgtype.Text
 }
 
 type ListTasksByProjectIdRow struct {
@@ -451,7 +462,7 @@ type ListTasksByProjectIdRow struct {
 	DueDate                  pgtype.Timestamptz
 	DoneAt                   pgtype.Timestamptz
 	ResponsibleID            pgtype.UUID
-	TaskOrder                int32
+	TaskOrder                string
 	AuthorAuthorID           pgtype.UUID
 	AuthorName               pgtype.Text
 	ResponsibleResponsibleID pgtype.UUID
@@ -557,7 +568,7 @@ type ListUserDueTasksRow struct {
 	DueDate                  pgtype.Timestamptz
 	DoneAt                   pgtype.Timestamptz
 	ResponsibleID            pgtype.UUID
-	TaskOrder                int32
+	TaskOrder                string
 	ProjectProjectID         uuid.UUID
 	ProjectName              string
 	ProjectDescription       string
@@ -631,7 +642,7 @@ RETURNING t.id, t.task_order, t.status
 `
 
 type MoveTaskParams struct {
-	TaskOrder int32
+	TaskOrder string
 	Status    string
 	UserID    uuid.UUID
 	ID        uuid.UUID
@@ -639,7 +650,7 @@ type MoveTaskParams struct {
 
 type MoveTaskRow struct {
 	ID        uuid.UUID
-	TaskOrder int32
+	TaskOrder string
 	Status    string
 }
 
@@ -720,7 +731,7 @@ type SearchTasksForUserRow struct {
 	DueDate                  pgtype.Timestamptz
 	DoneAt                   pgtype.Timestamptz
 	ResponsibleID            pgtype.UUID
-	TaskOrder                int32
+	TaskOrder                string
 	ProjectProjectID         uuid.UUID
 	ProjectName              string
 	ProjectDescription       string
@@ -802,7 +813,7 @@ type UpdateTaskParams struct {
 	Title         string
 	Description   string
 	Status        string
-	TaskOrder     int32
+	TaskOrder     string
 	Priority      string
 	DueDate       pgtype.Timestamptz
 	ResponsibleID pgtype.UUID
@@ -822,19 +833,5 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 		arg.DoneAt,
 		arg.ID,
 	)
-	return err
-}
-
-const updateTaskOrder = `-- name: UpdateTaskOrder :exec
-UPDATE tasks SET task_order = $1 WHERE id = $2
-`
-
-type UpdateTaskOrderParams struct {
-	TaskOrder int32
-	ID        uuid.UUID
-}
-
-func (q *Queries) UpdateTaskOrder(ctx context.Context, arg UpdateTaskOrderParams) error {
-	_, err := q.db.Exec(ctx, updateTaskOrder, arg.TaskOrder, arg.ID)
 	return err
 }

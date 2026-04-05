@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -119,12 +118,7 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	taskOrder := utils.GetQueryString(r, "task_order", "0")
-	taskOrderInt, err := strconv.Atoi(taskOrder)
-	if err != nil {
-		BadRequestResponse(w, err)
-		return
-	}
+	taskOrder := utils.GetQueryString(r, "task_order", "")
 
 	cursorUpdatedAt := utils.GetQueryString(r, "updated_at", "")
 	var updatedAt *time.Time
@@ -143,7 +137,7 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		ProjectId:       parsedProjectId,
 		RequestUserId:   userId,
 		Statuses:        statusesArray,
-		TaskOrder:       taskOrderInt,
+		TaskOrder:       taskOrder,
 		Limit:           int(limit),
 		CursorUpdatedAt: updatedAt,
 	}
@@ -174,12 +168,7 @@ func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := utils.GetQueryString(r, "limit", "15")
-	limitInt, err := strconv.Atoi(limit)
-	if err != nil {
-		BadRequestResponse(w, err)
-		return
-	}
+	limitInt := utils.GetQueryInt(r, "limit", 15)
 
 	if limitInt < 1 {
 		BadRequestResponse(w, errors.New("limit must be greater than 0"))
@@ -191,16 +180,7 @@ func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	taskOrder := utils.GetQueryString(r, "task_order", "0")
-	taskOrderInt, err := strconv.Atoi(taskOrder)
-	if err != nil {
-		BadRequestResponse(w, err)
-		return
-	}
-	if taskOrderInt < 0 {
-		BadRequestResponse(w, errors.New("task_order must be greater than 0"))
-		return
-	}
+	taskOrder := utils.GetQueryString(r, "task_order", "")
 
 	cursorUpdatedAt := utils.GetQueryString(r, "updated_at", "")
 	var updatedAt *time.Time
@@ -215,12 +195,14 @@ func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
 
 	statuses := utils.GetQueryString(r, "statuses", "")
 	statusesArray := []domain.TaskStatus{}
-	for _, status := range strings.Split(statuses, ",") {
-		if !slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(status)) {
-			BadRequestResponse(w, errors.New("invalid status"))
-			return
+	if statuses != "" {
+		for _, status := range strings.Split(statuses, ",") {
+			if !slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(status)) {
+				BadRequestResponse(w, errors.New("invalid status"))
+				return
+			}
+			statusesArray = append(statusesArray, domain.TaskStatus(status))
 		}
-		statusesArray = append(statusesArray, domain.TaskStatus(status))
 	}
 
 	userId := UserIdFromContext(r.Context())
@@ -229,8 +211,8 @@ func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
 		ProjectId:       parsedProjectId,
 		UserId:          userId,
 		Statuses:        statusesArray,
-		TaskOrder:       taskOrderInt,
-		Limit:           limitInt,
+		TaskOrder:       taskOrder,
+		Limit:           int(limitInt),
 		CursorUpdatedAt: updatedAt,
 	}
 

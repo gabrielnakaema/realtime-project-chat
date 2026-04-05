@@ -34,7 +34,7 @@ type Task struct {
 	Description   string       `json:"description"`
 	Status        TaskStatus   `json:"status"`
 	Priority      TaskPriority `json:"priority"`
-	Order         int          `json:"order"`
+	Order         string       `json:"order"`
 	ResponsibleId *uuid.UUID   `json:"responsible_id"`
 	DueDate       *time.Time   `json:"due_date"`
 	DoneAt        *time.Time   `json:"done_at"`

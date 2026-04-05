@@ -9,6 +9,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/fracindex"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 )
@@ -16,13 +17,12 @@ import (
 type taskRepository interface {
 	Create(ctx context.Context, task *domain.Task) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
-	ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
+	ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 	Update(ctx context.Context, task *domain.Task) error
 	CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error
-	GetSmallestOrderProjectTask(ctx context.Context, projectId uuid.UUID) (*domain.Task, error)
+	GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, status domain.TaskStatus) (*domain.Task, error)
 	GetProjectTaskAfterId(ctx context.Context, id uuid.UUID, projectId uuid.UUID) (*domain.Task, error)
 	MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID) (*domain.Task, error)
-	NormalizeProjectTaskOrders(ctx context.Context, projectId uuid.UUID) error
 	CountTasksByProjectIdAndStatus(ctx context.Context, projectId uuid.UUID, statuses []string) (map[string]int, error)
 	ListUserDueTasks(ctx context.Context, userId uuid.UUID, statuses []string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 	SearchTasksForUser(ctx context.Context, userId uuid.UUID, statuses []string, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
@@ -107,30 +107,26 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		}
 	}
 
-	orderTask, err := ts.taskRepository.GetSmallestOrderProjectTask(ctx, request.ProjectId)
+	firstTask, err := ts.taskRepository.GetFirstTaskInColumn(ctx, request.ProjectId, domain.TaskStatusPending)
 	if err != nil {
 		var domainErr domain.DomainError
 		if errors.As(err, &domainErr) {
 			if domainErr.Code != domain.NotFoundErrorCode {
-				return nil, domain.ServerError("failed to get smallest project task order", err)
+				return nil, domain.ServerError("failed to get first pending task", err)
 			}
 		} else {
-			return nil, domain.ServerError("failed to get smallest project task order", err)
+			return nil, domain.ServerError("failed to get first pending task", err)
 		}
 	}
 
-	order := 1000
+	var nextOrder string
+	if firstTask != nil {
+		nextOrder = firstTask.Order
+	}
 
-	if orderTask == nil {
-		order = 1000
-	} else {
-		order = order / 2
-		if order < 50 {
-			err = ts.taskRepository.NormalizeProjectTaskOrders(ctx, request.ProjectId)
-			if err != nil {
-				return nil, domain.ServerError("failed to normalize project task orders", err)
-			}
-		}
+	order, err := fracindex.GenerateKeyBetween("", nextOrder)
+	if err != nil {
+		return nil, domain.ServerError("failed to generate task order", err)
 	}
 
 	formattedTags := []string{}
@@ -152,7 +148,7 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		UpdatedAt:     time.Now(),
 		Author:        user,
 		Priority:      domain.TaskPriority(request.Priority),
-		Order:         int(order),
+		Order:         order,
 		ResponsibleId: request.ResponsibleId,
 		Responsible:   responsible,
 		DueDate:       request.DueDate,
@@ -306,7 +302,7 @@ type ListTasksRequest struct {
 	ProjectId       uuid.UUID
 	RequestUserId   uuid.UUID
 	Statuses        []string
-	TaskOrder       int
+	TaskOrder       string
 	Limit           int
 	CursorUpdatedAt *time.Time
 }
@@ -386,7 +382,7 @@ type GroupByStatusRequest struct {
 	ProjectId       uuid.UUID
 	UserId          uuid.UUID
 	Statuses        []domain.TaskStatus
-	TaskOrder       int
+	TaskOrder       string
 	CursorUpdatedAt *time.Time
 	Limit           int
 }
@@ -405,8 +401,17 @@ func (ts *TaskService) GroupByStatus(ctx context.Context, request GroupByStatusR
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
+	statuses := request.Statuses
+	if len(statuses) == 0 {
+		statuses = []domain.TaskStatus{
+			domain.TaskStatusPending,
+			domain.TaskStatusDoing,
+			domain.TaskStatusDone,
+		}
+	}
+
 	stringStatuses := []string{}
-	for _, status := range request.Statuses {
+	for _, status := range statuses {
 		if status == domain.TaskStatusArchived {
 			if !project.IsCreator(request.UserId) {
 				return nil, domain.ForbiddenError("only project owners can view archived tasks")
@@ -581,7 +586,7 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 	}
 	oldStatus := oldTask.Status
 
-	newOrder, prevOrder, err := ts.calculateOrder(ctx, request)
+	newOrder, err := ts.calculateOrder(ctx, request)
 	if err != nil {
 		var domainErr domain.DomainError
 		if errors.As(err, &domainErr) {
@@ -591,29 +596,6 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 			return nil, domainErr
 		}
 		return nil, domain.ServerError("failed to calculate order", err)
-	}
-
-	needsNormalization := false
-	if request.AfterTaskId == nil {
-		if newOrder < 1 {
-			needsNormalization = true
-		}
-	} else {
-		if newOrder <= prevOrder {
-			needsNormalization = true
-		}
-	}
-
-	if needsNormalization {
-		err = ts.taskRepository.NormalizeProjectTaskOrders(ctx, request.ProjectId)
-		if err != nil {
-			return nil, domain.ServerError("failed to normalize project task orders", err)
-		}
-
-		newOrder, _, err = ts.calculateOrder(ctx, request)
-		if err != nil {
-			return nil, domain.ServerError("failed to recalculate order", err)
-		}
 	}
 
 	task := domain.Task{
@@ -656,35 +638,36 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 	return updatedTask, nil
 }
 
-// Returns the new, previous order and an error if any
-func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskRequest) (int, int, error) {
+func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskRequest) (string, error) {
 	if request.AfterTaskId == nil {
-		smallestTask, err := ts.taskRepository.GetSmallestOrderProjectTask(ctx, request.ProjectId)
+		firstTask, err := ts.taskRepository.GetFirstTaskInColumn(ctx, request.ProjectId, request.Status)
 		if err != nil {
 			var domainErr domain.DomainError
 			if errors.As(err, &domainErr) && domainErr.Code == domain.NotFoundErrorCode {
-				return 1000, 0, nil
+				return fracindex.GenerateKeyBetween("", "")
 			}
-			return 0, 0, err
+			return "", err
 		}
-		return int(smallestTask.Order / 2), 0, nil
+		return fracindex.GenerateKeyBetween("", firstTask.Order)
 	}
 
 	prevTask, err := ts.taskRepository.GetById(ctx, *request.AfterTaskId)
 	if err != nil {
-		return 0, 0, err
+		return "", err
 	}
 
 	nextTask, err := ts.taskRepository.GetProjectTaskAfterId(ctx, *request.AfterTaskId, request.ProjectId)
 	if err != nil {
 		var domainErr domain.DomainError
-		if errors.As(err, &domainErr) && domainErr.Code == domain.NotFoundErrorCode {
-			return prevTask.Order + 1000, prevTask.Order, nil
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return fracindex.GenerateKeyBetween(prevTask.Order, "")
+			}
 		}
-		return 0, 0, err
+		return "", err
 	}
 
-	return int((prevTask.Order + nextTask.Order) / 2), prevTask.Order, nil
+	return fracindex.GenerateKeyBetween(prevTask.Order, nextTask.Order)
 }
 
 type SearchTasksForUserRequest struct {

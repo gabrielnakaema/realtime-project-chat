@@ -147,8 +147,8 @@ AND (
 )
 AND (
   sqlc.narg('cursor_updated_at')::timestamptz IS NULL
-  OR t.task_order > sqlc.narg('task_order')::integer
-  OR (t.task_order = sqlc.narg('task_order')::integer AND t.updated_at < sqlc.narg('cursor_updated_at')::timestamptz)
+  OR t.task_order > sqlc.narg('task_order')::text
+  OR (t.task_order = sqlc.narg('task_order')::text AND t.updated_at < sqlc.narg('cursor_updated_at')::timestamptz)
 )
 GROUP BY t.id, a.name, a.id, r.name, r.id
 ORDER BY t.task_order ASC, t.updated_at DESC
@@ -188,23 +188,26 @@ LIMIT $2;
 -- name: UpdateTask :exec
 UPDATE tasks SET title = $1, description = $2, status = $3, task_order = $4, priority = $5, due_date = $6, responsible_id = $7, done_at = $8, updated_at = CURRENT_TIMESTAMP WHERE id = $9;
 
--- name: UpdateTaskOrder :exec
-UPDATE tasks SET task_order = $1 WHERE id = $2;
-
 -- name: CreateTaskUpdate :one
 INSERT INTO task_updates (task_id, user_id, update_type) VALUES ($1, $2, $3) returning id;
 
 -- name: CreateTaskChange :one
 INSERT INTO task_changes (update_id, field, old_value, new_value, subject_id, old_value_id, new_value_id, old_display_value, new_display_value) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id;
 
--- name: GetSmallestOrderProjectTask :one
-SELECT id, project_id, title, description, status, created_at, updated_at, author_id, priority, due_date, done_at, responsible_id, task_order FROM tasks WHERE project_id = $1 ORDER BY task_order ASC, updated_at DESC LIMIT 1;
+-- name: GetFirstTaskInColumn :one
+SELECT id, project_id, title, description, status, created_at, updated_at, author_id, priority, due_date, done_at, responsible_id, task_order
+FROM tasks
+WHERE project_id = $1
+  AND status = $2
+ORDER BY task_order ASC, updated_at DESC
+LIMIT 1;
 
 -- name: GetProjectTaskAfterId :one
 SELECT t.* 
 FROM tasks t
 WHERE t.task_order >= (SELECT task_order FROM tasks t2 WHERE t2.id = $1)
   AND t.project_id = $2
+  AND t.status = (SELECT status FROM tasks t2 WHERE t2.id = $1)
   AND t.id != $1
 ORDER BY t.task_order ASC, t.updated_at DESC
 LIMIT 1;

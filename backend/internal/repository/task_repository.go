@@ -43,7 +43,7 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 		Status:      string(task.Status),
 		AuthorID:    task.AuthorId,
 		Priority:    string(task.Priority),
-		TaskOrder:   int32(task.Order),
+		TaskOrder:   task.Order,
 	}
 
 	if task.ResponsibleId != nil {
@@ -116,7 +116,7 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 		Description: result.TaskDescription,
 		Status:      domain.TaskStatus(result.TaskStatus),
 		Priority:    domain.TaskPriority(result.TaskPriority),
-		Order:       int(result.TaskOrder),
+		Order:       result.TaskOrder,
 		CreatedAt:   result.TaskCreatedAt.Time,
 		UpdatedAt:   result.TaskUpdatedAt.Time,
 	}
@@ -174,15 +174,15 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 	return &task, nil
 }
 
-func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
 	q := queries.New(tr.pool)
 
 	params := queries.ListTasksByProjectIdParams{
 		ProjectID: projectId,
 		Statuses:  nil,
-		TaskOrder: pgtype.Int4{
-			Int32: int32(taskOrder),
-			Valid: true,
+		TaskOrder: pgtype.Text{
+			String: taskOrder,
+			Valid:  taskOrder != "",
 		},
 		Limit: int32(limit + 1),
 		CursorUpdatedAt: pgtype.Timestamptz{
@@ -194,11 +194,6 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 		params.CursorUpdatedAt = pgtype.Timestamptz{
 			Time:  *cursorUpdatedAt,
 			Valid: true,
-		}
-	} else {
-		params.CursorUpdatedAt = pgtype.Timestamptz{
-			Valid: true,
-			Time:  time.Now().Add(1 * time.Hour),
 		}
 	}
 
@@ -222,7 +217,7 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 			Description: result.Description,
 			Status:      domain.TaskStatus(result.Status),
 			Priority:    domain.TaskPriority(result.Priority),
-			Order:       int(result.TaskOrder),
+			Order:       result.TaskOrder,
 			CreatedAt:   result.CreatedAt.Time,
 			UpdatedAt:   result.UpdatedAt.Time,
 		}
@@ -292,7 +287,7 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 		Description: task.Description,
 		Status:      string(task.Status),
 		ID:          task.Id,
-		TaskOrder:   int32(task.Order),
+		TaskOrder:   task.Order,
 		Priority:    string(task.Priority),
 	}
 
@@ -426,13 +421,16 @@ func (tr *TaskRepository) CreateUpdates(ctx context.Context, task *domain.Task, 
 	return tx.Commit(ctx)
 }
 
-func (tr *TaskRepository) GetSmallestOrderProjectTask(ctx context.Context, projectId uuid.UUID) (*domain.Task, error) {
+func (tr *TaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, status domain.TaskStatus) (*domain.Task, error) {
 	q := queries.New(tr.pool)
 
-	result, err := q.GetSmallestOrderProjectTask(ctx, projectId)
+	result, err := q.GetFirstTaskInColumn(ctx, queries.GetFirstTaskInColumnParams{
+		ProjectID: projectId,
+		Status:    string(status),
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.NotFoundError("no tasks found for project")
+			return nil, domain.NotFoundError("no tasks found for column")
 		}
 		return nil, err
 	}
@@ -445,7 +443,7 @@ func (tr *TaskRepository) GetSmallestOrderProjectTask(ctx context.Context, proje
 		Description: result.Description,
 		Status:      domain.TaskStatus(result.Status),
 		Priority:    domain.TaskPriority(result.Priority),
-		Order:       int(result.TaskOrder),
+		Order:       result.TaskOrder,
 		CreatedAt:   result.CreatedAt.Time,
 		UpdatedAt:   result.UpdatedAt.Time,
 	}
@@ -477,7 +475,7 @@ func (tr *TaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.UUI
 		Description: result.Description,
 		Status:      domain.TaskStatus(result.Status),
 		Priority:    domain.TaskPriority(result.Priority),
-		Order:       int(result.TaskOrder),
+		Order:       result.TaskOrder,
 		CreatedAt:   result.CreatedAt.Time,
 		UpdatedAt:   result.UpdatedAt.Time,
 	}
@@ -496,7 +494,7 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 	qtx := q.WithTx(tx)
 
 	params := queries.MoveTaskParams{
-		TaskOrder: int32(task.Order),
+		TaskOrder: task.Order,
 		Status:    string(task.Status),
 		UserID:    userId,
 		ID:        task.Id,
@@ -524,24 +522,6 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 	}
 
 	return task, nil
-}
-
-func (tr *TaskRepository) NormalizeProjectTaskOrders(ctx context.Context, projectId uuid.UUID) error {
-	const multiplier = 1000
-
-	query := `
-		UPDATE tasks t
-			set task_order = (t2.seqnum + 1) * $2
-			from (select t2.id, row_number() over(ORDER BY t2.task_order ASC, t2.updated_at DESC) as seqnum from tasks t2 where t2.project_id = $1) t2
-		where t.id = t2.id
-	`
-
-	_, err := tr.pool.Exec(ctx, query, projectId, multiplier)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (tr *TaskRepository) CountTasksByProjectIdAndStatus(ctx context.Context, projectId uuid.UUID, statuses []string) (map[string]int, error) {
@@ -621,7 +601,7 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 			Description:   result.Description,
 			Status:        domain.TaskStatus(result.Status),
 			Priority:      domain.TaskPriority(result.Priority),
-			Order:         int(result.TaskOrder),
+			Order:         result.TaskOrder,
 			CreatedAt:     result.CreatedAt.Time,
 			UpdatedAt:     result.UpdatedAt.Time,
 			Project: &domain.Project{
@@ -711,7 +691,7 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 			Description:   result.Description,
 			Status:        domain.TaskStatus(result.Status),
 			Priority:      domain.TaskPriority(result.Priority),
-			Order:         int(result.TaskOrder),
+			Order:         result.TaskOrder,
 			CreatedAt:     result.CreatedAt.Time,
 			UpdatedAt:     result.UpdatedAt.Time,
 			AuthorId:      result.AuthorID,

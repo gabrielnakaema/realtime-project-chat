@@ -83,7 +83,7 @@ type Task struct {
 	DueDate       pgtype.Timestamptz
 	DoneAt        pgtype.Timestamptz
 	ResponsibleID pgtype.UUID
-	TaskOrder     int32
+	TaskOrder     string
 }
 
 type TaskChange struct {

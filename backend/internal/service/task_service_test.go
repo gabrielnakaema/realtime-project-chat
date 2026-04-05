@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/fracindex"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -16,6 +17,15 @@ import (
 
 type mockTaskRepository struct {
 	mock.Mock
+}
+
+func mustGenerateTestOrder(t *testing.T, left, right string) string {
+	t.Helper()
+
+	key, err := fracindex.GenerateKeyBetween(left, right)
+	require.NoError(t, err)
+
+	return key
 }
 
 func (m *mockTaskRepository) Create(ctx context.Context, task *domain.Task) error {
@@ -31,7 +41,7 @@ func (m *mockTaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain
 	return args.Get(0).(*domain.Task), args.Error(1)
 }
 
-func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder int, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
 	args := m.Called(ctx, projectId, statuses, taskOrder, cursorUpdatedAt, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -55,8 +65,8 @@ func (m *mockTaskRepository) CreateUpdates(ctx context.Context, task *domain.Tas
 	return args.Error(0)
 }
 
-func (m *mockTaskRepository) GetSmallestOrderProjectTask(ctx context.Context, projectId uuid.UUID) (*domain.Task, error) {
-	args := m.Called(ctx, projectId)
+func (m *mockTaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, status domain.TaskStatus) (*domain.Task, error) {
+	args := m.Called(ctx, projectId, status)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -77,14 +87,6 @@ func (m *mockTaskRepository) MoveTask(ctx context.Context, task *domain.Task, us
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.Task), args.Error(1)
-}
-
-func (m *mockTaskRepository) NormalizeProjectTaskOrders(ctx context.Context, projectId uuid.UUID) error {
-	args := m.Called(ctx, projectId)
-	if args.Get(0) == nil {
-		return args.Error(0)
-	}
-	return args.Error(0)
 }
 
 func (m *mockTaskRepository) CountTasksByProjectIdAndStatus(ctx context.Context, projectId uuid.UUID, statuses []string) (map[string]int, error) {
@@ -147,6 +149,7 @@ func TestTaskService_Create(t *testing.T) {
 		Status:      domain.TaskStatusPending,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
+		Order:       mustGenerateTestOrder(t, "", ""),
 		Updates:     []domain.TaskUpdate{},
 	}
 
@@ -176,7 +179,7 @@ func TestTaskService_Create(t *testing.T) {
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("GetSmallestOrderProjectTask", mock.Anything, validProjectId).Return(nil, domain.NotFoundError("not found"))
+				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, domain.TaskStatusPending).Return(nil, domain.NotFoundError("not found"))
 				repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 			},
@@ -238,7 +241,7 @@ func TestTaskService_Create(t *testing.T) {
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("GetSmallestOrderProjectTask", mock.Anything, validProjectId).Return(nil, domain.NotFoundError("not found"))
+				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, domain.TaskStatusPending).Return(nil, domain.NotFoundError("not found"))
 				repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 			},
@@ -308,6 +311,44 @@ func TestTaskService_Create(t *testing.T) {
 			mockUserRepo.AssertExpectations(t)
 		})
 	}
+}
+
+func TestTaskService_GroupByStatus_DefaultStatuses(t *testing.T) {
+	validUserId := uuid.New()
+	validProjectId := uuid.New()
+
+	mockRepo := &mockTaskRepository{}
+	mockProjectRepo := &mockProjectRepository{}
+	mockUserRepo := &mockUserRepository{}
+
+	mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&domain.Project{
+		Id: validProjectId,
+		Members: []domain.ProjectMember{
+			{UserId: validUserId},
+		},
+	}, nil)
+
+	emptyPage := &utils.CursorPaginated[domain.Task]{Data: []domain.Task{}, HasNext: false}
+	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusPending)}, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
+	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusDoing)}, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
+	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusDone)}, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
+
+	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+
+	result, err := svc.GroupByStatus(context.Background(), service.GroupByStatusRequest{
+		ProjectId: validProjectId,
+		UserId:    validUserId,
+		Limit:     15,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, result, 3)
+	_, ok := result[domain.TaskStatusPending]
+	require.True(t, ok)
+	_, ok = result[domain.TaskStatusDoing]
+	require.True(t, ok)
+	_, ok = result[domain.TaskStatusDone]
+	require.True(t, ok)
 }
 
 func TestTaskService_Update(t *testing.T) {
