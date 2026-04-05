@@ -75,7 +75,7 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
           projectId: project.id,
           statuses: ['archived'],
           limit: DEFAULT_TASK_LIMIT,
-          taskOrder: 0,
+          taskOrder: '',
           updatedAt: null,
         }),
       });
@@ -89,7 +89,7 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
       projectId: project.id,
       statuses: ['archived'],
       limit: DEFAULT_TASK_LIMIT,
-      taskOrder: 0,
+      taskOrder: '',
       updatedAt: null,
     }),
     queryFn: ({ pageParam }) =>
@@ -106,7 +106,7 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
       const lastTask = page.data[page.data.length - 1];
       return { taskOrder: lastTask.order, updatedAt: lastTask.updated_at };
     },
-    initialPageParam: { taskOrder: 0, updatedAt: null as string | null },
+    initialPageParam: { taskOrder: '', updatedAt: null as string | null },
     enabled: open,
   });
 

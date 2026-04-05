@@ -11,7 +11,7 @@ interface UseBoardColumnTasksProps {
 }
 
 interface PageParam {
-  taskOrder: number;
+  taskOrder: string;
   updatedAt: null | string;
 }
 
@@ -23,7 +23,7 @@ export const useBoardColumnTasks = ({ projectId, status, limit }: UseBoardColumn
       projectId,
       statuses: [status],
       limit,
-      taskOrder: 0,
+      taskOrder: '',
       updatedAt: null,
     }),
     queryFn: ({ pageParam }) => {
@@ -48,7 +48,7 @@ export const useBoardColumnTasks = ({ projectId, status, limit }: UseBoardColumn
       };
     },
     initialPageParam: {
-      taskOrder: 0,
+      taskOrder: '',
       updatedAt: null,
     } as PageParam,
   });

@@ -26,7 +26,7 @@ export const listGroupedTasksByProjectId = async (request: ListTasksRequest) => 
     searchParams.set('statuses', request.statuses.join(','));
   }
   if (request.taskOrder) {
-    searchParams.set('task_order', request.taskOrder.toString());
+    searchParams.set('task_order', request.taskOrder);
   }
 
   if (request.limit) {
@@ -52,7 +52,7 @@ export const listTasksByProjectId = async (request: ListTasksRequest) => {
     searchParams.set('statuses', request.statuses.join(','));
   }
   if (request.taskOrder) {
-    searchParams.set('task_order', request.taskOrder.toString());
+    searchParams.set('task_order', request.taskOrder);
   }
   if (request.limit) {
     searchParams.set('limit', request.limit.toString());

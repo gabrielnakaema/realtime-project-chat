@@ -14,7 +14,7 @@ export interface Task {
   created_at: string;
   updated_at: string;
   priority: TaskPriority;
-  order: number;
+  order: string;
   responsible_id: string | null;
   due_date: string | null;
   done_at: string | null;
@@ -54,7 +54,7 @@ export interface TaskChange {
 export interface ListTasksRequest {
   projectId: string;
   statuses: string[];
-  taskOrder: number;
+  taskOrder: string;
   updatedAt: null | string;
   limit: number;
 }
