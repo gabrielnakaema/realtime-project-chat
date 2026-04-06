@@ -42,10 +42,11 @@ type Task struct {
 	CreatedAt     time.Time    `json:"created_at"`
 	UpdatedAt     time.Time    `json:"updated_at"`
 
-	Responsible *User        `json:"responsible,omitempty"`
-	Author      *User        `json:"author,omitempty"`
-	Updates     []TaskUpdate `json:"updates,omitempty"`
-	Project     *Project     `json:"project,omitempty"`
+	Responsible *User         `json:"responsible,omitempty"`
+	Author      *User         `json:"author,omitempty"`
+	Updates     []TaskUpdate  `json:"updates,omitempty"`
+	Project     *Project      `json:"project,omitempty"`
+	Comments    []TaskComment `json:"comments,omitempty"`
 }
 
 var AllowedTaskStatuses = []TaskStatus{TaskStatusPending, TaskStatusDoing, TaskStatusDone, TaskStatusArchived}

@@ -100,6 +100,16 @@ type TaskChange struct {
 	NewDisplayValue pgtype.Text
 }
 
+type TaskComment struct {
+	ID              uuid.UUID
+	TaskID          uuid.UUID
+	UserID          uuid.UUID
+	Content         string
+	ParentCommentID pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
 type TaskTag struct {
 	TaskID    uuid.UUID
 	Name      string

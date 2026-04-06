@@ -30,6 +30,15 @@ func (t *TaskUpdatedPayload) ToMessage() ([]byte, error) {
 	return json.Marshal(t)
 }
 
+type TaskCommentCreatedPayload struct {
+	TaskComment domain.TaskComment `json:"task_comment"`
+	User        domain.User        `json:"user"`
+}
+
+func (t *TaskCommentCreatedPayload) ToMessage() ([]byte, error) {
+	return json.Marshal(t)
+}
+
 type ProjectCreatedPayload struct {
 	Project domain.Project `json:"project"`
 	User    domain.User    `json:"user"`

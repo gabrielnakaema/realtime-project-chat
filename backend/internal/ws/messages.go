@@ -26,6 +26,7 @@ const (
 	WebsocketMessageTypeDisconnectUserFromRoom WebsocketMessageType = "disconnect_user_from_room"
 	WebsocketMessageTypeTaskCreated            WebsocketMessageType = "task_created"
 	WebsocketMessageTypeTaskUpdated            WebsocketMessageType = "task_updated"
+	WebsocketMessageTypeTaskCommentCreated     WebsocketMessageType = "task_comment_created"
 	WebsocketMessageTypeUsersOnline            WebsocketMessageType = "users_online"
 )
 
@@ -96,7 +97,7 @@ func MapTaskCreated(task *domain.Task) WebsocketMessage {
 }
 
 type TaskUpdatedData struct {
-	Task           *domain.Task        `json:"task"`
+	Task           *domain.Task       `json:"task"`
 	PreviousStatus *domain.TaskStatus `json:"previous_status,omitempty"`
 }
 
@@ -108,5 +109,13 @@ func MapTaskUpdated(task *domain.Task, previousStatus *domain.TaskStatus) Websoc
 			Task:           task,
 			PreviousStatus: previousStatus,
 		},
+	}
+}
+
+func MapTaskCommentCreated(comment *domain.TaskComment) WebsocketMessage {
+	return WebsocketMessage{
+		Type:   WebsocketMessageTypeTaskCommentCreated,
+		RoomId: comment.Task.ProjectId,
+		Data:   comment,
 	}
 }

@@ -137,3 +137,7 @@ func (ws *Server) SendUpdatedTask(ctx context.Context, task *domain.Task, previo
 func (ws *Server) SendCreatedTask(ctx context.Context, task *domain.Task) error {
 	return ws.SendEvent(ctx, MapTaskCreated(task))
 }
+
+func (ws *Server) SendCreatedTaskComment(ctx context.Context, comment *domain.TaskComment) error {
+	return ws.SendEvent(ctx, MapTaskCommentCreated(comment))
+}

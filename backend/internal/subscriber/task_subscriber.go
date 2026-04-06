@@ -13,6 +13,7 @@ import (
 type TaskNotifier interface {
 	SendCreatedTask(context.Context, *domain.Task) error
 	SendUpdatedTask(context.Context, *domain.Task, *domain.TaskStatus) error
+	SendCreatedTaskComment(context.Context, *domain.TaskComment) error
 }
 
 type TaskSubscriber struct {
@@ -33,7 +34,7 @@ func NewTaskSubscriber(ctx context.Context, config *config.Config, logger *slog.
 		notifier:   notifier,
 	}
 
-	topics := []events.Topic{events.TaskCreated, events.TaskUpdated}
+	topics := []events.Topic{events.TaskCreated, events.TaskUpdated, events.TaskCommentCreated}
 
 	err = subscriber.Subscribe(ctx, topics, taskSubscriber.handleTaskEvents, taskSubscriber.logger)
 	if err != nil {
@@ -53,10 +54,27 @@ func (ts *TaskSubscriber) handleTaskEvents(ctx context.Context, message Message)
 		return ts.handleTaskCreated(ctx, message)
 	case events.TaskUpdated:
 		return ts.handleTaskUpdated(ctx, message)
+	case events.TaskCommentCreated:
+		return ts.handleTaskCommentCreated(ctx, message)
 	default:
 		return nil
 
 	}
+}
+
+func (ts *TaskSubscriber) handleTaskCommentCreated(ctx context.Context, message Message) error {
+	var payload events.TaskCommentCreatedPayload
+	err := json.Unmarshal(message.Value, &payload)
+	if err != nil {
+		return domain.ServerError("failed to unmarshal task comment", err)
+	}
+
+	err = ts.notifier.SendCreatedTaskComment(ctx, &payload.TaskComment)
+	if err != nil {
+		return domain.ServerError("failed to send created task comment to ws server", err)
+	}
+
+	return nil
 }
 
 func (ts *TaskSubscriber) handleTaskCreated(ctx context.Context, message Message) error {

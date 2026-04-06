@@ -41,6 +41,7 @@ type Handlers struct {
 	Chat           *handlers.ChatHandler
 	Project        *handlers.ProjectHandler
 	Task           *handlers.TaskHandler
+	TaskComment    *handlers.TaskCommentHandler
 	User           *handlers.UserHandler
 }
 
@@ -70,6 +71,7 @@ func NewApi() (*Api, error) {
 	chatRepo := repository.NewChatRepository(pool)
 	projectRepo := repository.NewProjectRepository(pool)
 	taskRepo := repository.NewTaskRepository(pool)
+	taskCommentRepo := repository.NewTaskCommentRepository(pool)
 	userRepo := repository.NewUserRepository(pool)
 	activityRepo := repository.NewProjectActivityRepository(pool)
 
@@ -117,12 +119,15 @@ func NewApi() (*Api, error) {
 
 	taskService := service.NewTaskService(taskRepo, projectRepo, userRepo, pub)
 	taskHandler := handlers.NewTaskHandler(taskService)
+	taskCommentService := service.NewTaskCommentService(taskCommentRepo, taskRepo, projectRepo, userRepo, pub)
+	taskCommentHandler := handlers.NewTaskCommentHandler(taskCommentService)
 
 	handlers := Handlers{
 		AuthMiddleware: authMiddleware,
 		Chat:           chatHandler,
 		Project:        projectHandler,
 		Task:           taskHandler,
+		TaskComment:    taskCommentHandler,
 		User:           userHandler,
 	}
 
