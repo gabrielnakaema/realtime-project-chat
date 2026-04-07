@@ -171,6 +171,7 @@ LEFT JOIN users r ON r.id = t.responsible_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
 JOIN projects p ON p.id = t.project_id
 WHERE t.responsible_id = $1
+AND t.due_date IS NOT NULL
 AND (
   cardinality(sqlc.slice('statuses')::text[]) = 0
   OR t.status = ANY(sqlc.slice('statuses')::text[])
