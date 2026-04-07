@@ -26,6 +26,17 @@ export interface Task {
   project: Project | null;
 }
 
+export interface TaskComment {
+  id: string;
+  task: Task | null;
+  user: User;
+  content: string;
+  parent_comment_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  replies: TaskComment[];
+}
+
 export interface TaskUpdate {
   id: string;
   task_id: string;

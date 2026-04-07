@@ -1,6 +1,6 @@
 import { parse } from 'date-fns';
 import { api } from './api';
-import type { ListTasksRequest, ListUserDueTasksRequest, Task, TaskStatus } from '@/types/task';
+import type { ListTasksRequest, ListUserDueTasksRequest, Task, TaskComment, TaskStatus } from '@/types/task';
 import type { ITaskForm } from '@/schemas/task-schema';
 import type { CursorPaginated, Paginated } from '@/types/paginated';
 
@@ -157,6 +157,51 @@ export const getTask = async (taskId: string) => {
   const response = await api.get(`tasks/${taskId}`);
 
   const json = await response.json<Task>();
+  return json;
+};
+
+interface ListTaskCommentsRequest {
+  taskId: string;
+  limit?: number;
+  before?: string;
+  commentId?: string;
+}
+
+export const listTaskComments = async (request: ListTaskCommentsRequest) => {
+  const searchParams = new URLSearchParams();
+  if (request.limit) {
+    searchParams.set('limit', request.limit.toString());
+  }
+  if (request.before) {
+    searchParams.set('before', request.before);
+  }
+  if (request.commentId) {
+    searchParams.set('comment_id', request.commentId);
+  }
+
+  const response = await api.get(`tasks/${request.taskId}/comments`, {
+    searchParams,
+  });
+
+  const json = await response.json<CursorPaginated<TaskComment>>();
+  return json;
+};
+
+interface CreateTaskCommentRequest {
+  taskId: string;
+  content: string;
+  parentCommentId?: string | null;
+}
+
+export const createTaskComment = async (request: CreateTaskCommentRequest) => {
+  const response = await api.post(`tasks/${request.taskId}/comments`, {
+    json: {
+      content: request.content,
+      parent_comment_id: request.parentCommentId ?? null,
+    },
+  });
+
+  const json = await response.json<TaskComment>();
   return json;
 };
 

@@ -67,7 +67,7 @@ export const ProjectDetailsSheet = ({ project, children }: ProjectDetailsSheetPr
           {activities.length > 0 && (
             <div className="flex flex-col gap-2">
               <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">Activity</h3>
-              <div className="flex max-h-72 flex-col gap-4 overflow-y-auto pr-1">
+              <div className="flex flex-col gap-4 overflow-y-auto pr-1">
                 {activities.map((activity) => (
                   <ProjectActivity key={activity.id} activity={activity} showProject={false} />
                 ))}

@@ -18,6 +18,7 @@ export const taskQueryKeys = {
   all: ['tasks'],
   listByProjectId: (projectId: string) => ['tasks', 'list', { projectId }],
   details: (id: string) => ['tasks', 'details', id],
+  comments: (taskId: string) => ['tasks', 'comments', taskId],
   list: (request: ListTasksRequest) => ['tasks', 'list', request],
   listGroupedByProjectId: (request: ListTasksRequest) => ['tasks', 'list', 'grouped', request],
   countByStatus: (projectId: string, statuses: TaskStatus[]) => ['tasks', 'count', { projectId, statuses }],
