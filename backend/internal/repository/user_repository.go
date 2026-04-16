@@ -145,6 +145,27 @@ func (ur *UserRepository) CreateRefreshToken(ctx context.Context, refreshToken *
 	return nil
 }
 
+func (ur *UserRepository) ListUsers(ctx context.Context, excludeId uuid.UUID) ([]domain.User, error) {
+	q := queries.New(ur.pool)
+
+	rows, err := q.ListUsers(ctx, excludeId)
+	if err != nil {
+		return nil, err
+	}
+
+	users := []domain.User{}
+	for _, row := range rows {
+		users = append(users, domain.User{
+			Id:        row.ID,
+			Name:      row.Name,
+			Email:     row.Email,
+			CreatedAt: row.CreatedAt.Time,
+		})
+	}
+
+	return users, nil
+}
+
 func (ur *UserRepository) UpdateRefreshTokenActive(ctx context.Context, refreshToken *domain.RefreshToken) error {
 	q := queries.New(ur.pool)
 

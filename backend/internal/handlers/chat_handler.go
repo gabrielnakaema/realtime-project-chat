@@ -16,8 +16,12 @@ import (
 
 type chatService interface {
 	GetByProjectId(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Chat, error)
+	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Chat, error)
 	CreateMessage(ctx context.Context, request service.CreateChatMessageRequest) (*domain.ChatMessage, error)
 	ListMessagesByProjectId(ctx context.Context, request service.ListMessagesByProjectIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error)
+	GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, targetUserIds []uuid.UUID) (*domain.Chat, error)
+	ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error)
+	ListMessagesByChatId(ctx context.Context, request service.ListMessagesByChatIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error)
 }
 
 type ChatHandler struct {
@@ -50,6 +54,38 @@ func (ch *ChatHandler) GetChatByProjectId(w http.ResponseWriter, r *http.Request
 	}
 
 	chat, err := ch.chatService.GetByProjectId(r.Context(), parsedProjectId, userId)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, chat, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (ch *ChatHandler) GetChatById(w http.ResponseWriter, r *http.Request) {
+	chatId := chi.URLParam(r, "chatId")
+	if chatId == "" {
+		BadRequestResponse(w, errors.New("chatId is required"))
+		return
+	}
+
+	parsedChatId, err := uuid.Parse(chatId)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	userId := UserIdFromContext(r.Context())
+	if userId == uuid.Nil {
+		UnauthorizedResponse(w, "unauthorized")
+		return
+	}
+
+	chat, err := ch.chatService.GetById(r.Context(), parsedChatId, userId)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return
@@ -96,6 +132,137 @@ func (ch *ChatHandler) CreateMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = utils.WriteJSON(w, http.StatusCreated, message, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (ch *ChatHandler) GetOrCreateGeneralChat(w http.ResponseWriter, r *http.Request) {
+	var request GetOrCreateGeneralChatRequest
+	err := utils.ReadJSON(w, r, &request)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	v := validator.New()
+	request.Validate(v)
+	if !v.Valid() {
+		ValidationFailedResponse(w, v)
+		return
+	}
+
+	userId := UserIdFromContext(r.Context())
+	if userId == uuid.Nil {
+		UnauthorizedResponse(w, "unauthorized")
+		return
+	}
+
+	chat, err := ch.chatService.GetOrCreateGeneralChat(r.Context(), userId, request.UserIds)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, chat, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (ch *ChatHandler) ListGeneralChats(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+	if userId == uuid.Nil {
+		UnauthorizedResponse(w, "unauthorized")
+		return
+	}
+
+	chats, err := ch.chatService.ListGeneralChats(r.Context(), userId)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, chats, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (ch *ChatHandler) ListChatMessages(w http.ResponseWriter, r *http.Request) {
+	chatId := chi.URLParam(r, "chatId")
+	if chatId == "" {
+		BadRequestResponse(w, errors.New("chatId is required"))
+		return
+	}
+
+	limit := utils.GetQueryInt(r, "limit", 10)
+	if limit <= 0 {
+		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		return
+	}
+
+	if limit > 50 {
+		BadRequestResponse(w, errors.New("limit must be less than 50"))
+		return
+	}
+
+	before := utils.GetQueryString(r, "before", "")
+	beforeTime := time.Now()
+	if before != "" {
+		date, err := time.Parse(time.RFC3339, before)
+		if err != nil {
+			BadRequestResponse(w, errors.New("invalid before date"))
+			return
+		}
+		beforeTime = date
+	}
+
+	beforeId := utils.GetQueryString(r, "id", "")
+	beforeIdUUID := uuid.Nil
+	if beforeId != "" {
+		parsedBeforeId, err := uuid.Parse(beforeId)
+		if err != nil {
+			BadRequestResponse(w, err)
+			return
+		}
+		beforeIdUUID = parsedBeforeId
+	}
+
+	parsedChatId, err := uuid.Parse(chatId)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	userId := UserIdFromContext(r.Context())
+	if userId == uuid.Nil {
+		UnauthorizedResponse(w, "unauthorized")
+		return
+	}
+
+	paginationParams := utils.PaginationBeforeParams{
+		Limit:  limit,
+		Before: beforeTime,
+		Id:     beforeIdUUID,
+	}
+
+	serviceRequest := service.ListMessagesByChatIdRequest{
+		ChatId: parsedChatId,
+		UserId: userId,
+		Params: paginationParams,
+	}
+
+	messages, err := ch.chatService.ListMessagesByChatId(r.Context(), serviceRequest)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, messages, nil)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

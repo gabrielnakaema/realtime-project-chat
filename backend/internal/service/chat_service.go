@@ -21,6 +21,8 @@ type chatRepository interface {
 	UpdateMemberLastSeenAt(ctx context.Context, member *domain.ChatMember) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Chat, error)
 	ListMessages(ctx context.Context, chatId uuid.UUID, params utils.PaginationBeforeParams) ([]domain.ChatMessage, error)
+	GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, memberIds []uuid.UUID) (*domain.Chat, error)
+	ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error)
 }
 
 type chatUserRepository interface {
@@ -57,7 +59,7 @@ func (cs *ChatService) CreateChatFromProject(ctx context.Context, project *domai
 	}
 
 	chat := domain.Chat{
-		ProjectId: project.Id,
+		ProjectId: &project.Id,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 		Members:   members,
@@ -284,6 +286,13 @@ func (cs *ChatService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UU
 
 	chat, err := cs.chatRepository.GetById(ctx, id)
 	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("chat not found")
+			}
+			return nil, domainErr
+		}
 		return nil, domain.ServerError("failed to get chat", err)
 	}
 
@@ -318,4 +327,117 @@ func (cs *ChatService) UpdateMemberLastSeenAt(ctx context.Context, userId uuid.U
 	}
 
 	return nil
+}
+
+func SanitizeGeneralChatMemberIDs(currentUserId uuid.UUID, targetUserIds []uuid.UUID) []uuid.UUID {
+	seen := map[uuid.UUID]struct{}{}
+	memberIds := []uuid.UUID{currentUserId}
+	seen[currentUserId] = struct{}{}
+
+	for _, userId := range targetUserIds {
+		if userId == uuid.Nil || userId == currentUserId {
+			continue
+		}
+
+		if _, ok := seen[userId]; ok {
+			continue
+		}
+
+		seen[userId] = struct{}{}
+		memberIds = append(memberIds, userId)
+	}
+
+	return memberIds
+}
+
+func (cs *ChatService) GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, targetUserIds []uuid.UUID) (*domain.Chat, error) {
+	if currentUserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	memberIds := SanitizeGeneralChatMemberIDs(currentUserId, targetUserIds)
+	if len(memberIds) <= 1 {
+		return nil, domain.BusinessValidationError("at least one other user is required")
+	}
+
+	for _, memberId := range memberIds[1:] {
+		_, err := cs.userRepository.GetById(ctx, memberId)
+		if err != nil {
+			var domainErr domain.DomainError
+			if errors.As(err, &domainErr) {
+				if domainErr.Code == domain.NotFoundErrorCode {
+					return nil, domain.NotFoundError("user not found")
+				}
+				return nil, domainErr
+			}
+			return nil, domain.ServerError("failed to get user", err)
+		}
+	}
+
+	chat, err := cs.chatRepository.GetOrCreateGeneralChat(ctx, currentUserId, memberIds)
+	if err != nil {
+		return nil, domain.ServerError("failed to get or create general chat", err)
+	}
+
+	return chat, nil
+}
+
+func (cs *ChatService) ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error) {
+	if userId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	chats, err := cs.chatRepository.ListGeneralChats(ctx, userId)
+	if err != nil {
+		return nil, domain.ServerError("failed to list general chats", err)
+	}
+
+	return chats, nil
+}
+
+type ListMessagesByChatIdRequest struct {
+	ChatId uuid.UUID
+	UserId uuid.UUID
+	Params utils.PaginationBeforeParams
+}
+
+func (cs *ChatService) ListMessagesByChatId(ctx context.Context, request ListMessagesByChatIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error) {
+	if request.UserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	chat, err := cs.chatRepository.GetById(ctx, request.ChatId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("chat not found")
+			}
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to get chat", err)
+	}
+
+	hasPermission := false
+	for _, member := range chat.Members {
+		if member.UserId == request.UserId {
+			hasPermission = true
+			break
+		}
+	}
+	if !hasPermission {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	messages, err := cs.chatRepository.ListMessages(ctx, chat.Id, request.Params)
+	if err != nil {
+		return nil, domain.ServerError("failed to list messages", err)
+	}
+
+	slices.Reverse(messages)
+
+	return &utils.CursorPaginated[domain.ChatMessage]{
+		Data:    messages,
+		HasNext: len(messages) >= int(request.Params.Limit),
+	}, nil
 }

@@ -24,6 +24,7 @@ type userService interface {
 	RefreshToken(context.Context, service.RefreshTokenRequest) (*service.LoginResult, error)
 	GetMe(context.Context, uuid.UUID) (*domain.User, error)
 	Logout(context.Context, uuid.UUID, string) error
+	ListUsers(context.Context, uuid.UUID) ([]domain.User, error)
 }
 
 type UserHandler struct {
@@ -220,4 +221,20 @@ func (uh *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.WriteJSON(w, http.StatusOK, user, nil)
+}
+
+func (uh *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+	if userId == uuid.Nil {
+		UnauthorizedResponse(w, "unauthorized")
+		return
+	}
+
+	users, err := uh.userService.ListUsers(r.Context(), userId)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, users, nil)
 }

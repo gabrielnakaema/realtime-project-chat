@@ -43,6 +43,7 @@ func (a *Api) Router() http.Handler {
 	r.Route("/users", func(r chi.Router) {
 		r.Post("/", a.handlers.User.Create)
 		r.Get("/me", a.handlers.User.GetMe)
+		r.Get("/", a.handlers.User.ListUsers)
 	})
 
 	r.Route("/auth", func(r chi.Router) {
@@ -68,6 +69,10 @@ func (a *Api) Router() http.Handler {
 
 	r.Route("/chats", func(r chi.Router) {
 		r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
+		r.Post("/", a.handlers.Chat.GetOrCreateGeneralChat)
+		r.Get("/", a.handlers.Chat.ListGeneralChats)
+		r.Get("/{chatId}", a.handlers.Chat.GetChatById)
+		r.Get("/{chatId}/messages", a.handlers.Chat.ListChatMessages)
 		r.Post("/messages", a.handlers.Chat.CreateMessage)
 	})
 

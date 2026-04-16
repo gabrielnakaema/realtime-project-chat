@@ -10,6 +10,9 @@ UPDATE chat_members SET last_seen_at = $1 WHERE user_id = $2 AND chat_id = $3;
 -- name: CreateChatMessage :one
 INSERT INTO chat_messages (chat_id, user_id, content, created_at, updated_at, message_type) VALUES ($1, $2, $3, $4, $5, $6) returning id;
 
+-- name: UpdateChatUpdatedAt :exec
+UPDATE chats SET updated_at = $1 WHERE id = $2;
+
 -- name: GetChatById :one
 with chat_members_cte as (
 	select 
@@ -75,6 +78,60 @@ from chats c
 left join chat_members_cte cm on cm.member_chat_id = c.id
 where c.project_id = $1
 group by c.id;
+
+-- name: CreateGeneralChat :one
+INSERT INTO chats (chat_type) VALUES ('general') RETURNING id;
+
+-- name: FindGeneralChatByExactMembers :one
+SELECT c.id FROM chats c
+WHERE c.chat_type = 'general'
+  AND (SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id) = cardinality($1::uuid[])
+  AND NOT EXISTS (
+    SELECT 1 FROM chat_members cm
+    WHERE cm.chat_id = c.id AND cm.user_id != ALL($1::uuid[])
+  )
+LIMIT 1;
+
+-- name: ListGeneralChatsByUserId :many
+WITH chat_members_cte AS (
+	SELECT
+		cm.chat_id AS member_chat_id,
+		u.id AS member_user_id,
+		cm.joined_at AS member_joined_at,
+		cm.last_seen_at AS member_last_seen_at,
+		u.name AS member_name,
+		u.email AS member_email
+	FROM chat_members cm
+	JOIN users u ON u.id = cm.user_id
+)
+SELECT
+	c.id,
+	c.project_id,
+	c.chat_type,
+	c.created_at,
+	c.updated_at,
+	coalesce(
+		jsonb_agg(
+			jsonb_build_object(
+				'chat_id', cm.member_chat_id,
+				'user_id', cm.member_user_id,
+				'last_seen_at', cm.member_last_seen_at,
+				'joined_at', cm.member_joined_at,
+				'user',
+				jsonb_build_object(
+					'id', cm.member_user_id,
+					'name', cm.member_name,
+					'email', cm.member_email
+				)
+			)
+		) FILTER (WHERE cm.member_user_id IS NOT NULL)
+	, '[]'::jsonb) AS members
+FROM chats c
+JOIN chat_members cm_self ON cm_self.chat_id = c.id AND cm_self.user_id = $1
+LEFT JOIN chat_members_cte cm ON cm.member_chat_id = c.id
+WHERE c.chat_type = 'general'
+GROUP BY c.id
+ORDER BY c.updated_at DESC;
 
 -- name: ListChatMessages :many
 select 

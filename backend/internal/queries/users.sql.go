@@ -106,6 +106,47 @@ func (q *Queries) GetUserById(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
+const listUsers = `-- name: ListUsers :many
+SELECT DISTINCT u.id, u.name, u.email, u.created_at
+FROM users u
+JOIN project_members pm ON pm.user_id = u.id
+WHERE pm.project_id IN (SELECT project_id FROM project_members pm2 WHERE pm2.user_id = $1)
+AND u.id != $1
+ORDER BY u.name ASC
+`
+
+type ListUsersRow struct {
+	ID        uuid.UUID
+	Name      string
+	Email     string
+	CreatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListUsers(ctx context.Context, userID uuid.UUID) ([]ListUsersRow, error) {
+	rows, err := q.db.Query(ctx, listUsers, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUsersRow
+	for rows.Next() {
+		var i ListUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Email,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateRefreshToken = `-- name: UpdateRefreshToken :exec
 UPDATE refresh_tokens SET active = $1 WHERE token = $2
 `

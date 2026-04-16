@@ -53,6 +53,11 @@ func (m *mockUserRepository) UpdateRefreshTokenActive(ctx context.Context, refre
 	return args.Error(0)
 }
 
+func (m *mockUserRepository) ListUsers(ctx context.Context, excludeId uuid.UUID) ([]domain.User, error) {
+	args := m.Called(ctx, excludeId)
+	return args.Get(0).([]domain.User), args.Error(1)
+}
+
 type mockJWTProvider struct {
 	mock.Mock
 }

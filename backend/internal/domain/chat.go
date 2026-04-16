@@ -6,11 +6,19 @@ import (
 	"github.com/google/uuid"
 )
 
+type ChatType string
+
+var (
+	ChatTypeGeneral ChatType = "general"
+	ChatTypeProject ChatType = "project"
+)
+
 type Chat struct {
-	Id        uuid.UUID `json:"id"`
-	ProjectId uuid.UUID `json:"project_id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Id        uuid.UUID  `json:"id"`
+	ProjectId *uuid.UUID `json:"project_id"`
+	ChatType  ChatType   `json:"chat_type"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 
 	Members  []ChatMember  `json:"members,omitempty"`
 	Messages []ChatMessage `json:"messages,omitempty"`

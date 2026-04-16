@@ -20,6 +20,7 @@ type userRepository interface {
 	CreateRefreshToken(ctx context.Context, refreshToken *domain.RefreshToken) error
 	GetRefreshToken(ctx context.Context, token string) (*domain.RefreshToken, error)
 	UpdateRefreshTokenActive(ctx context.Context, refreshToken *domain.RefreshToken) error
+	ListUsers(ctx context.Context, excludeId uuid.UUID) ([]domain.User, error)
 }
 
 type jwtProvider interface {
@@ -135,6 +136,10 @@ func (us *UserService) Login(ctx context.Context, request LoginRequest) (*LoginR
 
 func (us *UserService) GetMe(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	return us.userRepository.GetById(ctx, id)
+}
+
+func (us *UserService) ListUsers(ctx context.Context, excludeId uuid.UUID) ([]domain.User, error) {
+	return us.userRepository.ListUsers(ctx, excludeId)
 }
 
 type RefreshTokenRequest struct {

@@ -14,6 +14,7 @@ type Chat struct {
 	ProjectID pgtype.UUID
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
+	ChatType  string
 }
 
 type ChatMember struct {

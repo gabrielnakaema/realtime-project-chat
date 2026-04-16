@@ -71,6 +71,35 @@ func (q *Queries) CreateChatMessage(ctx context.Context, arg CreateChatMessagePa
 	return id, err
 }
 
+const createGeneralChat = `-- name: CreateGeneralChat :one
+INSERT INTO chats (chat_type) VALUES ('general') RETURNING id
+`
+
+func (q *Queries) CreateGeneralChat(ctx context.Context) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createGeneralChat)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const findGeneralChatByExactMembers = `-- name: FindGeneralChatByExactMembers :one
+SELECT c.id FROM chats c
+WHERE c.chat_type = 'general'
+  AND (SELECT COUNT(*) FROM chat_members WHERE chat_id = c.id) = cardinality($1::uuid[])
+  AND NOT EXISTS (
+    SELECT 1 FROM chat_members cm
+    WHERE cm.chat_id = c.id AND cm.user_id != ALL($1::uuid[])
+  )
+LIMIT 1
+`
+
+func (q *Queries) FindGeneralChatByExactMembers(ctx context.Context, dollar_1 []uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, findGeneralChatByExactMembers, dollar_1)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getChatById = `-- name: GetChatById :one
 with chat_members_cte as (
 	select 
@@ -83,7 +112,7 @@ with chat_members_cte as (
 	left join users u on u.id = cm.user_id
 )
 select 
-	c.id, c.project_id, c.created_at, c.updated_at,
+	c.id, c.project_id, c.created_at, c.updated_at, c.chat_type,
 	coalesce(
 		jsonb_agg(
 			jsonb_build_object(
@@ -110,6 +139,7 @@ type GetChatByIdRow struct {
 	ProjectID pgtype.UUID
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
+	ChatType  string
 	Members   interface{}
 }
 
@@ -121,6 +151,7 @@ func (q *Queries) GetChatById(ctx context.Context, id uuid.UUID) (GetChatByIdRow
 		&i.ProjectID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ChatType,
 		&i.Members,
 	)
 	return i, err
@@ -138,7 +169,7 @@ with chat_members_cte as (
 	left join users u on u.id = cm.user_id
 )
 select 
-	c.id, c.project_id, c.created_at, c.updated_at,
+	c.id, c.project_id, c.created_at, c.updated_at, c.chat_type,
 	coalesce(
 		jsonb_agg(
 			jsonb_build_object(
@@ -165,6 +196,7 @@ type GetChatByProjectIdRow struct {
 	ProjectID pgtype.UUID
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
+	ChatType  string
 	Members   interface{}
 }
 
@@ -176,6 +208,7 @@ func (q *Queries) GetChatByProjectId(ctx context.Context, projectID pgtype.UUID)
 		&i.ProjectID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ChatType,
 		&i.Members,
 	)
 	return i, err
@@ -251,6 +284,84 @@ func (q *Queries) ListChatMessages(ctx context.Context, arg ListChatMessagesPara
 	return items, nil
 }
 
+const listGeneralChatsByUserId = `-- name: ListGeneralChatsByUserId :many
+WITH chat_members_cte AS (
+	SELECT
+		cm.chat_id AS member_chat_id,
+		u.id AS member_user_id,
+		cm.joined_at AS member_joined_at,
+		cm.last_seen_at AS member_last_seen_at,
+		u.name AS member_name,
+		u.email AS member_email
+	FROM chat_members cm
+	JOIN users u ON u.id = cm.user_id
+)
+SELECT
+	c.id,
+	c.project_id,
+	c.chat_type,
+	c.created_at,
+	c.updated_at,
+	coalesce(
+		jsonb_agg(
+			jsonb_build_object(
+				'chat_id', cm.member_chat_id,
+				'user_id', cm.member_user_id,
+				'last_seen_at', cm.member_last_seen_at,
+				'joined_at', cm.member_joined_at,
+				'user',
+				jsonb_build_object(
+					'id', cm.member_user_id,
+					'name', cm.member_name,
+					'email', cm.member_email
+				)
+			)
+		) FILTER (WHERE cm.member_user_id IS NOT NULL)
+	, '[]'::jsonb) AS members
+FROM chats c
+JOIN chat_members cm_self ON cm_self.chat_id = c.id AND cm_self.user_id = $1
+LEFT JOIN chat_members_cte cm ON cm.member_chat_id = c.id
+WHERE c.chat_type = 'general'
+GROUP BY c.id
+ORDER BY c.updated_at DESC
+`
+
+type ListGeneralChatsByUserIdRow struct {
+	ID        uuid.UUID
+	ProjectID pgtype.UUID
+	ChatType  string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+	Members   interface{}
+}
+
+func (q *Queries) ListGeneralChatsByUserId(ctx context.Context, userID uuid.UUID) ([]ListGeneralChatsByUserIdRow, error) {
+	rows, err := q.db.Query(ctx, listGeneralChatsByUserId, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGeneralChatsByUserIdRow
+	for rows.Next() {
+		var i ListGeneralChatsByUserIdRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProjectID,
+			&i.ChatType,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Members,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateChatMemberLastSeenAt = `-- name: UpdateChatMemberLastSeenAt :exec
 UPDATE chat_members SET last_seen_at = $1 WHERE user_id = $2 AND chat_id = $3
 `
@@ -263,5 +374,19 @@ type UpdateChatMemberLastSeenAtParams struct {
 
 func (q *Queries) UpdateChatMemberLastSeenAt(ctx context.Context, arg UpdateChatMemberLastSeenAtParams) error {
 	_, err := q.db.Exec(ctx, updateChatMemberLastSeenAt, arg.LastSeenAt, arg.UserID, arg.ChatID)
+	return err
+}
+
+const updateChatUpdatedAt = `-- name: UpdateChatUpdatedAt :exec
+UPDATE chats SET updated_at = $1 WHERE id = $2
+`
+
+type UpdateChatUpdatedAtParams struct {
+	UpdatedAt pgtype.Timestamptz
+	ID        uuid.UUID
+}
+
+func (q *Queries) UpdateChatUpdatedAt(ctx context.Context, arg UpdateChatUpdatedAtParams) error {
+	_, err := q.db.Exec(ctx, updateChatUpdatedAt, arg.UpdatedAt, arg.ID)
 	return err
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/queries"
@@ -34,7 +35,7 @@ func (cr *ChatRepository) Create(ctx context.Context, chat *domain.Chat) error {
 	q := queries.New(cr.pool)
 	qtx := q.WithTx(tx)
 
-	pgTypeUuid := pgtype.UUID{Bytes: chat.ProjectId, Valid: true}
+	pgTypeUuid := pgtype.UUID{Bytes: *chat.ProjectId, Valid: true}
 
 	id, err := qtx.CreateChat(ctx, pgTypeUuid)
 	if err != nil {
@@ -80,7 +81,15 @@ func (cr *ChatRepository) UpdateMemberLastSeenAt(ctx context.Context, member *do
 }
 
 func (cr *ChatRepository) CreateMessage(ctx context.Context, message *domain.ChatMessage) error {
+	tx, err := cr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
 	q := queries.New(cr.pool)
+	qtx := q.WithTx(tx)
+
 	params := queries.CreateChatMessageParams{
 		ChatID:      message.ChatId,
 		MessageType: string(message.MessageType),
@@ -93,14 +102,22 @@ func (cr *ChatRepository) CreateMessage(ctx context.Context, message *domain.Cha
 		params.UserID = pgtype.UUID{Bytes: *message.UserId, Valid: true}
 	}
 
-	id, err := q.CreateChatMessage(ctx, params)
+	id, err := qtx.CreateChatMessage(ctx, params)
 	if err != nil {
 		return err
 	}
 
 	message.Id = id
 
-	return nil
+	err = qtx.UpdateChatUpdatedAt(ctx, queries.UpdateChatUpdatedAtParams{
+		UpdatedAt: pgtype.Timestamptz{Time: message.UpdatedAt, Valid: true},
+		ID:        message.ChatId,
+	})
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (cr *ChatRepository) GetByProjectId(ctx context.Context, projectId uuid.UUID) (*domain.Chat, error) {
@@ -113,27 +130,20 @@ func (cr *ChatRepository) GetByProjectId(ctx context.Context, projectId uuid.UUI
 		return nil, err
 	}
 
-	chat := domain.Chat{
+	members, err := unmarshalMembers(chatResult.Members)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.Chat{
 		Id:        chatResult.ID,
-		ProjectId: chatResult.ProjectID.Bytes,
+		ProjectId: pgUUIDPointer(chatResult.ProjectID),
+		ChatType:  domain.ChatType(chatResult.ChatType),
 		CreatedAt: chatResult.CreatedAt.Time,
 		UpdatedAt: chatResult.UpdatedAt.Time,
-		Members:   []domain.ChatMember{},
+		Members:   members,
 		Messages:  []domain.ChatMessage{},
-	}
-
-	if chatResult.Members != nil {
-		bytes, err := json.Marshal(chatResult.Members)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(bytes, &chat.Members)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &chat, nil
+	}, nil
 }
 
 func (cr *ChatRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Chat, error) {
@@ -146,26 +156,107 @@ func (cr *ChatRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ch
 		return nil, err
 	}
 
-	chat := domain.Chat{
+	members, err := unmarshalMembers(chatResult.Members)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.Chat{
 		Id:        chatResult.ID,
-		ProjectId: chatResult.ProjectID.Bytes,
+		ProjectId: pgUUIDPointer(chatResult.ProjectID),
+		ChatType:  domain.ChatType(chatResult.ChatType),
 		CreatedAt: chatResult.CreatedAt.Time,
 		UpdatedAt: chatResult.UpdatedAt.Time,
-		Members:   []domain.ChatMember{},
+		Members:   members,
+	}, nil
+}
+
+func (cr *ChatRepository) GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, memberIds []uuid.UUID) (*domain.Chat, error) {
+	q := queries.New(cr.pool)
+
+	existingId, err := q.FindGeneralChatByExactMembers(ctx, memberIds)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	if err == nil {
+		return cr.GetById(ctx, existingId)
 	}
 
-	if chatResult.Members != nil {
-		bytes, err := json.Marshal(chatResult.Members)
+	tx, err := cr.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := q.WithTx(tx)
+
+	chatId, err := qtx.CreateGeneralChat(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	for _, userId := range memberIds {
+		err = qtx.CreateChatMember(ctx, queries.CreateChatMemberParams{
+			UserID:     userId,
+			ChatID:     chatId,
+			LastSeenAt: pgtype.Timestamptz{Time: now, Valid: true},
+			JoinedAt:   pgtype.Timestamptz{Time: now, Valid: true},
+		})
 		if err != nil {
 			return nil, err
 		}
-		err = json.Unmarshal(bytes, &chat.Members)
+	}
+
+	chatResult, err := qtx.GetChatById(ctx, chatId)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	members, err := unmarshalMembers(chatResult.Members)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.Chat{
+		Id:        chatResult.ID,
+		ProjectId: pgUUIDPointer(chatResult.ProjectID),
+		ChatType:  domain.ChatType(chatResult.ChatType),
+		CreatedAt: chatResult.CreatedAt.Time,
+		UpdatedAt: chatResult.UpdatedAt.Time,
+		Members:   members,
+	}, nil
+}
+
+func (cr *ChatRepository) ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error) {
+	q := queries.New(cr.pool)
+	rows, err := q.ListGeneralChatsByUserId(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	chats := []domain.Chat{}
+	for _, row := range rows {
+		members, err := unmarshalMembers(row.Members)
 		if err != nil {
 			return nil, err
 		}
+
+		chats = append(chats, domain.Chat{
+			Id:        row.ID,
+			ProjectId: pgUUIDPointer(row.ProjectID),
+			ChatType:  domain.ChatType(row.ChatType),
+			CreatedAt: row.CreatedAt.Time,
+			UpdatedAt: row.UpdatedAt.Time,
+			Members:   members,
+		})
 	}
 
-	return &chat, nil
+	return chats, nil
 }
 
 func (cr *ChatRepository) ListMessages(ctx context.Context, chatId uuid.UUID, params utils.PaginationBeforeParams) ([]domain.ChatMessage, error) {
@@ -213,4 +304,27 @@ func (cr *ChatRepository) ListMessages(ctx context.Context, chatId uuid.UUID, pa
 	}
 
 	return messages, nil
+}
+
+func unmarshalMembers(raw any) ([]domain.ChatMember, error) {
+	if raw == nil {
+		return []domain.ChatMember{}, nil
+	}
+	b, err := json.Marshal(raw)
+	if err != nil {
+		return nil, err
+	}
+	var members []domain.ChatMember
+	if err := json.Unmarshal(b, &members); err != nil {
+		return nil, err
+	}
+	return members, nil
+}
+
+func pgUUIDPointer(value pgtype.UUID) *uuid.UUID {
+	if !value.Valid {
+		return nil
+	}
+	id := uuid.UUID(value.Bytes)
+	return &id
 }

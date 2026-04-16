@@ -63,6 +63,11 @@ func (m *mockUserService) Logout(ctx context.Context, userId uuid.UUID, token st
 	return args.Error(0)
 }
 
+func (m *mockUserService) ListUsers(ctx context.Context, excludeId uuid.UUID) ([]domain.User, error) {
+	args := m.Called(ctx, excludeId)
+	return args.Get(0).([]domain.User), args.Error(1)
+}
+
 func TestUserHandler_Create(t *testing.T) {
 	tests := []struct {
 		name           string

@@ -1,3 +1,11 @@
+-- name: ListUsers :many
+SELECT DISTINCT u.id, u.name, u.email, u.created_at
+FROM users u
+JOIN project_members pm ON pm.user_id = u.id
+WHERE pm.project_id IN (SELECT project_id FROM project_members pm2 WHERE pm2.user_id = $1)
+AND u.id != $1
+ORDER BY u.name ASC;
+
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE email = $1;
 
