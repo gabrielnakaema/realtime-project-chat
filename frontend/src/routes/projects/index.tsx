@@ -1,10 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { MessageSquare } from 'lucide-react';
 import { CreateProject } from '@/components/create-project';
 import { HeaderUser } from '@/components/header-user';
 import { ProjectList } from '@/components/project-list';
 import { SearchBar } from '@/components/search-bar';
 import { UserDueTasks } from '@/components/user-due-tasks';
 import { UserProjectActivities } from '@/components/user-project-activities';
+import { useMessagesSheet } from '@/contexts/messages-sheet-context';
 import { useAuth } from '@/hooks/use-auth';
 
 export const Route = createFileRoute('/projects/')({
@@ -13,6 +15,7 @@ export const Route = createFileRoute('/projects/')({
 
 function RouteComponent() {
   const { user } = useAuth();
+  const { open: openMessages } = useMessagesSheet();
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -27,6 +30,14 @@ function RouteComponent() {
             <SearchBar action="/search" searchName="query" formClassName="w-full max-w-md" />
 
             <div className="flex items-center gap-4">
+              <button
+                onClick={openMessages}
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                <MessageSquare className="h-4 w-4" />
+                Messages
+              </button>
+
               <CreateProject />
 
               <HeaderUser />

@@ -23,3 +23,8 @@ export const createUser = async (form: ISignUpForm) => {
 
   return json;
 };
+
+export const listUsers = async (): Promise<User[]> => {
+  const response = await api.get('users');
+  return response.json<User[]>();
+};

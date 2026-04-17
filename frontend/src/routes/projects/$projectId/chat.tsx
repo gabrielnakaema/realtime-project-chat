@@ -2,7 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { ArrowLeft, Send } from 'lucide-react';
-import { useLayoutEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import type { IChatForm } from '@/schemas/chat-schema';
 import type { SubmitHandler } from 'react-hook-form';
@@ -31,7 +30,6 @@ const formatDate = (timestamp: string) => {
 function RouteComponent() {
   const { projectId } = Route.useParams();
   const { user } = useAuth();
-  const isInitialRender = useRef(true);
 
   const { register, handleSubmit, reset } = useForm<IChatForm>({
     resolver: zodResolver(chatSchema),
@@ -45,31 +43,6 @@ function RouteComponent() {
       reset();
     },
   });
-
-  useLayoutEffect(() => {
-    const container = chatContainerRef.current;
-    if (!container || messages.length === 0) {
-      return;
-    }
-
-    if (isInitialRender.current) {
-      isInitialRender.current = false;
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: 'instant',
-      });
-      return;
-    }
-
-    const isNearBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
-
-    if (isNearBottom) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: 'smooth',
-      });
-    }
-  }, [messages, chatContainerRef]);
 
   const onSubmit: SubmitHandler<IChatForm> = (form) => {
     if (!chatData?.id) {

@@ -1,17 +1,15 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef } from 'react';
-import { useOnlineUsers } from './use-online-users';
 import { useSocket } from './use-socket';
 import type { ChatMessage } from '@/types/chat';
 import type { CursorPaginated } from '@/types/paginated';
 import type { SocketEvent } from '@/types/websocket';
 import type { InfiniteData } from '@tanstack/react-query';
-import { getChatByProjectId, listMessagesByProjectId } from '@/services/chat';
-import { getProject } from '@/services/projects';
-import { chatQueryKeys, projectQueryKeys } from '@/services/query-keys';
+import { getGeneralChatById, listGeneralChatMessages } from '@/services/general-chat';
+import { generalChatQueryKeys } from '@/services/query-keys';
 import { handleError } from '@/utils/handle-error';
 
-export const useChat = (projectId: string) => {
+export const useGeneralChat = (chatId: string) => {
   const queryClient = useQueryClient();
 
   const observedRef = useRef<HTMLDivElement>(null);
@@ -20,6 +18,29 @@ export const useChat = (projectId: string) => {
   const wasAtBottomRef = useRef(true);
 
   const { status, subscribe } = useSocket();
+
+  const { data: chat } = useQuery({
+    queryKey: generalChatQueryKeys.details(chatId),
+    queryFn: () => getGeneralChatById(chatId),
+  });
+
+  const { data: messagesData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: generalChatQueryKeys.infiniteMessages(chatId),
+    queryFn: ({ pageParam }) => listGeneralChatMessages({ chatId, ...pageParam }),
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.has_next) {
+        return undefined;
+      }
+      return {
+        before: lastPage.data[0].created_at,
+        id: lastPage.data[0].id,
+      };
+    },
+    initialPageParam: {
+      before: '',
+      id: '',
+    },
+  });
 
   useEffect(() => {
     const container = chatContainerRef.current;
@@ -33,44 +54,11 @@ export const useChat = (projectId: string) => {
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const { data: project } = useQuery({
-    queryKey: projectQueryKeys.details(projectId),
-    queryFn: () => getProject(projectId),
-  });
-
-  const { data: chatData } = useQuery({
-    queryKey: chatQueryKeys.detailsByProjectId(projectId),
-    queryFn: () => getChatByProjectId(projectId),
-  });
-
-  const { data: messagesData, fetchNextPage } = useInfiniteQuery({
-    queryKey: chatQueryKeys.listInfiniteMessagesByProjectId({ projectId }),
-    queryFn: ({ pageParam }) => listMessagesByProjectId({ projectId, ...pageParam }),
-    getNextPageParam: (lastPage) => {
-      if (!lastPage.has_next) {
-        return undefined;
-      }
-
-      return {
-        before: lastPage.data[0].created_at,
-        id: lastPage.data[0].id,
-      };
-    },
-    initialPageParam: {
-      before: '',
-      id: '',
-    },
-  });
-
-  const chatId = useMemo(() => chatData?.id, [chatData]);
-
-  const { onlineUserIds } = useOnlineUsers(chatId);
-
   useEffect(() => {
     const intersectionObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
+          if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
             fetchNextPage();
           }
         });
@@ -88,18 +76,17 @@ export const useChat = (projectId: string) => {
     return () => {
       intersectionObserver.disconnect();
     };
-  }, [messagesData, fetchNextPage]);
+  }, [messagesData, fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const addNewMessage = (message: ChatMessage) => {
     queryClient.setQueryData(
-      chatQueryKeys.listInfiniteMessagesByProjectId({ projectId }),
+      generalChatQueryKeys.infiniteMessages(chatId),
       (old?: InfiniteData<CursorPaginated<ChatMessage>>) => {
         if (!old?.pages.length) {
           return old;
         }
 
         const firstPage = old.pages[0];
-
         const hasMorePages = old.pages.length > 1;
 
         if (hasMorePages) {
@@ -124,9 +111,7 @@ export const useChat = (projectId: string) => {
     }
 
     if (event.type === 'message') {
-      const chatMessage = event.data;
-
-      addNewMessage(chatMessage);
+      addNewMessage(event.data);
     }
   });
 
@@ -144,41 +129,44 @@ export const useChat = (projectId: string) => {
 
   const messages = useMemo(() => {
     const pages = messagesData?.pages || [];
-
     const m: ChatMessage[] = [];
-
     for (let i = pages.length - 1; i >= 0; i--) {
       for (const message of pages[i].data) {
         m.push(message);
       }
     }
-
     return m;
   }, [messagesData]);
 
   useLayoutEffect(() => {
     const container = chatContainerRef.current;
-    if (!container || messages.length === 0) return;
+    if (!container || messages.length === 0) {
+      return;
+    }
 
     if (isInitialRender.current) {
       isInitialRender.current = false;
       wasAtBottomRef.current = true;
-      container.scrollTo({ top: container.scrollHeight, behavior: 'instant' });
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'instant',
+      });
       return;
     }
 
     if (wasAtBottomRef.current) {
-      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth',
+      });
     }
   }, [messages]);
 
   return {
-    project,
-    chatData,
+    chat,
     messagesData,
     observedRef,
     chatContainerRef,
     messages,
-    onlineUserIds,
   };
 };

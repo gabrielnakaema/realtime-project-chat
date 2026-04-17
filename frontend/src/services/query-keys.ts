@@ -44,3 +44,13 @@ export const chatQueryKeys = {
     { projectId, before },
   ],
 } as const;
+
+export const generalChatQueryKeys = {
+  list: ['general-chats'],
+  details: (chatId: string) => ['general-chats', chatId],
+  infiniteMessages: (chatId: string) => ['general-chats', chatId, 'messages'],
+} as const;
+
+export const userListQueryKeys = {
+  all: ['users', 'list'],
+} as const;

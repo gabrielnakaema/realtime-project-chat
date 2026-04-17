@@ -1,5 +1,7 @@
 import { Outlet, createRootRoute } from '@tanstack/react-router';
 import { Suspense, lazy } from 'react';
+import { MessagesSheet } from '@/components/messages-sheet';
+import { MessagesSheetProvider } from '@/contexts/messages-sheet-context';
 
 const isDev = import.meta.env.DEV;
 
@@ -19,8 +21,9 @@ const devComponents = isDev
 
 export const Route = createRootRoute({
   component: () => (
-    <>
+    <MessagesSheetProvider>
       <Outlet />
+      <MessagesSheet />
       {isDev && devComponents.TanStackDevtools && (
         <Suspense fallback={null}>
           <devComponents.TanStackDevtools
@@ -41,6 +44,6 @@ export const Route = createRootRoute({
           />
         </Suspense>
       )}
-    </>
+    </MessagesSheetProvider>
   ),
 });

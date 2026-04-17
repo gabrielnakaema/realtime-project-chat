@@ -2,11 +2,12 @@ import type { User } from './user';
 
 export interface Chat {
   id: string;
-  project_id: string;
+  project_id: string | null;
+  chat_type: string;
   created_at: string;
   updated_at: string;
   members: ChatMember[];
-  messages: ChatMessage[];
+  messages?: ChatMessage[];
 }
 
 export interface ChatMember {
