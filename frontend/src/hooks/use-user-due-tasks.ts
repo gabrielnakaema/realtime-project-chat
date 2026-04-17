@@ -1,15 +1,14 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import type { CursorPaginated } from '@/types/paginated';
 import type { Task } from '@/types/task';
+import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { taskQueryKeys } from '@/services/query-keys';
 import { listUserDueTasks } from '@/services/tasks';
 
 const PAGE_SIZE = 10;
 
 export const useUserDueTasks = () => {
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
   const query = useInfiniteQuery({
     queryKey: taskQueryKeys.listUserDueTasks,
     initialPageParam: { cursorDueDate: null, cursorUpdatedAt: '' } as {
@@ -29,28 +28,18 @@ export const useUserDueTasks = () => {
     },
   });
 
-  const { fetchNextPage, hasNextPage } = query;
+  const { fetchNextPage, isFetchingNextPage } = query;
 
   const data = useMemo(() => query.data?.pages.flatMap((p) => p.data) ?? [], [query.data]);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || !hasNextPage) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) fetchNextPage();
-      },
-      { root: null, rootMargin: '200px', threshold: 0.1 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, data.length]);
+  const sentinelRef = useInfiniteScrollObserver<HTMLDivElement>({
+    onLoadMore: fetchNextPage,
+  });
 
   return {
     data,
     isLoading: query.isLoading,
-    isFetchingNextPage: query.isFetchingNextPage,
+    isFetchingNextPage,
     sentinelRef,
   };
 };

@@ -1,15 +1,14 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import type { CursorPaginated } from '@/types/paginated';
 import type { Task } from '@/types/task';
+import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { taskQueryKeys } from '@/services/query-keys';
 import { searchTasksForUser } from '@/services/tasks';
 
 const PAGE_SIZE = 15;
 
 export const useSearchTasks = (query?: string) => {
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
   const result = useInfiniteQuery({
     queryKey: taskQueryKeys.search({
       searchQuery: query || '',
@@ -37,29 +36,18 @@ export const useSearchTasks = (query?: string) => {
       cursorUpdatedAt: string;
     },
   });
-  const { fetchNextPage, hasNextPage } = result;
+  const { fetchNextPage, isFetchingNextPage } = result;
 
   const data = useMemo(() => result.data?.pages.flatMap((p) => p.data) ?? [], [result.data]);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || !hasNextPage) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) fetchNextPage();
-      },
-      { root: null, rootMargin: '200px', threshold: 0.1 },
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage, data.length]);
+  const sentinelRef = useInfiniteScrollObserver<HTMLDivElement>({
+    onLoadMore: fetchNextPage,
+  });
 
   return {
     data,
     isLoading: result.isLoading,
-    isFetchingNextPage: result.isFetchingNextPage,
+    isFetchingNextPage,
     sentinelRef,
   };
 };

@@ -1,9 +1,10 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import type { InfiniteData } from '@tanstack/react-query';
 import type { CursorPaginated } from '@/types/paginated';
 import type { TaskComment } from '@/types/task';
 import type { SocketEvent } from '@/types/websocket';
+import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { useSocket } from '@/hooks/use-socket';
 import { createTaskComment, listTaskComments } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
@@ -18,11 +19,10 @@ export const useTaskComments = ({ taskId, projectId, open }: { taskId: string; p
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [composerKey, setComposerKey] = useState(0);
   const [replyEditorKey, setReplyEditorKey] = useState(0);
-  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const queryKey = taskQueryKeys.comments(taskId);
 
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const { data, isLoading, fetchNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: taskQueryKeys.comments(taskId),
     queryFn: ({ pageParam }) => listTaskComments({ taskId, limit: 20, before: pageParam ?? undefined }),
     getNextPageParam: (lastPage) => {
@@ -35,24 +35,9 @@ export const useTaskComments = ({ taskId, projectId, open }: { taskId: string; p
 
   const comments = data?.pages.flatMap((page) => page.data) ?? [];
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && hasNextPage) {
-            fetchNextPage();
-          }
-        });
-      },
-      { rootMargin: '200px', threshold: 0.1 },
-    );
-
-    if (sentinelRef.current) {
-      observer.observe(sentinelRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage]);
+  const sentinelRef = useInfiniteScrollObserver<HTMLDivElement>({
+    onLoadMore: fetchNextPage,
+  });
 
   const { mutate: submitMutation, isPending: isSubmitting } = useMutation({
     mutationFn: ({ content, parentCommentId }: { content: string; parentCommentId?: string | null }) =>

@@ -1,11 +1,10 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
+import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { listProjectActivities } from '@/services/project-activities';
 import { projectQueryKeys } from '@/services/query-keys';
 
 export const useProjectActivities = (projectId: string) => {
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
   const infiniteQueryResult = useInfiniteQuery({
     queryKey: projectQueryKeys.activities(projectId),
     initialPageParam: {
@@ -28,32 +27,12 @@ export const useProjectActivities = (projectId: string) => {
     },
   });
 
-  const { fetchNextPage, hasNextPage } = infiniteQueryResult;
+  const { fetchNextPage } = infiniteQueryResult;
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && hasNextPage) {
-            fetchNextPage();
-          }
-        });
-      },
-      {
-        root: null,
-        rootMargin: '100px',
-        threshold: 0.1,
-      },
-    );
-
-    if (sentinelRef.current) {
-      observer.observe(sentinelRef.current);
-    }
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [fetchNextPage, hasNextPage]);
+  const sentinelRef = useInfiniteScrollObserver<HTMLDivElement>({
+    onLoadMore: fetchNextPage,
+    rootMargin: '100px',
+  });
 
   const data = useMemo(() => {
     return infiniteQueryResult.data?.pages.flatMap((page) => page.data) ?? [];

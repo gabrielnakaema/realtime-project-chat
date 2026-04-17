@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import type { TaskStatus } from '@/types/task';
+import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { taskQueryKeys } from '@/services/query-keys';
 import { listGroupedTasksByProjectId } from '@/services/tasks';
 
@@ -16,8 +17,6 @@ interface PageParam {
 }
 
 export const useBoardColumnTasks = ({ projectId, status, limit }: UseBoardColumnTasksProps) => {
-  const sentinelRef = useRef<HTMLDivElement>(null);
-
   const infiniteQueryResult = useInfiniteQuery({
     queryKey: taskQueryKeys.listGroupedByProjectId({
       projectId,
@@ -52,36 +51,15 @@ export const useBoardColumnTasks = ({ projectId, status, limit }: UseBoardColumn
       updatedAt: null,
     } as PageParam,
   });
-  const { fetchNextPage, hasNextPage } = infiniteQueryResult;
+  const { fetchNextPage } = infiniteQueryResult;
 
   const columnTasks = useMemo(() => {
     return infiniteQueryResult.data?.pages.flatMap((page) => page[status].data) ?? [];
   }, [infiniteQueryResult.data, status]);
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && hasNextPage) {
-            fetchNextPage();
-          }
-        });
-      },
-      {
-        root: null,
-        rootMargin: '200px',
-        threshold: 0.1,
-      },
-    );
-
-    if (sentinelRef.current) {
-      observer.observe(sentinelRef.current);
-    }
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [fetchNextPage, hasNextPage]);
+  const sentinelRef = useInfiniteScrollObserver<HTMLDivElement>({
+    onLoadMore: fetchNextPage,
+  });
 
   return {
     columnTasks,

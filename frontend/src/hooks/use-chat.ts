@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef } from 'react';
+import { useInfiniteScrollObserver } from './use-infinite-scroll-observer';
 import { useOnlineUsers } from './use-online-users';
 import { useSocket } from './use-socket';
 import type { ChatMessage } from '@/types/chat';
@@ -14,7 +15,6 @@ import { handleError } from '@/utils/handle-error';
 export const useChat = (projectId: string) => {
   const queryClient = useQueryClient();
 
-  const observedRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isInitialRender = useRef(true);
   const wasAtBottomRef = useRef(true);
@@ -43,7 +43,10 @@ export const useChat = (projectId: string) => {
     queryFn: () => getChatByProjectId(projectId),
   });
 
-  const { data: messagesData, fetchNextPage } = useInfiniteQuery({
+  const {
+    data: messagesData,
+    fetchNextPage,
+  } = useInfiniteQuery({
     queryKey: chatQueryKeys.listInfiniteMessagesByProjectId({ projectId }),
     queryFn: ({ pageParam }) => listMessagesByProjectId({ projectId, ...pageParam }),
     getNextPageParam: (lastPage) => {
@@ -66,29 +69,12 @@ export const useChat = (projectId: string) => {
 
   const { onlineUserIds } = useOnlineUsers(chatId);
 
-  useEffect(() => {
-    const intersectionObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            fetchNextPage();
-          }
-        });
-      },
-      {
-        root: chatContainerRef.current,
-        rootMargin: '40%',
-      },
-    );
-
-    if (observedRef.current) {
-      intersectionObserver.observe(observedRef.current);
-    }
-
-    return () => {
-      intersectionObserver.disconnect();
-    };
-  }, [messagesData, fetchNextPage]);
+  const observedRef = useInfiniteScrollObserver<HTMLDivElement>({
+    onLoadMore: fetchNextPage,
+    rootRef: chatContainerRef,
+    rootMargin: '40%',
+    threshold: 0,
+  });
 
   const addNewMessage = (message: ChatMessage) => {
     queryClient.setQueryData(

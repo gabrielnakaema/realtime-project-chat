@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef } from 'react';
+import { useInfiniteScrollObserver } from './use-infinite-scroll-observer';
 import { useSocket } from './use-socket';
 import type { ChatMessage } from '@/types/chat';
 import type { CursorPaginated } from '@/types/paginated';
@@ -12,7 +13,6 @@ import { handleError } from '@/utils/handle-error';
 export const useGeneralChat = (chatId: string) => {
   const queryClient = useQueryClient();
 
-  const observedRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isInitialRender = useRef(true);
   const wasAtBottomRef = useRef(true);
@@ -24,7 +24,10 @@ export const useGeneralChat = (chatId: string) => {
     queryFn: () => getGeneralChatById(chatId),
   });
 
-  const { data: messagesData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const {
+    data: messagesData,
+    fetchNextPage,
+  } = useInfiniteQuery({
     queryKey: generalChatQueryKeys.infiniteMessages(chatId),
     queryFn: ({ pageParam }) => listGeneralChatMessages({ chatId, ...pageParam }),
     getNextPageParam: (lastPage) => {
@@ -54,29 +57,12 @@ export const useGeneralChat = (chatId: string) => {
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
-  useEffect(() => {
-    const intersectionObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
-            fetchNextPage();
-          }
-        });
-      },
-      {
-        root: chatContainerRef.current,
-        rootMargin: '40%',
-      },
-    );
-
-    if (observedRef.current) {
-      intersectionObserver.observe(observedRef.current);
-    }
-
-    return () => {
-      intersectionObserver.disconnect();
-    };
-  }, [messagesData, fetchNextPage, hasNextPage, isFetchingNextPage]);
+  const observedRef = useInfiniteScrollObserver<HTMLDivElement>({
+    onLoadMore: fetchNextPage,
+    rootRef: chatContainerRef,
+    rootMargin: '40%',
+    threshold: 0,
+  });
 
   const addNewMessage = (message: ChatMessage) => {
     queryClient.setQueryData(

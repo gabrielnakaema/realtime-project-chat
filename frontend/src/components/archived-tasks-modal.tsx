@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArchiveRestore, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { EditTask } from './edit-task';
 import { TaskDetails } from './task-details';
 import { TaskPriorityBadge } from './task-priority-badge';
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import type { Task, TaskStatus } from '@/types/task';
 import type { Project } from '@/types/project';
+import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { ProjectMemberRole } from '@/types/project';
 import { listGroupedTasksByProjectId, updateTask } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
@@ -44,7 +45,6 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
   const [open, setOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const queryClient = useQueryClient();
   const [pickingStatusForTaskId, setPickingStatusForTaskId] = useState<string | null>(null);
@@ -84,7 +84,7 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
     },
   });
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const { data, fetchNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: taskQueryKeys.listGroupedByProjectId({
       projectId: project.id,
       statuses: ['archived'],
@@ -112,24 +112,9 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
 
   const archivedTasks = useMemo(() => data?.pages.flatMap((page) => page['archived'].data) ?? [], [data]);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && hasNextPage) {
-            fetchNextPage();
-          }
-        });
-      },
-      { rootMargin: '200px', threshold: 0.1 },
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [fetchNextPage, hasNextPage]);
+  const sentinelRef = useInfiniteScrollObserver<HTMLDivElement>({
+    onLoadMore: fetchNextPage,
+  });
 
   if (!isCreator) return null;
 
