@@ -103,7 +103,7 @@ export function adjustCountCache(
       if (!old) return old;
       const next = { ...old };
       for (const [status, diff] of Object.entries(delta) as [TaskStatus, number][]) {
-        next[status] = Math.max(0, next[status] + diff);
+        next[status] = Math.max(0, (next[status] || 0) + diff);
       }
       return next;
     },
