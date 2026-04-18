@@ -3,7 +3,7 @@ import { MessagesListView } from './list-view';
 import { useMessagesSheet } from '@/contexts/messages-sheet-context';
 
 export function MessagesSheet() {
-  const { isOpen, selectedChatId, close } = useMessagesSheet();
+  const { isOpen, selectedChatId, view, close } = useMessagesSheet();
 
   if (!isOpen) return null;
 
@@ -11,7 +11,7 @@ export function MessagesSheet() {
     <>
       <div className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px]" onClick={close} />
       <aside className="fixed top-0 right-0 z-50 flex h-full w-full max-w-[420px] flex-col border-l border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-        {selectedChatId ? <MessagesChatView chatId={selectedChatId} /> : <MessagesListView />}
+        {view === 'chat' && selectedChatId ? <MessagesChatView chatId={selectedChatId} /> : <MessagesListView />}
       </aside>
     </>
   );

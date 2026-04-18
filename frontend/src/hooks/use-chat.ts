@@ -12,41 +12,31 @@ import { getProject } from '@/services/projects';
 import { chatQueryKeys, projectQueryKeys } from '@/services/query-keys';
 import { handleError } from '@/utils/handle-error';
 
-export const useChat = (projectId: string) => {
-  const queryClient = useQueryClient();
-
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const isInitialRender = useRef(true);
-  const wasAtBottomRef = useRef(true);
-
-  const { status, subscribe } = useSocket();
-
-  useEffect(() => {
-    const container = chatContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      wasAtBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight <= 100;
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
-
+export const useProjectChat = (projectId: string) => {
   const { data: project } = useQuery({
     queryKey: projectQueryKeys.details(projectId),
     queryFn: () => getProject(projectId),
   });
 
-  const { data: chatData } = useQuery({
+  const { data: chat } = useQuery({
     queryKey: chatQueryKeys.detailsByProjectId(projectId),
     queryFn: () => getChatByProjectId(projectId),
   });
 
-  const {
-    data: messagesData,
-    fetchNextPage,
-  } = useInfiniteQuery({
+  const { onlineUserIds } = useOnlineUsers(chat?.id);
+
+  return {
+    project,
+    chat,
+    onlineUserIds,
+  };
+};
+
+export const useChatMessages = (projectId: string, chatId?: string) => {
+  const queryClient = useQueryClient();
+  const { status, subscribe } = useSocket();
+
+  const { data, fetchNextPage } = useInfiniteQuery({
     queryKey: chatQueryKeys.listInfiniteMessagesByProjectId({ projectId }),
     queryFn: ({ pageParam }) => listMessagesByProjectId({ projectId, ...pageParam }),
     getNextPageParam: (lastPage) => {
@@ -65,18 +55,7 @@ export const useChat = (projectId: string) => {
     },
   });
 
-  const chatId = useMemo(() => chatData?.id, [chatData]);
-
-  const { onlineUserIds } = useOnlineUsers(chatId);
-
-  const observedRef = useInfiniteScrollObserver<HTMLDivElement>({
-    onLoadMore: fetchNextPage,
-    rootRef: chatContainerRef,
-    rootMargin: '40%',
-    threshold: 0,
-  });
-
-  const addNewMessage = (message: ChatMessage) => {
+  const addMessage = (message: ChatMessage) => {
     queryClient.setQueryData(
       chatQueryKeys.listInfiniteMessagesByProjectId({ projectId }),
       (old?: InfiniteData<CursorPaginated<ChatMessage>>) => {
@@ -86,9 +65,7 @@ export const useChat = (projectId: string) => {
 
         const firstPage = old.pages[0];
 
-        const hasMorePages = old.pages.length > 1;
-
-        if (hasMorePages) {
+        if (old.pages.length > 1) {
           return {
             pages: [{ data: [...firstPage.data, message], has_next: false }, ...old.pages.slice(1)],
             pageParams: old.pageParams,
@@ -110,9 +87,7 @@ export const useChat = (projectId: string) => {
     }
 
     if (event.type === 'message') {
-      const chatMessage = event.data;
-
-      addNewMessage(chatMessage);
+      addMessage(event.data);
     }
   });
 
@@ -129,22 +104,58 @@ export const useChat = (projectId: string) => {
   }, [chatId, status, subscribe]);
 
   const messages = useMemo(() => {
-    const pages = messagesData?.pages || [];
-
-    const m: ChatMessage[] = [];
+    const pages = data?.pages || [];
+    const flattenedMessages: ChatMessage[] = [];
 
     for (let i = pages.length - 1; i >= 0; i--) {
       for (const message of pages[i].data) {
-        m.push(message);
+        flattenedMessages.push(message);
       }
     }
 
-    return m;
-  }, [messagesData]);
+    return flattenedMessages;
+  }, [data]);
+
+  return {
+    messages,
+    fetchNextPage,
+  };
+};
+
+export const useChatScrollBehavior = (messages: ChatMessage[], onLoadMore: () => void) => {
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const isInitialRender = useRef(true);
+  const wasAtBottomRef = useRef(true);
+
+  useEffect(() => {
+    const container = chatContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const handleScroll = () => {
+      wasAtBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight <= 100;
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  const observedRef = useInfiniteScrollObserver<HTMLDivElement>({
+    onLoadMore,
+    rootRef: chatContainerRef,
+    rootMargin: '40%',
+    threshold: 0,
+  });
 
   useLayoutEffect(() => {
     const container = chatContainerRef.current;
-    if (!container || messages.length === 0) return;
+    if (!container || messages.length === 0) {
+      return;
+    }
 
     if (isInitialRender.current) {
       isInitialRender.current = false;
@@ -159,12 +170,7 @@ export const useChat = (projectId: string) => {
   }, [messages]);
 
   return {
-    project,
-    chatData,
-    messagesData,
-    observedRef,
     chatContainerRef,
-    messages,
-    onlineUserIds,
+    observedRef,
   };
 };

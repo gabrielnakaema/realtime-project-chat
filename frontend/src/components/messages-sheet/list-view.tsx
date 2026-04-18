@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { PencilLine, X } from 'lucide-react';
-import { useState } from 'react';
 import { MessagesComposeModal } from './compose-modal';
 import { getAvatarColorClass, getChatAvatarSeed, getChatSubtitle, getChatTitle } from './utils';
 import { useMessagesSheet } from '@/contexts/messages-sheet-context';
@@ -11,8 +10,7 @@ import { generalChatQueryKeys } from '@/services/query-keys';
 
 export function MessagesListView() {
   const { user } = useAuth();
-  const { openChat, close } = useMessagesSheet();
-  const [showCompose, setShowCompose] = useState(false);
+  const { openChat, openCompose, close, view } = useMessagesSheet();
 
   const { data: chats = [] } = useQuery({
     queryKey: generalChatQueryKeys.list,
@@ -25,7 +23,7 @@ export function MessagesListView() {
         <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Messages</h2>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setShowCompose(true)}
+            onClick={openCompose}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300"
             title="New message"
           >
@@ -50,7 +48,7 @@ export function MessagesListView() {
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300">No messages yet</p>
             <p className="mt-1 text-xs text-slate-400">Start a conversation with a teammate</p>
             <button
-              onClick={() => setShowCompose(true)}
+              onClick={openCompose}
               className="mt-4 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700"
             >
               New message
@@ -85,7 +83,7 @@ export function MessagesListView() {
         )}
       </div>
 
-      {showCompose && <MessagesComposeModal onClose={() => setShowCompose(false)} />}
+      {view === 'compose' && <MessagesComposeModal />}
     </>
   );
 }
