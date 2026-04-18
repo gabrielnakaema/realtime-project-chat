@@ -15,7 +15,7 @@ export const HeaderUser = () => {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild>
         <button type="button" className="flex items-center gap-2">
           <div
             className={cn(

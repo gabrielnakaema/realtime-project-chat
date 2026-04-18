@@ -5,7 +5,7 @@ import type { IProjectForm } from '@/schemas/project-schema';
 export const listProjects = async (searchQuery?: string) => {
   const searchParams = new URLSearchParams();
   if (searchQuery) {
-    searchParams.set('query', searchQuery);
+    searchParams.set('query', searchQuery.toString());
   }
 
   const response = await api.get('projects', {

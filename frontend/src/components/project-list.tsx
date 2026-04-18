@@ -1,11 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { Link } from '@tanstack/react-router';
 import { CreateProject } from './create-project';
+import { ProjectCard, ProjectCardSkeleton } from './project-card';
 import { listProjects } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
-import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
-import { sanitizeHTML } from '@/utils/html';
 
 export const ProjectList = () => {
   const { data: projects, isLoading } = useQuery({
@@ -38,33 +36,7 @@ export const ProjectList = () => {
       {!!projects?.length && (
         <div className="flex w-full max-w-full items-stretch gap-4 overflow-x-auto pb-3">
           {projects.map((project) => (
-            <Link
-              key={project.id}
-              to="/projects/$projectId"
-              params={{ projectId: project.id }}
-              className="w-full max-w-sm min-w-sm cursor-pointer rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-lg dark:border-slate-700 dark:bg-slate-800"
-            >
-              <div className="flex h-full flex-col gap-3 p-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="overflow-hidden text-lg font-semibold text-ellipsis whitespace-nowrap text-slate-900 dark:text-slate-100">
-                    {project.name}
-                  </h3>
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-300">
-                    {project.members.length || 0} {project.members.length === 1 ? 'member' : 'members'}
-                  </span>
-                </div>
-
-                <p className="line-clamp-3 max-h-16 min-h-16 overflow-hidden text-sm text-ellipsis text-slate-600 dark:text-slate-400">
-                  <div dangerouslySetInnerHTML={{ __html: sanitizeHTML(project.description) }} />
-                </p>
-                <p className="mt-auto text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                  Last activity:{' '}
-                  <time dateTime={project.updated_at}>
-                    {project.updated_at ? formatRelativeActivityDateString(project.updated_at) : 'N/A'}
-                  </time>
-                </p>
-              </div>
-            </Link>
+            <ProjectCard key={project.id} project={project} />
           ))}
         </div>
       )}
@@ -78,24 +50,10 @@ export const ProjectListSkeleton = () => {
       <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Your Projects</h2>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, index) => (
-          <div
+          <ProjectCardSkeleton
             key={index}
-            className="cursor-pointer rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-lg dark:border-slate-700 dark:bg-slate-800"
-          >
-            <div className="flex flex-col gap-4 p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="h-4 w-1/4 animate-pulse rounded-full bg-slate-100 dark:bg-slate-700" />
-                <div className="h-4 w-1/5 animate-pulse rounded-full bg-slate-100 dark:bg-slate-700" />
-              </div>
-
-              <div className="space-y-1">
-                <div className="h-4 w-full animate-pulse rounded-full bg-slate-100 dark:bg-slate-700" />
-                <div className="h-4 w-full animate-pulse rounded-full bg-slate-100 dark:bg-slate-700" />
-                <div className="h-4 w-4/5 animate-pulse rounded-full bg-slate-100 dark:bg-slate-700" />
-              </div>
-              <div className="h-4 w-1/3 animate-pulse rounded-full bg-slate-100 dark:bg-slate-700" />
-            </div>
-          </div>
+            className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+          />
         ))}
       </div>
     </section>

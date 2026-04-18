@@ -1,7 +1,7 @@
-import { ChevronRight, Loader2 } from 'lucide-react';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Loader2 } from 'lucide-react';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useUserDueTasks } from '@/hooks/use-user-due-tasks';
+import { TaskLinkRow } from '@/components/task-link-row';
 import { cn } from '@/lib/utils';
 
 const BADGE_BASE = 'text-xs font-medium rounded-md px-2 py-0.5';
@@ -30,7 +30,6 @@ function DueBadge({ date }: { date: string | null }) {
 
 export const UserDueTasks = () => {
   const { data, isLoading, isFetchingNextPage, sentinelRef } = useUserDueTasks();
-  const navigate = useNavigate();
 
   if (!isLoading && !data.length) return null;
   if (isLoading) return <UserDueTasksSkeleton />;
@@ -44,38 +43,16 @@ export const UserDueTasks = () => {
 
       <div className="flex max-h-96 flex-col gap-4 overflow-y-auto pr-1">
         {data.map((task) => (
-          <article
+          <TaskLinkRow
             key={task.id}
-            className="group flex w-full cursor-pointer flex-row items-center justify-between gap-2 border-b border-slate-200 pb-2 dark:border-slate-700"
-            tabIndex={0}
-            role="button"
-            onClick={() => {
-              navigate({
-                to: '/projects/$projectId',
-                params: { projectId: task.project?.id ?? '' },
-                search: { taskId: task.id },
-              });
-            }}
-          >
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{task.title}</p>
-              <Link
-                to="/projects/$projectId"
-                params={{ projectId: task.project?.id ?? '' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                <p className="text-sm text-slate-500 hover:underline dark:text-slate-400">{task.project?.name}</p>
-              </Link>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-500 dark:text-slate-400">{formatDueDate(task.due_date)}</span>
-              <DueBadge date={task.due_date} />
-
-              <ChevronRight className="invisible h-4 w-4 text-slate-500 opacity-0 transition-all group-hover:visible group-hover:text-slate-700 group-hover:opacity-100 hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-300 dark:hover:text-slate-300" />
-            </div>
-          </article>
+            task={task}
+            trailingContent={
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500 dark:text-slate-400">{formatDueDate(task.due_date)}</span>
+                <DueBadge date={task.due_date} />
+              </div>
+            }
+          />
         ))}
         {isFetchingNextPage && (
           <div className="flex items-center justify-center">
