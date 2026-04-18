@@ -1,8 +1,8 @@
 import { MessageSquare, Reply, SendHorizontal } from 'lucide-react';
-import { Button } from './button';
-import { LoadingSpinner } from './loading';
-import { TextEditor } from './text-editor';
-import { ScrollArea, ScrollBar } from './ui/scroll-area';
+import { Button } from '../button';
+import { LoadingSpinner } from '../loading';
+import { TextEditor } from '../text-editor';
+import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import type { TaskComment } from '@/types/task';
 import { useAuth } from '@/hooks/use-auth';
 import { useTaskComments } from '@/hooks/use-task-comments';

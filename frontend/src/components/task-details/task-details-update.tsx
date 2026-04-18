@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react';
-import { Avatar } from './avatar';
-import { TaskPriorityBadge } from './task-priority-badge';
-import { TaskStatusBadge } from './task-status-badge';
+import { Avatar } from '../avatar';
+import { TaskPriorityBadge } from '../task-priority-badge';
+import { TaskStatusBadge } from '../task-status-badge';
 import type { TaskChange, TaskPriority, TaskStatus, TaskUpdate } from '@/types/task';
 import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
 

@@ -1,17 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { ArrowLeft, MessageSquare } from 'lucide-react';
-import { useState } from 'react';
 import { z } from 'zod';
 import { AddProjectMember } from '@/components/add-project-member';
-import { EditTask } from '@/components/edit-task';
 import { KanbanBoard } from '@/components/kanban-board';
 import { MembersAvatarList } from '@/components/members-avatar-list';
 import { ProjectDetailsSheet, ProjectDetailsSheetTrigger } from '@/components/project-details-sheet';
 import { ProjectMembersModal } from '@/components/project-members-modal';
 import { ProjectSettings } from '@/components/project-settings';
 import { TaskDetails } from '@/components/task-details';
+import { EditTask } from '@/components/task-form/edit-task';
 import { useOnlineUsers } from '@/hooks/use-online-users';
+import { useTaskDetailsRouting } from '@/hooks/use-task-details-routing';
 import { getProject } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';
 import { sanitizeHTML } from '@/utils/html';
@@ -25,9 +25,8 @@ export const Route = createFileRoute('/projects/$projectId/')({
 
 function RouteComponent() {
   const { projectId } = Route.useParams();
-  const { taskId } = Route.useSearch();
-  const navigate = Route.useNavigate();
-  const [isEditingTask, setIsEditingTask] = useState(false);
+  const { selectedTaskId, isEditingTask, openTask, closeTask, startEditingTask, stopEditingTask } =
+    useTaskDetailsRouting();
 
   const { onlineUserIds } = useOnlineUsers(projectId);
 
@@ -102,43 +101,22 @@ function RouteComponent() {
 
       {project && (
         <div className="p-6">
-          <KanbanBoard
-            project={project}
-            onTaskClick={(id) =>
-              navigate({
-                search: (prev) => ({ ...prev, taskId: id }),
-                replace: true,
-              })
-            }
-          />
+          <KanbanBoard project={project} onTaskClick={openTask} />
         </div>
       )}
 
       <TaskDetails
-        taskId={taskId ?? ''}
-        open={!!taskId && !isEditingTask}
+        taskId={selectedTaskId}
+        open={!!selectedTaskId && !isEditingTask}
         onOpenChange={(open) => {
           if (!open) {
-            navigate({
-              search: (prev) => ({ ...prev, taskId: undefined }),
-              replace: true,
-            });
+            closeTask();
           }
         }}
-        onEdit={() => {
-          setIsEditingTask(true);
-        }}
+        onEdit={startEditingTask}
       />
 
-      <EditTask
-        onOpenChange={(open) => {
-          if (!open) {
-            setIsEditingTask(false);
-          }
-        }}
-        taskId={taskId ?? ''}
-        open={isEditingTask && !!taskId}
-      />
+      <EditTask onOpenChange={stopEditingTask} taskId={selectedTaskId} open={isEditingTask} />
     </div>
   );
 }

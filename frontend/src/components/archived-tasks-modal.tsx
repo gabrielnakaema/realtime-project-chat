@@ -1,9 +1,9 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArchiveRestore, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { EditTask } from './edit-task';
 import { TaskDetails } from './task-details';
 import { TaskPriorityBadge } from './task-priority-badge';
+import { EditTask } from './task-form/edit-task';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import type { Task, TaskStatus } from '@/types/task';

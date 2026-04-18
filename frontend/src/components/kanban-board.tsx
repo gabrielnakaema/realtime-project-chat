@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArchivedTasksModal } from './archived-tasks-modal';
 import { BoardColumn } from './board-column';
-import { CreateTask } from './create-task';
+import { CreateTask } from './task-form/create-task';
 import type { TaskStatus } from '@/types/task';
 import type { Project } from '@/types/project';
 import { ProjectMemberRole } from '@/types/project';
