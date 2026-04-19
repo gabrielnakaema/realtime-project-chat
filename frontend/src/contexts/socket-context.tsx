@@ -111,8 +111,11 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
       setSubscriptions((prev) => {
         const existingSubToRoom = prev.find((sub) => sub.roomId === roomId);
+        const hasMatchingSubscription = prev.some((sub) => sub.roomId === roomId && sub.type === type);
+        const shouldConnect =
+          !hasMatchingSubscription && (!existingSubToRoom || (!!type && existingSubToRoom.type !== type));
 
-        if (!existingSubToRoom) {
+        if (shouldConnect) {
           send({ type: 'connect_user_to_room', data: { room_id: roomId, type } });
         }
 

@@ -28,7 +28,7 @@ function RouteComponent() {
   const { selectedTaskId, isEditingTask, openTask, closeTask, startEditingTask, stopEditingTask } =
     useTaskDetailsRouting();
 
-  const { onlineUserIds } = useOnlineUsers(projectId);
+  const { onlineUserIds } = useOnlineUsers(projectId, 'project');
 
   const { data: project } = useQuery({
     queryKey: projectQueryKeys.details(projectId),

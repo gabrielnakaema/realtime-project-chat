@@ -23,7 +23,7 @@ export const useProjectChat = (projectId: string) => {
     queryFn: () => getChatByProjectId(projectId),
   });
 
-  const { onlineUserIds } = useOnlineUsers(chat?.id);
+  const { onlineUserIds } = useOnlineUsers(chat?.id, 'chat');
 
   return {
     project,

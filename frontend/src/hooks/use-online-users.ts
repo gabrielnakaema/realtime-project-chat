@@ -2,7 +2,9 @@ import { useEffect, useEffectEvent, useState } from 'react';
 import { useSocket } from './use-socket';
 import type { SocketEvent } from '@/types/websocket';
 
-export const useOnlineUsers = (roomId?: string) => {
+type OnlineUsersRoomType = 'chat' | 'project';
+
+export const useOnlineUsers = (roomId?: string, roomType?: OnlineUsersRoomType) => {
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
 
   const { status, subscribe } = useSocket();
@@ -32,16 +34,16 @@ export const useOnlineUsers = (roomId?: string) => {
   });
 
   useEffect(() => {
-    if (status !== 'connected' || !roomId) {
+    if (status !== 'connected' || !roomId || !roomType) {
       return;
     }
 
-    const unsubscribe = subscribe(roomId, '', handleSocketEvent);
+    const unsubscribe = subscribe(roomId, roomType, handleSocketEvent);
 
     return () => {
       unsubscribe();
     };
-  }, [status, roomId, subscribe]);
+  }, [status, roomId, roomType, subscribe]);
 
   return {
     onlineUserIds,
