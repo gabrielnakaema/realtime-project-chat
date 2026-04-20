@@ -103,22 +103,19 @@ func (us *UserService) Login(ctx context.Context, request LoginRequest) (*LoginR
 
 	claims := make(map[string]string)
 
-	token, err := us.jwtProvider.Generate(user.Id.String(), time.Now().Add(30*time.Minute), claims)
+	now := time.Now()
+
+	token, err := us.jwtProvider.Generate(user.Id.String(), now.Add(domain.AccessTokenTTL), claims)
 	if err != nil {
 		return nil, domain.ServerError("error while generating token", err)
 	}
 
-	refreshTokenToken, err := GenerateRefreshToken(48)
+	refreshTokenToken, err := GenerateRefreshToken(domain.RefreshTokenByteLength)
 	if err != nil {
 		return nil, domain.ServerError("error while generating refresh token", err)
 	}
 
-	refreshToken := domain.RefreshToken{
-		Token:     refreshTokenToken,
-		UserId:    user.Id,
-		ExpiresAt: time.Now().Add(3 * time.Hour),
-		Active:    true,
-	}
+	refreshToken := domain.NewRefreshToken(user.Id, refreshTokenToken, now)
 
 	err = us.userRepository.CreateRefreshToken(ctx, &refreshToken)
 	if err != nil {
@@ -147,6 +144,8 @@ type RefreshTokenRequest struct {
 }
 
 func (us *UserService) RefreshToken(ctx context.Context, request RefreshTokenRequest) (*LoginResult, error) {
+	now := time.Now()
+
 	refreshToken, err := us.userRepository.GetRefreshToken(ctx, request.Token)
 	if err != nil {
 		var domainErr domain.DomainError
@@ -159,11 +158,7 @@ func (us *UserService) RefreshToken(ctx context.Context, request RefreshTokenReq
 		return nil, domain.ServerError("error while getting refresh token", err)
 	}
 
-	if !refreshToken.Active {
-		return nil, domain.UnauthorizedError("invalid refresh token")
-	}
-
-	if refreshToken.ExpiresAt.Before(time.Now()) {
+	if !refreshToken.IsUsableAt(now) {
 		return nil, domain.UnauthorizedError("invalid refresh token")
 	}
 
@@ -172,30 +167,24 @@ func (us *UserService) RefreshToken(ctx context.Context, request RefreshTokenReq
 		return nil, domain.UnauthorizedError("invalid refresh token")
 	}
 
-	accessToken, err := us.jwtProvider.Generate(user.Id.String(), time.Now().Add(30*time.Minute), make(map[string]string))
+	accessToken, err := us.jwtProvider.Generate(user.Id.String(), now.Add(domain.AccessTokenTTL), make(map[string]string))
 	if err != nil {
 		return nil, domain.ServerError("error while generating token", err)
 	}
 
-	newRefreshTokenToken, err := GenerateRefreshToken(48)
+	newRefreshTokenToken, err := GenerateRefreshToken(domain.RefreshTokenByteLength)
 	if err != nil {
 		return nil, domain.ServerError("error while generating refresh token", err)
 	}
 
-	newRefreshToken := domain.RefreshToken{
-		Token:     newRefreshTokenToken,
-		ExpiresAt: time.Now().Add(3 * time.Hour),
-		UserId:    user.Id,
-		CreatedAt: time.Now(),
-		Active:    true,
-	}
+	newRefreshToken := domain.NewRefreshToken(user.Id, newRefreshTokenToken, now)
 
 	err = us.userRepository.CreateRefreshToken(ctx, &newRefreshToken)
 	if err != nil {
 		return nil, domain.ServerError("error while creating new refresh token", err)
 	}
 
-	refreshToken.Active = false
+	refreshToken.Deactivate()
 
 	_ = us.userRepository.UpdateRefreshTokenActive(ctx, refreshToken)
 
@@ -218,7 +207,7 @@ func (us *UserService) Logout(ctx context.Context, userId uuid.UUID, token strin
 		return domain.ForbiddenError("invalid refresh token")
 	}
 
-	refreshToken.Active = false
+	refreshToken.Deactivate()
 
 	return us.userRepository.UpdateRefreshTokenActive(ctx, refreshToken)
 }
@@ -234,7 +223,7 @@ func GenerateRefreshToken(length int) (string, error) {
 func HashPassword(plaintext string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(plaintext), 10)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	return string(bytes), nil

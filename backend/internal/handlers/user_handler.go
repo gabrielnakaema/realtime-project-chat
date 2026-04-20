@@ -203,7 +203,7 @@ func setRefreshTokenCookie(w http.ResponseWriter, refreshToken string, isProduct
 		Secure:   isProduction,
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
-		Expires:  time.Now().Add(3 * time.Hour),
+		Expires:  time.Now().Add(domain.RefreshTokenTTL),
 	})
 }
 

@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -389,6 +390,7 @@ func TestHashPassword(t *testing.T) {
 		{"valid password", "password123", false},
 		{"empty password", "", false},
 		{"long password", "this-is-a-very-long-password-that-should-still-work", false},
+		{"bcrypt length limit exceeded", strings.Repeat("a", 73), true},
 	}
 
 	for _, tt := range tests {
