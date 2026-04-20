@@ -30,6 +30,11 @@ func (ws *Server) handleConnectUserToRoom(ctx context.Context, userId uuid.UUID,
 		return
 	}
 
+	if !isValidRoomType(data.Type) {
+		ws.logger.Error("invalid room type", "room_type", data.Type, "user_id", userId, "room_id", data.RoomId)
+		return
+	}
+
 	err = ws.connectUserToRoom(userId, data.RoomId, WsRoomType(data.Type))
 	if err != nil {
 		return

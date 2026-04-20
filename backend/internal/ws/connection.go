@@ -47,7 +47,6 @@ func (ws *Server) Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writerChannel := make(chan interface{}, 32)
-	readerChannel := make(chan interface{})
 	expiresAt, ok := token.Claims.(jwt.MapClaims)["exp"].(float64)
 	if !ok {
 		WriteErrorAndClose(r.Context(), c, "invalid token")
@@ -58,7 +57,6 @@ func (ws *Server) Handler(w http.ResponseWriter, r *http.Request) {
 		id:             userId,
 		tokenExpiresAt: time.Unix(int64(expiresAt), 0),
 		writer:         writerChannel,
-		reader:         readerChannel,
 		rooms:          make(map[uuid.UUID]bool),
 		lastPong:       time.Now(),
 		awaitingPong:   false,

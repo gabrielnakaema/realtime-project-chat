@@ -2,7 +2,6 @@ package ws
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
@@ -12,15 +11,22 @@ import (
 
 func (ws *Server) sendMessageToRoom(ctx context.Context, roomId uuid.UUID, message WebsocketMessage) error {
 	ws.mutex.Lock()
-	defer ws.mutex.Unlock()
-
 	room, ok := ws.rooms[roomId]
 	if !ok {
+		ws.mutex.Unlock()
 		return nil
 	}
 
+	userIds := make([]uuid.UUID, 0, len(room.users))
 	for userId := range room.users {
+		userIds = append(userIds, userId)
+	}
+	ws.mutex.Unlock()
+
+	for _, userId := range userIds {
+		ws.mutex.Lock()
 		user, ok := ws.users[userId]
+		ws.mutex.Unlock()
 		if !ok {
 			continue
 		}
@@ -80,12 +86,14 @@ func (ws *Server) disconnectUser(userId uuid.UUID) {
 		}
 	}
 
-	close(user.reader)
-	close(user.writer)
 	delete(ws.users, userId)
 }
 
 func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType WsRoomType) error {
+	if !isValidRoomType(roomType) {
+		return nil
+	}
+
 	if roomType == WsRoomTypeChat {
 		_, err := ws.chatService.GetById(context.Background(), roomId, userId)
 		if err != nil {
@@ -118,22 +126,26 @@ func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType
 	ws.mutex.Lock()
 	defer ws.mutex.Unlock()
 
+	user, ok := ws.users[userId]
+	if !ok {
+		return nil
+	}
+
 	room, ok := ws.rooms[roomId]
 	if ok {
 		room.users[userId] = true
-		ws.users[userId].rooms[roomId] = true
+		user.rooms[roomId] = true
 		return nil
 	}
 
 	room = &WsRoom{
 		id:       roomId,
 		users:    make(map[uuid.UUID]bool),
-		mutex:    sync.Mutex{},
 		roomType: roomType,
 	}
 	ws.rooms[roomId] = room
 	room.users[userId] = true
-	ws.users[userId].rooms[roomId] = true
+	user.rooms[roomId] = true
 
 	return nil
 }

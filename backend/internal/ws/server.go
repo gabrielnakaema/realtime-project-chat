@@ -16,7 +16,6 @@ type WsUser struct {
 	id             uuid.UUID
 	tokenExpiresAt time.Time
 	writer         chan any
-	reader         chan any
 	rooms          map[uuid.UUID]bool
 	lastPong       time.Time
 	awaitingPong   bool
@@ -38,7 +37,6 @@ const (
 type WsRoom struct {
 	id       uuid.UUID
 	users    map[uuid.UUID]bool
-	mutex    sync.Mutex
 	roomType WsRoomType
 }
 
@@ -91,22 +89,15 @@ func NewServer(ctx context.Context, tokenProvider tokenProvider, logger *slog.Lo
 				logger.Info("websocket server ticker stopped")
 				return
 			case <-usersOnlineTicker.C:
-				for _, room := range ws.rooms {
+				for _, room := range ws.snapshotRooms() {
 					tickCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-
-					userIds := []uuid.UUID{}
-					for userId := range room.users {
-						userIds = append(userIds, userId)
-					}
-
 					message := WebsocketMessage{
 						Type:   WebsocketMessageTypeUsersOnline,
 						RoomId: room.id,
-						Data:   userIds,
+						Data:   room.userIds,
 					}
 
 					ws.sendMessageToRoom(tickCtx, room.id, message)
-
 					cancel()
 				}
 			}
@@ -140,4 +131,38 @@ func (ws *Server) SendCreatedTask(ctx context.Context, task *domain.Task) error 
 
 func (ws *Server) SendCreatedTaskComment(ctx context.Context, comment *domain.TaskComment) error {
 	return ws.SendEvent(ctx, MapTaskCommentCreated(comment))
+}
+
+type roomSnapshot struct {
+	id      uuid.UUID
+	userIds []uuid.UUID
+}
+
+func (ws *Server) snapshotRooms() []roomSnapshot {
+	ws.mutex.Lock()
+	defer ws.mutex.Unlock()
+
+	rooms := make([]roomSnapshot, 0, len(ws.rooms))
+	for _, room := range ws.rooms {
+		userIds := make([]uuid.UUID, 0, len(room.users))
+		for userId := range room.users {
+			userIds = append(userIds, userId)
+		}
+
+		rooms = append(rooms, roomSnapshot{
+			id:      room.id,
+			userIds: userIds,
+		})
+	}
+
+	return rooms
+}
+
+func isValidRoomType(roomType WsRoomType) bool {
+	switch roomType {
+	case WsRoomTypeChat, WsRoomTypeProject:
+		return true
+	default:
+		return false
+	}
 }
