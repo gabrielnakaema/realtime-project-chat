@@ -121,6 +121,10 @@ func (ws *Server) SendMessages(ctx context.Context, message *domain.ChatMessage)
 	return ws.SendEvent(ctx, MapChatMessage(message))
 }
 
+func (ws *Server) SendReadUpdate(ctx context.Context, chatId uuid.UUID, read *domain.ChatMessageRead) error {
+	return ws.SendEvent(ctx, MapChatMessageRead(read, chatId))
+}
+
 func (ws *Server) SendUpdatedTask(ctx context.Context, task *domain.Task, previousStatus *domain.TaskStatus) error {
 	return ws.SendEvent(ctx, MapTaskUpdated(task, previousStatus))
 }

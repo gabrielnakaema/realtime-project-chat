@@ -34,6 +34,12 @@ type ChatMessage struct {
 	MessageType string
 }
 
+type ChatMessageRead struct {
+	ChatMessageID uuid.UUID
+	UserID        uuid.UUID
+	ReadAt        pgtype.Timestamptz
+}
+
 type Project struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID

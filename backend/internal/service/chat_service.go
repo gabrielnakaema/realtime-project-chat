@@ -23,6 +23,10 @@ type chatRepository interface {
 	ListMessages(ctx context.Context, chatId uuid.UUID, params utils.PaginationBeforeParams) ([]domain.ChatMessage, error)
 	GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, memberIds []uuid.UUID) (*domain.Chat, error)
 	ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error)
+	GetUnreadSummary(ctx context.Context, chatId uuid.UUID, userId uuid.UUID) (*domain.ChatUnreadSummary, error)
+	GetMessageById(ctx context.Context, id uuid.UUID) (*domain.ChatMessage, error)
+	MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId uuid.UUID, readAt time.Time, message *domain.ChatMessage) error
+	ListMessageReads(ctx context.Context, messageId uuid.UUID) ([]domain.ChatMessageRead, error)
 }
 
 type chatUserRepository interface {
@@ -234,6 +238,13 @@ func (cs *ChatService) GetByProjectId(ctx context.Context, projectId uuid.UUID, 
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
+	unreadSummary, err := cs.chatRepository.GetUnreadSummary(ctx, chat.Id, userId)
+	if err != nil {
+		return nil, domain.ServerError("failed to count unread messages", err)
+	}
+	chat.UnreadCount = unreadSummary.UnreadCount
+	chat.HasMoreUnread = unreadSummary.HasMoreUnread
+
 	return chat, nil
 }
 
@@ -306,6 +317,13 @@ func (cs *ChatService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UU
 	if !hasPermission {
 		return nil, domain.ForbiddenError("forbidden")
 	}
+
+	unreadSummary, err := cs.chatRepository.GetUnreadSummary(ctx, chat.Id, userId)
+	if err != nil {
+		return nil, domain.ServerError("failed to count unread messages", err)
+	}
+	chat.UnreadCount = unreadSummary.UnreadCount
+	chat.HasMoreUnread = unreadSummary.HasMoreUnread
 
 	return chat, nil
 }
@@ -440,4 +458,126 @@ func (cs *ChatService) ListMessagesByChatId(ctx context.Context, request ListMes
 		Data:    messages,
 		HasNext: len(messages) >= int(request.Params.Limit),
 	}, nil
+}
+
+type MarkChatReadRequest struct {
+	ChatId    uuid.UUID
+	UserId    uuid.UUID
+	MessageId *uuid.UUID
+}
+
+func (cs *ChatService) MarkChatRead(ctx context.Context, request MarkChatReadRequest) error {
+	if request.UserId == uuid.Nil {
+		return domain.UnauthorizedError("unauthorized")
+	}
+
+	chat, err := cs.chatRepository.GetById(ctx, request.ChatId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			return domainErr
+		}
+		return domain.ServerError("failed to get chat", err)
+	}
+
+	hasPermission := false
+	for _, member := range chat.Members {
+		if member.UserId == request.UserId {
+			hasPermission = true
+			break
+		}
+	}
+	if !hasPermission {
+		return domain.ForbiddenError("forbidden")
+	}
+
+	var message *domain.ChatMessage
+	if request.MessageId != nil {
+		message, err = cs.chatRepository.GetMessageById(ctx, *request.MessageId)
+		if err != nil {
+			var domainErr domain.DomainError
+			if errors.As(err, &domainErr) {
+				return domainErr
+			}
+			return domain.ServerError("failed to get chat message", err)
+		}
+
+		if message.ChatId != request.ChatId {
+			return domain.ForbiddenError("forbidden")
+		}
+	}
+
+	readAt := time.Now()
+	err = cs.chatRepository.MarkReadUpTo(ctx, request.ChatId, request.UserId, readAt, message)
+	if err != nil {
+		return domain.ServerError("failed to mark chat as read", err)
+	}
+
+	if message != nil {
+		err = cs.publisher.Publish(ctx, events.ChatMessageRead, &events.ChatMessageReadPayload{
+			ChatID:    request.ChatId,
+			MessageID: message.Id,
+			Read: domain.ChatMessageRead{
+				MessageId: message.Id,
+				UserId:    request.UserId,
+				ReadAt:    readAt,
+			},
+		})
+		if err != nil {
+			return domain.ServerError("failed to publish chat read event", err)
+		}
+	}
+
+	return nil
+}
+
+type ListMessageReadsRequest struct {
+	ChatId    uuid.UUID
+	MessageId uuid.UUID
+	UserId    uuid.UUID
+}
+
+func (cs *ChatService) ListMessageReads(ctx context.Context, request ListMessageReadsRequest) ([]domain.ChatMessageRead, error) {
+	if request.UserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	chat, err := cs.chatRepository.GetById(ctx, request.ChatId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to get chat", err)
+	}
+
+	hasPermission := false
+	for _, member := range chat.Members {
+		if member.UserId == request.UserId {
+			hasPermission = true
+			break
+		}
+	}
+	if !hasPermission {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	message, err := cs.chatRepository.GetMessageById(ctx, request.MessageId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to get chat message", err)
+	}
+	if message.ChatId != request.ChatId {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	reads, err := cs.chatRepository.ListMessageReads(ctx, request.MessageId)
+	if err != nil {
+		return nil, domain.ServerError("failed to list message reads", err)
+	}
+
+	return reads, nil
 }

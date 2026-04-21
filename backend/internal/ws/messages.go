@@ -28,6 +28,7 @@ const (
 	WebsocketMessageTypeTaskUpdated            WebsocketMessageType = "task_updated"
 	WebsocketMessageTypeTaskCommentCreated     WebsocketMessageType = "task_comment_created"
 	WebsocketMessageTypeUsersOnline            WebsocketMessageType = "users_online"
+	WebsocketMessageTypeMessageRead            WebsocketMessageType = "message_read"
 )
 
 type WebsocketMessage struct {
@@ -85,6 +86,14 @@ func MapChatMessage(message *domain.ChatMessage) WebsocketMessage {
 		Type:   WebsocketMessageTypeMessage,
 		RoomId: message.ChatId,
 		Data:   message,
+	}
+}
+
+func MapChatMessageRead(read *domain.ChatMessageRead, chatId uuid.UUID) WebsocketMessage {
+	return WebsocketMessage{
+		Type:   WebsocketMessageTypeMessageRead,
+		RoomId: chatId,
+		Data:   read,
 	}
 }
 

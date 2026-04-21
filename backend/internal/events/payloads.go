@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/google/uuid"
 )
 
 type Payload interface {
@@ -81,6 +82,16 @@ type ChatMessageCreatedPayload struct {
 }
 
 func (c *ChatMessageCreatedPayload) ToMessage() ([]byte, error) {
+	return json.Marshal(c)
+}
+
+type ChatMessageReadPayload struct {
+	ChatID    uuid.UUID              `json:"chat_id"`
+	MessageID uuid.UUID              `json:"message_id"`
+	Read      domain.ChatMessageRead `json:"read"`
+}
+
+func (c *ChatMessageReadPayload) ToMessage() ([]byte, error) {
 	return json.Marshal(c)
 }
 

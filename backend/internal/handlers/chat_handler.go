@@ -22,6 +22,8 @@ type chatService interface {
 	GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, targetUserIds []uuid.UUID) (*domain.Chat, error)
 	ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error)
 	ListMessagesByChatId(ctx context.Context, request service.ListMessagesByChatIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error)
+	MarkChatRead(ctx context.Context, request service.MarkChatReadRequest) error
+	ListMessageReads(ctx context.Context, request service.ListMessageReadsRequest) ([]domain.ChatMessageRead, error)
 }
 
 type ChatHandler struct {
@@ -263,6 +265,95 @@ func (ch *ChatHandler) ListChatMessages(w http.ResponseWriter, r *http.Request) 
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, messages, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (ch *ChatHandler) MarkChatRead(w http.ResponseWriter, r *http.Request) {
+	chatId := chi.URLParam(r, "chatId")
+	if chatId == "" {
+		BadRequestResponse(w, errors.New("chatId is required"))
+		return
+	}
+
+	parsedChatId, err := uuid.Parse(chatId)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	var request MarkChatReadRequest
+	err = utils.ReadJSON(w, r, &request)
+	if err != nil && !errors.Is(err, http.ErrBodyNotAllowed) && err.Error() != "EOF" {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	v := validator.New()
+	request.Validate(v)
+	if !v.Valid() {
+		ValidationFailedResponse(w, v)
+		return
+	}
+
+	userId := UserIdFromContext(r.Context())
+	if userId == uuid.Nil {
+		UnauthorizedResponse(w, "unauthorized")
+		return
+	}
+
+	err = ch.chatService.MarkChatRead(r.Context(), service.MarkChatReadRequest{
+		ChatId:    parsedChatId,
+		UserId:    userId,
+		MessageId: request.MessageId,
+	})
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (ch *ChatHandler) ListMessageReads(w http.ResponseWriter, r *http.Request) {
+	chatId := chi.URLParam(r, "chatId")
+	messageId := chi.URLParam(r, "messageId")
+	if chatId == "" || messageId == "" {
+		BadRequestResponse(w, errors.New("chatId and messageId are required"))
+		return
+	}
+
+	parsedChatId, err := uuid.Parse(chatId)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	parsedMessageId, err := uuid.Parse(messageId)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	userId := UserIdFromContext(r.Context())
+	if userId == uuid.Nil {
+		UnauthorizedResponse(w, "unauthorized")
+		return
+	}
+
+	reads, err := ch.chatService.ListMessageReads(r.Context(), service.ListMessageReadsRequest{
+		ChatId:    parsedChatId,
+		MessageId: parsedMessageId,
+		UserId:    userId,
+	})
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, reads, nil)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

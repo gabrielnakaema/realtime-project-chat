@@ -73,6 +73,8 @@ func (a *Api) Router() http.Handler {
 		r.Get("/", a.handlers.Chat.ListGeneralChats)
 		r.Get("/{chatId}", a.handlers.Chat.GetChatById)
 		r.Get("/{chatId}/messages", a.handlers.Chat.ListChatMessages)
+		r.Get("/{chatId}/messages/{messageId}/reads", a.handlers.Chat.ListMessageReads)
+		r.Post("/{chatId}/read", a.handlers.Chat.MarkChatRead)
 		r.Post("/messages", a.handlers.Chat.CreateMessage)
 	})
 

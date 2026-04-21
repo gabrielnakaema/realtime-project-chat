@@ -10,10 +10,12 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/google/uuid"
 )
 
 type MessageNotifier interface {
 	SendMessages(ctx context.Context, message *domain.ChatMessage) error
+	SendReadUpdate(ctx context.Context, chatId uuid.UUID, read *domain.ChatMessageRead) error
 }
 
 type ChatSubscriber struct {
@@ -36,7 +38,7 @@ func NewChatSubscriber(ctx context.Context, config *config.Config, logger *slog.
 		notifier:    notifier,
 	}
 
-	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ChatMemberCreated, events.ChatMessageCreated, events.ChatMemberViewed}
+	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ChatMemberCreated, events.ChatMessageCreated, events.ChatMemberViewed, events.ChatMessageRead}
 
 	err = subscriber.Subscribe(ctx, topics, chatSubscriber.handleChatEvents, chatSubscriber.logger)
 	if err != nil {
@@ -62,6 +64,8 @@ func (cs *ChatSubscriber) handleChatEvents(ctx context.Context, message Message)
 		return cs.handleChatMessageCreated(ctx, message)
 	case events.ChatMemberViewed:
 		return cs.handleChatMemberViewed(ctx, message)
+	case events.ChatMessageRead:
+		return cs.handleChatMessageRead(ctx, message)
 	}
 
 	return nil
@@ -159,4 +163,14 @@ func (cs *ChatSubscriber) handleChatMessageCreated(ctx context.Context, message 
 	}
 
 	return nil
+}
+
+func (cs *ChatSubscriber) handleChatMessageRead(ctx context.Context, message Message) error {
+	var payload events.ChatMessageReadPayload
+	err := json.Unmarshal(message.Value, &payload)
+	if err != nil {
+		return domain.ServerError("failed to unmarshal chat message read", err)
+	}
+
+	return cs.notifier.SendReadUpdate(ctx, payload.ChatID, &payload.Read)
 }

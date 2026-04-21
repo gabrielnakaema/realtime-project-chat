@@ -234,7 +234,10 @@ func (cr *ChatRepository) GetOrCreateGeneralChat(ctx context.Context, currentUse
 
 func (cr *ChatRepository) ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error) {
 	q := queries.New(cr.pool)
-	rows, err := q.ListGeneralChatsByUserId(ctx, userId)
+	rows, err := q.ListGeneralChatsByUserId(ctx, queries.ListGeneralChatsByUserIdParams{
+		UserID:  userId,
+		Column2: domain.ChatUnreadCountFetchLimit,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -247,12 +250,14 @@ func (cr *ChatRepository) ListGeneralChats(ctx context.Context, userId uuid.UUID
 		}
 
 		chats = append(chats, domain.Chat{
-			Id:        row.ID,
-			ProjectId: pgUUIDPointer(row.ProjectID),
-			ChatType:  domain.ChatType(row.ChatType),
-			CreatedAt: row.CreatedAt.Time,
-			UpdatedAt: row.UpdatedAt.Time,
-			Members:   members,
+			Id:            row.ID,
+			ProjectId:     pgUUIDPointer(row.ProjectID),
+			ChatType:      domain.ChatType(row.ChatType),
+			CreatedAt:     row.CreatedAt.Time,
+			UpdatedAt:     row.UpdatedAt.Time,
+			UnreadCount:   int(row.UnreadCount),
+			HasMoreUnread: row.HasMoreUnread,
+			Members:       members,
 		})
 	}
 
@@ -283,6 +288,7 @@ func (cr *ChatRepository) ListMessages(ctx context.Context, chatId uuid.UUID, pa
 			Content:     messageResult.Content,
 			CreatedAt:   messageResult.CreatedAt.Time,
 			UpdatedAt:   messageResult.UpdatedAt.Time,
+			ReadsCount:  int(messageResult.ReadsCount),
 		}
 
 		if messageResult.UserID.Valid {
@@ -304,6 +310,111 @@ func (cr *ChatRepository) ListMessages(ctx context.Context, chatId uuid.UUID, pa
 	}
 
 	return messages, nil
+}
+
+func (cr *ChatRepository) GetUnreadSummary(ctx context.Context, chatId uuid.UUID, userId uuid.UUID) (*domain.ChatUnreadSummary, error) {
+	q := queries.New(cr.pool)
+	row, err := q.GetUnreadCountByChatId(ctx, queries.GetUnreadCountByChatIdParams{
+		ChatID:  chatId,
+		UserID:  userId,
+		Column3: domain.ChatUnreadCountFetchLimit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.ChatUnreadSummary{
+		UnreadCount:   int(row.UnreadCount),
+		HasMoreUnread: row.HasMoreUnread,
+	}, nil
+}
+
+func (cr *ChatRepository) GetMessageById(ctx context.Context, id uuid.UUID) (*domain.ChatMessage, error) {
+	q := queries.New(cr.pool)
+	message, err := q.GetChatMessageById(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.NotFoundError("chat message not found")
+		}
+		return nil, err
+	}
+
+	result := &domain.ChatMessage{
+		Id:          message.ID,
+		ChatId:      message.ChatID,
+		MessageType: domain.MessageType(message.MessageType),
+		Content:     message.Content,
+		CreatedAt:   message.CreatedAt.Time,
+		UpdatedAt:   message.UpdatedAt.Time,
+	}
+
+	if message.UserID.Valid {
+		userId := uuid.UUID(message.UserID.Bytes)
+		result.UserId = &userId
+	}
+
+	return result, nil
+}
+
+func (cr *ChatRepository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId uuid.UUID, readAt time.Time, message *domain.ChatMessage) error {
+	tx, err := cr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	q := queries.New(cr.pool)
+	qtx := q.WithTx(tx)
+
+	err = qtx.UpdateChatMemberLastSeenAt(ctx, queries.UpdateChatMemberLastSeenAtParams{
+		LastSeenAt: pgtype.Timestamptz{Time: readAt, Valid: true},
+		UserID:     userId,
+		ChatID:     chatId,
+	})
+	if err != nil {
+		return err
+	}
+
+	if message != nil {
+		err = qtx.UpsertChatMessageReadsUpTo(ctx, queries.UpsertChatMessageReadsUpToParams{
+			ChatID:    chatId,
+			UserID:    userId,
+			ReadAt:    pgtype.Timestamptz{Time: readAt, Valid: true},
+			CreatedAt: pgtype.Timestamptz{Time: message.CreatedAt, Valid: true},
+			Column5:   message.Id,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (cr *ChatRepository) ListMessageReads(ctx context.Context, messageId uuid.UUID) ([]domain.ChatMessageRead, error) {
+	q := queries.New(cr.pool)
+	rows, err := q.ListChatMessageReads(ctx, messageId)
+	if err != nil {
+		return nil, err
+	}
+
+	reads := make([]domain.ChatMessageRead, 0, len(rows))
+	for _, row := range rows {
+		read := domain.ChatMessageRead{
+			MessageId: row.ChatMessageID,
+			UserId:    row.UserID,
+			ReadAt:    row.ReadAt.Time,
+			User: &domain.User{
+				Id:    row.UserID,
+				Name:  row.Name,
+				Email: row.Email,
+			},
+		}
+
+		reads = append(reads, read)
+	}
+
+	return reads, nil
 }
 
 func unmarshalMembers(raw any) ([]domain.ChatMember, error) {

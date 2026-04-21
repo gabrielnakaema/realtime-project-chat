@@ -30,7 +30,11 @@ type mockActivityRepository struct {
 }
 
 func (m *mockPublisher) Publish(ctx context.Context, topic events.Topic, payload events.Payload) error {
-	return nil
+	if len(m.ExpectedCalls) == 0 {
+		return nil
+	}
+
+	return m.Called(ctx, topic, payload).Error(0)
 }
 
 func (m *mockProjectRepository) Create(ctx context.Context, project *domain.Project) error {

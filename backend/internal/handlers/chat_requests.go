@@ -26,3 +26,13 @@ func (r *GetOrCreateGeneralChatRequest) Validate(v *validator.Validator) {
 		v.Check("user_ids", "user_ids contains an invalid user", userId != uuid.Nil)
 	}
 }
+
+type MarkChatReadRequest struct {
+	MessageId *uuid.UUID `json:"message_id"`
+}
+
+func (r *MarkChatReadRequest) Validate(v *validator.Validator) {
+	if r.MessageId != nil {
+		v.Check("message_id", "message_id is invalid", *r.MessageId != uuid.Nil)
+	}
+}

@@ -79,6 +79,18 @@ func (m *mockChatService) ListMessagesByChatId(ctx context.Context, request serv
 	return args.Get(0).(*utils.CursorPaginated[domain.ChatMessage]), args.Error(1)
 }
 
+func (m *mockChatService) MarkChatRead(ctx context.Context, request service.MarkChatReadRequest) error {
+	return m.Called(ctx, request).Error(0)
+}
+
+func (m *mockChatService) ListMessageReads(ctx context.Context, request service.ListMessageReadsRequest) ([]domain.ChatMessageRead, error) {
+	args := m.Called(ctx, request)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.ChatMessageRead), args.Error(1)
+}
+
 func withUserId(req *http.Request, userId uuid.UUID) *http.Request {
 	ctx := context.WithValue(req.Context(), handlers.UserIdContextKey, userId)
 	return req.WithContext(ctx)

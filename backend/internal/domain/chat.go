@@ -13,12 +13,16 @@ var (
 	ChatTypeProject ChatType = "project"
 )
 
+const ChatUnreadCountFetchLimit = 100
+
 type Chat struct {
-	Id        uuid.UUID  `json:"id"`
-	ProjectId *uuid.UUID `json:"project_id"`
-	ChatType  ChatType   `json:"chat_type"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	Id            uuid.UUID  `json:"id"`
+	ProjectId     *uuid.UUID `json:"project_id"`
+	ChatType      ChatType   `json:"chat_type"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	UnreadCount   int        `json:"unread_count"`
+	HasMoreUnread bool       `json:"has_more_unread"`
 
 	Members  []ChatMember  `json:"members,omitempty"`
 	Messages []ChatMessage `json:"messages,omitempty"`
@@ -49,6 +53,20 @@ type ChatMessage struct {
 	Content     string      `json:"content"`
 	CreatedAt   time.Time   `json:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at"`
+	ReadsCount  int         `json:"reads_count"`
 
 	Member *ChatMember `json:"member,omitempty"`
+}
+
+type ChatMessageRead struct {
+	MessageId uuid.UUID `json:"message_id"`
+	UserId    uuid.UUID `json:"user_id"`
+	ReadAt    time.Time `json:"read_at"`
+
+	User *User `json:"user,omitempty"`
+}
+
+type ChatUnreadSummary struct {
+	UnreadCount   int  `json:"unread_count"`
+	HasMoreUnread bool `json:"has_more_unread"`
 }
