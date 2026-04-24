@@ -1,6 +1,6 @@
 import { Outlet, createRootRoute } from '@tanstack/react-router';
 import { Suspense, lazy } from 'react';
-import { MessagesSheet } from '@/components/messages-sheet';
+import { MessagesSheet } from '@/components/chat';
 import { MessagesSheetProvider } from '@/contexts/messages-sheet-context';
 
 const isDev = import.meta.env.DEV;

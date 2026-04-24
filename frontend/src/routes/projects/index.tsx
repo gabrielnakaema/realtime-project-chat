@@ -1,13 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { MessageSquare } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { CreateProject } from '@/components/create-project';
 import { HeaderUser } from '@/components/header-user';
+import { UnreadCountBadge } from '@/components/unread-count-badge';
 import { ProjectList } from '@/components/project-list';
 import { SearchBar } from '@/components/search-bar';
 import { UserDueTasks } from '@/components/user-due-tasks';
 import { UserProjectActivities } from '@/components/user-project-activities';
 import { useMessagesSheet } from '@/contexts/messages-sheet-context';
 import { useAuth } from '@/hooks/use-auth';
+import { listGeneralChats } from '@/services/general-chat';
+import { generalChatQueryKeys } from '@/services/query-keys';
 
 export const Route = createFileRoute('/projects/')({
   component: RouteComponent,
@@ -16,6 +20,12 @@ export const Route = createFileRoute('/projects/')({
 function RouteComponent() {
   const { user } = useAuth();
   const { open: openMessages } = useMessagesSheet();
+  const { data: generalChats = [] } = useQuery({
+    queryKey: generalChatQueryKeys.list,
+    queryFn: listGeneralChats,
+  });
+  const unreadCount = generalChats.reduce((sum, chat) => sum + chat.unread_count, 0);
+  const hasMoreUnread = generalChats.some((chat) => chat.has_more_unread) || unreadCount > 99;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -36,6 +46,7 @@ function RouteComponent() {
               >
                 <MessageSquare className="h-4 w-4" />
                 Messages
+                <UnreadCountBadge count={unreadCount} hasMoreUnread={hasMoreUnread} />
               </button>
 
               <CreateProject />

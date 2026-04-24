@@ -29,15 +29,14 @@ export const taskQueryKeys = {
   _allCounts: () => ['tasks', 'count'] as const,
 } as const;
 
-export const chatQueryKeys = {
+export const chatMessageQueryKeys = {
+  reads: (chatId: string, messageId: string) => ['chats', chatId, 'message-reads', messageId],
+} as const;
+
+export const projectChatQueryKeys = {
   all: ['chats'],
   detailsByProjectId: (projectId: string) => ['chats', 'details', { projectId }],
-  listInfiniteMessagesByProjectId: ({ projectId }: { projectId: string }) => [
-    'chats',
-    'messages',
-    'infinite',
-    { projectId },
-  ],
+  infiniteMessages: (projectId: string) => ['chats', 'messages', 'infinite', { projectId }],
   listMessagesByProjectId: ({ projectId, before }: { projectId: string; before?: string }) => [
     'chats',
     'messages',

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { PencilLine, X } from 'lucide-react';
+import { UnreadCountBadge } from '../unread-count-badge';
 import { MessagesComposeModal } from './compose-modal';
 import { getAvatarColorClass, getChatAvatarSeed, getChatSubtitle, getChatTitle } from './utils';
 import { useMessagesSheet } from '@/contexts/messages-sheet-context';
@@ -8,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { listGeneralChats } from '@/services/general-chat';
 import { generalChatQueryKeys } from '@/services/query-keys';
 
-export function MessagesListView() {
+export const MessagesListView = () => {
   const { user } = useAuth();
   const { openChat, openCompose, close, view } = useMessagesSheet();
 
@@ -74,7 +75,10 @@ export function MessagesListView() {
                     <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                       {getChatTitle(chat, user?.id)}
                     </p>
-                    <p className="text-xs text-slate-400">{getChatSubtitle(chat, user?.id)}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-slate-400">{getChatSubtitle(chat, user?.id)}</p>
+                      <UnreadCountBadge count={chat.unread_count} hasMoreUnread={chat.has_more_unread} />
+                    </div>
                   </div>
                 </button>
               </li>
@@ -86,4 +90,4 @@ export function MessagesListView() {
       {view === 'compose' && <MessagesComposeModal />}
     </>
   );
-}
+};

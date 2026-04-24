@@ -10,12 +10,12 @@ interface MessagesChatMessageListProps {
   observedRef: RefObject<HTMLDivElement | null>;
 }
 
-export function MessagesChatMessageList({
+export const MessagesChatMessageList = ({
   messages,
   currentUserId,
   chatContainerRef,
   observedRef,
-}: MessagesChatMessageListProps) {
+}: MessagesChatMessageListProps) => {
   const timeline = buildMessagesTimeline(messages, currentUserId);
 
   return (
@@ -33,9 +33,16 @@ export function MessagesChatMessageList({
             );
           }
 
-          return <MessagesChatMessageItem key={item.id} message={item.message} isCurrentUser={item.isCurrentUser} />;
+          return (
+            <MessagesChatMessageItem
+              key={item.id}
+              message={item.message}
+              isCurrentUser={item.isCurrentUser}
+              currentUserId={currentUserId}
+            />
+          );
         })}
       </div>
     </div>
   );
-}
+};

@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { Chat, ChatMessage } from '@/types/chat';
+import type { Chat, ChatMessage, ChatMessageRead } from '@/types/chat';
 import type { CursorPaginated } from '@/types/paginated';
 
 export const getChatByProjectId = async (projectId: string) => {
@@ -50,4 +50,18 @@ export const createMessage = async (payload: CreateMessagePayload) => {
   const json = await response.json<ChatMessage>();
 
   return json;
+};
+
+export const markChatRead = async (chatId: string, messageId?: string) => {
+  await api.post(`chats/${chatId}/read`, {
+    json: {
+      message_id: messageId ?? null,
+    },
+  });
+};
+
+export const getMessageReads = async (chatId: string, messageId: string) => {
+  const response = await api.get(`chats/${chatId}/messages/${messageId}/reads`);
+
+  return response.json<ChatMessageRead[]>();
 };

@@ -6,6 +6,8 @@ export interface Chat {
   chat_type: string;
   created_at: string;
   updated_at: string;
+  unread_count: number;
+  has_more_unread: boolean;
   members: ChatMember[];
   messages?: ChatMessage[];
 }
@@ -25,9 +27,17 @@ export interface ChatMessage {
   id: string;
   message_type: MessageType;
   chat_id: string;
-  user_id: string;
+  user_id: string | null;
   content: string;
   created_at: string;
   updated_at: string;
+  reads_count: number;
   member: ChatMember | null;
+}
+
+export interface ChatMessageRead {
+  message_id: string;
+  user_id: string;
+  read_at: string;
+  user: User | null;
 }

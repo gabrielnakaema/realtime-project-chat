@@ -1,4 +1,4 @@
-import type { ChatMessage } from './chat';
+import type { ChatMessage, ChatMessageRead } from './chat';
 import type { Task, TaskComment } from './task';
 
 export type MessageEvent = {
@@ -48,6 +48,12 @@ export type UsersOnlineEvent = {
   data: string[];
 };
 
+export type MessageReadEvent = {
+  type: 'message_read';
+  room_id: string;
+  data: ChatMessageRead;
+};
+
 export type UserDisconnectedEvent = {
   type: 'user_disconnected';
   room_id: string;
@@ -74,5 +80,6 @@ export type SocketEvent =
   | TaskUpdatedEvent
   | TaskCommentCreatedEvent
   | UsersOnlineEvent
+  | MessageReadEvent
   | UserConnectedEvent
   | UserDisconnectedEvent;

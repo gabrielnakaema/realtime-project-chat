@@ -13,7 +13,7 @@ interface MessagesChatComposerProps {
   chatId: string;
 }
 
-export function MessagesChatComposer({ chatId }: MessagesChatComposerProps) {
+export const MessagesChatComposer = ({ chatId }: MessagesChatComposerProps) => {
   const { control, handleSubmit, reset } = useForm<IChatForm>({
     resolver: zodResolver(chatSchema),
     defaultValues: { content: '' },
@@ -25,6 +25,10 @@ export function MessagesChatComposer({ chatId }: MessagesChatComposerProps) {
   });
 
   const onSubmit: SubmitHandler<IChatForm> = (form) => {
+    if (!chatId) {
+      return;
+    }
+
     mutate({ chat_id: chatId, content: form.content });
   };
 
@@ -38,7 +42,7 @@ export function MessagesChatComposer({ chatId }: MessagesChatComposerProps) {
             <ExpandingTextarea
               placeholder="Message..."
               wrapperClassName="flex-1"
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:bg-slate-700"
+              className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm [overflow-wrap:anywhere] text-slate-900 placeholder-slate-400 focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:bg-slate-700"
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault();
@@ -51,7 +55,7 @@ export function MessagesChatComposer({ chatId }: MessagesChatComposerProps) {
         />
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || !chatId}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
         >
           {isPending ? <LoadingSpinner size="0.875em" /> : <Send className="h-4 w-4" />}
@@ -59,4 +63,4 @@ export function MessagesChatComposer({ chatId }: MessagesChatComposerProps) {
       </form>
     </div>
   );
-}
+};

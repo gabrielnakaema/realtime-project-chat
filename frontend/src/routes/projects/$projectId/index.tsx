@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { AddProjectMember } from '@/components/add-project-member';
 import { KanbanBoard } from '@/components/kanban-board';
 import { MembersAvatarList } from '@/components/members-avatar-list';
+import { UnreadCountBadge } from '@/components/unread-count-badge';
 import { ProjectDetailsSheet, ProjectDetailsSheetTrigger } from '@/components/project-details-sheet';
 import { ProjectMembersModal } from '@/components/project-members-modal';
 import { ProjectSettings } from '@/components/project-settings';
@@ -13,7 +14,8 @@ import { EditTask } from '@/components/task-form/edit-task';
 import { useOnlineUsers } from '@/hooks/use-online-users';
 import { useTaskDetailsRouting } from '@/hooks/use-task-details-routing';
 import { getProject } from '@/services/projects';
-import { projectQueryKeys } from '@/services/query-keys';
+import { getChatByProjectId } from '@/services/chat';
+import { projectChatQueryKeys, projectQueryKeys } from '@/services/query-keys';
 import { sanitizeHTML } from '@/utils/html';
 
 export const Route = createFileRoute('/projects/$projectId/')({
@@ -34,6 +36,14 @@ function RouteComponent() {
     queryKey: projectQueryKeys.details(projectId),
     queryFn: () => getProject(projectId),
   });
+
+  const { data: chat } = useQuery({
+    queryKey: projectChatQueryKeys.detailsByProjectId(projectId),
+    queryFn: () => getChatByProjectId(projectId),
+  });
+
+  const unreadCount = chat?.unread_count ?? 0;
+  const hasMoreUnread = chat?.has_more_unread ?? false;
 
   return (
     <div className="h-fit min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -92,6 +102,7 @@ function RouteComponent() {
               >
                 <MessageSquare className="mr-2 h-4 w-4" />
                 Chat
+                <UnreadCountBadge className="ml-2" count={unreadCount} hasMoreUnread={hasMoreUnread} />
               </Link>
               <ProjectSettings projectId={projectId} />
             </div>

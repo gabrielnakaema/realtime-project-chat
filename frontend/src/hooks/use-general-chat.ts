@@ -1,156 +1,39 @@
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef } from 'react';
-import { useInfiniteScrollObserver } from './use-infinite-scroll-observer';
-import { useSocket } from './use-socket';
-import type { ChatMessage } from '@/types/chat';
-import type { CursorPaginated } from '@/types/paginated';
-import type { SocketEvent } from '@/types/websocket';
-import type { InfiniteData } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useChatMessageFeed } from './use-chat-message-feed';
+import { useChatMessageListBehavior } from './use-chat-message-list-behavior';
 import { getGeneralChatById, listGeneralChatMessages } from '@/services/general-chat';
-import { generalChatQueryKeys } from '@/services/query-keys';
-import { handleError } from '@/utils/handle-error';
+import { chatMessageQueryKeys, generalChatQueryKeys } from '@/services/query-keys';
 
 export const useGeneralChat = (chatId: string) => {
   const queryClient = useQueryClient();
-
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const isInitialRender = useRef(true);
-  const wasAtBottomRef = useRef(true);
-
-  const { status, subscribe } = useSocket();
 
   const { data: chat } = useQuery({
     queryKey: generalChatQueryKeys.details(chatId),
     queryFn: () => getGeneralChatById(chatId),
   });
 
-  const {
-    data: messagesData,
-    fetchNextPage,
-  } = useInfiniteQuery({
-    queryKey: generalChatQueryKeys.infiniteMessages(chatId),
-    queryFn: ({ pageParam }) => listGeneralChatMessages({ chatId, ...pageParam }),
-    getNextPageParam: (lastPage) => {
-      if (!lastPage.has_next) {
-        return undefined;
-      }
-      return {
-        before: lastPage.data[0].created_at,
-        id: lastPage.data[0].id,
-      };
-    },
-    initialPageParam: {
-      before: '',
-      id: '',
+  const { messages, fetchNextPage } = useChatMessageFeed({
+    chatId,
+    messagesQueryKey: generalChatQueryKeys.infiniteMessages(chatId),
+    listMessages: (pageParam) => listGeneralChatMessages({ chatId, ...pageParam }),
+    onMessageRead: (messageId) => {
+      queryClient.invalidateQueries({
+        queryKey: chatMessageQueryKeys.reads(chatId, messageId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: generalChatQueryKeys.list,
+        exact: true,
+      });
     },
   });
-
-  useEffect(() => {
-    const container = chatContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      wasAtBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight <= 100;
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const observedRef = useInfiniteScrollObserver<HTMLDivElement>({
+  const { chatContainerRef, observedRef } = useChatMessageListBehavior({
+    chatId,
+    messages,
     onLoadMore: fetchNextPage,
-    rootRef: chatContainerRef,
-    rootMargin: '40%',
-    threshold: 0,
   });
-
-  const addNewMessage = (message: ChatMessage) => {
-    queryClient.setQueryData(
-      generalChatQueryKeys.infiniteMessages(chatId),
-      (old?: InfiniteData<CursorPaginated<ChatMessage>>) => {
-        if (!old?.pages.length) {
-          return old;
-        }
-
-        const firstPage = old.pages[0];
-        const hasMorePages = old.pages.length > 1;
-
-        if (hasMorePages) {
-          return {
-            pages: [{ data: [...firstPage.data, message], has_next: false }, ...old.pages.slice(1)],
-            pageParams: old.pageParams,
-          };
-        }
-
-        return {
-          pages: [{ data: [...firstPage.data, message], has_next: false }],
-          pageParams: old.pageParams,
-        };
-      },
-    );
-  };
-
-  const handleSocketMessage = useEffectEvent((event: SocketEvent) => {
-    if (event.type === 'error') {
-      handleError(event.data.message);
-      return;
-    }
-
-    if (event.type === 'message') {
-      addNewMessage(event.data);
-    }
-  });
-
-  useEffect(() => {
-    if (!chatId || status !== 'connected') {
-      return;
-    }
-
-    const unsubscribe = subscribe(chatId, 'chat', handleSocketMessage);
-
-    return () => {
-      unsubscribe();
-    };
-  }, [chatId, status, subscribe]);
-
-  const messages = useMemo(() => {
-    const pages = messagesData?.pages || [];
-    const m: ChatMessage[] = [];
-    for (let i = pages.length - 1; i >= 0; i--) {
-      for (const message of pages[i].data) {
-        m.push(message);
-      }
-    }
-    return m;
-  }, [messagesData]);
-
-  useLayoutEffect(() => {
-    const container = chatContainerRef.current;
-    if (!container || messages.length === 0) {
-      return;
-    }
-
-    if (isInitialRender.current) {
-      isInitialRender.current = false;
-      wasAtBottomRef.current = true;
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: 'instant',
-      });
-      return;
-    }
-
-    if (wasAtBottomRef.current) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: 'smooth',
-      });
-    }
-  }, [messages]);
 
   return {
     chat,
-    messagesData,
     observedRef,
     chatContainerRef,
     messages,

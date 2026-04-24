@@ -9,7 +9,7 @@ interface MessagesChatViewProps {
   chatId: string;
 }
 
-export function MessagesChatView({ chatId }: MessagesChatViewProps) {
+export const MessagesChatView = ({ chatId }: MessagesChatViewProps) => {
   const { user } = useAuth();
   const { backToList, close } = useMessagesSheet();
   const { chat, messages, observedRef, chatContainerRef } = useGeneralChat(chatId);
@@ -26,4 +26,4 @@ export function MessagesChatView({ chatId }: MessagesChatViewProps) {
       <MessagesChatComposer chatId={chatId} />
     </>
   );
-}
+};

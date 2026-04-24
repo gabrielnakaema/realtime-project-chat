@@ -62,7 +62,13 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      subscriptions.forEach((subscription) => subscription.handler(data));
+      subscriptions.forEach((subscription) => {
+        if (subscription.roomId !== data.room_id) {
+          return;
+        }
+
+        subscription.handler(data);
+      });
     } catch (error) {
       return;
     }

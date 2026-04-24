@@ -2,7 +2,7 @@ import { MessagesChatView } from './chat-view';
 import { MessagesListView } from './list-view';
 import { useMessagesSheet } from '@/contexts/messages-sheet-context';
 
-export function MessagesSheet() {
+export const MessagesSheet = () => {
   const { isOpen, selectedChatId, view, close } = useMessagesSheet();
 
   if (!isOpen) return null;
@@ -15,4 +15,4 @@ export function MessagesSheet() {
       </aside>
     </>
   );
-}
+};

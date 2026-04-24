@@ -10,7 +10,7 @@ interface MessagesChatHeaderProps {
   onClose: () => void;
 }
 
-export function MessagesChatHeader({ chat, currentUserId, onBack, onClose }: MessagesChatHeaderProps) {
+export const MessagesChatHeader = ({ chat, currentUserId, onBack, onClose }: MessagesChatHeaderProps) => {
   const avatarSeed = chat ? getChatAvatarSeed(chat, currentUserId) : '';
 
   return (
@@ -44,4 +44,4 @@ export function MessagesChatHeader({ chat, currentUserId, onBack, onClose }: Mes
       </button>
     </div>
   );
-}
+};
