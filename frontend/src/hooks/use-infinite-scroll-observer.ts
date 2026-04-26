@@ -1,5 +1,5 @@
-import { useEffect, useEffectEvent, useRef } from 'react';
-import type { RefObject } from 'react';
+import { useCallback, useEffect, useEffectEvent, useState } from 'react';
+import type { RefCallback, RefObject } from 'react';
 
 interface UseInfiniteScrollObserverOptions {
   onLoadMore: () => void;
@@ -14,14 +14,17 @@ export const useInfiniteScrollObserver = <T extends Element = HTMLDivElement>({
   rootRef,
   threshold = 0.1,
 }: UseInfiniteScrollObserverOptions) => {
-  const targetRef = useRef<T>(null);
+  const [target, setTarget] = useState<T | null>(null);
+
+  const targetRef = useCallback<RefCallback<T>>((node) => {
+    setTarget(node);
+  }, []);
 
   const handleIntersect = useEffectEvent(() => {
     onLoadMore();
   });
 
   useEffect(() => {
-    const target = targetRef.current;
     if (!target) return;
 
     const root = rootRef?.current ?? null;
@@ -42,7 +45,7 @@ export const useInfiniteScrollObserver = <T extends Element = HTMLDivElement>({
     observer.observe(target);
 
     return () => observer.disconnect();
-  }, [rootMargin, rootRef, threshold]);
+  }, [rootMargin, rootRef, target, threshold]);
 
   return targetRef;
 };

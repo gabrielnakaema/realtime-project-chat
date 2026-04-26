@@ -1,13 +1,13 @@
 import { buildMessagesTimeline } from './chat-timeline';
 import { MessagesChatMessageItem } from './chat-message-item';
-import type { RefObject } from 'react';
+import type { RefCallback, RefObject } from 'react';
 import type { ChatMessage } from '@/types/chat';
 
 interface MessagesChatMessageListProps {
   messages: ChatMessage[];
   currentUserId?: string;
   chatContainerRef: RefObject<HTMLDivElement | null>;
-  observedRef: RefObject<HTMLDivElement | null>;
+  observedRef: RefCallback<HTMLDivElement>;
 }
 
 export const MessagesChatMessageList = ({
