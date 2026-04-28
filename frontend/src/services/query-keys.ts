@@ -50,6 +50,12 @@ export const generalChatQueryKeys = {
   infiniteMessages: (chatId: string) => ['general-chats', chatId, 'messages'],
 } as const;
 
+export const notificationQueryKeys = {
+  all: ['notifications'],
+  list: ['notifications', 'list'],
+  unreadCount: ['notifications', 'unread-count'],
+} as const;
+
 export const userListQueryKeys = {
   all: ['users', 'list'],
 } as const;

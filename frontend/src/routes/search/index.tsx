@@ -2,6 +2,7 @@ import { Link, createFileRoute } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 import { HeaderUser } from '@/components/header-user';
+import { NotificationBell } from '@/components/notification-bell';
 import { ProjectSearchResults } from '@/components/search/project-search-results';
 import { SearchBar } from '@/components/search-bar';
 import { TaskSearchResults } from '@/components/search/task-search-results';
@@ -34,6 +35,7 @@ function RouteComponent() {
 
             <SearchBar action="/search" searchName="query" formClassName="w-full max-w-md" initialValue={query} />
             <div className="flex items-center gap-4">
+              <NotificationBell />
               <HeaderUser />
             </div>
           </div>

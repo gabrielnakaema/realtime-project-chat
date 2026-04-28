@@ -5,7 +5,7 @@ import { tokenService } from '@/services/api';
 
 type WebSocketStatus = 'disconnected' | 'connected';
 
-type SocketRoomType = 'chat' | 'project' | '';
+type SocketRoomType = 'chat' | 'project' | 'user' | '';
 
 type SocketHandler = (event: SocketEvent) => void;
 

@@ -3,6 +3,7 @@ import { MessageSquare } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { CreateProject } from '@/components/create-project';
 import { HeaderUser } from '@/components/header-user';
+import { NotificationBell } from '@/components/notification-bell';
 import { UnreadCountBadge } from '@/components/unread-count-badge';
 import { ProjectList } from '@/components/project-list';
 import { SearchBar } from '@/components/search-bar';
@@ -48,6 +49,8 @@ function RouteComponent() {
                 Messages
                 <UnreadCountBadge count={unreadCount} hasMoreUnread={hasMoreUnread} />
               </button>
+
+              <NotificationBell />
 
               <CreateProject />
 
