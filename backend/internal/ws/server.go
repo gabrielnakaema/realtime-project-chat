@@ -26,6 +26,7 @@ type WsRoomType string
 const (
 	WsRoomTypeChat    WsRoomType = "chat"
 	WsRoomTypeProject WsRoomType = "project"
+	WsRoomTypeUser    WsRoomType = "user"
 )
 
 const (
@@ -137,6 +138,10 @@ func (ws *Server) SendCreatedTaskComment(ctx context.Context, comment *domain.Ta
 	return ws.SendEvent(ctx, MapTaskCommentCreated(comment))
 }
 
+func (ws *Server) SendNotification(ctx context.Context, notification *domain.Notification) error {
+	return ws.SendEvent(ctx, MapNotificationCreated(notification))
+}
+
 type roomSnapshot struct {
 	id      uuid.UUID
 	userIds []uuid.UUID
@@ -148,6 +153,10 @@ func (ws *Server) snapshotRooms() []roomSnapshot {
 
 	rooms := make([]roomSnapshot, 0, len(ws.rooms))
 	for _, room := range ws.rooms {
+		if room.roomType == WsRoomTypeUser {
+			continue
+		}
+
 		userIds := make([]uuid.UUID, 0, len(room.users))
 		for userId := range room.users {
 			userIds = append(userIds, userId)
@@ -164,7 +173,7 @@ func (ws *Server) snapshotRooms() []roomSnapshot {
 
 func isValidRoomType(roomType WsRoomType) bool {
 	switch roomType {
-	case WsRoomTypeChat, WsRoomTypeProject:
+	case WsRoomTypeChat, WsRoomTypeProject, WsRoomTypeUser:
 		return true
 	default:
 		return false

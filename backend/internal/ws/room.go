@@ -123,6 +123,12 @@ func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType
 		}
 	}
 
+	if roomType == WsRoomTypeUser {
+		if roomId != userId {
+			return domain.ForbiddenError("forbidden")
+		}
+	}
+
 	ws.mutex.Lock()
 	defer ws.mutex.Unlock()
 

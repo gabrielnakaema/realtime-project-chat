@@ -40,6 +40,19 @@ type ChatMessageRead struct {
 	ReadAt        pgtype.Timestamptz
 }
 
+type Notification struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	ActorID       uuid.UUID
+	ProjectID     uuid.UUID
+	TaskID        pgtype.UUID
+	TaskCommentID pgtype.UUID
+	Type          string
+	ReadAt        pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
 type Project struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID

@@ -39,6 +39,7 @@ type Api struct {
 type Handlers struct {
 	AuthMiddleware *handlers.AuthMiddleware
 	Chat           *handlers.ChatHandler
+	Notification   *handlers.NotificationHandler
 	Project        *handlers.ProjectHandler
 	Task           *handlers.TaskHandler
 	TaskComment    *handlers.TaskCommentHandler
@@ -74,6 +75,7 @@ func NewApi() (*Api, error) {
 	taskCommentRepo := repository.NewTaskCommentRepository(pool)
 	userRepo := repository.NewUserRepository(pool)
 	activityRepo := repository.NewProjectActivityRepository(pool)
+	notificationRepo := repository.NewNotificationRepository(pool)
 
 	projectService := service.NewProjectService(projectRepo, userRepo, pub, activityRepo)
 	projectHandler := handlers.NewProjectHandler(projectService)
@@ -112,7 +114,16 @@ func NewApi() (*Api, error) {
 	}
 	subscribers = append(subscribers, taskUpdateSub)
 
+	notificationSub, err := subscriber.NewNotificationSubscriber(ctx, config, logger, notificationRepo, ws)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	subscribers = append(subscribers, notificationSub)
+
 	chatHandler := handlers.NewChatHandler(chatService)
+	notificationService := service.NewNotificationService(notificationRepo)
+	notificationHandler := handlers.NewNotificationHandler(notificationService)
 
 	userService := service.NewUserService(jwtProvider, userRepo)
 	userHandler := handlers.NewUserHandler(userService, config)
@@ -125,6 +136,7 @@ func NewApi() (*Api, error) {
 	handlers := Handlers{
 		AuthMiddleware: authMiddleware,
 		Chat:           chatHandler,
+		Notification:   notificationHandler,
 		Project:        projectHandler,
 		Task:           taskHandler,
 		TaskComment:    taskCommentHandler,

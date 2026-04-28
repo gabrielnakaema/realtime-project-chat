@@ -29,6 +29,7 @@ const (
 	WebsocketMessageTypeTaskCommentCreated     WebsocketMessageType = "task_comment_created"
 	WebsocketMessageTypeUsersOnline            WebsocketMessageType = "users_online"
 	WebsocketMessageTypeMessageRead            WebsocketMessageType = "message_read"
+	WebsocketMessageTypeNotificationCreated    WebsocketMessageType = "notification_created"
 )
 
 type WebsocketMessage struct {
@@ -126,5 +127,13 @@ func MapTaskCommentCreated(comment *domain.TaskComment) WebsocketMessage {
 		Type:   WebsocketMessageTypeTaskCommentCreated,
 		RoomId: comment.Task.ProjectId,
 		Data:   comment,
+	}
+}
+
+func MapNotificationCreated(notification *domain.Notification) WebsocketMessage {
+	return WebsocketMessage{
+		Type:   WebsocketMessageTypeNotificationCreated,
+		RoomId: notification.UserId,
+		Data:   notification,
 	}
 }
