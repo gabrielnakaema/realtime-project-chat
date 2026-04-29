@@ -57,6 +57,7 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Name:        request.Name,
 		Description: request.Description,
 		UserId:      userId,
+		Columns:     mapProjectColumnsRequest(request.Columns),
 	}
 
 	project, err := h.projectService.Create(r.Context(), serviceRequest)
@@ -160,10 +161,12 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serviceRequest := service.UpdateProjectRequest{
-		Id:          parsed,
-		Name:        request.Name,
-		Description: request.Description,
-		UserId:      userId,
+		Id:             parsed,
+		Name:           request.Name,
+		Description:    request.Description,
+		UserId:         userId,
+		Columns:        mapProjectColumnsRequest(request.Columns),
+		DeletedColumns: mapDeletedProjectColumnsRequest(request.DeletedColumns),
 	}
 
 	project, err := h.projectService.Update(r.Context(), serviceRequest)
@@ -177,6 +180,33 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, r, err)
 		return
 	}
+}
+
+func mapProjectColumnsRequest(columns []ProjectColumnRequest) []domain.ProjectColumn {
+	mapped := make([]domain.ProjectColumn, len(columns))
+	for i, column := range columns {
+		if column.Id != nil {
+			mapped[i].Id = *column.Id
+		}
+		mapped[i].Name = column.Name
+		mapped[i].Color = column.Color
+		mapped[i].Position = i
+		mapped[i].IsDoneColumn = column.IsDoneColumn
+	}
+
+	return mapped
+}
+
+func mapDeletedProjectColumnsRequest(columns []DeletedProjectColumnRequest) []service.DeletedProjectColumnRequest {
+	mapped := make([]service.DeletedProjectColumnRequest, len(columns))
+	for i, column := range columns {
+		mapped[i] = service.DeletedProjectColumnRequest{
+			Id:                  column.Id,
+			MoveTasksToColumnId: column.MoveTasksToColumnId,
+		}
+	}
+
+	return mapped
 }
 
 func (h *ProjectHandler) CreateMember(w http.ResponseWriter, r *http.Request) {

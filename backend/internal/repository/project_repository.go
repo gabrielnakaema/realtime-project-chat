@@ -63,6 +63,22 @@ func (pr *ProjectRepository) Create(ctx context.Context, project *domain.Project
 		project.Members[i].ProjectId = project.Id
 	}
 
+	for i, column := range project.Columns {
+		statusID, err := qtx.CreateProjectColumn(ctx, queries.CreateProjectColumnParams{
+			ProjectID:    project.Id,
+			Name:         column.Name,
+			Color:        column.Color,
+			Position:     int32(column.Position),
+			IsDoneColumn: column.IsDoneColumn,
+		})
+		if err != nil {
+			return err
+		}
+
+		project.Columns[i].Id = statusID
+		project.Columns[i].ProjectId = project.Id
+	}
+
 	return tx.Commit(ctx)
 }
 
@@ -91,6 +107,15 @@ func (pr *ProjectRepository) GetById(ctx context.Context, id uuid.UUID) (*domain
 		return nil, err
 	}
 	err = json.Unmarshal(bytes, &project.Members)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err = json.Marshal(projectResult.Columns)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(bytes, &project.Columns)
 	if err != nil {
 		return nil, err
 	}
@@ -135,6 +160,15 @@ func (pr *ProjectRepository) ListByUserId(ctx context.Context, userId uuid.UUID,
 			return nil, err
 		}
 		err = json.Unmarshal(bytes, &projects[i].Members)
+		if err != nil {
+			return nil, err
+		}
+
+		bytes, err = json.Marshal(projectResult.Columns)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(bytes, &projects[i].Columns)
 		if err != nil {
 			return nil, err
 		}
@@ -263,6 +297,79 @@ func (pr *ProjectRepository) MarkUpdatedAt(ctx context.Context, projectId uuid.U
 	q := queries.New(pr.pool)
 
 	return q.MarkProjectUpdatedAt(ctx, projectId)
+}
+
+func (pr *ProjectRepository) CreateColumn(ctx context.Context, status *domain.ProjectColumn) error {
+	q := queries.New(pr.pool)
+
+	id, err := q.CreateProjectColumn(ctx, queries.CreateProjectColumnParams{
+		ProjectID:    status.ProjectId,
+		Name:         status.Name,
+		Color:        status.Color,
+		Position:     int32(status.Position),
+		IsDoneColumn: status.IsDoneColumn,
+	})
+	if err != nil {
+		return err
+	}
+
+	status.Id = id
+	return nil
+}
+
+func (pr *ProjectRepository) UpdateColumn(ctx context.Context, status *domain.ProjectColumn) error {
+	q := queries.New(pr.pool)
+
+	return q.UpdateProjectColumn(ctx, queries.UpdateProjectColumnParams{
+		Name:         status.Name,
+		Color:        status.Color,
+		Position:     int32(status.Position),
+		IsDoneColumn: status.IsDoneColumn,
+		ID:           status.Id,
+		ProjectID:    status.ProjectId,
+	})
+}
+
+func (pr *ProjectRepository) DeleteColumn(ctx context.Context, projectId uuid.UUID, statusId uuid.UUID) error {
+	q := queries.New(pr.pool)
+
+	return q.DeleteProjectColumn(ctx, queries.DeleteProjectColumnParams{
+		ID:        statusId,
+		ProjectID: projectId,
+	})
+}
+
+func (pr *ProjectRepository) ReassignTasksToColumn(ctx context.Context, fromStatusId uuid.UUID, toStatus *domain.ProjectColumn) error {
+	q := queries.New(pr.pool)
+
+	return q.ReassignTasksToProjectColumn(ctx, queries.ReassignTasksToProjectColumnParams{
+		ProjectColumnID:   toStatus.Id,
+		Column2:           toStatus.IsDoneColumn,
+		ProjectColumnID_2: fromStatusId,
+	})
+}
+
+func (pr *ProjectRepository) GetColumnById(ctx context.Context, id uuid.UUID) (*domain.ProjectColumn, error) {
+	q := queries.New(pr.pool)
+
+	status, err := q.GetProjectColumnById(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.NotFoundError("project status not found")
+		}
+		return nil, err
+	}
+
+	return &domain.ProjectColumn{
+		Id:           status.ID,
+		ProjectId:    status.ProjectID,
+		Name:         status.Name,
+		Color:        status.Color,
+		Position:     int(status.Position),
+		IsDoneColumn: status.IsDoneColumn,
+		CreatedAt:    status.CreatedAt.Time,
+		UpdatedAt:    status.UpdatedAt.Time,
+	}, nil
 }
 
 func (pr *ProjectRepository) ListMembersByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.ProjectMember, error) {

@@ -126,8 +126,8 @@ func (ws *Server) SendReadUpdate(ctx context.Context, chatId uuid.UUID, read *do
 	return ws.SendEvent(ctx, MapChatMessageRead(read, chatId))
 }
 
-func (ws *Server) SendUpdatedTask(ctx context.Context, task *domain.Task, previousStatus *domain.TaskStatus) error {
-	return ws.SendEvent(ctx, MapTaskUpdated(task, previousStatus))
+func (ws *Server) SendUpdatedTask(ctx context.Context, task *domain.Task, previousProjectColumnID *uuid.UUID) error {
+	return ws.SendEvent(ctx, MapTaskUpdated(task, previousProjectColumnID))
 }
 
 func (ws *Server) SendCreatedTask(ctx context.Context, task *domain.Task) error {

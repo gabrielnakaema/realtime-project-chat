@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"time"
 
@@ -17,19 +16,20 @@ import (
 type taskRepository interface {
 	Create(ctx context.Context, task *domain.Task) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
-	ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
+	ListByProjectId(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, archived bool, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 	Update(ctx context.Context, task *domain.Task) error
 	CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error
-	GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, status domain.TaskStatus) (*domain.Task, error)
+	GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, projectColumnID uuid.UUID) (*domain.Task, error)
 	GetProjectTaskAfterId(ctx context.Context, id uuid.UUID, projectId uuid.UUID) (*domain.Task, error)
 	MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID) (*domain.Task, error)
-	CountTasksByProjectIdAndStatus(ctx context.Context, projectId uuid.UUID, statuses []string) (map[string]int, error)
-	ListUserDueTasks(ctx context.Context, userId uuid.UUID, statuses []string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
-	SearchTasksForUser(ctx context.Context, userId uuid.UUID, statuses []string, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
+	CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error)
+	ListUserDueTasks(ctx context.Context, userId uuid.UUID, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
+	SearchTasksForUser(ctx context.Context, userId uuid.UUID, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 }
 
 type taskServiceProjectRepository interface {
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Project, error)
+	GetColumnById(ctx context.Context, id uuid.UUID) (*domain.ProjectColumn, error)
 }
 
 type taskServiceUserRepository interface {
@@ -57,14 +57,15 @@ func NewTaskService(taskRepository taskRepository, projectRepository taskService
 }
 
 type CreateTaskRequest struct {
-	ProjectId     uuid.UUID
-	Title         string
-	Description   string
-	RequestUserId uuid.UUID
-	Priority      string
-	DueDate       *time.Time
-	ResponsibleId *uuid.UUID
-	Tags          []string
+	ProjectId       uuid.UUID
+	ProjectColumnId uuid.UUID
+	Title           string
+	Description     string
+	RequestUserId   uuid.UUID
+	Priority        string
+	DueDate         *time.Time
+	ResponsibleId   *uuid.UUID
+	Tags            []string
 }
 
 func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*domain.Task, error) {
@@ -94,6 +95,11 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		}
 	}
 
+	projectColumn, err := findProjectColumn(project, request.ProjectColumnId)
+	if err != nil {
+		return nil, err
+	}
+
 	user, err := ts.userRepository.GetById(ctx, request.RequestUserId)
 	if err != nil {
 		return nil, domain.ServerError("failed to get user", err)
@@ -107,15 +113,15 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		}
 	}
 
-	firstTask, err := ts.taskRepository.GetFirstTaskInColumn(ctx, request.ProjectId, domain.TaskStatusPending)
+	firstTask, err := ts.taskRepository.GetFirstTaskInColumn(ctx, request.ProjectId, request.ProjectColumnId)
 	if err != nil {
 		var domainErr domain.DomainError
 		if errors.As(err, &domainErr) {
 			if domainErr.Code != domain.NotFoundErrorCode {
-				return nil, domain.ServerError("failed to get first pending task", err)
+				return nil, domain.ServerError("failed to get first task in column", err)
 			}
 		} else {
-			return nil, domain.ServerError("failed to get first pending task", err)
+			return nil, domain.ServerError("failed to get first task in column", err)
 		}
 	}
 
@@ -139,21 +145,28 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 	}
 
 	task := domain.Task{
-		ProjectId:     request.ProjectId,
-		Title:         request.Title,
-		Description:   request.Description,
-		AuthorId:      request.RequestUserId,
-		Status:        domain.TaskStatusPending,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
-		Author:        user,
-		Priority:      domain.TaskPriority(request.Priority),
-		Order:         order,
-		ResponsibleId: request.ResponsibleId,
-		Responsible:   responsible,
-		DueDate:       request.DueDate,
-		Tags:          formattedTags,
-		Updates:       []domain.TaskUpdate{},
+		ProjectId:       request.ProjectId,
+		Title:           request.Title,
+		Description:     request.Description,
+		Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
+		AuthorId:        request.RequestUserId,
+		ProjectColumnId: request.ProjectColumnId,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+		Author:          user,
+		Priority:        domain.TaskPriority(request.Priority),
+		Order:           order,
+		ResponsibleId:   request.ResponsibleId,
+		Responsible:     responsible,
+		DueDate:         request.DueDate,
+		Tags:            formattedTags,
+		Updates:         []domain.TaskUpdate{},
+		ProjectColumn:   projectColumn,
+	}
+
+	if projectColumn.IsDoneColumn {
+		now := time.Now()
+		task.DoneAt = &now
 	}
 
 	err = ts.taskRepository.Create(ctx, &task)
@@ -175,16 +188,15 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 }
 
 type UpdateTaskRequest struct {
-	TaskId        uuid.UUID
-	Title         string
-	Description   string
-	Status        domain.TaskStatus
-	RequestUserId uuid.UUID
-	Priority      domain.TaskPriority
-	DueDate       *time.Time
-	ResponsibleId *uuid.UUID
-	Tags          []string
-	DoneAt        *time.Time
+	TaskId          uuid.UUID
+	Title           string
+	Description     string
+	ProjectColumnId uuid.UUID
+	RequestUserId   uuid.UUID
+	Priority        domain.TaskPriority
+	DueDate         *time.Time
+	ResponsibleId   *uuid.UUID
+	Tags            []string
 }
 
 func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*domain.Task, error) {
@@ -226,6 +238,11 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		}
 	}
 
+	projectColumn, err := findProjectColumn(project, request.ProjectColumnId)
+	if err != nil {
+		return nil, err
+	}
+
 	responsible := task.Responsible
 	if request.ResponsibleId == nil || *request.ResponsibleId == uuid.Nil {
 		responsible = nil
@@ -236,8 +253,7 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		}
 	}
 
-	// Capture old status for event payload
-	oldStatus := task.Status
+	oldProjectColumnID := task.ProjectColumnId
 
 	formattedTags := []string{}
 	for _, tag := range request.Tags {
@@ -248,28 +264,30 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 	}
 
 	updatedTask := domain.Task{
-		Id:            task.Id,
-		ProjectId:     task.ProjectId,
-		Status:        task.Status,
-		AuthorId:      task.AuthorId,
-		CreatedAt:     task.CreatedAt,
-		Author:        task.Author,
-		Order:         task.Order,
-		Title:         request.Title,
-		Description:   request.Description,
-		Priority:      request.Priority,
-		ResponsibleId: request.ResponsibleId,
-		Responsible:   responsible,
-		DueDate:       request.DueDate,
-		DoneAt:        request.DoneAt,
-		Tags:          formattedTags,
-		UpdatedAt:     time.Now(),
-		Updates:       []domain.TaskUpdate{},
+		Id:              task.Id,
+		ProjectId:       task.ProjectId,
+		ProjectColumnId: request.ProjectColumnId,
+		AuthorId:        task.AuthorId,
+		CreatedAt:       task.CreatedAt,
+		Author:          task.Author,
+		Order:           task.Order,
+		Title:           request.Title,
+		Description:     request.Description,
+		Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
+		Priority:        request.Priority,
+		ResponsibleId:   request.ResponsibleId,
+		Responsible:     responsible,
+		DueDate:         request.DueDate,
+		Tags:            formattedTags,
+		UpdatedAt:       time.Now(),
+		Updates:         []domain.TaskUpdate{},
+		ProjectColumn:   projectColumn,
+		ArchivedAt:      task.ArchivedAt,
 	}
 
-	err = updatedTask.ChangeStatus(request.Status)
-	if err != nil {
-		return nil, err
+	if projectColumn.IsDoneColumn {
+		now := time.Now()
+		updatedTask.DoneAt = &now
 	}
 
 	err = ts.taskRepository.Update(ctx, &updatedTask)
@@ -278,9 +296,9 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 	}
 
 	// Only include previous status if it changed
-	var previousStatus *domain.TaskStatus
-	if oldStatus != updatedTask.Status {
-		previousStatus = &oldStatus
+	var previousProjectColumnID *uuid.UUID
+	if oldProjectColumnID != updatedTask.ProjectColumnId {
+		previousProjectColumnID = &oldProjectColumnID
 	}
 
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
@@ -289,7 +307,7 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
-		PreviousStatus: previousStatus,
+		PreviousProjectColumnID: previousProjectColumnID,
 	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish task updated event", err)
@@ -299,12 +317,13 @@ func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*
 }
 
 type ListTasksRequest struct {
-	ProjectId       uuid.UUID
-	RequestUserId   uuid.UUID
-	Statuses        []string
-	TaskOrder       string
-	Limit           int
-	CursorUpdatedAt *time.Time
+	ProjectId        uuid.UUID
+	RequestUserId    uuid.UUID
+	ProjectColumnIDs []uuid.UUID
+	Archived         bool
+	TaskOrder        string
+	Limit            int
+	CursorUpdatedAt  *time.Time
 }
 
 func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
@@ -325,16 +344,11 @@ func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) (*uti
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
-	for _, s := range request.Statuses {
-		if s == string(domain.TaskStatusArchived) {
-			if !project.IsCreator(request.RequestUserId) {
-				return nil, domain.ForbiddenError("only project owners can view archived tasks")
-			}
-			break
-		}
+	if err := validateProjectColumnIDs(project, request.ProjectColumnIDs); err != nil {
+		return nil, err
 	}
 
-	tasks, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, request.Statuses, request.TaskOrder, request.CursorUpdatedAt, request.Limit)
+	tasks, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, request.ProjectColumnIDs, request.Archived, request.TaskOrder, request.CursorUpdatedAt, request.Limit)
 	if err != nil {
 		return nil, domain.ServerError("failed to list tasks", err)
 	}
@@ -378,16 +392,17 @@ func (ts *TaskService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UU
 	return task, nil
 }
 
-type GroupByStatusRequest struct {
-	ProjectId       uuid.UUID
-	UserId          uuid.UUID
-	Statuses        []domain.TaskStatus
-	TaskOrder       string
-	CursorUpdatedAt *time.Time
-	Limit           int
+type GroupByColumnRequest struct {
+	ProjectId        uuid.UUID
+	UserId           uuid.UUID
+	ProjectColumnIDs []uuid.UUID
+	Archived         bool
+	TaskOrder        string
+	CursorUpdatedAt  *time.Time
+	Limit            int
 }
 
-func (ts *TaskService) GroupByStatus(ctx context.Context, request GroupByStatusRequest) (map[domain.TaskStatus]utils.CursorPaginated[domain.Task], error) {
+func (ts *TaskService) GroupByColumn(ctx context.Context, request GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error) {
 	if request.UserId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
@@ -401,39 +416,31 @@ func (ts *TaskService) GroupByStatus(ctx context.Context, request GroupByStatusR
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
-	statuses := request.Statuses
-	if len(statuses) == 0 {
-		statuses = []domain.TaskStatus{
-			domain.TaskStatusPending,
-			domain.TaskStatusDoing,
-			domain.TaskStatusDone,
+	statusIDs := request.ProjectColumnIDs
+	if len(statusIDs) == 0 {
+		for _, column := range project.Columns {
+			statusIDs = append(statusIDs, column.Id)
 		}
 	}
 
-	stringStatuses := []string{}
-	for _, status := range statuses {
-		if status == domain.TaskStatusArchived {
-			if !project.IsCreator(request.UserId) {
-				return nil, domain.ForbiddenError("only project owners can view archived tasks")
-			}
-		}
-		stringStatuses = append(stringStatuses, string(status))
+	if err := validateProjectColumnIDs(project, statusIDs); err != nil {
+		return nil, err
 	}
 
-	results := map[domain.TaskStatus]utils.CursorPaginated[domain.Task]{}
+	results := map[string]utils.CursorPaginated[domain.Task]{}
 
-	for _, status := range stringStatuses {
-		result, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, []string{status}, request.TaskOrder, request.CursorUpdatedAt, request.Limit)
+	for _, statusID := range statusIDs {
+		result, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, []uuid.UUID{statusID}, request.Archived, request.TaskOrder, request.CursorUpdatedAt, request.Limit)
 		if err != nil {
 			return nil, domain.ServerError("failed to list tasks", err)
 		}
-		results[domain.TaskStatus(status)] = *result
+		results[statusID.String()] = *result
 	}
 
 	return results, nil
 }
 
-func (ts *TaskService) CountByStatus(ctx context.Context, projectId uuid.UUID, statuses []domain.TaskStatus, requestUserId uuid.UUID) (map[domain.TaskStatus]int, error) {
+func (ts *TaskService) CountByColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, requestUserId uuid.UUID) (map[string]int, error) {
 	if requestUserId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
@@ -447,23 +454,14 @@ func (ts *TaskService) CountByStatus(ctx context.Context, projectId uuid.UUID, s
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
-	stringStatuses := []string{}
-	for _, status := range statuses {
-		if !slices.Contains(domain.AllowedTaskStatuses, status) {
-			return nil, domain.BusinessValidationError("invalid status")
-		}
-		stringStatuses = append(stringStatuses, string(status))
+	if err := validateProjectColumnIDs(project, projectColumnIDs); err != nil {
+		return nil, err
 	}
-	results, err := ts.taskRepository.CountTasksByProjectIdAndStatus(ctx, projectId, stringStatuses)
+	results, err := ts.taskRepository.CountTasksByProjectIdAndColumn(ctx, projectId, projectColumnIDs)
 	if err != nil {
 		return nil, domain.ServerError("failed to count tasks", err)
 	}
-
-	result := map[domain.TaskStatus]int{}
-	for status, count := range results {
-		result[domain.TaskStatus(status)] = count
-	}
-	return result, nil
+	return results, nil
 }
 
 type ArchiveTaskRequest struct {
@@ -504,10 +502,10 @@ func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) 
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
-	oldStatus := task.Status
-
 	archivedTask := *task
 	archivedTask.Status = domain.TaskStatusArchived
+	now := time.Now()
+	archivedTask.ArchivedAt = &now
 	archivedTask.UpdatedAt = time.Now()
 	archivedTask.Updates = []domain.TaskUpdate{}
 
@@ -516,14 +514,13 @@ func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) 
 		return nil, domain.ServerError("failed to archive task", err)
 	}
 
-	previousStatus := &oldStatus
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
 		Task:         archivedTask,
 		PreviousTask: task,
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
-		PreviousStatus: previousStatus,
+		PreviousProjectColumnID: nil,
 	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish task archived event", err)
@@ -544,14 +541,7 @@ func (ts *TaskService) ListUserDueTasks(ctx context.Context, request ListUserDue
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
 
-	dueStatuses := []domain.TaskStatus{domain.TaskStatusPending, domain.TaskStatusDoing}
-
-	stringDueStatuses := []string{}
-	for _, status := range dueStatuses {
-		stringDueStatuses = append(stringDueStatuses, string(status))
-	}
-
-	result, err := ts.taskRepository.ListUserDueTasks(ctx, request.UserId, stringDueStatuses, request.CursorDueDate, request.CursorUpdatedAt, request.Limit)
+	result, err := ts.taskRepository.ListUserDueTasks(ctx, request.UserId, request.CursorDueDate, request.CursorUpdatedAt, request.Limit)
 	if err != nil {
 		return nil, domain.ServerError("failed to list user due tasks", err)
 	}
@@ -560,11 +550,11 @@ func (ts *TaskService) ListUserDueTasks(ctx context.Context, request ListUserDue
 }
 
 type MoveTaskRequest struct {
-	TaskId        uuid.UUID
-	RequestUserId uuid.UUID
-	AfterTaskId   *uuid.UUID
-	ProjectId     uuid.UUID
-	Status        domain.TaskStatus
+	TaskId          uuid.UUID
+	RequestUserId   uuid.UUID
+	AfterTaskId     *uuid.UUID
+	ProjectId       uuid.UUID
+	ProjectColumnId uuid.UUID
 }
 
 func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*domain.Task, error) {
@@ -572,7 +562,6 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
 
-	// Get the task before moving to capture old status
 	oldTask, err := ts.taskRepository.GetById(ctx, request.TaskId)
 	if err != nil {
 		var domainErr domain.DomainError
@@ -584,7 +573,19 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 		}
 		return nil, domain.ServerError("failed to get task", err)
 	}
-	oldStatus := oldTask.Status
+	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
+	if err != nil {
+		return nil, domain.ServerError("failed to get project", err)
+	}
+
+	if !project.IsMember(request.RequestUserId) {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	projectColumn, err := findProjectColumn(project, request.ProjectColumnId)
+	if err != nil {
+		return nil, err
+	}
 
 	newOrder, err := ts.calculateOrder(ctx, request)
 	if err != nil {
@@ -599,10 +600,17 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 	}
 
 	task := domain.Task{
-		Id:        request.TaskId,
-		ProjectId: request.ProjectId,
-		Order:     newOrder,
-		Status:    request.Status,
+		Id:              request.TaskId,
+		ProjectId:       request.ProjectId,
+		Order:           newOrder,
+		Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
+		ProjectColumnId: request.ProjectColumnId,
+		ProjectColumn:   projectColumn,
+	}
+
+	if projectColumn.IsDoneColumn {
+		now := time.Now()
+		task.DoneAt = &now
 	}
 
 	updatedTask, err := ts.taskRepository.MoveTask(ctx, &task, request.RequestUserId)
@@ -618,9 +626,9 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 	}
 
 	// Only include previous status if it changed
-	var previousStatus *domain.TaskStatus
-	if oldStatus != updatedTask.Status {
-		previousStatus = &oldStatus
+	var previousProjectColumnID *uuid.UUID
+	if oldTask.ProjectColumnId != updatedTask.ProjectColumnId {
+		previousProjectColumnID = &oldTask.ProjectColumnId
 	}
 
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
@@ -629,7 +637,7 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
-		PreviousStatus: previousStatus,
+		PreviousProjectColumnID: previousProjectColumnID,
 	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish task moved event", err)
@@ -640,7 +648,7 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 
 func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskRequest) (string, error) {
 	if request.AfterTaskId == nil {
-		firstTask, err := ts.taskRepository.GetFirstTaskInColumn(ctx, request.ProjectId, request.Status)
+		firstTask, err := ts.taskRepository.GetFirstTaskInColumn(ctx, request.ProjectId, request.ProjectColumnId)
 		if err != nil {
 			var domainErr domain.DomainError
 			if errors.As(err, &domainErr) && domainErr.Code == domain.NotFoundErrorCode {
@@ -654,6 +662,10 @@ func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskReque
 	prevTask, err := ts.taskRepository.GetById(ctx, *request.AfterTaskId)
 	if err != nil {
 		return "", err
+	}
+
+	if prevTask.ProjectId != request.ProjectId || prevTask.ProjectColumnId != request.ProjectColumnId {
+		return "", domain.BusinessValidationError("after_task_id must belong to the target column")
 	}
 
 	nextTask, err := ts.taskRepository.GetProjectTaskAfterId(ctx, *request.AfterTaskId, request.ProjectId)
@@ -683,16 +695,40 @@ func (ts *TaskService) SearchTasksForUser(ctx context.Context, request SearchTas
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
 
-	stringStatuses := []string{
-		string(domain.TaskStatusPending),
-		string(domain.TaskStatusDoing),
-		string(domain.TaskStatusDone),
-	}
-
-	result, err := ts.taskRepository.SearchTasksForUser(ctx, request.UserId, stringStatuses, request.SearchQuery, request.CursorDueDate, request.CursorUpdatedAt, request.Limit)
+	result, err := ts.taskRepository.SearchTasksForUser(ctx, request.UserId, request.SearchQuery, request.CursorDueDate, request.CursorUpdatedAt, request.Limit)
 	if err != nil {
 		return nil, domain.ServerError("failed to search tasks for user", err)
 	}
 
 	return result, nil
+}
+
+func findProjectColumn(project *domain.Project, statusID uuid.UUID) (*domain.ProjectColumn, error) {
+	for _, status := range project.Columns {
+		if status.Id == statusID {
+			statusCopy := status
+			return &statusCopy, nil
+		}
+	}
+
+	return nil, domain.BusinessValidationError("invalid project_column_id")
+}
+
+func validateProjectColumnIDs(project *domain.Project, statusIDs []uuid.UUID) error {
+	if len(statusIDs) == 0 {
+		return nil
+	}
+
+	valid := map[uuid.UUID]struct{}{}
+	for _, column := range project.Columns {
+		valid[column.Id] = struct{}{}
+	}
+
+	for _, statusID := range statusIDs {
+		if _, ok := valid[statusID]; !ok {
+			return domain.BusinessValidationError("invalid project_column_id")
+		}
+	}
+
+	return nil
 }

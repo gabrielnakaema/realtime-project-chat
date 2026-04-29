@@ -8,11 +8,12 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/google/uuid"
 )
 
 type TaskNotifier interface {
 	SendCreatedTask(context.Context, *domain.Task) error
-	SendUpdatedTask(context.Context, *domain.Task, *domain.TaskStatus) error
+	SendUpdatedTask(context.Context, *domain.Task, *uuid.UUID) error
 	SendCreatedTaskComment(context.Context, *domain.TaskComment) error
 }
 
@@ -99,7 +100,7 @@ func (ts *TaskSubscriber) handleTaskUpdated(ctx context.Context, message Message
 		return domain.ServerError("failed to unmarshal task", err)
 	}
 
-	err = ts.notifier.SendUpdatedTask(ctx, &payload.Task, payload.PreviousStatus)
+	err = ts.notifier.SendUpdatedTask(ctx, &payload.Task, payload.PreviousProjectColumnID)
 	if err != nil {
 		return domain.ServerError("failed to send updated task to ws server", err)
 	}

@@ -68,12 +68,19 @@ SELECT
       'author_id', t.author_id,
       'title', t.title,
       'description', t.description,
-      'status', t.status,
+      'status', CASE
+        WHEN t.archived_at IS NOT NULL THEN 'archived'
+        WHEN pc.is_done_column THEN 'done'
+        WHEN pc.position = 1 THEN 'doing'
+        ELSE 'pending'
+      END,
+      'project_column_id', t.project_column_id,
       'priority', t.priority,
       'order', t.task_order,
       'responsible_id', t.responsible_id,
       'due_date', t.due_date,
       'done_at', t.done_at,
+      'archived_at', t.archived_at,
       'created_at', t.created_at,
       'updated_at', t.updated_at,
       'tags', coalesce(task_tags.tags, '[]'::jsonb),
@@ -113,6 +120,7 @@ FROM notification_rows nr
 JOIN users actor ON actor.id = nr.actor_id
 JOIN projects p ON p.id = nr.project_id
 LEFT JOIN tasks t ON t.id = nr.task_id
+LEFT JOIN project_columns pc ON pc.id = t.project_column_id
 LEFT JOIN users author ON author.id = t.author_id
 LEFT JOIN users responsible ON responsible.id = t.responsible_id
 LEFT JOIN LATERAL (
@@ -173,12 +181,19 @@ SELECT
       'author_id', t.author_id,
       'title', t.title,
       'description', t.description,
-      'status', t.status,
+      'status', CASE
+        WHEN t.archived_at IS NOT NULL THEN 'archived'
+        WHEN pc.is_done_column THEN 'done'
+        WHEN pc.position = 1 THEN 'doing'
+        ELSE 'pending'
+      END,
+      'project_column_id', t.project_column_id,
       'priority', t.priority,
       'order', t.task_order,
       'responsible_id', t.responsible_id,
       'due_date', t.due_date,
       'done_at', t.done_at,
+      'archived_at', t.archived_at,
       'created_at', t.created_at,
       'updated_at', t.updated_at,
       'tags', coalesce(task_tags.tags, '[]'::jsonb),
@@ -218,6 +233,7 @@ FROM notification_rows nr
 JOIN users actor ON actor.id = nr.actor_id
 JOIN projects p ON p.id = nr.project_id
 LEFT JOIN tasks t ON t.id = nr.task_id
+LEFT JOIN project_columns pc ON pc.id = t.project_column_id
 LEFT JOIN users author ON author.id = t.author_id
 LEFT JOIN users responsible ON responsible.id = t.responsible_id
 LEFT JOIN LATERAL (

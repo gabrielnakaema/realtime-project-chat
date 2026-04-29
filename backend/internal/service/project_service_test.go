@@ -77,6 +77,46 @@ func (m *mockProjectRepository) Update(ctx context.Context, project *domain.Proj
 	return args.Error(0)
 }
 
+func (m *mockProjectRepository) CreateColumn(ctx context.Context, status *domain.ProjectColumn) error {
+	args := m.Called(ctx, status)
+	if args.Get(0) == nil {
+		return args.Error(0)
+	}
+	return args.Error(0)
+}
+
+func (m *mockProjectRepository) UpdateColumn(ctx context.Context, status *domain.ProjectColumn) error {
+	args := m.Called(ctx, status)
+	if args.Get(0) == nil {
+		return args.Error(0)
+	}
+	return args.Error(0)
+}
+
+func (m *mockProjectRepository) DeleteColumn(ctx context.Context, projectId uuid.UUID, statusId uuid.UUID) error {
+	args := m.Called(ctx, projectId, statusId)
+	if args.Get(0) == nil {
+		return args.Error(0)
+	}
+	return args.Error(0)
+}
+
+func (m *mockProjectRepository) ReassignTasksToColumn(ctx context.Context, fromStatusId uuid.UUID, toStatus *domain.ProjectColumn) error {
+	args := m.Called(ctx, fromStatusId, toStatus)
+	if args.Get(0) == nil {
+		return args.Error(0)
+	}
+	return args.Error(0)
+}
+
+func (m *mockProjectRepository) GetColumnById(ctx context.Context, id uuid.UUID) (*domain.ProjectColumn, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.ProjectColumn), args.Error(1)
+}
+
 func (m *mockProjectRepository) CreateMember(ctx context.Context, member *domain.ProjectMember) error {
 	args := m.Called(ctx, member)
 	if args.Get(0) == nil {
@@ -414,6 +454,9 @@ func TestProjectService_ListByUserId(t *testing.T) {
 func TestProjectService_Update(t *testing.T) {
 	validUserId := uuid.New()
 	validProjectId := uuid.New()
+	pendingStatusID := uuid.New()
+	doingStatusID := uuid.New()
+	doneStatusID := uuid.New()
 
 	validProject := domain.Project{
 		Id:          validProjectId,
@@ -428,6 +471,17 @@ func TestProjectService_Update(t *testing.T) {
 			},
 		},
 		UserId: validUserId,
+		Columns: []domain.ProjectColumn{
+			{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+			{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 1},
+			{Id: doneStatusID, ProjectId: validProjectId, Name: "Done", Color: "#059669", Position: 2, IsDoneColumn: true},
+		},
+	}
+
+	updatedColumns := []domain.ProjectColumn{
+		{Id: pendingStatusID, ProjectId: validProjectId, Name: "Backlog", Color: "#64748B", Position: 0},
+		{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 1},
+		{Id: doneStatusID, ProjectId: validProjectId, Name: "Done", Color: "#059669", Position: 2, IsDoneColumn: true},
 	}
 
 	type testCase struct {
@@ -448,10 +502,12 @@ func TestProjectService_Update(t *testing.T) {
 				Name:        "Updated Project",
 				Description: "Updated Description",
 				UserId:      validUserId,
+				Columns:     updatedColumns,
 			},
 			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 				repo.On("Update", mock.Anything, &validProject).Return(nil)
+				repo.On("UpdateColumn", mock.Anything, mock.AnythingOfType("*domain.ProjectColumn")).Return(nil).Times(6)
 			},
 			expectedProject: &validProject,
 			shouldSucceed:   true,
@@ -464,6 +520,7 @@ func TestProjectService_Update(t *testing.T) {
 				Name:        "Updated Project",
 				Description: "Updated Description",
 				UserId:      validUserId,
+				Columns:     updatedColumns,
 			},
 			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
@@ -480,6 +537,7 @@ func TestProjectService_Update(t *testing.T) {
 				Name:        "Updated Project",
 				Description: "Updated Description",
 				UserId:      uuid.New(),
+				Columns:     updatedColumns,
 			},
 			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
@@ -495,6 +553,7 @@ func TestProjectService_Update(t *testing.T) {
 				Name:        "Updated Project",
 				Description: "Updated Description",
 				UserId:      validUserId,
+				Columns:     updatedColumns,
 			},
 			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, mock.Anything).Return(nil, domain.NotFoundError("project not found"))

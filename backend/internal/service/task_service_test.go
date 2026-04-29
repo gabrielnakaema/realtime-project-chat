@@ -41,8 +41,8 @@ func (m *mockTaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain
 	return args.Get(0).(*domain.Task), args.Error(1)
 }
 
-func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
-	args := m.Called(ctx, projectId, statuses, taskOrder, cursorUpdatedAt, limit)
+func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, archived bool, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+	args := m.Called(ctx, projectId, projectColumnIDs, archived, taskOrder, cursorUpdatedAt, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -65,8 +65,8 @@ func (m *mockTaskRepository) CreateUpdates(ctx context.Context, task *domain.Tas
 	return args.Error(0)
 }
 
-func (m *mockTaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, status domain.TaskStatus) (*domain.Task, error) {
-	args := m.Called(ctx, projectId, status)
+func (m *mockTaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, projectColumnID uuid.UUID) (*domain.Task, error) {
+	args := m.Called(ctx, projectId, projectColumnID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -89,24 +89,24 @@ func (m *mockTaskRepository) MoveTask(ctx context.Context, task *domain.Task, us
 	return args.Get(0).(*domain.Task), args.Error(1)
 }
 
-func (m *mockTaskRepository) CountTasksByProjectIdAndStatus(ctx context.Context, projectId uuid.UUID, statuses []string) (map[string]int, error) {
-	args := m.Called(ctx, projectId, statuses)
+func (m *mockTaskRepository) CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error) {
+	args := m.Called(ctx, projectId, projectColumnIDs)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(map[string]int), args.Error(1)
 }
 
-func (m *mockTaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID, statuses []string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
-	args := m.Called(ctx, userId, statuses, cursorDueDate, cursorUpdatedAt, limit)
+func (m *mockTaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+	args := m.Called(ctx, userId, cursorDueDate, cursorUpdatedAt, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*utils.CursorPaginated[domain.Task]), args.Error(1)
 }
 
-func (m *mockTaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UUID, statuses []string, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
-	args := m.Called(ctx, userId, statuses, searchQuery, cursorDueDate, cursorUpdatedAt, limit)
+func (m *mockTaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UUID, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+	args := m.Called(ctx, userId, searchQuery, cursorDueDate, cursorUpdatedAt, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -117,6 +117,9 @@ func TestTaskService_Create(t *testing.T) {
 	validUserId := uuid.New()
 	validProjectId := uuid.New()
 	validTaskId := uuid.New()
+	pendingStatusID := uuid.New()
+	doingStatusID := uuid.New()
+	doneStatusID := uuid.New()
 
 	validProject := domain.Project{
 		Id:          validProjectId,
@@ -131,6 +134,11 @@ func TestTaskService_Create(t *testing.T) {
 			},
 		},
 		UserId: validUserId,
+		Columns: []domain.ProjectColumn{
+			{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+			{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 1},
+			{Id: doneStatusID, ProjectId: validProjectId, Name: "Done", Color: "#059669", Position: 2, IsDoneColumn: true},
+		},
 	}
 
 	validUser := domain.User{
@@ -140,17 +148,19 @@ func TestTaskService_Create(t *testing.T) {
 	}
 
 	validTask := domain.Task{
-		Id:          validTaskId,
-		ProjectId:   validProjectId,
-		AuthorId:    validUserId,
-		Author:      &validUser,
-		Title:       "Test Task",
-		Description: "Test Description",
-		Status:      domain.TaskStatusPending,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-		Order:       mustGenerateTestOrder(t, "", ""),
-		Updates:     []domain.TaskUpdate{},
+		Id:              validTaskId,
+		ProjectId:       validProjectId,
+		AuthorId:        validUserId,
+		Author:          &validUser,
+		Title:           "Test Task",
+		Description:     "Test Description",
+		Status:          domain.TaskStatusPending,
+		ProjectColumnId: pendingStatusID,
+		ProjectColumn:   &domain.ProjectColumn{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+		Order:           mustGenerateTestOrder(t, "", ""),
+		Updates:         []domain.TaskUpdate{},
 	}
 
 	type testCase struct {
@@ -168,18 +178,19 @@ func TestTaskService_Create(t *testing.T) {
 		{
 			name: "successful task creation",
 			request: service.CreateTaskRequest{
-				ProjectId:     validProjectId,
-				Title:         "Test Task",
-				Description:   "Test Description",
-				RequestUserId: validUserId,
-				Priority:      string(domain.TaskPriorityLow),
-				ResponsibleId: nil,
-				DueDate:       nil,
-				Tags:          []string{},
+				ProjectId:       validProjectId,
+				ProjectColumnId: pendingStatusID,
+				Title:           "Test Task",
+				Description:     "Test Description",
+				RequestUserId:   validUserId,
+				Priority:        string(domain.TaskPriorityLow),
+				ResponsibleId:   nil,
+				DueDate:         nil,
+				Tags:            []string{},
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, domain.TaskStatusPending).Return(nil, domain.NotFoundError("not found"))
+				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
 				repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 			},
@@ -190,10 +201,11 @@ func TestTaskService_Create(t *testing.T) {
 		{
 			name: "unauthorized error",
 			request: service.CreateTaskRequest{
-				ProjectId:     validProjectId,
-				Title:         "Test Task",
-				Description:   "Test Description",
-				RequestUserId: uuid.Nil,
+				ProjectId:       validProjectId,
+				ProjectColumnId: pendingStatusID,
+				Title:           "Test Task",
+				Description:     "Test Description",
+				RequestUserId:   uuid.Nil,
 			},
 			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {},
 			shouldSucceed:     false,
@@ -203,10 +215,11 @@ func TestTaskService_Create(t *testing.T) {
 		{
 			name: "project not found",
 			request: service.CreateTaskRequest{
-				ProjectId:     validProjectId,
-				Title:         "Test Task",
-				Description:   "Test Description",
-				RequestUserId: validUserId,
+				ProjectId:       validProjectId,
+				ProjectColumnId: pendingStatusID,
+				Title:           "Test Task",
+				Description:     "Test Description",
+				RequestUserId:   validUserId,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(nil, domain.NotFoundError("project not found"))
@@ -218,10 +231,11 @@ func TestTaskService_Create(t *testing.T) {
 		{
 			name: "forbidden error",
 			request: service.CreateTaskRequest{
-				ProjectId:     validProjectId,
-				Title:         "Test Task",
-				Description:   "Test Description",
-				RequestUserId: uuid.New(),
+				ProjectId:       validProjectId,
+				ProjectColumnId: pendingStatusID,
+				Title:           "Test Task",
+				Description:     "Test Description",
+				RequestUserId:   uuid.New(),
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
@@ -233,15 +247,16 @@ func TestTaskService_Create(t *testing.T) {
 		{
 			name: "remove empty tags",
 			request: service.CreateTaskRequest{
-				ProjectId:     validProjectId,
-				Title:         "Test Task",
-				Description:   "Test Description",
-				RequestUserId: validUserId,
-				Tags:          []string{"", "tag1", "tag2", "", "tag3"},
+				ProjectId:       validProjectId,
+				ProjectColumnId: pendingStatusID,
+				Title:           "Test Task",
+				Description:     "Test Description",
+				RequestUserId:   validUserId,
+				Tags:            []string{"", "tag1", "tag2", "", "tag3"},
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, domain.TaskStatusPending).Return(nil, domain.NotFoundError("not found"))
+				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
 				repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 			},
@@ -255,10 +270,11 @@ func TestTaskService_Create(t *testing.T) {
 		{
 			name: "responsible must be a project member",
 			request: service.CreateTaskRequest{
-				ProjectId:     validProjectId,
-				Title:         "Test Task",
-				Description:   "Test Description",
-				RequestUserId: validUserId,
+				ProjectId:       validProjectId,
+				ProjectColumnId: pendingStatusID,
+				Title:           "Test Task",
+				Description:     "Test Description",
+				RequestUserId:   validUserId,
 				ResponsibleId: func() *uuid.UUID {
 					id := uuid.New()
 					return &id
@@ -313,9 +329,12 @@ func TestTaskService_Create(t *testing.T) {
 	}
 }
 
-func TestTaskService_GroupByStatus_DefaultStatuses(t *testing.T) {
+func TestTaskService_GroupByColumn_DefaultStatuses(t *testing.T) {
 	validUserId := uuid.New()
 	validProjectId := uuid.New()
+	pendingStatusID := uuid.New()
+	doingStatusID := uuid.New()
+	doneStatusID := uuid.New()
 
 	mockRepo := &mockTaskRepository{}
 	mockProjectRepo := &mockProjectRepository{}
@@ -326,16 +345,21 @@ func TestTaskService_GroupByStatus_DefaultStatuses(t *testing.T) {
 		Members: []domain.ProjectMember{
 			{UserId: validUserId},
 		},
+		Columns: []domain.ProjectColumn{
+			{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+			{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 1},
+			{Id: doneStatusID, ProjectId: validProjectId, Name: "Done", Color: "#059669", Position: 2, IsDoneColumn: true},
+		},
 	}, nil)
 
 	emptyPage := &utils.CursorPaginated[domain.Task]{Data: []domain.Task{}, HasNext: false}
-	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusPending)}, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
-	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusDoing)}, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
-	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusDone)}, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
+	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{pendingStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
+	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{doingStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
+	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{doneStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
 
 	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
 
-	result, err := svc.GroupByStatus(context.Background(), service.GroupByStatusRequest{
+	result, err := svc.GroupByColumn(context.Background(), service.GroupByColumnRequest{
 		ProjectId: validProjectId,
 		UserId:    validUserId,
 		Limit:     15,
@@ -343,11 +367,11 @@ func TestTaskService_GroupByStatus_DefaultStatuses(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, result, 3)
-	_, ok := result[domain.TaskStatusPending]
+	_, ok := result[pendingStatusID.String()]
 	require.True(t, ok)
-	_, ok = result[domain.TaskStatusDoing]
+	_, ok = result[doingStatusID.String()]
 	require.True(t, ok)
-	_, ok = result[domain.TaskStatusDone]
+	_, ok = result[doneStatusID.String()]
 	require.True(t, ok)
 }
 
@@ -355,6 +379,9 @@ func TestTaskService_Update(t *testing.T) {
 	validUserId := uuid.New()
 	validProjectId := uuid.New()
 	validTaskId := uuid.New()
+	pendingStatusID := uuid.New()
+	doingStatusID := uuid.New()
+	doneStatusID := uuid.New()
 
 	validUser := domain.User{
 		Id:    validUserId,
@@ -375,20 +402,27 @@ func TestTaskService_Update(t *testing.T) {
 			},
 		},
 		UserId: validUserId,
+		Columns: []domain.ProjectColumn{
+			{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+			{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 1},
+			{Id: doneStatusID, ProjectId: validProjectId, Name: "Done", Color: "#059669", Position: 2, IsDoneColumn: true},
+		},
 	}
 
 	validTask := domain.Task{
-		Id:          validTaskId,
-		ProjectId:   validProjectId,
-		AuthorId:    validUserId,
-		Author:      &validUser,
-		Title:       "Test Task",
-		Description: "Test Description",
-		Status:      domain.TaskStatusPending,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-		Updates:     []domain.TaskUpdate{},
-		Tags:        []string{"tag1", "tag2", "tag3"},
+		Id:              validTaskId,
+		ProjectId:       validProjectId,
+		AuthorId:        validUserId,
+		Author:          &validUser,
+		Title:           "Test Task",
+		Description:     "Test Description",
+		Status:          domain.TaskStatusPending,
+		ProjectColumnId: pendingStatusID,
+		ProjectColumn:   &domain.ProjectColumn{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+		Updates:         []domain.TaskUpdate{},
+		Tags:            []string{"tag1", "tag2", "tag3"},
 	}
 
 	type testCase struct {
@@ -407,15 +441,15 @@ func TestTaskService_Update(t *testing.T) {
 		{
 			name: "successful task update",
 			request: service.UpdateTaskRequest{
-				TaskId:        validTaskId,
-				Title:         "Updated Task",
-				Description:   "Updated Deascription",
-				Status:        domain.TaskStatusDone,
-				RequestUserId: validUserId,
-				Priority:      domain.TaskPriorityHigh,
-				ResponsibleId: nil,
-				DueDate:       nil,
-				Tags:          []string{},
+				TaskId:          validTaskId,
+				Title:           "Updated Task",
+				Description:     "Updated Deascription",
+				ProjectColumnId: doneStatusID,
+				RequestUserId:   validUserId,
+				Priority:        domain.TaskPriorityHigh,
+				ResponsibleId:   nil,
+				DueDate:         nil,
+				Tags:            []string{},
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
@@ -430,11 +464,11 @@ func TestTaskService_Update(t *testing.T) {
 		{
 			name: "unauthorized error",
 			request: service.UpdateTaskRequest{
-				TaskId:        validTaskId,
-				Title:         "Updated Task",
-				Description:   "Updated Description",
-				Status:        domain.TaskStatusDoing,
-				RequestUserId: uuid.Nil,
+				TaskId:          validTaskId,
+				Title:           "Updated Task",
+				Description:     "Updated Description",
+				ProjectColumnId: doingStatusID,
+				RequestUserId:   uuid.Nil,
 			},
 			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {},
 			shouldSucceed:     false,
@@ -444,11 +478,11 @@ func TestTaskService_Update(t *testing.T) {
 		{
 			name: "project not found",
 			request: service.UpdateTaskRequest{
-				TaskId:        validTaskId,
-				Title:         "Updated Task",
-				Description:   "Updated Description",
-				Status:        domain.TaskStatusDoing,
-				RequestUserId: validUserId,
+				TaskId:          validTaskId,
+				Title:           "Updated Task",
+				Description:     "Updated Description",
+				ProjectColumnId: doingStatusID,
+				RequestUserId:   validUserId,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
@@ -461,11 +495,11 @@ func TestTaskService_Update(t *testing.T) {
 		{
 			name: "forbidden error",
 			request: service.UpdateTaskRequest{
-				TaskId:        validTaskId,
-				Title:         "Updated Task",
-				Description:   "Updated Description",
-				Status:        domain.TaskStatusDoing,
-				RequestUserId: uuid.New(),
+				TaskId:          validTaskId,
+				Title:           "Updated Task",
+				Description:     "Updated Description",
+				ProjectColumnId: doingStatusID,
+				RequestUserId:   uuid.New(),
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
@@ -479,11 +513,11 @@ func TestTaskService_Update(t *testing.T) {
 		{
 			name: "task not found",
 			request: service.UpdateTaskRequest{
-				TaskId:        validTaskId,
-				Title:         "Updated Task",
-				Description:   "Updated Description",
-				Status:        domain.TaskStatusDoing,
-				RequestUserId: validUserId,
+				TaskId:          validTaskId,
+				Title:           "Updated Task",
+				Description:     "Updated Description",
+				ProjectColumnId: doingStatusID,
+				RequestUserId:   validUserId,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(nil, domain.NotFoundError("task not found"))
@@ -496,12 +530,12 @@ func TestTaskService_Update(t *testing.T) {
 		{
 			name: "remove empty tags",
 			request: service.UpdateTaskRequest{
-				TaskId:        validTaskId,
-				Title:         "Updated Task",
-				Description:   "Updated Description",
-				Status:        domain.TaskStatusDoing,
-				RequestUserId: validUserId,
-				Tags:          []string{"", "tag1", "tag2", "", "tag3"},
+				TaskId:          validTaskId,
+				Title:           "Updated Task",
+				Description:     "Updated Description",
+				ProjectColumnId: doingStatusID,
+				RequestUserId:   validUserId,
+				Tags:            []string{"", "tag1", "tag2", "", "tag3"},
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
@@ -535,7 +569,7 @@ func TestTaskService_Update(t *testing.T) {
 
 				assert.Equal(t, tt.request.Title, task.Title)
 				assert.Equal(t, tt.request.Description, task.Description)
-				assert.Equal(t, tt.request.Status, task.Status)
+				assert.Equal(t, tt.request.ProjectColumnId, task.ProjectColumnId)
 				assert.Equal(t, tt.expectedTaskUpdatesLength, len(task.Updates))
 			} else {
 				require.Error(t, err)
@@ -563,6 +597,7 @@ func TestTaskService_Archive(t *testing.T) {
 	memberUserId := uuid.New()
 	validProjectId := uuid.New()
 	validTaskId := uuid.New()
+	pendingStatusID := uuid.New()
 
 	validProject := domain.Project{
 		Id:          validProjectId,
@@ -575,19 +610,23 @@ func TestTaskService_Archive(t *testing.T) {
 			{UserId: memberUserId, Role: domain.ProjectMemberRoleMember},
 		},
 		UserId: validUserId,
+		Columns: []domain.ProjectColumn{
+			{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+		},
 	}
 
 	validTask := domain.Task{
-		Id:          validTaskId,
-		ProjectId:   validProjectId,
-		AuthorId:    validUserId,
-		Title:       "Test Task",
-		Description: "Test Description",
-		Status:      domain.TaskStatusPending,
-		Priority:    domain.TaskPriorityLow,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-		Updates:     []domain.TaskUpdate{},
+		Id:              validTaskId,
+		ProjectId:       validProjectId,
+		AuthorId:        validUserId,
+		Title:           "Test Task",
+		Description:     "Test Description",
+		Status:          domain.TaskStatusPending,
+		ProjectColumnId: pendingStatusID,
+		Priority:        domain.TaskPriorityLow,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+		Updates:         []domain.TaskUpdate{},
 	}
 
 	type testCase struct {
@@ -728,6 +767,7 @@ func TestTaskService_Update_LoadsResponsibleDetailsForChangedAssignee(t *testing
 	newResponsibleID := uuid.New()
 	validProjectId := uuid.New()
 	validTaskId := uuid.New()
+	pendingStatusID := uuid.New()
 
 	validUser := domain.User{
 		Id:    validUserId,
@@ -758,18 +798,22 @@ func TestTaskService_Update_LoadsResponsibleDetailsForChangedAssignee(t *testing
 			},
 		},
 		UserId: validUserId,
+		Columns: []domain.ProjectColumn{
+			{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+		},
 	}
 
 	validTask := domain.Task{
-		Id:          validTaskId,
-		ProjectId:   validProjectId,
-		AuthorId:    validUserId,
-		Author:      &validUser,
-		Title:       "Test Task",
-		Description: "Test Description",
-		Status:      domain.TaskStatusPending,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		Id:              validTaskId,
+		ProjectId:       validProjectId,
+		AuthorId:        validUserId,
+		Author:          &validUser,
+		Title:           "Test Task",
+		Description:     "Test Description",
+		Status:          domain.TaskStatusPending,
+		ProjectColumnId: pendingStatusID,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
 	}
 
 	mockRepo := &mockTaskRepository{}
@@ -783,14 +827,14 @@ func TestTaskService_Update_LoadsResponsibleDetailsForChangedAssignee(t *testing
 
 	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
 	task, err := svc.Update(context.Background(), service.UpdateTaskRequest{
-		TaskId:        validTaskId,
-		Title:         "Test Task",
-		Description:   "Test Description",
-		Status:        domain.TaskStatusPending,
-		RequestUserId: validUserId,
-		Priority:      domain.TaskPriorityLow,
-		ResponsibleId: &newResponsibleID,
-		Tags:          []string{},
+		TaskId:          validTaskId,
+		Title:           "Test Task",
+		Description:     "Test Description",
+		ProjectColumnId: pendingStatusID,
+		RequestUserId:   validUserId,
+		Priority:        domain.TaskPriorityLow,
+		ResponsibleId:   &newResponsibleID,
+		Tags:            []string{},
 	})
 
 	require.NoError(t, err)
@@ -809,6 +853,9 @@ func TestTaskService_List(t *testing.T) {
 	memberUserId := uuid.New()
 	validProjectId := uuid.New()
 	validTaskId := uuid.New()
+	pendingStatusID := uuid.New()
+	doingStatusID := uuid.New()
+	doneStatusID := uuid.New()
 
 	validProject := domain.Project{
 		Id:          validProjectId,
@@ -821,13 +868,19 @@ func TestTaskService_List(t *testing.T) {
 			{UserId: memberUserId, Role: domain.ProjectMemberRoleMember},
 		},
 		UserId: validUserId,
+		Columns: []domain.ProjectColumn{
+			{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+			{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 1},
+			{Id: doneStatusID, ProjectId: validProjectId, Name: "Done", Color: "#059669", Position: 2, IsDoneColumn: true},
+		},
 	}
 
 	validTask := domain.Task{
-		Id:        validTaskId,
-		ProjectId: validProjectId,
-		Title:     "Test Task",
-		Status:    domain.TaskStatusPending,
+		Id:              validTaskId,
+		ProjectId:       validProjectId,
+		Title:           "Test Task",
+		Status:          domain.TaskStatusPending,
+		ProjectColumnId: pendingStatusID,
 	}
 
 	emptyPage := &utils.CursorPaginated[domain.Task]{Data: []domain.Task{}, HasNext: false}
@@ -846,14 +899,14 @@ func TestTaskService_List(t *testing.T) {
 		{
 			name: "successful list",
 			request: service.ListTasksRequest{
-				ProjectId:     validProjectId,
-				RequestUserId: validUserId,
-				Statuses:      []string{string(domain.TaskStatusPending)},
-				Limit:         15,
+				ProjectId:        validProjectId,
+				RequestUserId:    validUserId,
+				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
+				Limit:            15,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("ListByProjectId", mock.Anything, validProjectId, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(onePage, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{pendingStatusID}, false, "", (*time.Time)(nil), 15).Return(onePage, nil)
 			},
 			shouldSucceed: true,
 			expectedLen:   1,
@@ -861,10 +914,10 @@ func TestTaskService_List(t *testing.T) {
 		{
 			name: "unauthorized",
 			request: service.ListTasksRequest{
-				ProjectId:     validProjectId,
-				RequestUserId: uuid.Nil,
-				Statuses:      []string{string(domain.TaskStatusPending)},
-				Limit:         15,
+				ProjectId:        validProjectId,
+				RequestUserId:    uuid.Nil,
+				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
+				Limit:            15,
 			},
 			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {},
 			shouldSucceed:     false,
@@ -873,10 +926,10 @@ func TestTaskService_List(t *testing.T) {
 		{
 			name: "forbidden - not a member",
 			request: service.ListTasksRequest{
-				ProjectId:     validProjectId,
-				RequestUserId: uuid.New(),
-				Statuses:      []string{string(domain.TaskStatusPending)},
-				Limit:         15,
+				ProjectId:        validProjectId,
+				RequestUserId:    uuid.New(),
+				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
+				Limit:            15,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
@@ -887,43 +940,30 @@ func TestTaskService_List(t *testing.T) {
 		{
 			name: "creator can list archived tasks",
 			request: service.ListTasksRequest{
-				ProjectId:     validProjectId,
-				RequestUserId: validUserId,
-				Statuses:      []string{string(domain.TaskStatusArchived)},
-				Limit:         15,
+				ProjectId:        validProjectId,
+				RequestUserId:    validUserId,
+				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
+				Archived:         true,
+				Limit:            15,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("ListByProjectId", mock.Anything, validProjectId, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{pendingStatusID}, true, "", (*time.Time)(nil), 15).Return(emptyPage, nil)
 			},
 			shouldSucceed: true,
 			expectedLen:   0,
 		},
 		{
-			name: "non-creator forbidden from listing archived tasks",
-			request: service.ListTasksRequest{
-				ProjectId:     validProjectId,
-				RequestUserId: memberUserId,
-				Statuses:      []string{string(domain.TaskStatusArchived)},
-				Limit:         15,
-			},
-			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
-				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-			},
-			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ForbiddenErrorCode),
-		},
-		{
 			name: "non-creator can list non-archived tasks",
 			request: service.ListTasksRequest{
-				ProjectId:     validProjectId,
-				RequestUserId: memberUserId,
-				Statuses:      []string{string(domain.TaskStatusPending), string(domain.TaskStatusDoing)},
-				Limit:         15,
+				ProjectId:        validProjectId,
+				RequestUserId:    memberUserId,
+				ProjectColumnIDs: []uuid.UUID{pendingStatusID, doingStatusID},
+				Limit:            15,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("ListByProjectId", mock.Anything, validProjectId, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{pendingStatusID, doingStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil)
 			},
 			shouldSucceed: true,
 			expectedLen:   0,
@@ -962,10 +1002,13 @@ func TestTaskService_List(t *testing.T) {
 	}
 }
 
-func TestTaskService_GroupByStatus(t *testing.T) {
+func TestTaskService_GroupByColumn(t *testing.T) {
 	validUserId := uuid.New()
 	memberUserId := uuid.New()
 	validProjectId := uuid.New()
+	pendingStatusID := uuid.New()
+	doingStatusID := uuid.New()
+	doneStatusID := uuid.New()
 
 	validProject := domain.Project{
 		Id:          validProjectId,
@@ -978,13 +1021,18 @@ func TestTaskService_GroupByStatus(t *testing.T) {
 			{UserId: memberUserId, Role: domain.ProjectMemberRoleMember},
 		},
 		UserId: validUserId,
+		Columns: []domain.ProjectColumn{
+			{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+			{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 1},
+			{Id: doneStatusID, ProjectId: validProjectId, Name: "Done", Color: "#059669", Position: 2, IsDoneColumn: true},
+		},
 	}
 
 	emptyPage := &utils.CursorPaginated[domain.Task]{Data: []domain.Task{}, HasNext: false}
 
 	type testCase struct {
 		name              string
-		request           service.GroupByStatusRequest
+		request           service.GroupByColumnRequest
 		mockSetup         func(*mockTaskRepository, *mockProjectRepository)
 		expectedErrorCode string
 		shouldSucceed     bool
@@ -993,81 +1041,53 @@ func TestTaskService_GroupByStatus(t *testing.T) {
 	tests := []testCase{
 		{
 			name: "successful group by status",
-			request: service.GroupByStatusRequest{
-				ProjectId: validProjectId,
-				UserId:    validUserId,
-				Statuses:  []domain.TaskStatus{domain.TaskStatusPending, domain.TaskStatusDoing},
-				Limit:     15,
+			request: service.GroupByColumnRequest{
+				ProjectId:        validProjectId,
+				UserId:           validUserId,
+				ProjectColumnIDs: []uuid.UUID{pendingStatusID, doingStatusID},
+				Limit:            15,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusPending)}, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
-				repo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusDoing)}, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{pendingStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{doingStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil)
 			},
 			shouldSucceed: true,
 		},
 		{
 			name: "unauthorized",
-			request: service.GroupByStatusRequest{
-				ProjectId: validProjectId,
-				UserId:    uuid.Nil,
-				Statuses:  []domain.TaskStatus{domain.TaskStatusPending},
-				Limit:     15,
+			request: service.GroupByColumnRequest{
+				ProjectId:        validProjectId,
+				UserId:           uuid.Nil,
+				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
+				Limit:            15,
 			},
 			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {},
 			shouldSucceed:     false,
 			expectedErrorCode: string(domain.UnauthorizedErrorCode),
 		},
 		{
-			name: "creator can group by archived status",
-			request: service.GroupByStatusRequest{
-				ProjectId: validProjectId,
-				UserId:    validUserId,
-				Statuses:  []domain.TaskStatus{domain.TaskStatusArchived},
-				Limit:     15,
-			},
-			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
-				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusArchived)}, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
-			},
-			shouldSucceed: true,
-		},
-		{
-			name: "non-creator forbidden from grouping by archived status",
-			request: service.GroupByStatusRequest{
-				ProjectId: validProjectId,
-				UserId:    memberUserId,
-				Statuses:  []domain.TaskStatus{domain.TaskStatusArchived},
-				Limit:     15,
-			},
-			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
-				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-			},
-			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ForbiddenErrorCode),
-		},
-		{
 			name: "non-creator can group by non-archived statuses",
-			request: service.GroupByStatusRequest{
-				ProjectId: validProjectId,
-				UserId:    memberUserId,
-				Statuses:  []domain.TaskStatus{domain.TaskStatusPending, domain.TaskStatusDone},
-				Limit:     15,
+			request: service.GroupByColumnRequest{
+				ProjectId:        validProjectId,
+				UserId:           memberUserId,
+				ProjectColumnIDs: []uuid.UUID{pendingStatusID, doneStatusID},
+				Limit:            15,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusPending)}, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
-				repo.On("ListByProjectId", mock.Anything, validProjectId, []string{string(domain.TaskStatusDone)}, mock.Anything, mock.Anything, mock.Anything).Return(emptyPage, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{pendingStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil)
+				repo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{doneStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil)
 			},
 			shouldSucceed: true,
 		},
 		{
 			name: "forbidden - not a project member",
-			request: service.GroupByStatusRequest{
-				ProjectId: validProjectId,
-				UserId:    uuid.New(),
-				Statuses:  []domain.TaskStatus{domain.TaskStatusPending},
-				Limit:     15,
+			request: service.GroupByColumnRequest{
+				ProjectId:        validProjectId,
+				UserId:           uuid.New(),
+				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
+				Limit:            15,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
@@ -1087,7 +1107,7 @@ func TestTaskService_GroupByStatus(t *testing.T) {
 			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
 			ctx := context.Background()
 
-			result, err := svc.GroupByStatus(ctx, tt.request)
+			result, err := svc.GroupByColumn(ctx, tt.request)
 
 			if tt.shouldSucceed {
 				assert.NoError(t, err)

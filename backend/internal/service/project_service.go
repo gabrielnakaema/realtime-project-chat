@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"regexp"
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
@@ -12,11 +13,27 @@ import (
 	"github.com/google/uuid"
 )
 
+var defaultProjectColumnColors = []string{
+	"#64748B",
+	"#2563EB",
+	"#059669",
+	"#D97706",
+	"#DC2626",
+	"#0891B2",
+}
+
+var projectColumnColorPattern = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
+
 type projectRepository interface {
 	Create(ctx context.Context, project *domain.Project) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Project, error)
 	ListByUserId(ctx context.Context, userId uuid.UUID, memberRole string, searchQuery string) ([]domain.Project, error)
 	Update(ctx context.Context, project *domain.Project) error
+	CreateColumn(ctx context.Context, status *domain.ProjectColumn) error
+	UpdateColumn(ctx context.Context, status *domain.ProjectColumn) error
+	DeleteColumn(ctx context.Context, projectId uuid.UUID, statusId uuid.UUID) error
+	ReassignTasksToColumn(ctx context.Context, fromStatusId uuid.UUID, toStatus *domain.ProjectColumn) error
+	GetColumnById(ctx context.Context, id uuid.UUID) (*domain.ProjectColumn, error)
 	CreateMember(ctx context.Context, member *domain.ProjectMember) error
 	RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) error
 	GetMemberByUserIdAndProjectId(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) (*domain.ProjectMember, error)
@@ -55,6 +72,7 @@ type CreateProjectRequest struct {
 	Name        string
 	Description string
 	UserId      uuid.UUID
+	Columns     []domain.ProjectColumn
 }
 
 func (ps *ProjectService) Create(ctx context.Context, request CreateProjectRequest) (*domain.Project, error) {
@@ -73,7 +91,8 @@ func (ps *ProjectService) Create(ctx context.Context, request CreateProjectReque
 				Role:   domain.ProjectMemberRoleCreator,
 			},
 		},
-		UserId: request.UserId,
+		UserId:  request.UserId,
+		Columns: defaultProjectColumns(request.Columns),
 	}
 
 	err := ps.projectRepository.Create(ctx, &project)
@@ -152,10 +171,17 @@ func (ps *ProjectService) ListByUserId(ctx context.Context, request ListProjects
 }
 
 type UpdateProjectRequest struct {
-	Id          uuid.UUID
-	Name        string
-	Description string
-	UserId      uuid.UUID
+	Id             uuid.UUID
+	Name           string
+	Description    string
+	UserId         uuid.UUID
+	Columns        []domain.ProjectColumn
+	DeletedColumns []DeletedProjectColumnRequest
+}
+
+type DeletedProjectColumnRequest struct {
+	Id                  uuid.UUID
+	MoveTasksToColumnId uuid.UUID
 }
 
 func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectRequest) (*domain.Project, error) {
@@ -189,6 +215,87 @@ func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectReque
 		return nil, domain.ServerError("failed to update project", err)
 	}
 
+	if err := validateProjectColumns(request.Columns); err != nil {
+		return nil, err
+	}
+
+	existingColumns := map[uuid.UUID]domain.ProjectColumn{}
+	for _, column := range project.Columns {
+		existingColumns[column.Id] = column
+	}
+
+	deletedColumns := map[uuid.UUID]DeletedProjectColumnRequest{}
+	for _, deleted := range request.DeletedColumns {
+		deletedColumns[deleted.Id] = deleted
+	}
+
+	for i, column := range request.Columns {
+		column.Position = i
+		column.ProjectId = project.Id
+
+		if column.Id == uuid.Nil {
+			continue
+		}
+
+		if _, ok := existingColumns[column.Id]; !ok {
+			return nil, domain.BusinessValidationError("invalid project column")
+		}
+
+		column.IsDoneColumn = false
+		column.Position = i + 1000
+		if err := ps.projectRepository.UpdateColumn(ctx, &column); err != nil {
+			return nil, domain.ServerError("failed to prepare project columns", err)
+		}
+
+	}
+
+	for i := range request.Columns {
+		request.Columns[i].Position = i
+		request.Columns[i].ProjectId = project.Id
+
+		if request.Columns[i].Id == uuid.Nil {
+			if err := ps.projectRepository.CreateColumn(ctx, &request.Columns[i]); err != nil {
+				return nil, domain.ServerError("failed to create project column", err)
+			}
+			continue
+		}
+
+		if err := ps.projectRepository.UpdateColumn(ctx, &request.Columns[i]); err != nil {
+			return nil, domain.ServerError("failed to update project column", err)
+		}
+	}
+
+	finalColumnsByID := map[uuid.UUID]domain.ProjectColumn{}
+	for _, column := range request.Columns {
+		finalColumnsByID[column.Id] = column
+	}
+
+	for existingID := range existingColumns {
+		if _, ok := finalColumnsByID[existingID]; ok {
+			continue
+		}
+
+		deleted, ok := deletedColumns[existingID]
+		if !ok {
+			return nil, domain.BusinessValidationError("deleted column reassignment is required")
+		}
+
+		targetColumn, ok := finalColumnsByID[deleted.MoveTasksToColumnId]
+		if !ok {
+			return nil, domain.BusinessValidationError("deleted column target is invalid")
+		}
+
+		if err := ps.projectRepository.ReassignTasksToColumn(ctx, existingID, &targetColumn); err != nil {
+			return nil, domain.ServerError("failed to move tasks from deleted column", err)
+		}
+
+		if err := ps.projectRepository.DeleteColumn(ctx, project.Id, existingID); err != nil {
+			return nil, domain.ServerError("failed to delete project column", err)
+		}
+	}
+
+	project.Columns = request.Columns
+
 	err = ps.publisher.Publish(ctx, events.ProjectUpdated, &events.ProjectUpdatedPayload{
 		Project: *project,
 		User: domain.User{
@@ -200,6 +307,49 @@ func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectReque
 	}
 
 	return project, nil
+}
+
+func defaultProjectColumns(columns []domain.ProjectColumn) []domain.ProjectColumn {
+	if len(columns) > 0 {
+		for i := range columns {
+			columns[i].Position = i
+			if columns[i].Color == "" {
+				columns[i].Color = defaultProjectColumnColors[i%len(defaultProjectColumnColors)]
+			}
+		}
+		return columns
+	}
+
+	return []domain.ProjectColumn{
+		{Name: "Pending", Color: defaultProjectColumnColors[0], Position: 0, IsDoneColumn: false},
+		{Name: "Doing", Color: defaultProjectColumnColors[1], Position: 1, IsDoneColumn: false},
+		{Name: "Done", Color: defaultProjectColumnColors[2], Position: 2, IsDoneColumn: true},
+	}
+}
+
+func validateProjectColumns(columns []domain.ProjectColumn) error {
+	if len(columns) == 0 {
+		return domain.BusinessValidationError("project must have at least one column")
+	}
+
+	doneColumns := 0
+	for _, column := range columns {
+		if column.Name == "" {
+			return domain.BusinessValidationError("project column name is required")
+		}
+		if !projectColumnColorPattern.MatchString(column.Color) {
+			return domain.BusinessValidationError("project column color must be a valid hex value")
+		}
+		if column.IsDoneColumn {
+			doneColumns++
+		}
+	}
+
+	if doneColumns != 1 {
+		return domain.BusinessValidationError("project must have exactly one done column")
+	}
+
+	return nil
 }
 
 type CreateMemberRequest struct {

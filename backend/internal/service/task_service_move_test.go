@@ -18,9 +18,10 @@ func TestTaskService_Move(t *testing.T) {
 	validTaskId := uuid.New()
 	taskIdA := uuid.New()
 	taskIdB := uuid.New()
+	pendingStatusID := uuid.New()
 
-	taskA := domain.Task{Id: taskIdA, ProjectId: validProjectId, Order: "500000000000"}
-	taskB := domain.Task{Id: taskIdB, ProjectId: validProjectId, Order: "750000000000"}
+	taskA := domain.Task{Id: taskIdA, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Order: "500000000000"}
+	taskB := domain.Task{Id: taskIdB, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Order: "750000000000"}
 
 	topOrder := mustMoveOrder(t, "", "")
 	beforeFirstOrder := mustMoveOrder(t, "", taskA.Order)
@@ -39,15 +40,15 @@ func TestTaskService_Move(t *testing.T) {
 		{
 			name: "move to top (no existing tasks)",
 			request: service.MoveTaskRequest{
-				TaskId:        validTaskId,
-				ProjectId:     validProjectId,
-				RequestUserId: validUserId,
-				AfterTaskId:   nil,
-				Status:        domain.TaskStatusPending,
+				TaskId:          validTaskId,
+				ProjectId:       validProjectId,
+				RequestUserId:   validUserId,
+				AfterTaskId:     nil,
+				ProjectColumnId: pendingStatusID,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
-				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, Status: domain.TaskStatusPending}, nil)
-				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, domain.TaskStatusPending).Return(nil, domain.NotFoundError("not found"))
+				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Status: domain.TaskStatusPending}, nil)
+				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
 				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
 					return t.Order == topOrder
 				}), validUserId).Return(&domain.Task{Order: topOrder}, nil)
@@ -58,15 +59,15 @@ func TestTaskService_Move(t *testing.T) {
 		{
 			name: "move to top (existing tasks)",
 			request: service.MoveTaskRequest{
-				TaskId:        validTaskId,
-				ProjectId:     validProjectId,
-				RequestUserId: validUserId,
-				AfterTaskId:   nil,
-				Status:        domain.TaskStatusPending,
+				TaskId:          validTaskId,
+				ProjectId:       validProjectId,
+				RequestUserId:   validUserId,
+				AfterTaskId:     nil,
+				ProjectColumnId: pendingStatusID,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
-				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, Status: domain.TaskStatusPending}, nil)
-				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, domain.TaskStatusPending).Return(&taskA, nil)
+				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Status: domain.TaskStatusPending}, nil)
+				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(&taskA, nil)
 				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
 					return t.Order == beforeFirstOrder
 				}), validUserId).Return(&domain.Task{Order: beforeFirstOrder}, nil)
@@ -77,14 +78,14 @@ func TestTaskService_Move(t *testing.T) {
 		{
 			name: "move after task A (between A and B)",
 			request: service.MoveTaskRequest{
-				TaskId:        validTaskId,
-				ProjectId:     validProjectId,
-				RequestUserId: validUserId,
-				AfterTaskId:   &taskIdA,
-				Status:        domain.TaskStatusPending,
+				TaskId:          validTaskId,
+				ProjectId:       validProjectId,
+				RequestUserId:   validUserId,
+				AfterTaskId:     &taskIdA,
+				ProjectColumnId: pendingStatusID,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
-				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, Status: domain.TaskStatusPending}, nil)
+				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetById", mock.Anything, taskIdA).Return(&taskA, nil)
 				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdA, validProjectId).Return(&taskB, nil)
 				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
@@ -97,14 +98,14 @@ func TestTaskService_Move(t *testing.T) {
 		{
 			name: "move after task B (end of list)",
 			request: service.MoveTaskRequest{
-				TaskId:        validTaskId,
-				ProjectId:     validProjectId,
-				RequestUserId: validUserId,
-				AfterTaskId:   &taskIdB,
-				Status:        domain.TaskStatusPending,
+				TaskId:          validTaskId,
+				ProjectId:       validProjectId,
+				RequestUserId:   validUserId,
+				AfterTaskId:     &taskIdB,
+				ProjectColumnId: pendingStatusID,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
-				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, Status: domain.TaskStatusPending}, nil)
+				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetById", mock.Anything, taskIdB).Return(&taskB, nil)
 				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdB, validProjectId).Return(nil, domain.NotFoundError("not found"))
 				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
@@ -125,6 +126,9 @@ func TestTaskService_Move(t *testing.T) {
 			mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&domain.Project{
 				Id:      validProjectId,
 				Members: []domain.ProjectMember{{UserId: validUserId}},
+				Columns: []domain.ProjectColumn{
+					{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+				},
 			}, nil)
 
 			tt.mockSetup(mockRepo, mockProjectRepo)

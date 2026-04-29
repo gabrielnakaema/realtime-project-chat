@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
@@ -25,6 +26,27 @@ func NewTaskRepository(pool *pgxpool.Pool) *TaskRepository {
 	}
 }
 
+func mapProjectColumn(columnID uuid.UUID, projectID uuid.UUID, name string, color string, position int32, isDone bool, createdAt pgtype.Timestamptz, updatedAt pgtype.Timestamptz) *domain.ProjectColumn {
+	return &domain.ProjectColumn{
+		Id:           columnID,
+		ProjectId:    projectID,
+		Name:         name,
+		Color:        color,
+		Position:     int(position),
+		IsDoneColumn: isDone,
+		CreatedAt:    createdAt.Time,
+		UpdatedAt:    updatedAt.Time,
+	}
+}
+
+func compatibilityTaskStatus(projectColumnName string, archivedAt *time.Time) domain.TaskStatus {
+	if archivedAt != nil {
+		return domain.TaskStatusArchived
+	}
+
+	return domain.TaskStatus(strings.ToLower(projectColumnName))
+}
+
 func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 	q := queries.New(tr.pool)
 
@@ -37,13 +59,13 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 	qtx := q.WithTx(tx)
 
 	params := queries.CreateTaskParams{
-		ProjectID:   task.ProjectId,
-		Title:       task.Title,
-		Description: task.Description,
-		Status:      string(task.Status),
-		AuthorID:    task.AuthorId,
-		Priority:    string(task.Priority),
-		TaskOrder:   task.Order,
+		ProjectID:       task.ProjectId,
+		Title:           task.Title,
+		Description:     task.Description,
+		ProjectColumnID: task.ProjectColumnId,
+		AuthorID:        task.AuthorId,
+		Priority:        string(task.Priority),
+		TaskOrder:       task.Order,
 	}
 
 	if task.ResponsibleId != nil {
@@ -56,6 +78,13 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 	if task.DueDate != nil {
 		params.DueDate = pgtype.Timestamptz{
 			Time:  *task.DueDate,
+			Valid: true,
+		}
+	}
+
+	if task.DoneAt != nil {
+		params.DoneAt = pgtype.Timestamptz{
+			Time:  *task.DoneAt,
 			Valid: true,
 		}
 	}
@@ -109,16 +138,16 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 	}
 
 	task := domain.Task{
-		Id:          result.TaskID,
-		ProjectId:   result.TaskProjectID,
-		AuthorId:    result.TaskAuthorID,
-		Title:       result.TaskTitle,
-		Description: result.TaskDescription,
-		Status:      domain.TaskStatus(result.TaskStatus),
-		Priority:    domain.TaskPriority(result.TaskPriority),
-		Order:       result.TaskOrder,
-		CreatedAt:   result.TaskCreatedAt.Time,
-		UpdatedAt:   result.TaskUpdatedAt.Time,
+		Id:              result.TaskID,
+		ProjectId:       result.TaskProjectID,
+		AuthorId:        result.TaskAuthorID,
+		Title:           result.TaskTitle,
+		Description:     result.TaskDescription,
+		ProjectColumnId: result.TaskProjectColumnID,
+		Priority:        domain.TaskPriority(result.TaskPriority),
+		Order:           result.TaskOrder,
+		CreatedAt:       result.TaskCreatedAt.Time,
+		UpdatedAt:       result.TaskUpdatedAt.Time,
 	}
 
 	if result.TaskAuthorName.Valid {
@@ -149,6 +178,18 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 		task.DoneAt = &result.TaskDoneAt.Time
 	}
 
+	if result.TaskArchivedAt.Valid {
+		task.ArchivedAt = &result.TaskArchivedAt.Time
+	}
+
+	if len(result.ProjectColumn) > 0 {
+		task.ProjectColumn = &domain.ProjectColumn{}
+		if err := json.Unmarshal(result.ProjectColumn, task.ProjectColumn); err != nil {
+			return nil, err
+		}
+		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
+	}
+
 	if result.Tags != nil {
 		bytes, err := json.Marshal(result.Tags)
 		if err != nil {
@@ -174,12 +215,12 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 	return &task, nil
 }
 
-func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, statuses []string, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, archived bool, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
 	q := queries.New(tr.pool)
 
 	params := queries.ListTasksByProjectIdParams{
 		ProjectID: projectId,
-		Statuses:  nil,
+		Archived:  archived,
 		TaskOrder: pgtype.Text{
 			String: taskOrder,
 			Valid:  taskOrder != "",
@@ -197,8 +238,8 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 		}
 	}
 
-	if len(statuses) > 0 {
-		params.Statuses = statuses
+	if len(projectColumnIDs) > 0 {
+		params.ProjectColumnIds = projectColumnIDs
 	}
 
 	results, err := q.ListTasksByProjectId(ctx, params)
@@ -210,17 +251,28 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 	for _, result := range results {
 
 		task := domain.Task{
-			Id:          result.ID,
-			ProjectId:   result.ProjectID,
-			AuthorId:    result.AuthorID,
-			Title:       result.Title,
-			Description: result.Description,
-			Status:      domain.TaskStatus(result.Status),
-			Priority:    domain.TaskPriority(result.Priority),
-			Order:       result.TaskOrder,
-			CreatedAt:   result.CreatedAt.Time,
-			UpdatedAt:   result.UpdatedAt.Time,
+			Id:              result.ID,
+			ProjectId:       result.ProjectID,
+			AuthorId:        result.AuthorID,
+			Title:           result.Title,
+			Description:     result.Description,
+			ProjectColumnId: result.ProjectColumnID,
+			Priority:        domain.TaskPriority(result.Priority),
+			Order:           result.TaskOrder,
+			CreatedAt:       result.CreatedAt.Time,
+			UpdatedAt:       result.UpdatedAt.Time,
+			ProjectColumn: mapProjectColumn(
+				result.ProjectColumnID2,
+				result.ProjectColumnProjectID,
+				result.ProjectColumnName,
+				result.ProjectColumnColor,
+				result.ProjectColumnPosition,
+				result.ProjectColumnIsDoneColumn,
+				result.ProjectColumnCreatedAt,
+				result.ProjectColumnUpdatedAt,
+			),
 		}
+		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
 
 		if result.AuthorAuthorID.Valid {
 			user := domain.User{
@@ -258,6 +310,10 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 			task.DoneAt = &result.DoneAt.Time
 		}
 
+		if result.ArchivedAt.Valid {
+			task.ArchivedAt = &result.ArchivedAt.Time
+		}
+
 		tasks = append(tasks, task)
 	}
 
@@ -283,12 +339,12 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 	qtx := q.WithTx(tx)
 
 	params := queries.UpdateTaskParams{
-		Title:       task.Title,
-		Description: task.Description,
-		Status:      string(task.Status),
-		ID:          task.Id,
-		TaskOrder:   task.Order,
-		Priority:    string(task.Priority),
+		Title:           task.Title,
+		Description:     task.Description,
+		ProjectColumnID: task.ProjectColumnId,
+		ID:              task.Id,
+		TaskOrder:       task.Order,
+		Priority:        string(task.Priority),
 	}
 
 	if task.ResponsibleId != nil {
@@ -308,6 +364,13 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 	if task.DoneAt != nil {
 		params.DoneAt = pgtype.Timestamptz{
 			Time:  *task.DoneAt,
+			Valid: true,
+		}
+	}
+
+	if task.ArchivedAt != nil {
+		params.ArchivedAt = pgtype.Timestamptz{
+			Time:  *task.ArchivedAt,
 			Valid: true,
 		}
 	}
@@ -421,12 +484,12 @@ func (tr *TaskRepository) CreateUpdates(ctx context.Context, task *domain.Task, 
 	return tx.Commit(ctx)
 }
 
-func (tr *TaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, status domain.TaskStatus) (*domain.Task, error) {
+func (tr *TaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, projectColumnID uuid.UUID) (*domain.Task, error) {
 	q := queries.New(tr.pool)
 
 	result, err := q.GetFirstTaskInColumn(ctx, queries.GetFirstTaskInColumnParams{
-		ProjectID: projectId,
-		Status:    string(status),
+		ProjectID:       projectId,
+		ProjectColumnID: projectColumnID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -436,17 +499,18 @@ func (tr *TaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uu
 	}
 
 	task := domain.Task{
-		Id:          result.ID,
-		ProjectId:   result.ProjectID,
-		AuthorId:    result.AuthorID,
-		Title:       result.Title,
-		Description: result.Description,
-		Status:      domain.TaskStatus(result.Status),
-		Priority:    domain.TaskPriority(result.Priority),
-		Order:       result.TaskOrder,
-		CreatedAt:   result.CreatedAt.Time,
-		UpdatedAt:   result.UpdatedAt.Time,
+		Id:              result.ID,
+		ProjectId:       result.ProjectID,
+		AuthorId:        result.AuthorID,
+		Title:           result.Title,
+		Description:     result.Description,
+		ProjectColumnId: result.ProjectColumnID,
+		Priority:        domain.TaskPriority(result.Priority),
+		Order:           result.TaskOrder,
+		CreatedAt:       result.CreatedAt.Time,
+		UpdatedAt:       result.UpdatedAt.Time,
 	}
+	task.Status = compatibilityTaskStatus("", nil)
 
 	return &task, nil
 }
@@ -468,17 +532,18 @@ func (tr *TaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.UUI
 	}
 
 	task := domain.Task{
-		Id:          result.ID,
-		ProjectId:   result.ProjectID,
-		AuthorId:    result.AuthorID,
-		Title:       result.Title,
-		Description: result.Description,
-		Status:      domain.TaskStatus(result.Status),
-		Priority:    domain.TaskPriority(result.Priority),
-		Order:       result.TaskOrder,
-		CreatedAt:   result.CreatedAt.Time,
-		UpdatedAt:   result.UpdatedAt.Time,
+		Id:              result.ID,
+		ProjectId:       result.ProjectID,
+		AuthorId:        result.AuthorID,
+		Title:           result.Title,
+		Description:     result.Description,
+		ProjectColumnId: result.ProjectColumnID,
+		Priority:        domain.TaskPriority(result.Priority),
+		Order:           result.TaskOrder,
+		CreatedAt:       result.CreatedAt.Time,
+		UpdatedAt:       result.UpdatedAt.Time,
 	}
+	task.Status = compatibilityTaskStatus("", nil)
 
 	return &task, nil
 }
@@ -494,10 +559,17 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 	qtx := q.WithTx(tx)
 
 	params := queries.MoveTaskParams{
-		TaskOrder: task.Order,
-		Status:    string(task.Status),
-		UserID:    userId,
-		ID:        task.Id,
+		TaskOrder:       task.Order,
+		ProjectColumnID: task.ProjectColumnId,
+		UserID:          userId,
+		ID:              task.Id,
+	}
+
+	if task.DoneAt != nil {
+		params.DoneAt = pgtype.Timestamptz{
+			Time:  *task.DoneAt,
+			Valid: true,
+		}
 	}
 
 	result, err := qtx.MoveTask(ctx, params)
@@ -524,28 +596,28 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 	return task, nil
 }
 
-func (tr *TaskRepository) CountTasksByProjectIdAndStatus(ctx context.Context, projectId uuid.UUID, statuses []string) (map[string]int, error) {
+func (tr *TaskRepository) CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error) {
 	q := queries.New(tr.pool)
 
-	params := queries.CountTasksByProjectIdAndStatusParams{
+	params := queries.CountTasksByProjectIdAndColumnParams{
 		ProjectID: projectId,
-		Column2:   statuses,
+		Column2:   projectColumnIDs,
 	}
 
-	results, err := q.CountTasksByProjectIdAndStatus(ctx, params)
+	results, err := q.CountTasksByProjectIdAndColumn(ctx, params)
 	if err != nil {
 		return nil, err
 	}
 
 	result := map[string]int{}
 	for _, r := range results {
-		result[r.Status] = int(r.Count)
+		result[r.ProjectColumnID.String()] = int(r.Count)
 	}
 
 	return result, nil
 }
 
-func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID, statuses []string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
 	q := queries.New(tr.pool)
 
 	params := queries.ListUserDueTasksParams{
@@ -553,7 +625,6 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 			Bytes: userId,
 			Valid: true,
 		},
-		Statuses: statuses,
 		CursorDueDate: pgtype.Timestamptz{
 			Valid: cursorDueDate != nil,
 		},
@@ -582,10 +653,6 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 		}
 	}
 
-	if len(statuses) > 0 {
-		params.Statuses = statuses
-	}
-
 	results, err := q.ListUserDueTasks(ctx, params)
 	if err != nil {
 		return nil, err
@@ -594,16 +661,26 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 	tasks := []domain.Task{}
 	for _, result := range results {
 		task := domain.Task{
-			Id:            result.ID,
-			ProjectId:     result.ProjectID,
-			ResponsibleId: (*uuid.UUID)(result.ResponsibleResponsibleID.Bytes[:]),
-			Title:         result.Title,
-			Description:   result.Description,
-			Status:        domain.TaskStatus(result.Status),
-			Priority:      domain.TaskPriority(result.Priority),
-			Order:         result.TaskOrder,
-			CreatedAt:     result.CreatedAt.Time,
-			UpdatedAt:     result.UpdatedAt.Time,
+			Id:              result.ID,
+			ProjectId:       result.ProjectID,
+			ResponsibleId:   (*uuid.UUID)(result.ResponsibleResponsibleID.Bytes[:]),
+			Title:           result.Title,
+			Description:     result.Description,
+			ProjectColumnId: result.ProjectColumnID,
+			Priority:        domain.TaskPriority(result.Priority),
+			Order:           result.TaskOrder,
+			CreatedAt:       result.CreatedAt.Time,
+			UpdatedAt:       result.UpdatedAt.Time,
+			ProjectColumn: mapProjectColumn(
+				result.ProjectColumnID2,
+				result.ProjectColumnProjectID,
+				result.ProjectColumnName,
+				result.ProjectColumnColor,
+				result.ProjectColumnPosition,
+				result.ProjectColumnIsDoneColumn,
+				result.ProjectColumnCreatedAt,
+				result.ProjectColumnUpdatedAt,
+			),
 			Project: &domain.Project{
 				Id:          result.ProjectProjectID,
 				Name:        result.ProjectName,
@@ -613,6 +690,7 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 				UserId:      result.ProjectUserID,
 			},
 		}
+		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
 
 		if result.Tags != nil {
 			bytes, err := json.Marshal(result.Tags)
@@ -633,6 +711,10 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 			task.DoneAt = &result.DoneAt.Time
 		}
 
+		if result.ArchivedAt.Valid {
+			task.ArchivedAt = &result.ArchivedAt.Time
+		}
+
 		tasks = append(tasks, task)
 	}
 
@@ -646,7 +728,7 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 	return &paginated, nil
 }
 
-func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UUID, statuses []string, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UUID, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
 	q := queries.New(tr.pool)
 
 	params := queries.SearchTasksForUserParams{
@@ -655,7 +737,6 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 		Query:           pgtype.Text{String: searchQuery, Valid: true},
 		CursorDueDate:   pgtype.Timestamptz{Valid: cursorDueDate != nil},
 		CursorUpdatedAt: pgtype.Timestamptz{Valid: cursorUpdatedAt != nil},
-		Statuses:        statuses,
 	}
 
 	if cursorUpdatedAt != nil {
@@ -685,18 +766,29 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 	tasks := []domain.Task{}
 	for _, result := range results {
 		task := domain.Task{
-			Id:            result.ID,
-			ProjectId:     result.ProjectID,
-			Title:         result.Title,
-			Description:   result.Description,
-			Status:        domain.TaskStatus(result.Status),
-			Priority:      domain.TaskPriority(result.Priority),
-			Order:         result.TaskOrder,
-			CreatedAt:     result.CreatedAt.Time,
-			UpdatedAt:     result.UpdatedAt.Time,
-			AuthorId:      result.AuthorID,
-			ResponsibleId: (*uuid.UUID)(result.ResponsibleID.Bytes[:]),
+			Id:              result.ID,
+			ProjectId:       result.ProjectID,
+			Title:           result.Title,
+			Description:     result.Description,
+			ProjectColumnId: result.ProjectColumnID,
+			Priority:        domain.TaskPriority(result.Priority),
+			Order:           result.TaskOrder,
+			CreatedAt:       result.CreatedAt.Time,
+			UpdatedAt:       result.UpdatedAt.Time,
+			AuthorId:        result.AuthorID,
+			ResponsibleId:   (*uuid.UUID)(result.ResponsibleID.Bytes[:]),
+			ProjectColumn: mapProjectColumn(
+				result.ProjectColumnID2,
+				result.ProjectColumnProjectID,
+				result.ProjectColumnName,
+				result.ProjectColumnColor,
+				result.ProjectColumnPosition,
+				result.ProjectColumnIsDoneColumn,
+				result.ProjectColumnCreatedAt,
+				result.ProjectColumnUpdatedAt,
+			),
 		}
+		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
 
 		if result.Tags != nil {
 			bytes, err := json.Marshal(result.Tags)
@@ -715,6 +807,10 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 
 		if result.DoneAt.Valid {
 			task.DoneAt = &result.DoneAt.Time
+		}
+
+		if result.ArchivedAt.Valid {
+			task.ArchivedAt = &result.ArchivedAt.Time
 		}
 
 		if result.ProjectProjectID != uuid.Nil {

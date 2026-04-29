@@ -16,15 +16,23 @@ type taskCommentRepository interface {
 	ListByTaskID(ctx context.Context, taskID uuid.UUID, before time.Time, beforeID uuid.UUID, limit int) (*utils.CursorPaginated[domain.TaskComment], error)
 }
 
+type taskCommentTaskRepository interface {
+	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
+}
+
+type taskCommentProjectRepository interface {
+	GetById(ctx context.Context, id uuid.UUID) (*domain.Project, error)
+}
+
 type TaskCommentService struct {
 	taskCommentRepository taskCommentRepository
-	taskRepository        taskRepository
-	projectRepository     taskServiceProjectRepository
+	taskRepository        taskCommentTaskRepository
+	projectRepository     taskCommentProjectRepository
 	userRepository        taskServiceUserRepository
 	publisher             taskServicePublisher
 }
 
-func NewTaskCommentService(taskCommentRepository taskCommentRepository, taskRepository taskRepository, projectRepository taskServiceProjectRepository, userRepository taskServiceUserRepository, publisher taskServicePublisher) *TaskCommentService {
+func NewTaskCommentService(taskCommentRepository taskCommentRepository, taskRepository taskCommentTaskRepository, projectRepository taskCommentProjectRepository, userRepository taskServiceUserRepository, publisher taskServicePublisher) *TaskCommentService {
 	return &TaskCommentService{
 		taskCommentRepository: taskCommentRepository,
 		taskRepository:        taskRepository,

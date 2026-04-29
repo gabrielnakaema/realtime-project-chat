@@ -12,6 +12,8 @@ import (
 func TestNewTaskUpdate(t *testing.T) {
 	authorID := uuid.New()
 	taskID := uuid.New()
+	pendingStatusID := uuid.New()
+	doingStatusID := uuid.New()
 	responsibleID := uuid.New()
 	oldResponsibleID := uuid.New()
 	newResponsibleID := uuid.New()
@@ -28,18 +30,18 @@ func TestNewTaskUpdate(t *testing.T) {
 		{
 			name: "primitive field change",
 			oldTask: &Task{
-				Id:          taskID,
-				Title:       "Old title",
-				Description: "Description",
-				Status:      TaskStatusPending,
-				Priority:    TaskPriorityLow,
+				Id:              taskID,
+				Title:           "Old title",
+				Description:     "Description",
+				ProjectColumnId: pendingStatusID,
+				Priority:        TaskPriorityLow,
 			},
 			newTask: &Task{
-				Id:          taskID,
-				Title:       "New title",
-				Description: "Description",
-				Status:      TaskStatusPending,
-				Priority:    TaskPriorityLow,
+				Id:              taskID,
+				Title:           "New title",
+				Description:     "Description",
+				ProjectColumnId: pendingStatusID,
+				Priority:        TaskPriorityLow,
 			},
 			assertChanges: func(t *testing.T, update TaskUpdate) {
 				require.Len(t, update.Changes, 1)
@@ -57,14 +59,14 @@ func TestNewTaskUpdate(t *testing.T) {
 		{
 			name: "assigned responsible",
 			oldTask: &Task{
-				Id:     taskID,
-				Status: TaskStatusPending,
+				Id:              taskID,
+				ProjectColumnId: pendingStatusID,
 			},
 			newTask: &Task{
-				Id:            taskID,
-				Status:        TaskStatusPending,
-				ResponsibleId: &responsibleID,
-				Responsible:   &User{Id: responsibleID, Name: "Maria"},
+				Id:              taskID,
+				ProjectColumnId: pendingStatusID,
+				ResponsibleId:   &responsibleID,
+				Responsible:     &User{Id: responsibleID, Name: "Maria"},
 			},
 			assertChanges: func(t *testing.T, update TaskUpdate) {
 				require.Len(t, update.Changes, 1)
@@ -86,14 +88,14 @@ func TestNewTaskUpdate(t *testing.T) {
 		{
 			name: "unassigned responsible",
 			oldTask: &Task{
-				Id:            taskID,
-				Status:        TaskStatusPending,
-				ResponsibleId: &responsibleID,
-				Responsible:   &User{Id: responsibleID, Name: "Maria"},
+				Id:              taskID,
+				ProjectColumnId: pendingStatusID,
+				ResponsibleId:   &responsibleID,
+				Responsible:     &User{Id: responsibleID, Name: "Maria"},
 			},
 			newTask: &Task{
-				Id:     taskID,
-				Status: TaskStatusPending,
+				Id:              taskID,
+				ProjectColumnId: pendingStatusID,
 			},
 			assertChanges: func(t *testing.T, update TaskUpdate) {
 				require.Len(t, update.Changes, 1)
@@ -114,16 +116,16 @@ func TestNewTaskUpdate(t *testing.T) {
 		{
 			name: "reassigned responsible",
 			oldTask: &Task{
-				Id:            taskID,
-				Status:        TaskStatusPending,
-				ResponsibleId: &oldResponsibleID,
-				Responsible:   &User{Id: oldResponsibleID, Name: "Maria"},
+				Id:              taskID,
+				ProjectColumnId: pendingStatusID,
+				ResponsibleId:   &oldResponsibleID,
+				Responsible:     &User{Id: oldResponsibleID, Name: "Maria"},
 			},
 			newTask: &Task{
-				Id:            taskID,
-				Status:        TaskStatusPending,
-				ResponsibleId: &newResponsibleID,
-				Responsible:   &User{Id: newResponsibleID, Name: "Joao"},
+				Id:              taskID,
+				ProjectColumnId: pendingStatusID,
+				ResponsibleId:   &newResponsibleID,
+				Responsible:     &User{Id: newResponsibleID, Name: "Joao"},
 			},
 			assertChanges: func(t *testing.T, update TaskUpdate) {
 				require.Len(t, update.Changes, 1)
@@ -143,19 +145,19 @@ func TestNewTaskUpdate(t *testing.T) {
 		{
 			name: "mixed field edit with responsible",
 			oldTask: &Task{
-				Id:          taskID,
-				Title:       "Old title",
-				Description: "Description",
-				Status:      TaskStatusPending,
+				Id:              taskID,
+				Title:           "Old title",
+				Description:     "Description",
+				ProjectColumnId: pendingStatusID,
 			},
 			newTask: &Task{
-				Id:            taskID,
-				Title:         "New title",
-				Description:   "Description",
-				Status:        TaskStatusPending,
-				ResponsibleId: &responsibleID,
-				Responsible:   &User{Id: responsibleID, Name: "Maria"},
-				DueDate:       &dueDate,
+				Id:              taskID,
+				Title:           "New title",
+				Description:     "Description",
+				ProjectColumnId: pendingStatusID,
+				ResponsibleId:   &responsibleID,
+				Responsible:     &User{Id: responsibleID, Name: "Maria"},
+				DueDate:         &dueDate,
 			},
 			assertChanges: func(t *testing.T, update TaskUpdate) {
 				require.Len(t, update.Changes, 3)
@@ -168,18 +170,18 @@ func TestNewTaskUpdate(t *testing.T) {
 		{
 			name: "no changes",
 			oldTask: &Task{
-				Id:          taskID,
-				Title:       "Same title",
-				Description: "Same description",
-				Status:      TaskStatusPending,
-				Priority:    TaskPriorityLow,
+				Id:              taskID,
+				Title:           "Same title",
+				Description:     "Same description",
+				ProjectColumnId: pendingStatusID,
+				Priority:        TaskPriorityLow,
 			},
 			newTask: &Task{
-				Id:          taskID,
-				Title:       "Same title",
-				Description: "Same description",
-				Status:      TaskStatusPending,
-				Priority:    TaskPriorityLow,
+				Id:              taskID,
+				Title:           "Same title",
+				Description:     "Same description",
+				ProjectColumnId: pendingStatusID,
+				Priority:        TaskPriorityLow,
 			},
 			assertChanges: func(t *testing.T, update TaskUpdate) {
 				assert.Empty(t, update.Changes)
@@ -199,6 +201,30 @@ func TestNewTaskUpdate(t *testing.T) {
 			assertChanges: func(t *testing.T, update TaskUpdate) {
 				assert.Empty(t, update.Changes)
 				assert.Equal(t, TaskUpdateTypeUpdated, update.UpdateType)
+			},
+		},
+		{
+			name: "status change uses display names",
+			oldTask: &Task{
+				Id:              taskID,
+				ProjectColumnId: pendingStatusID,
+				ProjectColumn:   &ProjectColumn{Id: pendingStatusID, Name: "Pending", Color: "#64748B"},
+			},
+			newTask: &Task{
+				Id:              taskID,
+				ProjectColumnId: doingStatusID,
+				ProjectColumn:   &ProjectColumn{Id: doingStatusID, Name: "Doing", Color: "#2563EB"},
+			},
+			assertChanges: func(t *testing.T, update TaskUpdate) {
+				require.Len(t, update.Changes, 1)
+				change := update.Changes[0]
+				require.NotNil(t, change.OldDisplayValue)
+				require.NotNil(t, change.NewDisplayValue)
+				assert.Equal(t, TaskUpdateTypeColumn, update.UpdateType)
+				assert.Equal(t, pendingStatusID.String(), change.OldValue)
+				assert.Equal(t, doingStatusID.String(), change.NewValue)
+				assert.Equal(t, "Pending", *change.OldDisplayValue)
+				assert.Equal(t, "Doing", *change.NewDisplayValue)
 			},
 		},
 	}

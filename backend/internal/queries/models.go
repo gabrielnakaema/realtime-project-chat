@@ -74,6 +74,17 @@ type ProjectActivityLog struct {
 	UpdatedAt    pgtype.Timestamptz
 }
 
+type ProjectColumn struct {
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	Name         string
+	Color        string
+	Position     int32
+	IsDoneColumn bool
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
 type ProjectMember struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
@@ -91,19 +102,20 @@ type RefreshToken struct {
 }
 
 type Task struct {
-	ID            uuid.UUID
-	ProjectID     uuid.UUID
-	Title         string
-	Description   string
-	Status        string
-	CreatedAt     pgtype.Timestamptz
-	UpdatedAt     pgtype.Timestamptz
-	AuthorID      uuid.UUID
-	Priority      string
-	DueDate       pgtype.Timestamptz
-	DoneAt        pgtype.Timestamptz
-	ResponsibleID pgtype.UUID
-	TaskOrder     string
+	ID              uuid.UUID
+	ProjectID       uuid.UUID
+	Title           string
+	Description     string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+	AuthorID        uuid.UUID
+	Priority        string
+	DueDate         pgtype.Timestamptz
+	DoneAt          pgtype.Timestamptz
+	ResponsibleID   pgtype.UUID
+	TaskOrder       string
+	ProjectColumnID uuid.UUID
+	ArchivedAt      pgtype.Timestamptz
 }
 
 type TaskChange struct {

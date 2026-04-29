@@ -40,11 +40,19 @@ task_entities AS (
       'project_id', t.project_id,
       'title', t.title,
       'description', t.description,
-      'status', t.status,
+      'status', CASE
+        WHEN t.archived_at IS NOT NULL THEN 'archived'
+        WHEN pc.is_done_column THEN 'done'
+        WHEN pc.position = 1 THEN 'doing'
+        ELSE 'pending'
+      END,
+      'project_column_id', t.project_column_id,
+      'archived_at', t.archived_at,
       'created_at', t.created_at,
       'updated_at', t.updated_at
     ) as entity_data
   FROM tasks t
+  LEFT JOIN project_columns pc ON pc.id = t.project_column_id
 ),
 project_member_entities AS (
   SELECT 

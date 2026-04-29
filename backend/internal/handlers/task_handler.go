@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -22,8 +21,8 @@ type taskService interface {
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error)
 	Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error)
 	Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error)
-	GroupByStatus(ctx context.Context, request service.GroupByStatusRequest) (map[domain.TaskStatus]utils.CursorPaginated[domain.Task], error)
-	CountByStatus(ctx context.Context, projectId uuid.UUID, statuses []domain.TaskStatus, requestUserId uuid.UUID) (map[domain.TaskStatus]int, error)
+	GroupByColumn(ctx context.Context, request service.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error)
+	CountByColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, requestUserId uuid.UUID) (map[string]int, error)
 	Archive(ctx context.Context, request service.ArchiveTaskRequest) (*domain.Task, error)
 	ListUserDueTasks(ctx context.Context, request service.ListUserDueTasksRequest) (*utils.CursorPaginated[domain.Task], error)
 	SearchTasksForUser(ctx context.Context, request service.SearchTasksForUserRequest) (*utils.CursorPaginated[domain.Task], error)
@@ -58,14 +57,15 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userId := UserIdFromContext(r.Context())
 
 	serviceRequest := service.CreateTaskRequest{
-		ProjectId:     request.ProjectId,
-		Title:         request.Title,
-		Description:   request.Description,
-		RequestUserId: userId,
-		Priority:      request.Priority,
-		ResponsibleId: request.ResponsibleId,
-		DueDate:       request.DueDate,
-		Tags:          request.Tags,
+		ProjectId:       request.ProjectId,
+		ProjectColumnId: request.ProjectColumnId,
+		Title:           request.Title,
+		Description:     request.Description,
+		RequestUserId:   userId,
+		Priority:        request.Priority,
+		ResponsibleId:   request.ResponsibleId,
+		DueDate:         request.DueDate,
+		Tags:            request.Tags,
 	}
 
 	task, err := h.taskService.Create(r.Context(), serviceRequest)
@@ -94,10 +94,10 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	statuses := utils.GetQueryString(r, "statuses", "")
-	statusesArray := strings.Split(statuses, ",")
-	if statuses == "" {
-		statusesArray = []string{}
+	projectColumnIDs, err := parseUUIDQueryParam(utils.GetQueryString(r, "project_column_ids", ""))
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
 	}
 
 	limit := utils.GetQueryInt(r, "limit", 15)
@@ -109,13 +109,6 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	if limit > 100 {
 		BadRequestResponse(w, errors.New("limit must be less than 100"))
 		return
-	}
-
-	for _, status := range statusesArray {
-		if !slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(status)) {
-			BadRequestResponse(w, errors.New("invalid status"))
-			return
-		}
 	}
 
 	taskOrder := utils.GetQueryString(r, "task_order", "")
@@ -132,14 +125,16 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userId := UserIdFromContext(r.Context())
+	archived := utils.GetQueryString(r, "archived", "") == "true"
 
 	serviceRequest := service.ListTasksRequest{
-		ProjectId:       parsedProjectId,
-		RequestUserId:   userId,
-		Statuses:        statusesArray,
-		TaskOrder:       taskOrder,
-		Limit:           int(limit),
-		CursorUpdatedAt: updatedAt,
+		ProjectId:        parsedProjectId,
+		RequestUserId:    userId,
+		ProjectColumnIDs: projectColumnIDs,
+		Archived:         archived,
+		TaskOrder:        taskOrder,
+		Limit:            int(limit),
+		CursorUpdatedAt:  updatedAt,
 	}
 
 	result, err := h.taskService.List(r.Context(), serviceRequest)
@@ -155,7 +150,7 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
+func (h *TaskHandler) GroupByColumn(w http.ResponseWriter, r *http.Request) {
 	projectId := utils.GetQueryString(r, "project_id", "")
 	if projectId == "" {
 		BadRequestResponse(w, errors.New("project_id is required"))
@@ -193,30 +188,26 @@ func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
 		updatedAt = &parsedTime
 	}
 
-	statuses := utils.GetQueryString(r, "statuses", "")
-	statusesArray := []domain.TaskStatus{}
-	if statuses != "" {
-		for _, status := range strings.Split(statuses, ",") {
-			if !slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(status)) {
-				BadRequestResponse(w, errors.New("invalid status"))
-				return
-			}
-			statusesArray = append(statusesArray, domain.TaskStatus(status))
-		}
+	projectColumnIDs, err := parseUUIDQueryParam(utils.GetQueryString(r, "project_column_ids", ""))
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
 	}
 
 	userId := UserIdFromContext(r.Context())
+	archived := utils.GetQueryString(r, "archived", "") == "true"
 
-	serviceRequest := service.GroupByStatusRequest{
-		ProjectId:       parsedProjectId,
-		UserId:          userId,
-		Statuses:        statusesArray,
-		TaskOrder:       taskOrder,
-		Limit:           int(limitInt),
-		CursorUpdatedAt: updatedAt,
+	serviceRequest := service.GroupByColumnRequest{
+		ProjectId:        parsedProjectId,
+		UserId:           userId,
+		ProjectColumnIDs: projectColumnIDs,
+		Archived:         archived,
+		TaskOrder:        taskOrder,
+		Limit:            int(limitInt),
+		CursorUpdatedAt:  updatedAt,
 	}
 
-	result, err := h.taskService.GroupByStatus(r.Context(), serviceRequest)
+	result, err := h.taskService.GroupByColumn(r.Context(), serviceRequest)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return
@@ -229,7 +220,7 @@ func (h *TaskHandler) GroupByStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *TaskHandler) CountByStatus(w http.ResponseWriter, r *http.Request) {
+func (h *TaskHandler) CountByColumn(w http.ResponseWriter, r *http.Request) {
 	projectId := utils.GetQueryString(r, "project_id", "")
 	if projectId == "" {
 		BadRequestResponse(w, errors.New("project_id is required"))
@@ -244,22 +235,18 @@ func (h *TaskHandler) CountByStatus(w http.ResponseWriter, r *http.Request) {
 
 	userId := UserIdFromContext(r.Context())
 
-	statuses := utils.GetQueryString(r, "statuses", "")
-	statusesArray := []domain.TaskStatus{}
-	for _, status := range strings.Split(statuses, ",") {
-		if !slices.Contains(domain.AllowedTaskStatuses, domain.TaskStatus(status)) {
-			BadRequestResponse(w, errors.New("invalid status"))
-			return
-		}
-		statusesArray = append(statusesArray, domain.TaskStatus(status))
-	}
-
-	if len(statusesArray) == 0 {
-		BadRequestResponse(w, errors.New("statuses are required"))
+	projectColumnIDs, err := parseUUIDQueryParam(utils.GetQueryString(r, "project_column_ids", ""))
+	if err != nil {
+		BadRequestResponse(w, err)
 		return
 	}
 
-	result, err := h.taskService.CountByStatus(r.Context(), parsedProjectId, statusesArray, userId)
+	if len(projectColumnIDs) == 0 {
+		BadRequestResponse(w, errors.New("project_column_ids are required"))
+		return
+	}
+
+	result, err := h.taskService.CountByColumn(r.Context(), parsedProjectId, projectColumnIDs, userId)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return
@@ -321,16 +308,15 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userId := UserIdFromContext(r.Context())
 
 	serviceRequest := service.UpdateTaskRequest{
-		TaskId:        parsedId,
-		Title:         request.Title,
-		Description:   request.Description,
-		Status:        domain.TaskStatus(request.Status),
-		RequestUserId: userId,
-		Priority:      domain.TaskPriority(request.Priority),
-		ResponsibleId: request.ResponsibleId,
-		DueDate:       request.DueDate,
-		Tags:          request.Tags,
-		DoneAt:        request.DoneAt,
+		TaskId:          parsedId,
+		Title:           request.Title,
+		Description:     request.Description,
+		ProjectColumnId: request.ProjectColumnId,
+		RequestUserId:   userId,
+		Priority:        domain.TaskPriority(request.Priority),
+		ResponsibleId:   request.ResponsibleId,
+		DueDate:         request.DueDate,
+		Tags:            request.Tags,
 	}
 
 	task, err := h.taskService.Update(r.Context(), serviceRequest)
@@ -399,11 +385,11 @@ func (h *TaskHandler) Move(w http.ResponseWriter, r *http.Request) {
 	userId := UserIdFromContext(r.Context())
 
 	serviceRequest := service.MoveTaskRequest{
-		TaskId:        parsedId,
-		RequestUserId: userId,
-		AfterTaskId:   request.AfterTaskId,
-		ProjectId:     request.ProjectId,
-		Status:        domain.TaskStatus(request.Status),
+		TaskId:          parsedId,
+		RequestUserId:   userId,
+		AfterTaskId:     request.AfterTaskId,
+		ProjectId:       request.ProjectId,
+		ProjectColumnId: request.ProjectColumnId,
 	}
 
 	task, err := h.taskService.Move(r.Context(), serviceRequest)
@@ -417,6 +403,24 @@ func (h *TaskHandler) Move(w http.ResponseWriter, r *http.Request) {
 		ErrorResponse(w, r, err)
 		return
 	}
+}
+
+func parseUUIDQueryParam(value string) ([]uuid.UUID, error) {
+	if value == "" {
+		return []uuid.UUID{}, nil
+	}
+
+	parts := strings.Split(value, ",")
+	ids := make([]uuid.UUID, 0, len(parts))
+	for _, part := range parts {
+		parsed, err := uuid.Parse(part)
+		if err != nil {
+			return nil, errors.New("invalid project_column_id")
+		}
+		ids = append(ids, parsed)
+	}
+
+	return ids, nil
 }
 
 func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {

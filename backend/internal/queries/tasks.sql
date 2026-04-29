@@ -1,5 +1,6 @@
 -- name: CreateTask :one
-INSERT INTO tasks (project_id, title, description, status, author_id, responsible_id, priority, due_date, task_order) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id;
+INSERT INTO tasks (project_id, title, description, project_column_id, author_id, responsible_id, priority, due_date, done_at, task_order)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id;
 
 -- name: CreateTaskTag :exec
 INSERT INTO task_tags (task_id, name) VALUES ($1, $2);
@@ -90,11 +91,12 @@ SELECT
   t.project_id as task_project_id,
   t.title as task_title,
   t.description as task_description,
-  t.status as task_status,
+  t.project_column_id as task_project_column_id,
   t.priority as task_priority,
   t.responsible_id as task_responsible_id,
   t.due_date as task_due_date,
   t.done_at as task_done_at,
+  t.archived_at as task_archived_at,
   t.task_order as task_order,
   t.created_at as task_created_at,
   t.updated_at as task_updated_at,
@@ -105,6 +107,16 @@ SELECT
   r.name as task_responsible_name,
   r.email as task_responsible_email,
   r.created_at as task_responsible_created_at,
+  jsonb_build_object(
+    'id', ps.id,
+    'project_id', ps.project_id,
+    'name', ps.name,
+    'color', ps.color,
+    'position', ps.position,
+    'is_done_column', ps.is_done_column,
+    'created_at', ps.created_at,
+    'updated_at', ps.updated_at
+  ) as project_column,
   (select coalesce(jsonb_agg(tt.task_tag_name) filter (where tt.task_tag_name is not null), '[]') from task_tags_cte tt) as tags,
   (select coalesce(jsonb_agg(
     jsonb_build_object(
@@ -126,37 +138,59 @@ SELECT
 FROM tasks t
 LEFT JOIN users a ON a.id = t.author_id
 LEFT JOIN users r ON r.id = t.responsible_id
+JOIN project_columns ps ON ps.id = t.project_column_id
 WHERE t.id = $1;
 
 -- name: ListTasksByProjectId :many
 SELECT
   t.*,
+  ps.id as project_column_id_2,
+  ps.project_id as project_column_project_id,
+  ps.name as project_column_name,
+  ps.color as project_column_color,
+  ps.position as project_column_position,
+  ps.is_done_column as project_column_is_done_column,
+  ps.created_at as project_column_created_at,
+  ps.updated_at as project_column_updated_at,
   a.id as author_author_id,
   a.name as author_name,
   r.id as responsible_responsible_id,
   r.name as responsible_name,
   coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
 FROM tasks t
+JOIN project_columns ps ON ps.id = t.project_column_id
 LEFT JOIN users a ON a.id = t.author_id
 LEFT JOIN users r ON r.id = t.responsible_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
-WHERE project_id = $1
+WHERE t.project_id = $1
 AND (
-  cardinality(sqlc.slice('statuses')::text[]) = 0
-  OR t.status = ANY(sqlc.slice('statuses')::text[])
+  cardinality(sqlc.slice('project_column_ids')::uuid[]) = 0
+  OR t.project_column_id = ANY(sqlc.slice('project_column_ids')::uuid[])
+)
+AND (
+  sqlc.arg('archived')::boolean = true
+  OR t.archived_at IS NULL
 )
 AND (
   sqlc.narg('cursor_updated_at')::timestamptz IS NULL
   OR t.task_order > sqlc.narg('task_order')::text
   OR (t.task_order = sqlc.narg('task_order')::text AND t.updated_at < sqlc.narg('cursor_updated_at')::timestamptz)
 )
-GROUP BY t.id, a.name, a.id, r.name, r.id
+GROUP BY t.id, ps.id, a.name, a.id, r.name, r.id
 ORDER BY t.task_order ASC, t.updated_at DESC
 LIMIT $2;
 
 -- name: ListUserDueTasks :many
 SELECT
   t.*,
+  ps.id as project_column_id_2,
+  ps.project_id as project_column_project_id,
+  ps.name as project_column_name,
+  ps.color as project_column_color,
+  ps.position as project_column_position,
+  ps.is_done_column as project_column_is_done_column,
+  ps.created_at as project_column_created_at,
+  ps.updated_at as project_column_updated_at,
   p.id as project_project_id,
   p.name as project_name,
   p.description as project_description,
@@ -167,27 +201,26 @@ SELECT
   r.name as responsible_name,
   coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
 FROM tasks t
+JOIN project_columns ps ON ps.id = t.project_column_id
 LEFT JOIN users r ON r.id = t.responsible_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
 JOIN projects p ON p.id = t.project_id
 WHERE t.responsible_id = $1
 AND t.due_date IS NOT NULL
-AND (
-  cardinality(sqlc.slice('statuses')::text[]) = 0
-  OR t.status = ANY(sqlc.slice('statuses')::text[])
-)
+AND t.archived_at IS NULL
+AND ps.is_done_column = false
 AND (
   sqlc.narg('cursor_due_date')::timestamptz IS NULL
   OR sqlc.narg('cursor_updated_at')::timestamptz IS NULL
   OR t.due_date > sqlc.narg('cursor_due_date')::timestamptz
   OR (t.due_date = sqlc.narg('cursor_due_date')::timestamptz AND t.updated_at < sqlc.narg('cursor_updated_at')::timestamptz)
 )
-GROUP BY t.id, r.name, r.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id
+GROUP BY t.id, ps.id, r.name, r.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id
 ORDER BY t.due_date ASC, t.updated_at DESC
 LIMIT $2;
 
 -- name: UpdateTask :exec
-UPDATE tasks SET title = $1, description = $2, status = $3, task_order = $4, priority = $5, due_date = $6, responsible_id = $7, done_at = $8, updated_at = CURRENT_TIMESTAMP WHERE id = $9;
+UPDATE tasks SET title = $1, description = $2, project_column_id = $3, task_order = $4, priority = $5, due_date = $6, responsible_id = $7, done_at = $8, archived_at = $9, updated_at = CURRENT_TIMESTAMP WHERE id = $10;
 
 -- name: CreateTaskUpdate :one
 INSERT INTO task_updates (task_id, user_id, update_type) VALUES ($1, $2, $3) returning id;
@@ -196,10 +229,11 @@ INSERT INTO task_updates (task_id, user_id, update_type) VALUES ($1, $2, $3) ret
 INSERT INTO task_changes (update_id, field, old_value, new_value, subject_id, old_value_id, new_value_id, old_display_value, new_display_value) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id;
 
 -- name: GetFirstTaskInColumn :one
-SELECT id, project_id, title, description, status, created_at, updated_at, author_id, priority, due_date, done_at, responsible_id, task_order
+SELECT id, project_id, title, description, project_column_id, created_at, updated_at, author_id, priority, due_date, done_at, archived_at, responsible_id, task_order
 FROM tasks
 WHERE project_id = $1
-  AND status = $2
+  AND project_column_id = $2
+  AND archived_at IS NULL
 ORDER BY task_order ASC, updated_at DESC
 LIMIT 1;
 
@@ -208,28 +242,31 @@ SELECT t.*
 FROM tasks t
 WHERE t.task_order >= (SELECT task_order FROM tasks t2 WHERE t2.id = $1)
   AND t.project_id = $2
-  AND t.status = (SELECT status FROM tasks t2 WHERE t2.id = $1)
+  AND t.project_column_id = (SELECT project_column_id FROM tasks t2 WHERE t2.id = $1)
   AND t.id != $1
+  AND t.archived_at IS NULL
 ORDER BY t.task_order ASC, t.updated_at DESC
 LIMIT 1;
 
 -- name: MoveTask :one
 UPDATE tasks t
 SET task_order = $1,
-    status = $2,
+    project_column_id = $2,
+    done_at = $3,
     updated_at = CURRENT_TIMESTAMP
 FROM projects p
-JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $3
-WHERE t.id = $4
+JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $4
+WHERE t.id = $5
   AND p.id = t.project_id
-RETURNING t.id, t.task_order, t.status;
+RETURNING t.id, t.task_order, t.project_column_id;
 
--- name: CountTasksByProjectIdAndStatus :many
-SELECT t.status, COUNT(*) AS count
+-- name: CountTasksByProjectIdAndColumn :many
+SELECT t.project_column_id, COUNT(*) AS count
 FROM tasks t
 WHERE t.project_id = $1
-  AND ($2::text[] IS NULL OR t.status = ANY($2::text[]))
-GROUP BY t.status;
+  AND t.archived_at IS NULL
+  AND ($2::uuid[] IS NULL OR t.project_column_id = ANY($2::uuid[]))
+GROUP BY t.project_column_id;
 
 -- name: SearchTasksForUser :many
 WITH project_ids_cte AS (
@@ -238,6 +275,14 @@ WITH project_ids_cte AS (
   WHERE pm.user_id = $1
 )
 SELECT t.*,
+  ps.id as project_column_id_2,
+  ps.project_id as project_column_project_id,
+  ps.name as project_column_name,
+  ps.color as project_column_color,
+  ps.position as project_column_position,
+  ps.is_done_column as project_column_is_done_column,
+  ps.created_at as project_column_created_at,
+  ps.updated_at as project_column_updated_at,
   p.id as project_project_id,
   p.name as project_name,
   p.description as project_description,
@@ -254,21 +299,21 @@ SELECT t.*,
   a.created_at as author_created_at,
   coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
 FROM tasks t
+JOIN project_columns ps ON ps.id = t.project_column_id
 LEFT JOIN users r ON r.id = t.responsible_id
 LEFT JOIN users a ON a.id = t.author_id
 JOIN projects p ON p.id = t.project_id
 JOIN project_ids_cte pi ON pi.project_id = t.project_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
 WHERE (sqlc.narg('query')::text IS NULL OR (t.title ILIKE '%' || sqlc.narg('query')::text || '%' OR t.description ILIKE '%' || sqlc.narg('query')::text || '%'))
+AND t.archived_at IS NULL
+AND ps.is_done_column = false
 AND (
   sqlc.narg('cursor_due_date')::timestamptz IS NULL
   OR sqlc.narg('cursor_updated_at')::timestamptz IS NULL
   OR t.due_date > sqlc.narg('cursor_due_date')::timestamptz
   OR (t.due_date = sqlc.narg('cursor_due_date')::timestamptz AND t.updated_at < sqlc.narg('cursor_updated_at')::timestamptz)
-) AND (
-  cardinality(sqlc.slice('statuses')::text[]) = 0
-  OR t.status = ANY(sqlc.slice('statuses')::text[])
 )
-GROUP BY t.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id, r.id, r.name, r.email, r.created_at, a.id, a.name, a.email, a.created_at
+GROUP BY t.id, ps.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id, r.id, r.name, r.email, r.created_at, a.id, a.name, a.email, a.created_at
 ORDER BY t.due_date ASC, t.updated_at DESC
 LIMIT $2;

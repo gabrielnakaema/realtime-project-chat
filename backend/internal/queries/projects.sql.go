@@ -32,6 +32,34 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (u
 	return id, err
 }
 
+const createProjectColumn = `-- name: CreateProjectColumn :one
+INSERT INTO
+  project_columns (project_id, name, color, position, is_done_column)
+VALUES
+  ($1, $2, $3, $4, $5) returning id
+`
+
+type CreateProjectColumnParams struct {
+	ProjectID    uuid.UUID
+	Name         string
+	Color        string
+	Position     int32
+	IsDoneColumn bool
+}
+
+func (q *Queries) CreateProjectColumn(ctx context.Context, arg CreateProjectColumnParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createProjectColumn,
+		arg.ProjectID,
+		arg.Name,
+		arg.Color,
+		arg.Position,
+		arg.IsDoneColumn,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createProjectMember = `-- name: CreateProjectMember :one
 INSERT INTO
   project_members (user_id, project_id, role)
@@ -52,6 +80,22 @@ func (q *Queries) CreateProjectMember(ctx context.Context, arg CreateProjectMemb
 	return id, err
 }
 
+const deleteProjectColumn = `-- name: DeleteProjectColumn :exec
+DELETE FROM project_columns
+WHERE id = $1
+  AND project_id = $2
+`
+
+type DeleteProjectColumnParams struct {
+	ID        uuid.UUID
+	ProjectID uuid.UUID
+}
+
+func (q *Queries) DeleteProjectColumn(ctx context.Context, arg DeleteProjectColumnParams) error {
+	_, err := q.db.Exec(ctx, deleteProjectColumn, arg.ID, arg.ProjectID)
+	return err
+}
+
 const getProjectById = `-- name: GetProjectById :one
 WITH project_members_cte AS (
   SELECT
@@ -69,6 +113,18 @@ WITH project_members_cte AS (
     JOIN users u ON u.id = pm.user_id
   WHERE
     pm.project_id = $1
+), project_columns_cte AS (
+  SELECT
+    ps.id,
+    ps.project_id,
+    ps.name,
+    ps.color,
+    ps.position,
+    ps.is_done_column,
+    ps.created_at,
+    ps.updated_at
+  FROM project_columns ps
+  WHERE ps.project_id = $1
 )
 SELECT
   p.id, p.user_id, p.name, p.description, p.created_at, p.updated_at,
@@ -102,7 +158,23 @@ SELECT
         pm.project_member_id is not null
     ),
     '[]' :: jsonb
-  ) as members
+  ) as members,
+  (
+    SELECT coalesce(jsonb_agg(
+      jsonb_build_object(
+        'id', ps.id,
+        'project_id', ps.project_id,
+        'name', ps.name,
+        'color', ps.color,
+        'position', ps.position,
+        'is_done_column', ps.is_done_column,
+        'created_at', ps.created_at,
+        'updated_at', ps.updated_at
+      )
+      ORDER BY ps.position ASC, ps.created_at ASC
+    ), '[]'::jsonb)
+    FROM project_columns_cte ps
+  ) as columns
 FROM
   projects p
   LEFT JOIN project_members_cte pm ON pm.project_id = p.id
@@ -120,6 +192,7 @@ type GetProjectByIdRow struct {
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
 	Members     interface{}
+	Columns     interface{}
 }
 
 func (q *Queries) GetProjectById(ctx context.Context, id uuid.UUID) (GetProjectByIdRow, error) {
@@ -133,6 +206,29 @@ func (q *Queries) GetProjectById(ctx context.Context, id uuid.UUID) (GetProjectB
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Members,
+		&i.Columns,
+	)
+	return i, err
+}
+
+const getProjectColumnById = `-- name: GetProjectColumnById :one
+SELECT id, project_id, name, color, position, is_done_column, created_at, updated_at
+FROM project_columns
+WHERE id = $1
+`
+
+func (q *Queries) GetProjectColumnById(ctx context.Context, id uuid.UUID) (ProjectColumn, error) {
+	row := q.db.QueryRow(ctx, getProjectColumnById, id)
+	var i ProjectColumn
+	err := row.Scan(
+		&i.ID,
+		&i.ProjectID,
+		&i.Name,
+		&i.Color,
+		&i.Position,
+		&i.IsDoneColumn,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -234,6 +330,17 @@ WITH project_members_cte AS (
   FROM
     project_members pm
     JOIN users u ON u.id = pm.user_id
+), project_columns_cte AS (
+  SELECT
+    ps.id,
+    ps.project_id,
+    ps.name,
+    ps.color,
+    ps.position,
+    ps.is_done_column,
+    ps.created_at,
+    ps.updated_at
+  FROM project_columns ps
 )
 SELECT
   p.id, p.user_id, p.name, p.description, p.created_at, p.updated_at,
@@ -267,7 +374,24 @@ SELECT
         pm.project_member_id is not null
     ),
     '[]' :: jsonb
-  ) as members
+  ) as members,
+  (
+    SELECT coalesce(jsonb_agg(
+      jsonb_build_object(
+        'id', ps.id,
+        'project_id', ps.project_id,
+        'name', ps.name,
+        'color', ps.color,
+        'position', ps.position,
+        'is_done_column', ps.is_done_column,
+        'created_at', ps.created_at,
+        'updated_at', ps.updated_at
+      )
+      ORDER BY ps.position ASC, ps.created_at ASC
+    ), '[]'::jsonb)
+    FROM project_columns_cte ps
+    WHERE ps.project_id = p.id
+  ) as columns
 FROM
   projects p
   INNER JOIN project_members_cte pm ON pm.project_id = p.id
@@ -301,6 +425,7 @@ type ListProjectsByUserIdRow struct {
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
 	Members     interface{}
+	Columns     interface{}
 }
 
 func (q *Queries) ListProjectsByUserId(ctx context.Context, arg ListProjectsByUserIdParams) ([]ListProjectsByUserIdRow, error) {
@@ -320,6 +445,7 @@ func (q *Queries) ListProjectsByUserId(ctx context.Context, arg ListProjectsByUs
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Members,
+			&i.Columns,
 		); err != nil {
 			return nil, err
 		}
@@ -339,6 +465,30 @@ WHERE id = $1
 
 func (q *Queries) MarkProjectUpdatedAt(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, markProjectUpdatedAt, id)
+	return err
+}
+
+const reassignTasksToProjectColumn = `-- name: ReassignTasksToProjectColumn :exec
+UPDATE tasks
+SET
+  project_column_id = $1,
+  done_at = CASE
+    WHEN $2::boolean = true AND archived_at IS NULL AND done_at IS NULL THEN CURRENT_TIMESTAMP
+    WHEN $2::boolean = false THEN NULL
+    ELSE done_at
+  END,
+  updated_at = CURRENT_TIMESTAMP
+WHERE project_column_id = $3
+`
+
+type ReassignTasksToProjectColumnParams struct {
+	ProjectColumnID   uuid.UUID
+	Column2           bool
+	ProjectColumnID_2 uuid.UUID
+}
+
+func (q *Queries) ReassignTasksToProjectColumn(ctx context.Context, arg ReassignTasksToProjectColumnParams) error {
+	_, err := q.db.Exec(ctx, reassignTasksToProjectColumn, arg.ProjectColumnID, arg.Column2, arg.ProjectColumnID_2)
 	return err
 }
 
@@ -394,5 +544,40 @@ type UpdateProjectParams struct {
 
 func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) error {
 	_, err := q.db.Exec(ctx, updateProject, arg.Name, arg.Description, arg.ID)
+	return err
+}
+
+const updateProjectColumn = `-- name: UpdateProjectColumn :exec
+UPDATE
+  project_columns
+SET
+  name = $1,
+  color = $2,
+  position = $3,
+  is_done_column = $4,
+  updated_at = CURRENT_TIMESTAMP
+WHERE
+  id = $5
+  AND project_id = $6
+`
+
+type UpdateProjectColumnParams struct {
+	Name         string
+	Color        string
+	Position     int32
+	IsDoneColumn bool
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+}
+
+func (q *Queries) UpdateProjectColumn(ctx context.Context, arg UpdateProjectColumnParams) error {
+	_, err := q.db.Exec(ctx, updateProjectColumn,
+		arg.Name,
+		arg.Color,
+		arg.Position,
+		arg.IsDoneColumn,
+		arg.ID,
+		arg.ProjectID,
+	)
 	return err
 }

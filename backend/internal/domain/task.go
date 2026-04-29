@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,45 +26,36 @@ var (
 var AllowedTaskPriorities = []TaskPriority{TaskPriorityLow, TaskPriorityMedium, TaskPriorityHigh}
 
 type Task struct {
-	Id            uuid.UUID    `json:"id"`
-	ProjectId     uuid.UUID    `json:"project_id"`
-	AuthorId      uuid.UUID    `json:"author_id"`
-	Title         string       `json:"title"`
-	Description   string       `json:"description"`
-	Status        TaskStatus   `json:"status"`
-	Priority      TaskPriority `json:"priority"`
-	Order         string       `json:"order"`
-	ResponsibleId *uuid.UUID   `json:"responsible_id"`
-	DueDate       *time.Time   `json:"due_date"`
-	DoneAt        *time.Time   `json:"done_at"`
-	Tags          []string     `json:"tags"`
-	CreatedAt     time.Time    `json:"created_at"`
-	UpdatedAt     time.Time    `json:"updated_at"`
+	Id              uuid.UUID    `json:"id"`
+	ProjectId       uuid.UUID    `json:"project_id"`
+	AuthorId        uuid.UUID    `json:"author_id"`
+	Title           string       `json:"title"`
+	Description     string       `json:"description"`
+	Status          TaskStatus   `json:"status"`
+	ProjectColumnId uuid.UUID    `json:"project_column_id"`
+	Priority        TaskPriority `json:"priority"`
+	Order           string       `json:"order"`
+	ResponsibleId   *uuid.UUID   `json:"responsible_id"`
+	DueDate         *time.Time   `json:"due_date"`
+	DoneAt          *time.Time   `json:"done_at"`
+	ArchivedAt      *time.Time   `json:"archived_at"`
+	Tags            []string     `json:"tags"`
+	CreatedAt       time.Time    `json:"created_at"`
+	UpdatedAt       time.Time    `json:"updated_at"`
 
-	Responsible *User         `json:"responsible,omitempty"`
-	Author      *User         `json:"author,omitempty"`
-	Updates     []TaskUpdate  `json:"updates,omitempty"`
-	Project     *Project      `json:"project,omitempty"`
-	Comments    []TaskComment `json:"comments,omitempty"`
-}
-
-var AllowedTaskStatuses = []TaskStatus{TaskStatusPending, TaskStatusDoing, TaskStatusDone, TaskStatusArchived}
-
-func (t *Task) ChangeStatus(status TaskStatus) error {
-	if !slices.Contains(AllowedTaskStatuses, status) {
-		return BusinessValidationError("invalid status")
-	}
-
-	t.Status = status
-
-	return nil
+	Responsible   *User          `json:"responsible,omitempty"`
+	Author        *User          `json:"author,omitempty"`
+	Updates       []TaskUpdate   `json:"updates,omitempty"`
+	Project       *Project       `json:"project,omitempty"`
+	ProjectColumn *ProjectColumn `json:"project_column,omitempty"`
+	Comments      []TaskComment  `json:"comments,omitempty"`
 }
 
 type TaskUpdateType string
 
 var (
 	TaskUpdateTypeCreated    TaskUpdateType = "created"
-	TaskUpdateTypeStatus     TaskUpdateType = "status"
+	TaskUpdateTypeColumn     TaskUpdateType = "column"
 	TaskUpdateTypeUpdated    TaskUpdateType = "updated"
 	TaskUpdateTypeDone       TaskUpdateType = "done"
 	TaskUpdateTypeArchived   TaskUpdateType = "archived"
@@ -145,16 +135,28 @@ var taskChangeDefinitions = []taskChangeDefinition{
 		},
 	},
 	{
-		field: "status",
+		field: "column",
 		build: func(old *Task, new *Task) *TaskChange {
-			if old.Status == new.Status {
+			if old.ProjectColumnId == new.ProjectColumnId {
 				return nil
 			}
 
+			oldDisplay := ""
+			if old.ProjectColumn != nil {
+				oldDisplay = old.ProjectColumn.Name
+			}
+
+			newDisplay := ""
+			if new.ProjectColumn != nil {
+				newDisplay = new.ProjectColumn.Name
+			}
+
 			return &TaskChange{
-				Field:    "status",
-				OldValue: string(old.Status),
-				NewValue: string(new.Status),
+				Field:           "column",
+				OldValue:        old.ProjectColumnId.String(),
+				NewValue:        new.ProjectColumnId.String(),
+				OldDisplayValue: optionalString(oldDisplay),
+				NewDisplayValue: optionalString(newDisplay),
 			}
 		},
 	},
@@ -247,8 +249,8 @@ func determineTaskUpdateType(changes []TaskChange) TaskUpdateType {
 		}
 	}
 
-	if len(changes) == 1 && changes[0].Field == "status" {
-		return TaskUpdateTypeStatus
+	if len(changes) == 1 && changes[0].Field == "column" {
+		return TaskUpdateTypeColumn
 	}
 
 	return TaskUpdateTypeUpdated
@@ -306,5 +308,13 @@ func formatTaskTime(value *time.Time) string {
 }
 
 func stringPointer(value string) *string {
+	return &value
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+
 	return &value
 }

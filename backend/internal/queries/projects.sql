@@ -4,6 +4,12 @@ INSERT INTO
 VALUES
   ($1, $2, $3) returning id;
 
+-- name: CreateProjectColumn :one
+INSERT INTO
+  project_columns (project_id, name, color, position, is_done_column)
+VALUES
+  ($1, $2, $3, $4, $5) returning id;
+
 -- name: CreateProjectMember :one
 INSERT INTO
   project_members (user_id, project_id, role)
@@ -27,6 +33,18 @@ WITH project_members_cte AS (
     JOIN users u ON u.id = pm.user_id
   WHERE
     pm.project_id = $1
+), project_columns_cte AS (
+  SELECT
+    ps.id,
+    ps.project_id,
+    ps.name,
+    ps.color,
+    ps.position,
+    ps.is_done_column,
+    ps.created_at,
+    ps.updated_at
+  FROM project_columns ps
+  WHERE ps.project_id = $1
 )
 SELECT
   p.*,
@@ -60,7 +78,23 @@ SELECT
         pm.project_member_id is not null
     ),
     '[]' :: jsonb
-  ) as members
+  ) as members,
+  (
+    SELECT coalesce(jsonb_agg(
+      jsonb_build_object(
+        'id', ps.id,
+        'project_id', ps.project_id,
+        'name', ps.name,
+        'color', ps.color,
+        'position', ps.position,
+        'is_done_column', ps.is_done_column,
+        'created_at', ps.created_at,
+        'updated_at', ps.updated_at
+      )
+      ORDER BY ps.position ASC, ps.created_at ASC
+    ), '[]'::jsonb)
+    FROM project_columns_cte ps
+  ) as columns
 FROM
   projects p
   LEFT JOIN project_members_cte pm ON pm.project_id = p.id
@@ -84,6 +118,17 @@ WITH project_members_cte AS (
   FROM
     project_members pm
     JOIN users u ON u.id = pm.user_id
+), project_columns_cte AS (
+  SELECT
+    ps.id,
+    ps.project_id,
+    ps.name,
+    ps.color,
+    ps.position,
+    ps.is_done_column,
+    ps.created_at,
+    ps.updated_at
+  FROM project_columns ps
 )
 SELECT
   p.*,
@@ -117,7 +162,24 @@ SELECT
         pm.project_member_id is not null
     ),
     '[]' :: jsonb
-  ) as members
+  ) as members,
+  (
+    SELECT coalesce(jsonb_agg(
+      jsonb_build_object(
+        'id', ps.id,
+        'project_id', ps.project_id,
+        'name', ps.name,
+        'color', ps.color,
+        'position', ps.position,
+        'is_done_column', ps.is_done_column,
+        'created_at', ps.created_at,
+        'updated_at', ps.updated_at
+      )
+      ORDER BY ps.position ASC, ps.created_at ASC
+    ), '[]'::jsonb)
+    FROM project_columns_cte ps
+    WHERE ps.project_id = p.id
+  ) as columns
 FROM
   projects p
   INNER JOIN project_members_cte pm ON pm.project_id = p.id
@@ -145,6 +207,41 @@ SET
   updated_at = CURRENT_TIMESTAMP
 WHERE
   id = $3;
+
+-- name: UpdateProjectColumn :exec
+UPDATE
+  project_columns
+SET
+  name = $1,
+  color = $2,
+  position = $3,
+  is_done_column = $4,
+  updated_at = CURRENT_TIMESTAMP
+WHERE
+  id = $5
+  AND project_id = $6;
+
+-- name: DeleteProjectColumn :exec
+DELETE FROM project_columns
+WHERE id = $1
+  AND project_id = $2;
+
+-- name: ReassignTasksToProjectColumn :exec
+UPDATE tasks
+SET
+  project_column_id = $1,
+  done_at = CASE
+    WHEN $2::boolean = true AND archived_at IS NULL AND done_at IS NULL THEN CURRENT_TIMESTAMP
+    WHEN $2::boolean = false THEN NULL
+    ELSE done_at
+  END,
+  updated_at = CURRENT_TIMESTAMP
+WHERE project_column_id = $3;
+
+-- name: GetProjectColumnById :one
+SELECT *
+FROM project_columns
+WHERE id = $1;
 
 -- name: RemoveProjectMember :exec
 DELETE FROM project_members

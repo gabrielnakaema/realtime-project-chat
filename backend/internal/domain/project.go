@@ -15,6 +15,7 @@ type Project struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 
 	Members []ProjectMember `json:"members,omitempty"`
+	Columns []ProjectColumn `json:"columns,omitempty"`
 }
 
 func (p *Project) IsMember(userId uuid.UUID) bool {
@@ -48,4 +49,15 @@ type ProjectMember struct {
 	User      *User             `json:"user,omitempty"`
 	ProjectId uuid.UUID         `json:"project_id"`
 	Role      ProjectMemberRole `json:"role"`
+}
+
+type ProjectColumn struct {
+	Id           uuid.UUID `json:"id"`
+	ProjectId    uuid.UUID `json:"project_id"`
+	Name         string    `json:"name"`
+	Color        string    `json:"color"`
+	Position     int       `json:"position"`
+	IsDoneColumn bool      `json:"is_done_column"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
