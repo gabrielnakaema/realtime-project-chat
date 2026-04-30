@@ -9,11 +9,9 @@ import {
   updateTaskInColumn,
 } from './task-cache-helpers';
 import type { SocketEvent } from '@/types/websocket';
-import type { TaskStatus } from '@/types/task';
 import { taskQueryKeys } from '@/services/query-keys';
-import { TASK_STATUSES } from '@/constants/tasks';
 
-export const useRealtimeTaskSync = (projectId: string) => {
+export const useRealtimeTaskSync = (projectId: string, projectColumnIds: string[]) => {
   const queryClient = useQueryClient();
   const { status, subscribe } = useSocket();
   const connectedOnce = useRef(false);
@@ -21,28 +19,28 @@ export const useRealtimeTaskSync = (projectId: string) => {
   const handleSocketEvent = useEffectEvent((event: SocketEvent) => {
     if (event.type === 'task_created') {
       const task = event.data;
-      insertTaskAtCorrectPosition(queryClient, projectId, 'pending', task);
-      adjustCountCache(queryClient, projectId, { pending: 1 });
+      insertTaskAtCorrectPosition(queryClient, projectId, task.project_column_id, task);
+      adjustCountCache(queryClient, projectId, projectColumnIds, { [task.project_column_id]: 1 });
       return;
     }
 
     if (event.type === 'task_updated') {
-      const { task, previous_status } = event.data;
-      const nextStatus = task.status;
+      const { task, previous_project_column_id } = event.data;
+      const nextColumn = task.project_column_id;
 
-      if (!previous_status) {
-        updateTaskInColumn(queryClient, projectId, nextStatus, task);
+      if (!previous_project_column_id) {
+        updateTaskInColumn(queryClient, projectId, nextColumn, task);
         return;
       }
 
-      const prevStatus = previous_status as TaskStatus;
-      removeTaskFromColumn(queryClient, projectId, prevStatus, task.id);
+      const prevColumn = previous_project_column_id;
+      removeTaskFromColumn(queryClient, projectId, prevColumn, task.id);
 
-      if (nextStatus === 'archived') {
-        adjustCountCache(queryClient, projectId, { [prevStatus]: -1 });
+      if (task.archived_at) {
+        adjustCountCache(queryClient, projectId, projectColumnIds, { [prevColumn]: -1 });
       } else {
-        insertTaskAtCorrectPosition(queryClient, projectId, nextStatus, task);
-        adjustCountCache(queryClient, projectId, { [prevStatus]: -1, [nextStatus]: 1 });
+        insertTaskAtCorrectPosition(queryClient, projectId, nextColumn, task);
+        adjustCountCache(queryClient, projectId, projectColumnIds, { [prevColumn]: -1, [nextColumn]: 1 });
       }
     }
   });
@@ -56,13 +54,13 @@ export const useRealtimeTaskSync = (projectId: string) => {
   useEffect(() => {
     if (status !== 'connected') return;
     if (connectedOnce.current) {
-      for (const s of TASK_STATUSES) {
+      for (const s of projectColumnIds) {
         queryClient.invalidateQueries({ queryKey: buildColumnQueryKey(projectId, s) });
       }
       queryClient.invalidateQueries({
-        queryKey: taskQueryKeys.countByStatus(projectId, [...TASK_STATUSES]),
+        queryKey: taskQueryKeys.countByColumn(projectId, projectColumnIds),
       });
     }
     connectedOnce.current = true;
-  }, [status, projectId, queryClient]);
+  }, [status, projectId, projectColumnIds, queryClient]);
 };

@@ -37,12 +37,16 @@ interface UpdateProjectRequest {
   id: string;
   name: string;
   description: string;
+  columns: IProjectForm['columns'];
+  deleted_columns: IProjectForm['deleted_columns'];
 }
 
 export const updateProject = async (request: UpdateProjectRequest) => {
   const payload = {
     name: request.name,
     description: request.description,
+    columns: request.columns,
+    deleted_columns: request.deleted_columns,
   };
 
   const response = await api.put(`projects/${request.id}`, {

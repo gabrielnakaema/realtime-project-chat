@@ -1,6 +1,7 @@
 import { TaskBadge } from './task-badge';
 import type { TaskBadgeColor } from './task-badge';
 import type { TaskStatus } from '@/types/task';
+import { buildProjectColumnSurface } from '@/lib/project-column-colors';
 
 const statusToColor: Record<TaskStatus, TaskBadgeColor> = {
   pending: 'slate',
@@ -16,6 +17,31 @@ const statusLabelText: Record<TaskStatus, string> = {
   archived: 'Archived',
 };
 
-export const TaskStatusBadge = ({ status }: { status: TaskStatus }) => {
-  return <TaskBadge color={statusToColor[status]}>{statusLabelText[status]}</TaskBadge>;
+export const TaskStatusBadge = ({
+  status,
+  label,
+  color,
+}: {
+  status: TaskStatus;
+  label?: string;
+  color?: string | null;
+}) => {
+  if (color && label) {
+    const surface = buildProjectColumnSurface(color);
+
+    return (
+      <TaskBadge
+        color="slate"
+        style={{
+          backgroundColor: surface.badgeBackground,
+          borderColor: surface.borderColor,
+          color: surface.accentColor,
+        }}
+      >
+        {label}
+      </TaskBadge>
+    );
+  }
+
+  return <TaskBadge color={statusToColor[status]}>{label || statusLabelText[status] || status}</TaskBadge>;
 };

@@ -22,7 +22,7 @@ export const TaskDataGrid = ({ task }: TaskDataGridProps) => {
       <div className={infoFieldClassNames}>
         <CircleCheck className={infoIconClassNames} />
         <p className={infoTitleClassNames}>Status</p>
-        <TaskStatusBadge status={task.status} />
+        <TaskStatusBadge status={task.status} label={task.project_column?.name} color={task.project_column?.color} />
       </div>
 
       <div className={infoFieldClassNames}>

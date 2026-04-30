@@ -9,7 +9,7 @@ interface TaskActivityTimelineProps {
   updates: TaskUpdate[];
 }
 
-export const TaskActivityTimeline = ({ updates }: TaskActivityTimelineProps) => {
+export const TaskActivityTimeline = ({ updates = [] }: TaskActivityTimelineProps) => {
   const [open, setOpen] = useState(false);
 
   return (

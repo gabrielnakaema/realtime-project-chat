@@ -1,30 +1,31 @@
 import { parse } from 'date-fns';
 import { api } from './api';
-import type { ListTasksRequest, ListUserDueTasksRequest, Task, TaskComment, TaskStatus } from '@/types/task';
+import type { ListTasksRequest, ListUserDueTasksRequest, Task, TaskComment } from '@/types/task';
 import type { ITaskForm } from '@/schemas/task-schema';
 import type { CursorPaginated, Paginated } from '@/types/paginated';
 
-export const countTasksByStatus = async (projectId: string, statuses: TaskStatus[]) => {
+export const countTasksByColumn = async (projectId: string, projectColumnIds: string[]) => {
   const searchParams = new URLSearchParams();
   searchParams.set('project_id', projectId);
-  if (statuses.length > 0) {
-    searchParams.set('statuses', statuses.join(','));
+  if (projectColumnIds.length > 0) {
+    searchParams.set('project_column_ids', projectColumnIds.join(','));
   }
 
-  const response = await api.get('tasks/count-by-status', {
+  const response = await api.get('tasks/count-by-column', {
     searchParams,
   });
 
-  const json = await response.json<Record<TaskStatus, number>>();
+  const json = await response.json<Record<string, number>>();
   return json;
 };
 
 export const listGroupedTasksByProjectId = async (request: ListTasksRequest) => {
   const searchParams = new URLSearchParams();
   searchParams.set('project_id', request.projectId);
-  if (request.statuses.length > 0) {
-    searchParams.set('statuses', request.statuses.join(','));
+  if (request.projectColumnIds.length > 0) {
+    searchParams.set('project_column_ids', request.projectColumnIds.join(','));
   }
+  searchParams.set('archived', String(request.archived));
   if (request.taskOrder) {
     searchParams.set('task_order', request.taskOrder);
   }
@@ -37,20 +38,21 @@ export const listGroupedTasksByProjectId = async (request: ListTasksRequest) => 
     searchParams.set('updated_at', request.updatedAt);
   }
 
-  const response = await api.get('tasks/group-by-status', {
+  const response = await api.get('tasks/group-by-column', {
     searchParams,
   });
 
-  const json = await response.json<Record<TaskStatus, CursorPaginated<Task>>>();
+  const json = await response.json<Record<string, CursorPaginated<Task>>>();
   return json;
 };
 
 export const listTasksByProjectId = async (request: ListTasksRequest) => {
   const searchParams = new URLSearchParams();
   searchParams.set('project_id', request.projectId);
-  if (request.statuses.length > 0) {
-    searchParams.set('statuses', request.statuses.join(','));
+  if (request.projectColumnIds.length > 0) {
+    searchParams.set('project_column_ids', request.projectColumnIds.join(','));
   }
+  searchParams.set('archived', String(request.archived));
   if (request.taskOrder) {
     searchParams.set('task_order', request.taskOrder);
   }
@@ -93,6 +95,7 @@ export const createTask = async (request: CreateTaskRequest) => {
 
   const payload = {
     project_id: request.projectId,
+    project_column_id: request.form.project_column_id,
     title: request.form.title,
     description: request.form.description,
     priority: request.form.priority,
@@ -113,28 +116,24 @@ interface UpdateTaskRequest {
   id: string;
   title: string;
   description: string;
-  status: string;
+  project_column_id: string;
 
   priority: string;
   due_date: string | null;
   responsible_id: string | null;
-  done_at: string | null;
   tags: string[];
 }
 
 export const updateTask = async (request: UpdateTaskRequest) => {
   const formattedDueDate = formatDateForApi(request.due_date);
 
-  const formattedDoneAt = formatDateForApi(request.done_at);
-
   const payload = {
     title: request.title,
     description: request.description,
-    status: request.status,
+    project_column_id: request.project_column_id,
     priority: request.priority,
     due_date: formattedDueDate,
     responsible_id: request.responsible_id || null,
-    done_at: formattedDoneAt,
     tags: request.tags,
   };
 
@@ -208,7 +207,8 @@ export const createTaskComment = async (request: CreateTaskCommentRequest) => {
 interface MoveTaskRequest {
   taskId: string;
   projectId: string;
-  status: TaskStatus;
+  projectColumnId: string;
+  projectColumnIds: string[];
   afterTaskId: string | null;
 }
 
@@ -216,7 +216,7 @@ export const moveTask = async (request: MoveTaskRequest) => {
   const payload = {
     after_task_id: request.afterTaskId,
     project_id: request.projectId,
-    status: request.status,
+    project_column_id: request.projectColumnId,
   };
 
   const response = await api.patch(`tasks/${request.taskId}/move`, {

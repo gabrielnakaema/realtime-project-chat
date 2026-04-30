@@ -1,13 +1,12 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import type { TaskStatus } from '@/types/task';
 import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { taskQueryKeys } from '@/services/query-keys';
 import { listGroupedTasksByProjectId } from '@/services/tasks';
 
 interface UseBoardColumnTasksProps {
   projectId: string;
-  status: TaskStatus;
+  columnId: string;
   limit: number;
 }
 
@@ -16,11 +15,12 @@ interface PageParam {
   updatedAt: null | string;
 }
 
-export const useBoardColumnTasks = ({ projectId, status, limit }: UseBoardColumnTasksProps) => {
+export const useBoardColumnTasks = ({ projectId, columnId, limit }: UseBoardColumnTasksProps) => {
   const infiniteQueryResult = useInfiniteQuery({
     queryKey: taskQueryKeys.listGroupedByProjectId({
       projectId,
-      statuses: [status],
+      projectColumnIds: [columnId],
+      archived: false,
       limit,
       taskOrder: '',
       updatedAt: null,
@@ -28,18 +28,19 @@ export const useBoardColumnTasks = ({ projectId, status, limit }: UseBoardColumn
     queryFn: ({ pageParam }) => {
       return listGroupedTasksByProjectId({
         projectId,
-        statuses: [status],
+        projectColumnIds: [columnId],
+        archived: false,
         taskOrder: pageParam.taskOrder,
         updatedAt: pageParam.updatedAt,
         limit,
       });
     },
     getNextPageParam: (lastPage) => {
-      if (!lastPage[status].has_next) {
+      if (!lastPage[columnId].has_next) {
         return undefined;
       }
 
-      const lastTask = lastPage[status].data[lastPage[status].data.length - 1];
+      const lastTask = lastPage[columnId].data[lastPage[columnId].data.length - 1];
 
       return {
         taskOrder: lastTask.order,
@@ -54,8 +55,8 @@ export const useBoardColumnTasks = ({ projectId, status, limit }: UseBoardColumn
   const { fetchNextPage } = infiniteQueryResult;
 
   const columnTasks = useMemo(() => {
-    return infiniteQueryResult.data?.pages.flatMap((page) => page[status].data) ?? [];
-  }, [infiniteQueryResult.data, status]);
+    return infiniteQueryResult.data?.pages.flatMap((page) => page[columnId].data) ?? [];
+  }, [infiniteQueryResult.data, columnId]);
 
   const sentinelRef = useInfiniteScrollObserver<HTMLDivElement>({
     onLoadMore: fetchNextPage,

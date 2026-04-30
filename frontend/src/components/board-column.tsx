@@ -11,6 +11,7 @@ import type {
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import type { Column } from '@/types/board';
 import { cn } from '@/lib/utils';
+import { buildProjectColumnSurface } from '@/lib/project-column-colors';
 import { useMoveTask } from '@/hooks/use-move-task';
 import { useBoardColumnTasks } from '@/hooks/use-board-column-tasks';
 import { DEFAULT_TASK_LIMIT } from '@/constants/tasks';
@@ -28,7 +29,7 @@ export const BoardColumn = ({ column, onTaskClick }: BoardColumnProps) => {
 
   const { columnTasks: tasks, sentinelRef } = useBoardColumnTasks({
     projectId: column.project_id,
-    status: column.status,
+    columnId: column.columnId,
     limit: DEFAULT_TASK_LIMIT,
   });
 
@@ -44,7 +45,8 @@ export const BoardColumn = ({ column, onTaskClick }: BoardColumnProps) => {
         mutation.mutate({
           afterTaskId: tasksLength > 0 ? tasks[tasksLength - 1].id : null,
           projectId: column.project_id,
-          status: column.status,
+          projectColumnId: column.columnId,
+          projectColumnIds: [column.columnId],
           taskId: sourceTaskId,
         });
       }
@@ -75,7 +77,8 @@ export const BoardColumn = ({ column, onTaskClick }: BoardColumnProps) => {
         mutation.mutate({
           afterTaskId: task.id,
           projectId: task.project_id,
-          status: task.status,
+          projectColumnId: task.project_column_id,
+          projectColumnIds: [task.project_column_id, column.columnId],
           taskId: droppedTaskId,
         });
       }
@@ -86,14 +89,16 @@ export const BoardColumn = ({ column, onTaskClick }: BoardColumnProps) => {
           mutation.mutate({
             afterTaskId: task.id,
             projectId: task.project_id,
-            status: task.status,
+            projectColumnId: task.project_column_id,
+            projectColumnIds: [task.project_column_id, column.columnId],
             taskId: droppedTaskId,
           });
         } else {
           mutation.mutate({
             afterTaskId: null,
             projectId: column.project_id,
-            status: column.status,
+            projectColumnId: column.columnId,
+            projectColumnIds: [column.columnId],
             taskId: droppedTaskId,
           });
         }
@@ -102,16 +107,33 @@ export const BoardColumn = ({ column, onTaskClick }: BoardColumnProps) => {
     [column, mutation, tasks],
   );
 
+  const surface = buildProjectColumnSurface(column.color);
+
   return (
-    <div key={column.id} className={cn(column.color, 'flex flex-col overflow-auto rounded-lg p-4')} ref={columnRef}>
+    <div
+      key={column.id}
+      className={cn('flex flex-col overflow-auto rounded-2xl border p-4 shadow-sm')}
+      style={{ backgroundColor: surface.backgroundColor, borderColor: surface.borderColor }}
+      ref={columnRef}
+    >
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-slate-900 dark:text-slate-100">{column.title}</h3>
-          <span className="inline-flex items-center rounded-full bg-slate-200 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+          <span
+            className="inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium"
+            style={{
+              backgroundColor: surface.badgeBackground,
+              borderColor: surface.borderColor,
+              color: surface.accentColor,
+            }}
+          >
             {column.total}
           </span>
         </div>
-        <button className="rounded p-1 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+        <button
+          className="rounded p-1 text-slate-500 transition-colors hover:text-slate-700 dark:hover:text-slate-300"
+          style={{ color: surface.accentColor }}
+        >
           <MoreHorizontal className="h-4 w-4" />
         </button>
       </div>

@@ -33,7 +33,7 @@ export type TaskUpdatedEvent = {
   room_id: string;
   data: {
     task: Task;
-    previous_status?: string;
+    previous_project_column_id?: string;
   };
 };
 

@@ -16,7 +16,7 @@ import {
 } from '../ui/dialog';
 import { TaskFormFields } from './task-form-fields';
 import type { SubmitHandler } from 'react-hook-form';
-import type { Member } from '@/types/project';
+import type { Member, ProjectColumn } from '@/types/project';
 import type { ITaskForm } from '@/schemas/task-schema';
 import { handleSuccess } from '@/utils/handle-success';
 import { createTask } from '@/services/tasks';
@@ -26,9 +26,10 @@ import { taskSchema } from '@/schemas/task-schema';
 interface CreateTaskModalProps {
   projectId: string;
   projectMembers: Member[];
+  projectColumns: ProjectColumn[];
 }
 
-export const CreateTask = ({ projectId, projectMembers }: CreateTaskModalProps) => {
+export const CreateTask = ({ projectId, projectMembers, projectColumns }: CreateTaskModalProps) => {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -46,6 +47,9 @@ export const CreateTask = ({ projectId, projectMembers }: CreateTaskModalProps) 
     setValue,
   } = useForm<ITaskForm>({
     resolver: zodResolver(taskSchema),
+    defaultValues: {
+      project_column_id: projectColumns[0]?.id,
+    },
   });
 
   const { mutate, isPending } = useMutation({
@@ -80,6 +84,7 @@ export const CreateTask = ({ projectId, projectMembers }: CreateTaskModalProps) 
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex w-full flex-col gap-4">
+          <input type="hidden" value={projectColumns[0]?.id} {...register('project_column_id')} />
           <TaskFormFields
             control={control}
             register={register}

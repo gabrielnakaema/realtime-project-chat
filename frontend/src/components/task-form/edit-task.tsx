@@ -86,8 +86,7 @@ function useEditTaskForm(taskId: string, open: boolean, onOpenChange: (open: boo
       due_date: data.due_date ?? null,
       responsible_id: data.responsible_id ?? null,
       tags: parseUniqueTags(data.tags),
-      done_at: null,
-      status: task?.status ?? 'pending',
+      project_column_id: task?.project_column_id ?? '',
     });
   };
 

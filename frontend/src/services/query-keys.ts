@@ -1,4 +1,4 @@
-import type { ListTasksRequest, TaskStatus } from '@/types/task';
+import type { ListTasksRequest } from '@/types/task';
 import type { SearchTasksForUserRequest } from './tasks';
 
 export const userQueryKeys = {
@@ -21,7 +21,7 @@ export const taskQueryKeys = {
   comments: (taskId: string) => ['tasks', 'comments', taskId],
   list: (request: ListTasksRequest) => ['tasks', 'list', request],
   listGroupedByProjectId: (request: ListTasksRequest) => ['tasks', 'list', 'grouped', request],
-  countByStatus: (projectId: string, statuses: TaskStatus[]) => ['tasks', 'count', { projectId, statuses }],
+  countByColumn: (projectId: string, projectColumnIds: string[]) => ['tasks', 'count', { projectId, projectColumnIds }],
   listUserDueTasks: ['tasks', 'list', 'user'],
   search: (request: SearchTasksForUserRequest) => ['tasks', 'search', request],
 

@@ -6,7 +6,7 @@ import { TaskPriorityBadge } from './task-priority-badge';
 import { EditTask } from './task-form/edit-task';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
-import type { Task, TaskStatus } from '@/types/task';
+import type { Task } from '@/types/task';
 import type { Project } from '@/types/project';
 import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { ProjectMemberRole } from '@/types/project';
@@ -14,27 +14,6 @@ import { listGroupedTasksByProjectId, updateTask } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
 import { useAuth } from '@/hooks/use-auth';
 import { DEFAULT_TASK_LIMIT } from '@/constants/tasks';
-
-const RESTORE_STATUSES: { status: TaskStatus; label: string; className: string }[] = [
-  {
-    status: 'pending',
-    label: 'Pending',
-    className:
-      'border-slate-400 bg-slate-500/10 text-slate-600 hover:bg-slate-500/20 dark:border-slate-500 dark:text-slate-300',
-  },
-  {
-    status: 'doing',
-    label: 'Doing',
-    className:
-      'border-blue-500 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 dark:border-blue-400 dark:text-blue-400',
-  },
-  {
-    status: 'done',
-    label: 'Done',
-    className:
-      'border-green-500 bg-green-500/10 text-green-600 hover:bg-green-500/20 dark:border-green-400 dark:text-green-400',
-  },
-];
 
 interface ArchivedTasksModalProps {
   project: Project;
@@ -56,16 +35,15 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
     isPending: isRestoring,
     variables: restoreVariables,
   } = useMutation({
-    mutationFn: ({ task, status }: { task: Task; status: TaskStatus }) =>
+    mutationFn: ({ task, projectColumnId }: { task: Task; projectColumnId: string }) =>
       updateTask({
         id: task.id,
         title: task.title,
         description: task.description,
-        status,
+        project_column_id: projectColumnId,
         priority: task.priority,
         due_date: task.due_date,
         responsible_id: task.responsible_id,
-        done_at: status === 'done' ? new Date().toISOString() : null,
         tags: task.tags ?? [],
       }),
     onSuccess: () => {
@@ -73,7 +51,8 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
       queryClient.invalidateQueries({
         queryKey: taskQueryKeys.listGroupedByProjectId({
           projectId: project.id,
-          statuses: ['archived'],
+          projectColumnIds: [],
+          archived: true,
           limit: DEFAULT_TASK_LIMIT,
           taskOrder: '',
           updatedAt: null,
@@ -87,7 +66,8 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
   const { data, fetchNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: taskQueryKeys.listGroupedByProjectId({
       projectId: project.id,
-      statuses: ['archived'],
+      projectColumnIds: [],
+      archived: true,
       limit: DEFAULT_TASK_LIMIT,
       taskOrder: '',
       updatedAt: null,
@@ -95,13 +75,14 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
     queryFn: ({ pageParam }) =>
       listGroupedTasksByProjectId({
         projectId: project.id,
-        statuses: ['archived'],
+        projectColumnIds: [],
+        archived: true,
         taskOrder: pageParam.taskOrder,
         updatedAt: pageParam.updatedAt,
         limit: DEFAULT_TASK_LIMIT,
       }),
     getNextPageParam: (lastPage) => {
-      const page = lastPage['archived'];
+      const page = Object.values(lastPage)[0];
       if (!page.has_next) return undefined;
       const lastTask = page.data[page.data.length - 1];
       return { taskOrder: lastTask.order, updatedAt: lastTask.updated_at };
@@ -110,7 +91,10 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
     enabled: open,
   });
 
-  const archivedTasks = useMemo(() => data?.pages.flatMap((page) => page['archived'].data) ?? [], [data]);
+  const archivedTasks = useMemo(
+    () => data?.pages.flatMap((page) => Object.values(page).flatMap((column) => column.data)) ?? [],
+    [data],
+  );
 
   const sentinelRef = useInfiniteScrollObserver<HTMLDivElement>({
     onLoadMore: fetchNextPage,
@@ -163,15 +147,15 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
 
                       {isPicking ? (
                         <div className="flex shrink-0 items-center gap-1">
-                          {RESTORE_STATUSES.map(({ status, label, className }) => (
+                          {project.columns.map((column) => (
                             <button
-                              key={status}
+                              key={column.id}
                               type="button"
                               disabled={isRestoringThis}
-                              onClick={() => restore({ task, status })}
-                              className={`rounded border px-2 py-0.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+                              onClick={() => restore({ task, projectColumnId: column.id! })}
+                              className="rounded border px-2 py-0.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              {isRestoringThis && restoreVariables.status === status ? '...' : label}
+                              {isRestoringThis && restoreVariables.projectColumnId === column.id ? '...' : column.name}
                             </button>
                           ))}
                           <button

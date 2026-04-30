@@ -31,7 +31,12 @@ export const TaskCard = ({ task, onDrop, onTaskClick }: TaskCardProps) => {
     return combine(
       draggable({
         element: el,
-        getInitialData: () => ({ type: 'task', taskId: task.id, status: task.status, title: task.title }),
+        getInitialData: () => ({
+          type: 'task',
+          taskId: task.id,
+          projectColumnId: task.project_column_id,
+          title: task.title,
+        }),
         onDragStart: () => setIsDragging(true),
         onDrop: () => setIsDragging(false),
       }),
@@ -39,7 +44,7 @@ export const TaskCard = ({ task, onDrop, onTaskClick }: TaskCardProps) => {
         element: el,
         canDrop: () => true,
         getData: ({ input, element }) => {
-          const data = { type: 'task', taskId: task.id, status: task.status, title: task.title };
+          const data = { type: 'task', taskId: task.id, projectColumnId: task.project_column_id, title: task.title };
           return attachClosestEdge(data, {
             input,
             element,

@@ -6,6 +6,8 @@ export type TaskBadgeColor = 'blue' | 'green' | 'yellow' | 'red' | 'slate';
 interface TaskBadgeProps {
   children: React.ReactNode;
   color: TaskBadgeColor;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
 const colorsClassNames: Record<string, string> = {
@@ -29,9 +31,12 @@ export const statusToColor: Record<TaskStatus, TaskBadgeColor> = {
   archived: 'red',
 };
 
-export const TaskBadge = ({ children, color }: TaskBadgeProps) => {
+export const TaskBadge = ({ children, color, className, style }: TaskBadgeProps) => {
   return (
-    <div className={cn('w-fit rounded-md border px-2 py-0.5 text-xs font-medium', colorsClassNames[color])}>
+    <div
+      className={cn('w-fit rounded-md border px-2 py-0.5 text-xs font-medium', colorsClassNames[color], className)}
+      style={style}
+    >
       {children}
     </div>
   );

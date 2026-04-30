@@ -8,6 +8,18 @@ export interface Project {
   created_at: string;
   updated_at: string;
   members: Member[];
+  columns: ProjectColumn[];
+}
+
+export interface ProjectColumn {
+  id?: string;
+  project_id?: string;
+  name: string;
+  color: string;
+  position: number;
+  is_done_column: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Member {

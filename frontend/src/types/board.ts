@@ -1,5 +1,3 @@
-import type { TaskStatus } from './task';
-
 export interface Board {
   columns: Column;
 }
@@ -9,6 +7,7 @@ export interface Column {
   project_id: string;
   title: string;
   color: string;
-  status: TaskStatus;
+  columnId: string;
+  isDoneColumn: boolean;
   total: number;
 }

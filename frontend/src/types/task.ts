@@ -1,7 +1,7 @@
-import type { Project } from './project';
+import type { Project, ProjectColumn } from './project';
 import type { User } from './user';
 
-export type TaskStatus = 'pending' | 'doing' | 'done' | 'archived';
+export type TaskStatus = string;
 
 export type TaskPriority = 'low' | 'medium' | 'high';
 
@@ -11,6 +11,8 @@ export interface Task {
   title: string;
   description: string;
   status: TaskStatus;
+  project_column_id: string;
+  project_column: ProjectColumn | null;
   created_at: string;
   updated_at: string;
   priority: TaskPriority;
@@ -18,6 +20,7 @@ export interface Task {
   responsible_id: string | null;
   due_date: string | null;
   done_at: string | null;
+  archived_at: string | null;
   tags: string[] | null;
   author_id: string;
   author: User;
@@ -64,7 +67,8 @@ export interface TaskChange {
 
 export interface ListTasksRequest {
   projectId: string;
-  statuses: string[];
+  projectColumnIds: string[];
+  archived: boolean;
   taskOrder: string;
   updatedAt: null | string;
   limit: number;

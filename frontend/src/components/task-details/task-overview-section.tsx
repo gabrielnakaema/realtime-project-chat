@@ -14,7 +14,7 @@ export const TaskOverviewSection = ({ task }: TaskOverviewSectionProps) => {
         <h3 className="text-xs font-semibold tracking-[0.16em] text-slate-500 uppercase dark:text-slate-400">
           Overview
         </h3>
-        <TaskStatusBadge status={task.status} />
+        <TaskStatusBadge status={task.status} label={task.project_column?.name} color={task.project_column?.color} />
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5 dark:border-slate-700 dark:bg-slate-900/40">

@@ -27,7 +27,17 @@ export const TaskSearchResults = ({ query }: TaskSearchResultsProps) => {
             {isLoading && <TaskSearchSkeleton />}
 
             {tasks.map((task) => (
-              <TaskLinkRow key={task.id} task={task} trailingContent={<TaskStatusBadge status={task.status} />} />
+              <TaskLinkRow
+                key={task.id}
+                task={task}
+                trailingContent={
+                  <TaskStatusBadge
+                    status={task.status}
+                    label={task.project_column?.name}
+                    color={task.project_column?.color}
+                  />
+                }
+              />
             ))}
 
             {isFetchingNextPage && (

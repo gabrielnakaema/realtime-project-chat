@@ -2,13 +2,13 @@ import { ArrowRight } from 'lucide-react';
 import { Avatar } from '../avatar';
 import { TaskPriorityBadge } from '../task-priority-badge';
 import { TaskStatusBadge } from '../task-status-badge';
-import type { TaskChange, TaskPriority, TaskStatus, TaskUpdate } from '@/types/task';
+import type { TaskChange, TaskPriority, TaskUpdate } from '@/types/task';
 import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
 
 const fieldLabels: Record<string, string> = {
   title: 'Title',
   description: 'Description',
-  status: 'Status',
+  column: 'Column',
   priority: 'Priority',
   responsible_id: 'Responsible',
   due_date: 'Due date',
@@ -87,15 +87,16 @@ const UpdateSummary = ({ update }: { update: TaskUpdate }) => {
     );
   }
 
-  const isStatusOnly =
+  const isColumnOnly =
     changes.length === 1 &&
-    changes[0].field === 'status' &&
-    (update.update_type === 'status' || update.update_type === 'updated');
+    changes[0].field === 'column' &&
+    (update.update_type === 'column' || update.update_type === 'updated');
 
-  if (isStatusOnly) {
+  if (isColumnOnly) {
     return (
       <p className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
-        <Actor name={update.user.name} /> moved to <TaskStatusBadge status={changes[0].new_value as TaskStatus} />
+        <Actor name={update.user.name} /> moved to{' '}
+        <TaskStatusBadge status={changes[0].new_value} label={changes[0].new_display_value ?? changes[0].new_value} />
       </p>
     );
   }
@@ -128,7 +129,7 @@ const UpdateChanges = ({ update }: { update: TaskUpdate }) => {
   const skipTypes = new Set(['created', 'assigned', 'unassigned', 'done']);
   if (skipTypes.has(update.update_type)) return null;
 
-  if (changes.length === 1 && (changes[0].field === 'status' || changes[0].field === 'priority')) return null;
+  if (changes.length === 1 && (changes[0].field === 'column' || changes[0].field === 'priority')) return null;
 
   return (
     <div className="mt-1.5 flex flex-col gap-1.5">
@@ -140,13 +141,13 @@ const UpdateChanges = ({ update }: { update: TaskUpdate }) => {
 };
 
 const ChangeRow = ({ change }: { change: TaskChange }) => {
-  if (change.field === 'status') {
+  if (change.field === 'column') {
     return (
       <div className="flex items-center gap-1.5">
-        <span className="w-20 shrink-0 text-xs text-slate-400 dark:text-slate-500">{fieldLabels.status}</span>
-        <TaskStatusBadge status={change.old_value as TaskStatus} />
+        <span className="w-20 shrink-0 text-xs text-slate-400 dark:text-slate-500">{fieldLabels.column}</span>
+        <TaskStatusBadge status={change.old_value} label={change.old_display_value ?? change.old_value} />
         <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
-        <TaskStatusBadge status={change.new_value as TaskStatus} />
+        <TaskStatusBadge status={change.new_value} label={change.new_display_value ?? change.new_value} />
       </div>
     );
   }

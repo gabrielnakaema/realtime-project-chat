@@ -3,6 +3,7 @@ import { z } from 'zod';
 export type ITaskForm = z.infer<typeof taskSchema>;
 
 export const taskSchema = z.object({
+  project_column_id: z.string().optional(),
   title: z
     .string({
       error: 'Title is required',
