@@ -22,11 +22,14 @@ func TestTaskService_Move(t *testing.T) {
 
 	taskA := domain.Task{Id: taskIdA, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Order: "500000000000"}
 	taskB := domain.Task{Id: taskIdB, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Order: "750000000000"}
+	taskWithDuplicateOrder := domain.Task{Id: taskIdB, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Order: taskA.Order}
+	movedTaskBetweenAAndB := domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Order: "625000000000", Status: domain.TaskStatusPending}
 
 	topOrder := mustMoveOrder(t, "", "")
 	beforeFirstOrder := mustMoveOrder(t, "", taskA.Order)
 	betweenOrder := mustMoveOrder(t, taskA.Order, taskB.Order)
 	afterLastOrder := mustMoveOrder(t, taskB.Order, "")
+	afterDuplicateOrder := mustMoveOrder(t, taskA.Order, "")
 
 	type testCase struct {
 		name          string
@@ -113,6 +116,47 @@ func TestTaskService_Move(t *testing.T) {
 				}), validUserId).Return(&domain.Task{Order: afterLastOrder}, nil)
 			},
 			expectedOrder: afterLastOrder,
+			shouldSucceed: true,
+		},
+		{
+			name: "move after task A skips the moving task when it is returned as the next task",
+			request: service.MoveTaskRequest{
+				TaskId:          validTaskId,
+				ProjectId:       validProjectId,
+				RequestUserId:   validUserId,
+				AfterTaskId:     &taskIdA,
+				ProjectColumnId: pendingStatusID,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&movedTaskBetweenAAndB, nil)
+				repo.On("GetById", mock.Anything, taskIdA).Return(&taskA, nil)
+				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdA, validProjectId).Return(&movedTaskBetweenAAndB, nil)
+				repo.On("GetProjectTaskAfterId", mock.Anything, validTaskId, validProjectId).Return(&taskB, nil)
+				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
+					return t.Order == betweenOrder
+				}), validUserId).Return(&domain.Task{Order: betweenOrder}, nil)
+			},
+			expectedOrder: betweenOrder,
+			shouldSucceed: true,
+		},
+		{
+			name: "move after task A falls back to the end when the next task has the same order",
+			request: service.MoveTaskRequest{
+				TaskId:          validTaskId,
+				ProjectId:       validProjectId,
+				RequestUserId:   validUserId,
+				AfterTaskId:     &taskIdA,
+				ProjectColumnId: pendingStatusID,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Order: "250000000000", Status: domain.TaskStatusPending}, nil)
+				repo.On("GetById", mock.Anything, taskIdA).Return(&taskA, nil)
+				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdA, validProjectId).Return(&taskWithDuplicateOrder, nil)
+				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
+					return t.Order == afterDuplicateOrder
+				}), validUserId).Return(&domain.Task{Order: afterDuplicateOrder}, nil)
+			},
+			expectedOrder: afterDuplicateOrder,
 			shouldSucceed: true,
 		},
 	}

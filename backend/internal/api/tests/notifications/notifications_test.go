@@ -43,6 +43,7 @@ func TestNotificationEndpoints(t *testing.T) {
 		actorID := createUser(t, testAPI, "actor@example.com")
 		userID := getCurrentUserID(t, client)
 		projectID := uuid.New()
+		projectColumnID := uuid.New()
 		taskID := uuid.New()
 		notificationID := uuid.New()
 
@@ -59,9 +60,15 @@ func TestNotificationEndpoints(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = testAPI.DB.Exec(context.Background(), `
-			INSERT INTO tasks (id, project_id, title, description, status, author_id, priority, task_order)
-			VALUES ($1, $2, 'Task title', 'Task description', 'pending', $3, 'medium', '500000000000')
-		`, taskID, projectID, actorID)
+			INSERT INTO project_columns (id, project_id, name, color, position, is_done_column)
+			VALUES ($1, $2, 'Pending', '#64748B', 0, false)
+		`, projectColumnID, projectID)
+		require.NoError(t, err)
+
+		_, err = testAPI.DB.Exec(context.Background(), `
+			INSERT INTO tasks (id, project_id, title, description, project_column_id, author_id, priority, task_order)
+			VALUES ($1, $2, 'Task title', 'Task description', $3, $4, 'medium', '500000000000')
+		`, taskID, projectID, projectColumnID, actorID)
 		require.NoError(t, err)
 
 		_, err = testAPI.DB.Exec(context.Background(), `

@@ -11,6 +11,89 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func validProjectColumnsPayload() []map[string]any {
+	return []map[string]any{
+		{
+			"name":           "Pending",
+			"color":          "#64748B",
+			"is_done_column": false,
+		},
+		{
+			"name":           "Doing",
+			"color":          "#2563EB",
+			"is_done_column": false,
+		},
+		{
+			"name":           "Done",
+			"color":          "#059669",
+			"is_done_column": true,
+		},
+	}
+}
+
+func validProjectPayload(name string, description string) map[string]any {
+	return map[string]any{
+		"name":        name,
+		"description": description,
+		"columns":     validProjectColumnsPayload(),
+	}
+}
+
+func projectColumnsPayloadFromResponse(t *testing.T, rawColumns any) []map[string]any {
+	t.Helper()
+
+	columns, ok := rawColumns.([]interface{})
+	require.True(t, ok, "expected columns array in project response")
+
+	payload := make([]map[string]any, 0, len(columns))
+	for _, rawColumn := range columns {
+		column, ok := rawColumn.(map[string]interface{})
+		require.True(t, ok, "expected column object in project response")
+
+		payload = append(payload, map[string]any{
+			"id":             column["id"],
+			"name":           column["name"],
+			"color":          column["color"],
+			"is_done_column": column["is_done_column"],
+		})
+	}
+
+	return payload
+}
+
+func assertProjectColumnsContract(t *testing.T, rawColumns any, expectedProjectID string) {
+	t.Helper()
+
+	columns, ok := rawColumns.([]interface{})
+	require.True(t, ok, "expected columns array in project response")
+	require.Len(t, columns, 3)
+
+	expectedColumns := []struct {
+		name         string
+		color        string
+		position     float64
+		isDoneColumn bool
+	}{
+		{name: "Pending", color: "#64748B", position: 0, isDoneColumn: false},
+		{name: "Doing", color: "#2563EB", position: 1, isDoneColumn: false},
+		{name: "Done", color: "#059669", position: 2, isDoneColumn: true},
+	}
+
+	for i, rawColumn := range columns {
+		column, ok := rawColumn.(map[string]interface{})
+		require.True(t, ok, "expected column object in project response")
+
+		assert.Contains(t, column, "id")
+		assert.Equal(t, expectedProjectID, column["project_id"])
+		assert.Equal(t, expectedColumns[i].name, column["name"])
+		assert.Equal(t, expectedColumns[i].color, column["color"])
+		assert.Equal(t, expectedColumns[i].position, column["position"])
+		assert.Equal(t, expectedColumns[i].isDoneColumn, column["is_done_column"])
+		assert.Contains(t, column, "created_at")
+		assert.Contains(t, column, "updated_at")
+	}
+}
+
 func TestProjectsEndpoints(t *testing.T) {
 	testAPI, cleanup := shared.SetupTestAPI(t)
 	defer cleanup()
@@ -62,10 +145,7 @@ func TestProjectsEndpoints(t *testing.T) {
 
 		client.CreateUserAndLogin("test@example.com", "password123")
 
-		payload := map[string]string{
-			"name":        "Test Project",
-			"description": "Test Description",
-		}
+		payload := validProjectPayload("Test Project", "Test Description")
 
 		resp, err := client.POST("/projects", payload)
 		require.NoError(t, err)
@@ -83,6 +163,8 @@ func TestProjectsEndpoints(t *testing.T) {
 		assert.Contains(t, response, "created_at")
 		assert.Contains(t, response, "updated_at")
 		assert.Contains(t, response, "members")
+		assert.Contains(t, response, "columns")
+		assertProjectColumnsContract(t, response["columns"], response["id"].(string))
 	})
 
 	t.Run("POST /projects - create project with invalid fields", func(t *testing.T) {
@@ -93,48 +175,64 @@ func TestProjectsEndpoints(t *testing.T) {
 
 		type testCase struct {
 			name           string
-			payload        map[string]string
+			payload        map[string]any
 			expectedText   []string
 			expectedStatus int
 		}
 		tests := []testCase{
 			{
 				name: "missing description",
-				payload: map[string]string{
-					"name": "Test Project",
+				payload: map[string]any{
+					"name":    "Test Project",
+					"columns": validProjectColumnsPayload(),
 				},
 				expectedText:   []string{"description is required"},
 				expectedStatus: http.StatusUnprocessableEntity,
 			},
 			{
 				name: "missing name",
-				payload: map[string]string{
+				payload: map[string]any{
 					"description": "Test Description",
+					"columns":     validProjectColumnsPayload(),
 				},
 				expectedText:   []string{"name is required"},
 				expectedStatus: http.StatusUnprocessableEntity,
 			},
 			{
-				name:           "missing name and description",
-				payload:        map[string]string{},
+				name: "missing name and description",
+				payload: map[string]any{
+					"columns": validProjectColumnsPayload(),
+				},
 				expectedText:   []string{"name is required", "description is required"},
 				expectedStatus: http.StatusUnprocessableEntity,
-			}, {
+			},
+			{
 				name: "blank name",
-				payload: map[string]string{
+				payload: map[string]any{
 					"name":        "",
 					"description": "Test Description",
+					"columns":     validProjectColumnsPayload(),
 				},
 				expectedText:   []string{"name is required"},
 				expectedStatus: http.StatusUnprocessableEntity,
 			},
 			{
 				name: "blank description",
-				payload: map[string]string{
+				payload: map[string]any{
 					"name":        "a",
 					"description": "",
+					"columns":     validProjectColumnsPayload(),
 				},
 				expectedText:   []string{"description is required"},
+				expectedStatus: http.StatusUnprocessableEntity,
+			},
+			{
+				name: "missing columns",
+				payload: map[string]any{
+					"name":        "Test Project",
+					"description": "Test Description",
+				},
+				expectedText:   []string{"at least one column is required", "exactly one done column is required"},
 				expectedStatus: http.StatusUnprocessableEntity,
 			},
 		}
@@ -162,10 +260,7 @@ func TestProjectsEndpoints(t *testing.T) {
 		client := shared.NewHTTPClient(testAPI.GetBaseURL())
 		client.CreateUserAndLogin("test@example.com", "password123")
 
-		payload := map[string]string{
-			"name":        "Test Project",
-			"description": "Test Description",
-		}
+		payload := validProjectPayload("Test Project", "Test Description")
 		resp, err := client.POST("/projects", payload)
 		require.NoError(t, err)
 		defer resp.Body.Close()
@@ -188,6 +283,8 @@ func TestProjectsEndpoints(t *testing.T) {
 		assert.Contains(t, response[0], "created_at")
 		assert.Contains(t, response[0], "updated_at")
 		assert.Contains(t, response[0], "members")
+		assert.Contains(t, response[0], "columns")
+		assertProjectColumnsContract(t, response[0]["columns"], response[0]["id"].(string))
 	})
 
 	t.Run("GET /projects/{id} - get project", func(t *testing.T) {
@@ -196,10 +293,7 @@ func TestProjectsEndpoints(t *testing.T) {
 		client := shared.NewHTTPClient(testAPI.GetBaseURL())
 		client.CreateUserAndLogin("test@example.com", "password123")
 
-		payload := map[string]string{
-			"name":        "Test Project",
-			"description": "Test Description",
-		}
+		payload := validProjectPayload("Test Project", "Test Description")
 
 		resp, err := client.POST("/projects", payload)
 		require.NoError(t, err)
@@ -225,6 +319,8 @@ func TestProjectsEndpoints(t *testing.T) {
 		assert.Contains(t, getResponse, "created_at")
 		assert.Contains(t, getResponse, "updated_at")
 		assert.Contains(t, getResponse, "members")
+		assert.Contains(t, getResponse, "columns")
+		assertProjectColumnsContract(t, getResponse["columns"], getResponse["id"].(string))
 	})
 
 	t.Run("PUT /projects/{id} - update project", func(t *testing.T) {
@@ -233,10 +329,7 @@ func TestProjectsEndpoints(t *testing.T) {
 		client := shared.NewHTTPClient(testAPI.GetBaseURL())
 		client.CreateUserAndLogin("test@example.com", "password123")
 
-		payload := map[string]string{
-			"name":        "Test Project",
-			"description": "Test Description",
-		}
+		payload := validProjectPayload("Test Project", "Test Description")
 
 		resp, err := client.POST("/projects", payload)
 		require.NoError(t, err)
@@ -247,9 +340,10 @@ func TestProjectsEndpoints(t *testing.T) {
 		err = json.NewDecoder(resp.Body).Decode(&response)
 		require.NoError(t, err)
 
-		payload = map[string]string{
+		payload = map[string]any{
 			"name":        "Updated Project",
 			"description": "Updated Description",
+			"columns":     projectColumnsPayloadFromResponse(t, response["columns"]),
 		}
 
 		resp, err = client.PUT("/projects/"+response["id"].(string), payload)
@@ -267,6 +361,8 @@ func TestProjectsEndpoints(t *testing.T) {
 		assert.Contains(t, updateResponse, "created_at")
 		assert.Contains(t, updateResponse, "updated_at")
 		assert.Contains(t, updateResponse, "members")
+		assert.Contains(t, updateResponse, "columns")
+		assertProjectColumnsContract(t, updateResponse["columns"], updateResponse["id"].(string))
 	})
 
 	t.Run("POST /projects/{id}/members - create member", func(t *testing.T) {
@@ -276,10 +372,7 @@ func TestProjectsEndpoints(t *testing.T) {
 
 		client.CreateUserAndLogin("owner@example.com", "password123")
 
-		projectPayload := map[string]string{
-			"name":        "Test Project",
-			"description": "Test Description",
-		}
+		projectPayload := validProjectPayload("Test Project", "Test Description")
 
 		resp, err := client.POST("/projects", projectPayload)
 		require.NoError(t, err)
@@ -319,10 +412,7 @@ func TestProjectsEndpoints(t *testing.T) {
 		client := shared.NewHTTPClient(testAPI.GetBaseURL())
 		client.CreateUserAndLogin("owner@example.com", "password123")
 
-		projectPayload := map[string]string{
-			"name":        "Test Project",
-			"description": "Test Description",
-		}
+		projectPayload := validProjectPayload("Test Project", "Test Description")
 
 		resp, err := client.POST("/projects", projectPayload)
 		require.NoError(t, err)
@@ -388,10 +478,7 @@ func TestProjectsEndpoints(t *testing.T) {
 		client := shared.NewHTTPClient(testAPI.GetBaseURL())
 		client.CreateUserAndLogin("owner@example.com", "password123")
 
-		projectPayload := map[string]string{
-			"name":        "Test Project",
-			"description": "Test Description",
-		}
+		projectPayload := validProjectPayload("Test Project", "Test Description")
 
 		resp, err := client.POST("/projects", projectPayload)
 		require.NoError(t, err)

@@ -240,12 +240,17 @@ LIMIT 1;
 -- name: GetProjectTaskAfterId :one
 SELECT t.* 
 FROM tasks t
-WHERE t.task_order >= (SELECT task_order FROM tasks t2 WHERE t2.id = $1)
-  AND t.project_id = $2
-  AND t.project_column_id = (SELECT project_column_id FROM tasks t2 WHERE t2.id = $1)
-  AND t.id != $1
+JOIN tasks current ON current.id = $1
+WHERE t.project_id = $2
+  AND t.project_column_id = current.project_column_id
+  AND t.id != current.id
   AND t.archived_at IS NULL
-ORDER BY t.task_order ASC, t.updated_at DESC
+  AND (
+    t.task_order > current.task_order
+    OR (t.task_order = current.task_order AND t.updated_at < current.updated_at)
+    OR (t.task_order = current.task_order AND t.updated_at = current.updated_at AND t.id > current.id)
+  )
+ORDER BY t.task_order ASC, t.updated_at DESC, t.id ASC
 LIMIT 1;
 
 -- name: MoveTask :one

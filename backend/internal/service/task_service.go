@@ -656,6 +656,20 @@ func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskReque
 			}
 			return "", err
 		}
+
+		if firstTask.Id == request.TaskId {
+			nextTask, err := ts.taskRepository.GetProjectTaskAfterId(ctx, request.TaskId, request.ProjectId)
+			if err != nil {
+				var domainErr domain.DomainError
+				if errors.As(err, &domainErr) && domainErr.Code == domain.NotFoundErrorCode {
+					return fracindex.GenerateKeyBetween("", "")
+				}
+				return "", err
+			}
+
+			return fracindex.GenerateKeyBetween("", nextTask.Order)
+		}
+
 		return fracindex.GenerateKeyBetween("", firstTask.Order)
 	}
 
@@ -677,6 +691,23 @@ func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskReque
 			}
 		}
 		return "", err
+	}
+
+	if nextTask.Id == request.TaskId {
+		nextTask, err = ts.taskRepository.GetProjectTaskAfterId(ctx, request.TaskId, request.ProjectId)
+		if err != nil {
+			var domainErr domain.DomainError
+			if errors.As(err, &domainErr) {
+				if domainErr.Code == domain.NotFoundErrorCode {
+					return fracindex.GenerateKeyBetween(prevTask.Order, "")
+				}
+			}
+			return "", err
+		}
+	}
+
+	if nextTask.Order <= prevTask.Order {
+		return fracindex.GenerateKeyBetween(prevTask.Order, "")
 	}
 
 	return fracindex.GenerateKeyBetween(prevTask.Order, nextTask.Order)
