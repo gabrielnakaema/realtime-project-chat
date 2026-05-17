@@ -3,14 +3,14 @@ import { getAvatarColorClass, getChatAvatarSeed, getChatTitle } from './utils';
 import type { Chat } from '@/types/chat';
 import { cn } from '@/lib/utils';
 
-interface MessagesChatHeaderProps {
+interface ChatHeaderProps {
   chat?: Chat;
   currentUserId?: string;
   onBack: () => void;
   onClose: () => void;
 }
 
-export const MessagesChatHeader = ({ chat, currentUserId, onBack, onClose }: MessagesChatHeaderProps) => {
+export const ChatHeader = ({ chat, currentUserId, onBack, onClose }: ChatHeaderProps) => {
   const avatarSeed = chat ? getChatAvatarSeed(chat, currentUserId) : '';
 
   return (

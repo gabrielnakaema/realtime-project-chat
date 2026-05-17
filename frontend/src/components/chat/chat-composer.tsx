@@ -9,11 +9,11 @@ import { LoadingSpinner } from '@/components/loading';
 import { chatSchema } from '@/schemas/chat-schema';
 import { createMessage } from '@/services/chat';
 
-interface MessagesChatComposerProps {
+interface ChatComposerProps {
   chatId: string;
 }
 
-export const MessagesChatComposer = ({ chatId }: MessagesChatComposerProps) => {
+export const ChatComposer = ({ chatId }: ChatComposerProps) => {
   const { control, handleSubmit, reset } = useForm<IChatForm>({
     resolver: zodResolver(chatSchema),
     defaultValues: { content: '' },

@@ -5,13 +5,13 @@ import type { ChatMessage } from '@/types/chat';
 import { ChatMessageReadsSheet } from '@/components/chat-message-reads-sheet';
 import { cn } from '@/lib/utils';
 
-interface MessagesChatMessageItemProps {
+interface ChatMessageItemProps {
   message: ChatMessage;
   isCurrentUser: boolean;
   currentUserId?: string;
 }
 
-export const MessagesChatMessageItem = ({ message, isCurrentUser, currentUserId }: MessagesChatMessageItemProps) => {
+export const ChatMessageItem = ({ message, isCurrentUser, currentUserId }: ChatMessageItemProps) => {
   const [isReadsSheetOpen, setIsReadsSheetOpen] = useState(false);
   const authorName = message.member?.user?.name ?? '';
   const messageTime = formatTime(message.created_at);

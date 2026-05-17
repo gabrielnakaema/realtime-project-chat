@@ -1,21 +1,16 @@
 import { buildMessagesTimeline } from './chat-timeline';
-import { MessagesChatMessageItem } from './chat-message-item';
+import { ChatMessageItem } from './chat-message-item';
 import type { RefCallback, RefObject } from 'react';
 import type { ChatMessage } from '@/types/chat';
 
-interface MessagesChatMessageListProps {
+interface ChatMessageListProps {
   messages: ChatMessage[];
   currentUserId?: string;
   chatContainerRef: RefObject<HTMLDivElement | null>;
   observedRef: RefCallback<HTMLDivElement>;
 }
 
-export const MessagesChatMessageList = ({
-  messages,
-  currentUserId,
-  chatContainerRef,
-  observedRef,
-}: MessagesChatMessageListProps) => {
+export const ChatMessageList = ({ messages, currentUserId, chatContainerRef, observedRef }: ChatMessageListProps) => {
   const timeline = buildMessagesTimeline(messages, currentUserId);
 
   return (
@@ -34,7 +29,7 @@ export const MessagesChatMessageList = ({
           }
 
           return (
-            <MessagesChatMessageItem
+            <ChatMessageItem
               key={item.id}
               message={item.message}
               isCurrentUser={item.isCurrentUser}

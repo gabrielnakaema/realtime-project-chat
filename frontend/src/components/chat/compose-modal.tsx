@@ -3,7 +3,7 @@ import { getAvatarColorClass, isUserSelected } from './utils';
 import { useComposeChat } from '@/hooks/use-compose-chat';
 import { cn } from '@/lib/utils';
 
-export const MessagesComposeModal = () => {
+export const ComposeModal = () => {
   const { search, setSearch, selectedUserIds, filteredUsers, isPending, toggleUser, submit, closeCompose } =
     useComposeChat();
 

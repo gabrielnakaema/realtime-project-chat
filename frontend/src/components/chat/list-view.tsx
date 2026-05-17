@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { PencilLine, X } from 'lucide-react';
 import { UnreadCountBadge } from '../unread-count-badge';
-import { MessagesComposeModal } from './compose-modal';
+import { ComposeModal } from './compose-modal';
 import { getAvatarColorClass, getChatAvatarSeed, getChatSubtitle, getChatTitle } from './utils';
 import { useMessagesSheet } from '@/contexts/messages-sheet-context';
 import { useAuth } from '@/hooks/use-auth';
@@ -87,7 +87,7 @@ export const MessagesListView = () => {
         )}
       </div>
 
-      {view === 'compose' && <MessagesComposeModal />}
+      {view === 'compose' && <ComposeModal />}
     </>
   );
 };
