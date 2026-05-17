@@ -24,6 +24,7 @@ type taskService interface {
 	GroupByColumn(ctx context.Context, request service.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error)
 	CountByColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, requestUserId uuid.UUID) (map[string]int, error)
 	Archive(ctx context.Context, request service.ArchiveTaskRequest) (*domain.Task, error)
+	Restore(ctx context.Context, request service.RestoreTaskRequest) (*domain.Task, error)
 	ListUserDueTasks(ctx context.Context, request service.ListUserDueTasksRequest) (*utils.CursorPaginated[domain.Task], error)
 	SearchTasksForUser(ctx context.Context, request service.SearchTasksForUserRequest) (*utils.CursorPaginated[domain.Task], error)
 }
@@ -348,6 +349,49 @@ func (h *TaskHandler) Archive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	task, err := h.taskService.Archive(r.Context(), serviceRequest)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, task, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *TaskHandler) Restore(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	parsedId, err := uuid.Parse(id)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	var request RestoreTaskRequest
+	err = utils.ReadJSON(w, r, &request)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	v := validator.New()
+	request.Validate(v)
+	if !v.Valid() {
+		ValidationFailedResponse(w, v)
+		return
+	}
+
+	userId := UserIdFromContext(r.Context())
+
+	serviceRequest := service.RestoreTaskRequest{
+		TaskId:          parsedId,
+		ProjectColumnId: request.ProjectColumnId,
+		RequestUserId:   userId,
+	}
+
+	task, err := h.taskService.Restore(r.Context(), serviceRequest)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

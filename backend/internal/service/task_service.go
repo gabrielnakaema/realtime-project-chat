@@ -520,13 +520,96 @@ func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) 
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
-		PreviousProjectColumnID: nil,
+		PreviousProjectColumnID: &task.ProjectColumnId,
 	})
 	if err != nil {
 		return nil, domain.ServerError("failed to publish task archived event", err)
 	}
 
 	return &archivedTask, nil
+}
+
+type RestoreTaskRequest struct {
+	TaskId          uuid.UUID
+	ProjectColumnId uuid.UUID
+	RequestUserId   uuid.UUID
+}
+
+func (ts *TaskService) Restore(ctx context.Context, request RestoreTaskRequest) (*domain.Task, error) {
+	if request.RequestUserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	task, err := ts.taskRepository.GetById(ctx, request.TaskId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("task not found")
+			}
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to get task", err)
+	}
+
+	project, err := ts.projectRepository.GetById(ctx, task.ProjectId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("project not found")
+			}
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to get project", err)
+	}
+
+	if !project.IsMember(request.RequestUserId) {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	if task.ArchivedAt == nil {
+		return nil, domain.BusinessValidationError("task is not archived")
+	}
+
+	projectColumn, err := findProjectColumn(project, request.ProjectColumnId)
+	if err != nil {
+		return nil, err
+	}
+
+	restoredTask := *task
+	restoredTask.ProjectColumnId = request.ProjectColumnId
+	restoredTask.ProjectColumn = projectColumn
+	restoredTask.Status = domain.TaskStatus(strings.ToLower(projectColumn.Name))
+	restoredTask.ArchivedAt = nil
+	restoredTask.UpdatedAt = time.Now()
+	restoredTask.Updates = []domain.TaskUpdate{}
+
+	if projectColumn.IsDoneColumn {
+		now := time.Now()
+		restoredTask.DoneAt = &now
+	} else {
+		restoredTask.DoneAt = nil
+	}
+
+	err = ts.taskRepository.Update(ctx, &restoredTask)
+	if err != nil {
+		return nil, domain.ServerError("failed to restore task", err)
+	}
+
+	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
+		Task:         restoredTask,
+		PreviousTask: task,
+		User: domain.User{
+			Id: request.RequestUserId,
+		},
+		PreviousProjectColumnID: nil,
+	})
+	if err != nil {
+		return nil, domain.ServerError("failed to publish task restored event", err)
+	}
+
+	return &restoredTask, nil
 }
 
 type ListUserDueTasksRequest struct {

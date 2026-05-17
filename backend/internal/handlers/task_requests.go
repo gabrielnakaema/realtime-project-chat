@@ -73,3 +73,11 @@ func (r *MoveTaskRequest) Validate(v *validator.Validator) {
 	v.Check("project_id", "project_id is required", r.ProjectId != uuid.Nil)
 	v.Check("project_column_id", "project_column_id is required", r.ProjectColumnId != uuid.Nil)
 }
+
+type RestoreTaskRequest struct {
+	ProjectColumnId uuid.UUID `json:"project_column_id"`
+}
+
+func (r *RestoreTaskRequest) Validate(v *validator.Validator) {
+	v.Check("project_column_id", "project_column_id is required", r.ProjectColumnId != uuid.Nil)
+}

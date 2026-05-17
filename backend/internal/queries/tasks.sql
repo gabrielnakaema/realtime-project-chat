@@ -168,8 +168,8 @@ AND (
   OR t.project_column_id = ANY(sqlc.slice('project_column_ids')::uuid[])
 )
 AND (
-  sqlc.arg('archived')::boolean = true
-  OR t.archived_at IS NULL
+  (sqlc.arg('archived')::boolean = true AND t.archived_at IS NOT NULL)
+  OR (sqlc.arg('archived')::boolean = false AND t.archived_at IS NULL)
 )
 AND (
   sqlc.narg('cursor_updated_at')::timestamptz IS NULL

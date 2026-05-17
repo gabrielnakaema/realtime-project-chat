@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/gabrielnakaema/project-chat/internal/fracindex"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
@@ -760,6 +761,145 @@ func TestTaskService_Archive(t *testing.T) {
 			mockUserRepo.AssertExpectations(t)
 		})
 	}
+}
+
+func TestTaskService_Archive_PublishesPreviousProjectColumnID(t *testing.T) {
+	validUserId := uuid.New()
+	validProjectId := uuid.New()
+	validTaskId := uuid.New()
+	pendingStatusID := uuid.New()
+
+	validProject := domain.Project{
+		Id:      validProjectId,
+		UserId:  validUserId,
+		Members: []domain.ProjectMember{{UserId: validUserId, Role: domain.ProjectMemberRoleCreator}},
+		Columns: []domain.ProjectColumn{
+			{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+		},
+	}
+
+	validTask := domain.Task{
+		Id:              validTaskId,
+		ProjectId:       validProjectId,
+		AuthorId:        validUserId,
+		Title:           "Test Task",
+		Description:     "Test Description",
+		Status:          domain.TaskStatusPending,
+		ProjectColumnId: pendingStatusID,
+		Priority:        domain.TaskPriorityLow,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+
+	mockRepo := &mockTaskRepository{}
+	mockProjectRepo := &mockProjectRepository{}
+	mockUserRepo := &mockUserRepository{}
+	mockPublisher := &mockPublisher{}
+
+	mockRepo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
+	mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+	mockPublisher.On("Publish", mock.Anything, events.TaskUpdated, mock.MatchedBy(func(payload events.Payload) bool {
+		taskUpdatedPayload, ok := payload.(*events.TaskUpdatedPayload)
+		if !ok {
+			return false
+		}
+
+		return taskUpdatedPayload.PreviousProjectColumnID != nil &&
+			*taskUpdatedPayload.PreviousProjectColumnID == pendingStatusID &&
+			taskUpdatedPayload.Task.ArchivedAt != nil
+	})).Return(nil)
+
+	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, mockPublisher)
+
+	task, err := svc.Archive(context.Background(), service.ArchiveTaskRequest{
+		TaskId:        validTaskId,
+		RequestUserId: validUserId,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, task)
+	assert.Equal(t, domain.TaskStatusArchived, task.Status)
+
+	mockRepo.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+	mockPublisher.AssertExpectations(t)
+}
+
+func TestTaskService_Restore(t *testing.T) {
+	validUserId := uuid.New()
+	validProjectId := uuid.New()
+	validTaskId := uuid.New()
+	pendingStatusID := uuid.New()
+	doingStatusID := uuid.New()
+
+	archivedAt := time.Now().Add(-time.Hour)
+
+	validProject := domain.Project{
+		Id:      validProjectId,
+		UserId:  validUserId,
+		Members: []domain.ProjectMember{{UserId: validUserId, Role: domain.ProjectMemberRoleCreator}},
+		Columns: []domain.ProjectColumn{
+			{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+			{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 1},
+		},
+	}
+
+	archivedTask := domain.Task{
+		Id:              validTaskId,
+		ProjectId:       validProjectId,
+		AuthorId:        validUserId,
+		Title:           "Archived Task",
+		Description:     "Test Description",
+		Status:          domain.TaskStatusArchived,
+		ProjectColumnId: pendingStatusID,
+		Priority:        domain.TaskPriorityLow,
+		ArchivedAt:      &archivedAt,
+		CreatedAt:       time.Now().Add(-2 * time.Hour),
+		UpdatedAt:       time.Now().Add(-time.Hour),
+	}
+
+	mockRepo := &mockTaskRepository{}
+	mockProjectRepo := &mockProjectRepository{}
+	mockUserRepo := &mockUserRepository{}
+	mockPublisher := &mockPublisher{}
+
+	mockRepo.On("GetById", mock.Anything, validTaskId).Return(&archivedTask, nil)
+	mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+	mockRepo.On("Update", mock.Anything, mock.MatchedBy(func(task *domain.Task) bool {
+		return task.ProjectColumnId == doingStatusID &&
+			task.ArchivedAt == nil &&
+			task.Status == domain.TaskStatusDoing &&
+			task.DoneAt == nil
+	})).Return(nil)
+	mockPublisher.On("Publish", mock.Anything, events.TaskUpdated, mock.MatchedBy(func(payload events.Payload) bool {
+		taskUpdatedPayload, ok := payload.(*events.TaskUpdatedPayload)
+		if !ok {
+			return false
+		}
+
+		return taskUpdatedPayload.Task.ProjectColumnId == doingStatusID &&
+			taskUpdatedPayload.Task.ArchivedAt == nil &&
+			taskUpdatedPayload.PreviousProjectColumnID == nil
+	})).Return(nil)
+
+	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, mockPublisher)
+
+	task, err := svc.Restore(context.Background(), service.RestoreTaskRequest{
+		TaskId:          validTaskId,
+		ProjectColumnId: doingStatusID,
+		RequestUserId:   validUserId,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, task)
+	assert.Equal(t, doingStatusID, task.ProjectColumnId)
+	assert.Nil(t, task.ArchivedAt)
+	assert.Equal(t, domain.TaskStatusDoing, task.Status)
+
+	mockRepo.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+	mockPublisher.AssertExpectations(t)
 }
 
 func TestTaskService_Update_LoadsResponsibleDetailsForChangedAssignee(t *testing.T) {

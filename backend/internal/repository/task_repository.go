@@ -272,7 +272,6 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 				result.ProjectColumnUpdatedAt,
 			),
 		}
-		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
 
 		if result.AuthorAuthorID.Valid {
 			user := domain.User{
@@ -313,6 +312,8 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 		if result.ArchivedAt.Valid {
 			task.ArchivedAt = &result.ArchivedAt.Time
 		}
+
+		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
 
 		tasks = append(tasks, task)
 	}
@@ -690,7 +691,6 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 				UserId:      result.ProjectUserID,
 			},
 		}
-		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
 
 		if result.Tags != nil {
 			bytes, err := json.Marshal(result.Tags)
@@ -714,6 +714,8 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 		if result.ArchivedAt.Valid {
 			task.ArchivedAt = &result.ArchivedAt.Time
 		}
+
+		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
 
 		tasks = append(tasks, task)
 	}
@@ -788,7 +790,6 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 				result.ProjectColumnUpdatedAt,
 			),
 		}
-		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
 
 		if result.Tags != nil {
 			bytes, err := json.Marshal(result.Tags)
@@ -812,6 +813,8 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 		if result.ArchivedAt.Valid {
 			task.ArchivedAt = &result.ArchivedAt.Time
 		}
+
+		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
 
 		if result.ProjectProjectID != uuid.Nil {
 			task.Project = &domain.Project{

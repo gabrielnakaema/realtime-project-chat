@@ -487,8 +487,8 @@ AND (
   OR t.project_column_id = ANY($3::uuid[])
 )
 AND (
-  $4::boolean = true
-  OR t.archived_at IS NULL
+  ($4::boolean = true AND t.archived_at IS NOT NULL)
+  OR ($4::boolean = false AND t.archived_at IS NULL)
 )
 AND (
   $5::timestamptz IS NULL

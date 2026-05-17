@@ -88,6 +88,7 @@ func (a *Api) Router() http.Handler {
 		r.Get("/{id}", a.handlers.Task.Get)
 		r.Get("/{id}/comments", a.handlers.TaskComment.ListByTaskID)
 		r.Post("/{id}/comments", a.handlers.TaskComment.Create)
+		r.Post("/{id}/restore", a.handlers.Task.Restore)
 		r.Put("/{id}", a.handlers.Task.Update)
 		r.Delete("/{id}", a.handlers.Task.Archive)
 		r.Patch("/{id}/move", a.handlers.Task.Move)
