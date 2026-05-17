@@ -152,6 +152,17 @@ export const archiveTask = async (taskId: string) => {
   return json;
 };
 
+export const restoreTask = async (taskId: string, projectColumnId: string) => {
+  const response = await api.post(`tasks/${taskId}/restore`, {
+    json: {
+      project_column_id: projectColumnId,
+    },
+  });
+
+  const json = await response.json<Task>();
+  return json;
+};
+
 export const getTask = async (taskId: string) => {
   const response = await api.get(`tasks/${taskId}`);
 

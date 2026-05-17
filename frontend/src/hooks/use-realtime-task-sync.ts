@@ -4,6 +4,7 @@ import { useSocket } from './use-socket';
 import {
   adjustCountCache,
   buildColumnQueryKey,
+  findTaskInColumnCaches,
   insertTaskAtCorrectPosition,
   removeTaskFromColumn,
   updateTaskInColumn,
@@ -27,21 +28,38 @@ export const useRealtimeTaskSync = (projectId: string, projectColumnIds: string[
     if (event.type === 'task_updated') {
       const { task, previous_project_column_id } = event.data;
       const nextColumn = task.project_column_id;
+      const found = findTaskInColumnCaches(queryClient, projectId, projectColumnIds, task.id);
+
+      if (task.archived_at) {
+        const archivedColumn = previous_project_column_id ?? found?.columnId ?? nextColumn;
+
+        removeTaskFromColumn(queryClient, projectId, archivedColumn, task.id);
+        adjustCountCache(queryClient, projectId, projectColumnIds, { [archivedColumn]: -1 });
+        return;
+      }
 
       if (!previous_project_column_id) {
-        updateTaskInColumn(queryClient, projectId, nextColumn, task);
+        if (!found) {
+          insertTaskAtCorrectPosition(queryClient, projectId, nextColumn, task);
+          adjustCountCache(queryClient, projectId, projectColumnIds, { [nextColumn]: 1 });
+          return;
+        }
+
+        if (found.columnId === nextColumn) {
+          updateTaskInColumn(queryClient, projectId, nextColumn, task);
+          return;
+        }
+
+        removeTaskFromColumn(queryClient, projectId, found.columnId, task.id);
+        insertTaskAtCorrectPosition(queryClient, projectId, nextColumn, task);
+        adjustCountCache(queryClient, projectId, projectColumnIds, { [found.columnId]: -1, [nextColumn]: 1 });
         return;
       }
 
       const prevColumn = previous_project_column_id;
       removeTaskFromColumn(queryClient, projectId, prevColumn, task.id);
-
-      if (task.archived_at) {
-        adjustCountCache(queryClient, projectId, projectColumnIds, { [prevColumn]: -1 });
-      } else {
-        insertTaskAtCorrectPosition(queryClient, projectId, nextColumn, task);
-        adjustCountCache(queryClient, projectId, projectColumnIds, { [prevColumn]: -1, [nextColumn]: 1 });
-      }
+      insertTaskAtCorrectPosition(queryClient, projectId, nextColumn, task);
+      adjustCountCache(queryClient, projectId, projectColumnIds, { [prevColumn]: -1, [nextColumn]: 1 });
     }
   });
 

@@ -10,7 +10,7 @@ import type { Task } from '@/types/task';
 import type { Project } from '@/types/project';
 import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { ProjectMemberRole } from '@/types/project';
-import { listGroupedTasksByProjectId, updateTask } from '@/services/tasks';
+import { listGroupedTasksByProjectId, restoreTask } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
 import { useAuth } from '@/hooks/use-auth';
 import { DEFAULT_TASK_LIMIT } from '@/constants/tasks';
@@ -36,16 +36,7 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
     variables: restoreVariables,
   } = useMutation({
     mutationFn: ({ task, projectColumnId }: { task: Task; projectColumnId: string }) =>
-      updateTask({
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        project_column_id: projectColumnId,
-        priority: task.priority,
-        due_date: task.due_date,
-        responsible_id: task.responsible_id,
-        tags: task.tags ?? [],
-      }),
+      restoreTask(task.id, projectColumnId),
     onSuccess: () => {
       setPickingStatusForTaskId(null);
       queryClient.invalidateQueries({
