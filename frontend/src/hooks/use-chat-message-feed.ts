@@ -14,6 +14,37 @@ interface UseChatMessageFeedProps {
   onMessageRead: (messageId: string) => void;
 }
 
+const initialMessagesPageParam = {
+  before: '',
+  id: '',
+};
+
+export const appendMessageToFeed = (
+  old: InfiniteData<CursorPaginated<ChatMessage>> | undefined,
+  message: ChatMessage,
+): InfiniteData<CursorPaginated<ChatMessage>> => {
+  if (!old?.pages.length) {
+    return {
+      pages: [{ data: [message], has_next: false }],
+      pageParams: [initialMessagesPageParam],
+    };
+  }
+
+  const alreadyExists = old.pages.some((page) =>
+    page.data.some((existingMessage) => existingMessage.id === message.id),
+  );
+  if (alreadyExists) {
+    return old;
+  }
+
+  const firstPage = old.pages[0];
+
+  return {
+    pages: [{ ...firstPage, data: [...firstPage.data, message] }, ...old.pages.slice(1)],
+    pageParams: old.pageParams,
+  };
+};
+
 export const useChatMessageFeed = ({
   chatId,
   messagesQueryKey,
@@ -36,24 +67,12 @@ export const useChatMessageFeed = ({
         id: lastPage.data[0].id,
       };
     },
-    initialPageParam: {
-      before: '',
-      id: '',
-    },
+    initialPageParam: initialMessagesPageParam,
   });
 
   const addMessage = (message: ChatMessage) => {
     queryClient.setQueryData(messagesQueryKey, (old?: InfiniteData<CursorPaginated<ChatMessage>>) => {
-      if (!old?.pages.length) {
-        return old;
-      }
-
-      const firstPage = old.pages[0];
-
-      return {
-        pages: [{ ...firstPage, data: [...firstPage.data, message] }, ...old.pages.slice(1)],
-        pageParams: old.pageParams,
-      };
+      return appendMessageToFeed(old, message);
     });
   };
 
