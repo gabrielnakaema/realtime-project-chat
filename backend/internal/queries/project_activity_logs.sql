@@ -42,11 +42,22 @@ task_entities AS (
       'description', t.description,
       'status', CASE
         WHEN t.archived_at IS NOT NULL THEN 'archived'
-        WHEN pc.is_done_column THEN 'done'
-        WHEN pc.position = 1 THEN 'doing'
-        ELSE 'pending'
+        ELSE lower(COALESCE(pc.name, ''))
       END,
       'project_column_id', t.project_column_id,
+      'project_column', CASE
+        WHEN pc.id IS NULL THEN NULL
+        ELSE jsonb_build_object(
+          'id', pc.id,
+          'project_id', pc.project_id,
+          'name', pc.name,
+          'color', pc.color,
+          'position', pc.position,
+          'is_done_column', pc.is_done_column,
+          'created_at', pc.created_at,
+          'updated_at', pc.updated_at
+        )
+      END,
       'archived_at', t.archived_at,
       'created_at', t.created_at,
       'updated_at', t.updated_at

@@ -60,9 +60,9 @@ func TestNotificationEndpoints(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = testAPI.DB.Exec(context.Background(), `
-			INSERT INTO project_columns (id, project_id, name, color, position, is_done_column)
-			VALUES ($1, $2, 'Pending', '#64748B', 0, false)
-		`, projectColumnID, projectID)
+				INSERT INTO project_columns (id, project_id, name, color, position, is_done_column)
+				VALUES ($1, $2, 'QA Review', '#F59E0B', 3, false)
+			`, projectColumnID, projectID)
 		require.NoError(t, err)
 
 		_, err = testAPI.DB.Exec(context.Background(), `
@@ -85,6 +85,19 @@ func TestNotificationEndpoints(t *testing.T) {
 		var listResponse map[string]any
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&listResponse))
 		assert.Len(t, listResponse["data"], 1)
+
+		data, ok := listResponse["data"].([]any)
+		require.True(t, ok)
+		notification, ok := data[0].(map[string]any)
+		require.True(t, ok)
+		task, ok := notification["task"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "qa review", task["status"])
+
+		projectColumn, ok := task["project_column"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "QA Review", projectColumn["name"])
+		assert.Equal(t, "#F59E0B", projectColumn["color"])
 
 		resp, err = client.GET("/notifications/unread-count")
 		require.NoError(t, err)

@@ -1,12 +1,15 @@
 package projects_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/api/tests/shared"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -249,7 +252,6 @@ func TestProjectsEndpoints(t *testing.T) {
 				for _, expectedText := range tc.expectedText {
 					assert.Contains(t, string(bodyBytes), expectedText)
 				}
-
 			})
 		}
 	})
@@ -549,4 +551,104 @@ func TestProjectsEndpoints(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(bodyBytes), "invalid project id")
 	})
+
+	t.Run("GET /projects/{id}/activities returns the actual project column for tasks", func(t *testing.T) {
+		testAPI.TruncateTables(t)
+
+		client := shared.NewHTTPClient(testAPI.GetBaseURL())
+		_, err := client.CreateUserAndLogin("activities@example.com", "password123")
+		require.NoError(t, err)
+
+		actorID := createProjectTestUser(t, testAPI, "activity-actor@example.com")
+		userID := getProjectTestCurrentUserID(t, client)
+		projectID := uuid.New()
+		projectColumnID := uuid.New()
+		taskID := uuid.New()
+		activityID := uuid.New()
+		now := time.Now().UTC()
+
+		_, err = testAPI.DB.Exec(context.Background(), `
+			INSERT INTO projects (id, user_id, name, description, created_at, updated_at)
+			VALUES ($1, $2, 'Activity Project', 'Project Description', $3, $3)
+		`, projectID, actorID, now)
+		require.NoError(t, err)
+
+		_, err = testAPI.DB.Exec(context.Background(), `
+			INSERT INTO project_members (id, user_id, project_id, role)
+			VALUES ($1, $2, $3, 'creator'), ($4, $5, $3, 'member')
+		`, uuid.New(), actorID, projectID, uuid.New(), userID)
+		require.NoError(t, err)
+
+		_, err = testAPI.DB.Exec(context.Background(), `
+			INSERT INTO project_columns (id, project_id, name, color, position, is_done_column, created_at, updated_at)
+			VALUES ($1, $2, 'QA Review', '#F59E0B', 3, false, $3, $3)
+		`, projectColumnID, projectID, now)
+		require.NoError(t, err)
+
+		_, err = testAPI.DB.Exec(context.Background(), `
+			INSERT INTO tasks (id, project_id, title, description, project_column_id, author_id, priority, task_order, created_at, updated_at)
+			VALUES ($1, $2, 'Task title', 'Task description', $3, $4, 'medium', '500000000000', $5, $5)
+		`, taskID, projectID, projectColumnID, actorID, now)
+		require.NoError(t, err)
+
+		_, err = testAPI.DB.Exec(context.Background(), `
+			INSERT INTO project_activity_logs (id, project_id, actor_id, activity_type, activity_data, entity_type, entity_id, created_at, updated_at)
+			VALUES ($1, $2, $3, 'task.updated', '{}'::jsonb, 'task', $4, $5, $5)
+		`, activityID, projectID, actorID, taskID, now)
+		require.NoError(t, err)
+
+		resp, err := client.GET("/projects/" + projectID.String() + "/activities")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var response map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
+
+		data, ok := response["data"].([]any)
+		require.True(t, ok)
+		require.Len(t, data, 1)
+
+		activity, ok := data[0].(map[string]any)
+		require.True(t, ok)
+		task, ok := activity["task"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "qa review", task["status"])
+
+		projectColumn, ok := task["project_column"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "QA Review", projectColumn["name"])
+		assert.Equal(t, "#F59E0B", projectColumn["color"])
+	})
+}
+
+func createProjectTestUser(t *testing.T, testAPI *shared.TestAPI, email string) uuid.UUID {
+	t.Helper()
+
+	id := uuid.New()
+	_, err := testAPI.DB.Exec(context.Background(), `
+		INSERT INTO users (id, name, email, password)
+		VALUES ($1, 'Actor', $2, 'password123')
+	`, id, email)
+	require.NoError(t, err)
+
+	return id
+}
+
+func getProjectTestCurrentUserID(t *testing.T, client *shared.HTTPClient) uuid.UUID {
+	t.Helper()
+
+	resp, err := client.GET("/users/me")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	var user struct {
+		ID string `json:"id"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&user))
+
+	parsed, err := uuid.Parse(user.ID)
+	require.NoError(t, err)
+
+	return parsed
 }
