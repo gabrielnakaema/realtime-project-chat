@@ -18,11 +18,15 @@ import { handleSuccess } from '@/utils/handle-success';
 import { projectQueryKeys } from '@/services/query-keys';
 import { buildProjectColumnSurface, getDefaultProjectColumnColor } from '@/lib/project-column-colors';
 
+type ProjectPreviewColumn = Pick<ProjectColumn, 'id' | 'name'>;
+
 const defaultColumns = (): Pick<ProjectColumn, 'name' | 'color' | 'is_done_column'>[] => [
   { name: 'Pending', color: getDefaultProjectColumnColor(0), is_done_column: false },
   { name: 'Doing', color: getDefaultProjectColumnColor(1), is_done_column: false },
   { name: 'Done', color: getDefaultProjectColumnColor(2), is_done_column: true },
 ];
+
+const getColumnKey = (column: ProjectPreviewColumn, index: number) => column.id ?? `new-column-${index}`;
 
 export const CreateProject = () => {
   const queryClient = useQueryClient();
@@ -119,7 +123,7 @@ export const CreateProject = () => {
               <div className="mt-4 flex flex-wrap gap-2">
                 {columns.map((column, index) => (
                   <span
-                    key={`${column.name}-${index}`}
+                    key={getColumnKey(column, index)}
                     className="rounded-full border px-3 py-1 text-xs font-medium"
                     style={{
                       backgroundColor: buildProjectColumnSurface(column.color).badgeBackground,

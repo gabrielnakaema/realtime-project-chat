@@ -9,6 +9,7 @@ import { buildProjectColumnSurface, getDefaultProjectColumnColor } from '@/lib/p
 
 type FormColumn = IProjectForm['columns'][number];
 type DeletedColumn = IProjectForm['deleted_columns'][number];
+type ColumnKeyItem = Pick<FormColumn, 'id'>;
 
 interface ProjectColumnsEditorProps {
   columns: FormColumn[];
@@ -31,6 +32,8 @@ const ensureSingleDoneColumn = (columns: FormColumn[], preferredIndex = 0) =>
     ...column,
     is_done_column: index === preferredIndex,
   }));
+
+const getColumnKey = (column: ColumnKeyItem, index: number) => column.id ?? `new-column-${index}`;
 
 export const ProjectColumnsEditor = ({
   columns,
@@ -167,7 +170,7 @@ export const ProjectColumnsEditor = ({
 
           return (
             <div
-              key={column.id ?? `${column.name}-${index}`}
+              key={getColumnKey(column, index)}
               style={{ borderColor: column.is_done_column ? undefined : surface.borderColor }}
               className={cn(
                 'rounded-2xl border bg-white p-4 shadow-sm transition-colors dark:bg-slate-950',

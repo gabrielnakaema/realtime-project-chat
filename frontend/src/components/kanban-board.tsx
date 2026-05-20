@@ -18,7 +18,9 @@ interface KanbanBoardProps {
 
 export const KanbanBoard = ({ project, onTaskClick }: KanbanBoardProps) => {
   const projectId = project.id;
-  const projectColumnIds = project.columns.map((column) => column.id!).filter(Boolean);
+  const projectColumnIds = useMemo(() => {
+    return project.columns.map((column) => column.id!).filter(Boolean);
+  }, [project.columns]);
 
   useRealtimeTaskSync(projectId, projectColumnIds);
 

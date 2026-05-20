@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useEffectEvent, useRef } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import { useSocket } from './use-socket';
 import {
   adjustCountCache,
@@ -16,6 +16,10 @@ export const useRealtimeTaskSync = (projectId: string, projectColumnIds: string[
   const queryClient = useQueryClient();
   const { status, subscribe } = useSocket();
   const connectedOnce = useRef(false);
+  const columnIdsKey = projectColumnIds.join(',');
+  const stableProjectColumnIds = useMemo(() => {
+    return columnIdsKey ? columnIdsKey.split(',') : [];
+  }, [columnIdsKey]);
 
   const handleSocketEvent = useEffectEvent((event: SocketEvent) => {
     if (event.type === 'task_created') {
@@ -72,13 +76,13 @@ export const useRealtimeTaskSync = (projectId: string, projectColumnIds: string[
   useEffect(() => {
     if (status !== 'connected') return;
     if (connectedOnce.current) {
-      for (const s of projectColumnIds) {
+      for (const s of stableProjectColumnIds) {
         queryClient.invalidateQueries({ queryKey: buildColumnQueryKey(projectId, s) });
       }
       queryClient.invalidateQueries({
-        queryKey: taskQueryKeys.countByColumn(projectId, projectColumnIds),
+        queryKey: taskQueryKeys.countByColumn(projectId, stableProjectColumnIds),
       });
     }
     connectedOnce.current = true;
-  }, [status, projectId, projectColumnIds, queryClient]);
+  }, [status, projectId, queryClient, stableProjectColumnIds]);
 };

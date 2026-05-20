@@ -21,6 +21,10 @@ interface ProjectSettingsProps {
   projectId: string;
 }
 
+type ProjectSettingsColumn = IProjectForm['columns'][number];
+
+const getColumnKey = (column: ProjectSettingsColumn, index: number) => column.id ?? `new-column-${index}`;
+
 export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
   const queryClient = useQueryClient();
 
@@ -145,7 +149,7 @@ export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
                 <div className="mt-4 flex flex-wrap gap-2">
                   {columns.map((column, index) => (
                     <span
-                      key={column.id ?? `${column.name}-${index}`}
+                      key={getColumnKey(column, index)}
                       className="rounded-full border px-3 py-1 text-xs font-medium"
                       style={{
                         backgroundColor: buildProjectColumnSurface(column.color).badgeBackground,
