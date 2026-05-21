@@ -130,6 +130,10 @@ func (ws *Server) SendUpdatedTask(ctx context.Context, task *domain.Task, previo
 	return ws.SendEvent(ctx, MapTaskUpdated(task, previousProjectColumnID))
 }
 
+func (ws *Server) SendUpdatedProject(ctx context.Context, project *domain.Project) error {
+	return ws.SendEvent(ctx, MapProjectUpdated(project))
+}
+
 func (ws *Server) SendCreatedTask(ctx context.Context, task *domain.Task) error {
 	return ws.SendEvent(ctx, MapTaskCreated(task))
 }

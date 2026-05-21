@@ -26,6 +26,7 @@ const (
 	WebsocketMessageTypeDisconnectUserFromRoom WebsocketMessageType = "disconnect_user_from_room"
 	WebsocketMessageTypeTaskCreated            WebsocketMessageType = "task_created"
 	WebsocketMessageTypeTaskUpdated            WebsocketMessageType = "task_updated"
+	WebsocketMessageTypeProjectUpdated         WebsocketMessageType = "project_updated"
 	WebsocketMessageTypeTaskCommentCreated     WebsocketMessageType = "task_comment_created"
 	WebsocketMessageTypeUsersOnline            WebsocketMessageType = "users_online"
 	WebsocketMessageTypeMessageRead            WebsocketMessageType = "message_read"
@@ -119,6 +120,14 @@ func MapTaskUpdated(task *domain.Task, previousProjectColumnID *uuid.UUID) Webso
 			Task:                    task,
 			PreviousProjectColumnID: previousProjectColumnID,
 		},
+	}
+}
+
+func MapProjectUpdated(project *domain.Project) WebsocketMessage {
+	return WebsocketMessage{
+		Type:   WebsocketMessageTypeProjectUpdated,
+		RoomId: project.Id,
+		Data:   project,
 	}
 }
 

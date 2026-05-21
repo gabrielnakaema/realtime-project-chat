@@ -100,6 +100,13 @@ func NewApi() (*Api, error) {
 	}
 	subscribers = append(subscribers, taskSub)
 
+	projectSub, err := subscriber.NewProjectSubscriber(ctx, config, logger, ws)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	subscribers = append(subscribers, projectSub)
+
 	activitySub, err := subscriber.NewProjectActivitySubscriber(ctx, config, logger, activityRepo, projectRepo)
 	if err != nil {
 		cancel()
