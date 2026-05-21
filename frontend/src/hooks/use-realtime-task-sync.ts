@@ -10,7 +10,7 @@ import {
   updateTaskInColumn,
 } from './task-cache-helpers';
 import type { SocketEvent } from '@/types/websocket';
-import { taskQueryKeys } from '@/services/query-keys';
+import { projectQueryKeys, taskQueryKeys } from '@/services/query-keys';
 
 export const useRealtimeTaskSync = (projectId: string, projectColumnIds: string[]) => {
   const queryClient = useQueryClient();
@@ -22,6 +22,11 @@ export const useRealtimeTaskSync = (projectId: string, projectColumnIds: string[
   }, [columnIdsKey]);
 
   const handleSocketEvent = useEffectEvent((event: SocketEvent) => {
+    if (event.type === 'project_updated') {
+      queryClient.invalidateQueries({ queryKey: projectQueryKeys.details(projectId) });
+      return;
+    }
+
     if (event.type === 'task_created') {
       const task = event.data;
       insertTaskAtCorrectPosition(queryClient, projectId, task.project_column_id, task);

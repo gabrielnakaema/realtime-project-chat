@@ -1,5 +1,6 @@
 import type { ChatMessage, ChatMessageRead } from './chat';
 import type { Notification } from './notification';
+import type { Project } from './project';
 import type { Task, TaskComment } from './task';
 
 export type MessageEvent = {
@@ -41,6 +42,12 @@ export type TaskCommentCreatedEvent = {
   type: 'task_comment_created';
   room_id: string;
   data: TaskComment;
+};
+
+export type ProjectUpdatedEvent = {
+  type: 'project_updated';
+  room_id: string;
+  data: Project;
 };
 
 export type UsersOnlineEvent = {
@@ -86,6 +93,7 @@ export type SocketEvent =
   | TaskCreatedEvent
   | TaskUpdatedEvent
   | TaskCommentCreatedEvent
+  | ProjectUpdatedEvent
   | UsersOnlineEvent
   | MessageReadEvent
   | NotificationCreatedEvent
