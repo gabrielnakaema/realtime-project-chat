@@ -7,8 +7,9 @@ import (
 )
 
 type CursorPaginated[T any] struct {
-	Data    []T  `json:"data"`
-	HasNext bool `json:"has_next"`
+	Data        []T  `json:"data"`
+	HasNext     bool `json:"has_next"`
+	HasPrevious bool `json:"has_previous"`
 }
 
 type PaginationBeforeParams struct {

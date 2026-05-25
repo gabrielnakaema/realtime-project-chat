@@ -91,24 +91,57 @@ func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request
 	}
 
 	before := utils.GetQueryString(r, "before", "")
-	beforeTime := time.Now()
+	after := utils.GetQueryString(r, "after", "")
+	if before != "" && after != "" {
+		BadRequestResponse(w, errors.New("before and after cannot be used together"))
+		return
+	}
+
+	var beforeTime *time.Time
 	if before != "" {
 		parsedBefore, err := time.Parse(time.RFC3339, before)
 		if err != nil {
 			BadRequestResponse(w, errors.New("invalid before date"))
 			return
 		}
-		beforeTime = parsedBefore
+		beforeTime = &parsedBefore
+	}
+
+	var afterTime *time.Time
+	if after != "" {
+		parsedAfter, err := time.Parse(time.RFC3339, after)
+		if err != nil {
+			BadRequestResponse(w, errors.New("invalid after date"))
+			return
+		}
+		afterTime = &parsedAfter
+	}
+
+	if beforeTime == nil && afterTime == nil {
+		now := time.Now()
+		beforeTime = &now
 	}
 
 	beforeCommentID := utils.GetQueryString(r, "comment_id", "")
-	parsedBeforeCommentID := uuid.Nil
+	var parsedBeforeCommentID *uuid.UUID
 	if beforeCommentID != "" {
-		parsedBeforeCommentID, err = uuid.Parse(beforeCommentID)
+		id, err := uuid.Parse(beforeCommentID)
 		if err != nil {
 			BadRequestResponse(w, err)
 			return
 		}
+		parsedBeforeCommentID = &id
+	}
+
+	afterCommentID := utils.GetQueryString(r, "after_comment_id", "")
+	var parsedAfterCommentID *uuid.UUID
+	if afterCommentID != "" {
+		id, err := uuid.Parse(afterCommentID)
+		if err != nil {
+			BadRequestResponse(w, err)
+			return
+		}
+		parsedAfterCommentID = &id
 	}
 
 	userID := UserIdFromContext(r.Context())
@@ -119,6 +152,8 @@ func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request
 		Limit:           int(limit),
 		Before:          beforeTime,
 		BeforeCommentID: parsedBeforeCommentID,
+		After:           afterTime,
+		AfterCommentID:  parsedAfterCommentID,
 	})
 	if err != nil {
 		ErrorResponse(w, r, err)

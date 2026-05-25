@@ -13,7 +13,15 @@ import (
 
 type taskCommentRepository interface {
 	Create(ctx context.Context, comment *domain.TaskComment, parentCommentID *uuid.UUID) error
-	ListByTaskID(ctx context.Context, taskID uuid.UUID, before time.Time, beforeID uuid.UUID, limit int) (*utils.CursorPaginated[domain.TaskComment], error)
+	ListByTaskID(
+		ctx context.Context,
+		taskID uuid.UUID,
+		before *time.Time,
+		beforeID *uuid.UUID,
+		after *time.Time,
+		afterID *uuid.UUID,
+		limit int,
+	) (*utils.CursorPaginated[domain.TaskComment], error)
 }
 
 type taskCommentTaskRepository interface {
@@ -119,8 +127,10 @@ type ListTaskCommentsRequest struct {
 	TaskID          uuid.UUID
 	RequestUserID   uuid.UUID
 	Limit           int
-	Before          time.Time
-	BeforeCommentID uuid.UUID
+	Before          *time.Time
+	BeforeCommentID *uuid.UUID
+	After           *time.Time
+	AfterCommentID  *uuid.UUID
 }
 
 func (s *TaskCommentService) ListByTaskID(ctx context.Context, request ListTaskCommentsRequest) (*utils.CursorPaginated[domain.TaskComment], error) {
@@ -156,7 +166,15 @@ func (s *TaskCommentService) ListByTaskID(ctx context.Context, request ListTaskC
 		return nil, domain.ForbiddenError("forbidden")
 	}
 
-	comments, err := s.taskCommentRepository.ListByTaskID(ctx, request.TaskID, request.Before, request.BeforeCommentID, request.Limit)
+	comments, err := s.taskCommentRepository.ListByTaskID(
+		ctx,
+		request.TaskID,
+		request.Before,
+		request.BeforeCommentID,
+		request.After,
+		request.AfterCommentID,
+		request.Limit,
+	)
 	if err != nil {
 		return nil, domain.ServerError("failed to list task comments", err)
 	}

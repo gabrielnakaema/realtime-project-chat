@@ -24,8 +24,16 @@ func (m *mockTaskCommentRepository) Create(ctx context.Context, comment *domain.
 	return args.Error(0)
 }
 
-func (m *mockTaskCommentRepository) ListByTaskID(ctx context.Context, taskID uuid.UUID, before time.Time, beforeID uuid.UUID, limit int) (*utils.CursorPaginated[domain.TaskComment], error) {
-	args := m.Called(ctx, taskID, before, beforeID, limit)
+func (m *mockTaskCommentRepository) ListByTaskID(
+	ctx context.Context,
+	taskID uuid.UUID,
+	before *time.Time,
+	beforeID *uuid.UUID,
+	after *time.Time,
+	afterID *uuid.UUID,
+	limit int,
+) (*utils.CursorPaginated[domain.TaskComment], error) {
+	args := m.Called(ctx, taskID, before, beforeID, after, afterID, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -287,7 +295,8 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 				},
 			},
 		},
-		HasNext: true,
+		HasNext:     true,
+		HasPrevious: true,
 	}
 
 	type testCase struct {
@@ -306,18 +315,19 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 				TaskID:          validTaskID,
 				RequestUserID:   validUserID,
 				Limit:           10,
-				Before:          beforeTime,
-				BeforeCommentID: beforeCommentID,
+				Before:          &beforeTime,
+				BeforeCommentID: &beforeCommentID,
 			},
 			mockSetup: func(commentRepo *mockTaskCommentRepository, taskRepo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				taskRepo.On("GetById", mock.Anything, validTaskID).Return(validTask, nil)
 				projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
-				commentRepo.On("ListByTaskID", mock.Anything, validTaskID, beforeTime, beforeCommentID, 10).Return(expectedComments, nil)
+				commentRepo.On("ListByTaskID", mock.Anything, validTaskID, &beforeTime, &beforeCommentID, (*time.Time)(nil), (*uuid.UUID)(nil), 10).Return(expectedComments, nil)
 			},
 			shouldSucceed: true,
 			checkFunc: func(t *testing.T, comments *utils.CursorPaginated[domain.TaskComment]) {
 				assert.Len(t, comments.Data, 1)
 				assert.True(t, comments.HasNext)
+				assert.True(t, comments.HasPrevious)
 				assert.Equal(t, "Root comment", comments.Data[0].Content)
 				assert.Len(t, comments.Data[0].Replies, 1)
 				assert.Equal(t, "Reply comment", comments.Data[0].Replies[0].Content)
@@ -382,13 +392,13 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 				TaskID:          validTaskID,
 				RequestUserID:   validUserID,
 				Limit:           10,
-				Before:          beforeTime,
-				BeforeCommentID: beforeCommentID,
+				Before:          &beforeTime,
+				BeforeCommentID: &beforeCommentID,
 			},
 			mockSetup: func(commentRepo *mockTaskCommentRepository, taskRepo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				taskRepo.On("GetById", mock.Anything, validTaskID).Return(validTask, nil)
 				projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
-				commentRepo.On("ListByTaskID", mock.Anything, validTaskID, beforeTime, beforeCommentID, 10).Return(nil, errors.New("database error"))
+				commentRepo.On("ListByTaskID", mock.Anything, validTaskID, &beforeTime, &beforeCommentID, (*time.Time)(nil), (*uuid.UUID)(nil), 10).Return(nil, errors.New("database error"))
 			},
 			shouldSucceed:     false,
 			expectedErrorCode: string(domain.ServerErrorCode),

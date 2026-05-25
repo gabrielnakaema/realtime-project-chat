@@ -159,3 +159,128 @@ func (q *Queries) ListTaskComments(ctx context.Context, arg ListTaskCommentsPara
 	}
 	return items, nil
 }
+
+const listTaskCommentsAfter = `-- name: ListTaskCommentsAfter :many
+WITH recursive paginated_parent_comments AS (
+  SELECT
+    c.id,
+    c.task_id,
+    c.user_id,
+    c.content,
+    c.parent_comment_id,
+    c.created_at,
+    c.updated_at
+  FROM task_comments c
+  WHERE c.task_id = $1
+    AND c.parent_comment_id IS NULL
+    AND (c.created_at, c.id) > ($3::timestamptz, $4::uuid)
+  ORDER BY c.created_at ASC, c.id ASC
+  LIMIT $2
+),
+comment_tree AS (
+  SELECT
+    p.id,
+    p.task_id,
+    p.user_id,
+    p.content,
+    p.parent_comment_id,
+    p.created_at,
+    p.updated_at,
+    0 as level,
+    p.created_at as root_created_at,
+    u.id as comment_user_id,
+    u.name as comment_user_name,
+    u.email as comment_user_email,
+    u.created_at as comment_user_created_at,
+    u.updated_at as comment_user_updated_at
+  FROM paginated_parent_comments p
+  JOIN users u ON p.user_id = u.id
+  UNION ALL
+  SELECT
+    c.id,
+    c.task_id,
+    c.user_id,
+    c.content,
+    c.parent_comment_id,
+    c.created_at,
+    c.updated_at,
+    ct.level + 1 as level,
+    ct.root_created_at,
+    u.id as comment_user_id,
+    u.name as comment_user_name,
+    u.email as comment_user_email,
+    u.created_at as comment_user_created_at,
+    u.updated_at as comment_user_updated_at
+  FROM task_comments c
+  JOIN users u ON c.user_id = u.id
+  JOIN comment_tree ct ON c.parent_comment_id = ct.id
+)
+SELECT
+  id, task_id, user_id, content, parent_comment_id, created_at, updated_at, level, root_created_at, comment_user_id, comment_user_name, comment_user_email, comment_user_created_at, comment_user_updated_at
+FROM comment_tree
+ORDER BY root_created_at ASC, created_at ASC, id ASC
+`
+
+type ListTaskCommentsAfterParams struct {
+	TaskID  uuid.UUID
+	Limit   int32
+	Column3 pgtype.Timestamptz
+	Column4 uuid.UUID
+}
+
+type ListTaskCommentsAfterRow struct {
+	ID                   uuid.UUID
+	TaskID               uuid.UUID
+	UserID               uuid.UUID
+	Content              string
+	ParentCommentID      pgtype.UUID
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+	Level                int32
+	RootCreatedAt        pgtype.Timestamptz
+	CommentUserID        uuid.UUID
+	CommentUserName      string
+	CommentUserEmail     string
+	CommentUserCreatedAt pgtype.Timestamptz
+	CommentUserUpdatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) ListTaskCommentsAfter(ctx context.Context, arg ListTaskCommentsAfterParams) ([]ListTaskCommentsAfterRow, error) {
+	rows, err := q.db.Query(ctx, listTaskCommentsAfter,
+		arg.TaskID,
+		arg.Limit,
+		arg.Column3,
+		arg.Column4,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTaskCommentsAfterRow
+	for rows.Next() {
+		var i ListTaskCommentsAfterRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TaskID,
+			&i.UserID,
+			&i.Content,
+			&i.ParentCommentID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Level,
+			&i.RootCreatedAt,
+			&i.CommentUserID,
+			&i.CommentUserName,
+			&i.CommentUserEmail,
+			&i.CommentUserCreatedAt,
+			&i.CommentUserUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
