@@ -1,16 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { createContext, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { getNotificationNavigationTarget } from './notification-navigation';
 import type { Notification } from '@/types/notification';
 import type { SocketEvent } from '@/types/websocket';
 import { useAuth } from '@/hooks/use-auth';
 import { useInfiniteNotifications } from '@/hooks/use-infinite-notifications';
 import { useSocket } from '@/hooks/use-socket';
-import {
-  getUnreadNotificationCount,
-  markAllNotificationsRead,
-  markNotificationRead,
-} from '@/services/notifications';
+import { getUnreadNotificationCount, markAllNotificationsRead, markNotificationRead } from '@/services/notifications';
 import { notificationQueryKeys } from '@/services/query-keys';
 
 interface NotificationContextData {
@@ -94,14 +91,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     await markNotificationReadAndUpdateCache(notification);
     setIsOpen(false);
 
-    const projectId = notification.project?.id ?? notification.project_id;
-    const taskId = notification.task?.id ?? notification.task_id;
-
-    await navigate({
-      to: '/projects/$projectId',
-      params: { projectId },
-      search: taskId ? { taskId } : {},
-    });
+    await navigate(getNotificationNavigationTarget(notification));
   };
 
   const markAllAsRead = async () => {

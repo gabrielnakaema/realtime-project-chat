@@ -25,7 +25,7 @@ export const appendMessageToFeed = (
 ): InfiniteData<CursorPaginated<ChatMessage>> => {
   if (!old?.pages.length) {
     return {
-      pages: [{ data: [message], has_next: false }],
+      pages: [{ data: [message], has_next: false, has_previous: false }],
       pageParams: [initialMessagesPageParam],
     };
   }

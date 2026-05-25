@@ -22,13 +22,23 @@ export const Route = createFileRoute('/projects/$projectId/')({
   component: RouteComponent,
   validateSearch: z.object({
     taskId: z.string().optional(),
+    commentId: z.string().optional(),
+    commentCreatedAt: z.string().optional(),
   }),
 });
 
 function RouteComponent() {
   const { projectId } = Route.useParams();
-  const { selectedTaskId, isEditingTask, openTask, closeTask, startEditingTask, stopEditingTask } =
-    useTaskDetailsRouting();
+  const {
+    selectedTaskId,
+    selectedCommentId,
+    selectedCommentCreatedAt,
+    isEditingTask,
+    openTask,
+    closeTask,
+    startEditingTask,
+    stopEditingTask,
+  } = useTaskDetailsRouting();
 
   const { onlineUserIds } = useOnlineUsers(projectId, 'project');
 
@@ -119,6 +129,8 @@ function RouteComponent() {
       <TaskDetails
         taskId={selectedTaskId}
         open={!!selectedTaskId && !isEditingTask}
+        targetCommentId={selectedCommentId}
+        targetCommentCreatedAt={selectedCommentCreatedAt}
         onOpenChange={(open) => {
           if (!open) {
             closeTask();

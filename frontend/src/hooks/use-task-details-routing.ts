@@ -9,16 +9,18 @@ export const useTaskDetailsRouting = () => {
     from: '/projects/$projectId',
   });
 
-  const { taskId } = search;
+  const { taskId, commentId, commentCreatedAt } = search;
   const [isEditingTaskOpen, setIsEditingTaskOpen] = useState(false);
 
   const selectedTaskId = taskId ?? '';
+  const selectedCommentId = commentId;
+  const selectedCommentCreatedAt = commentCreatedAt;
   const isEditingTask = Boolean(selectedTaskId) && isEditingTaskOpen;
 
   const openTask = (nextTaskId: string) => {
     setIsEditingTaskOpen(false);
     navigate({
-      search: (prev) => ({ ...prev, taskId: nextTaskId }),
+      search: (prev) => ({ ...prev, taskId: nextTaskId, commentId: undefined, commentCreatedAt: undefined }),
       replace: true,
     });
   };
@@ -26,7 +28,7 @@ export const useTaskDetailsRouting = () => {
   const closeTask = () => {
     setIsEditingTaskOpen(false);
     navigate({
-      search: (prev) => ({ ...prev, taskId: undefined }),
+      search: (prev) => ({ ...prev, taskId: undefined, commentId: undefined, commentCreatedAt: undefined }),
       replace: true,
     });
   };
@@ -45,6 +47,8 @@ export const useTaskDetailsRouting = () => {
 
   return {
     selectedTaskId,
+    selectedCommentId,
+    selectedCommentCreatedAt,
     isEditingTask,
     openTask,
     closeTask,

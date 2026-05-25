@@ -174,7 +174,9 @@ interface ListTaskCommentsRequest {
   taskId: string;
   limit?: number;
   before?: string;
-  commentId?: string;
+  beforeCommentId?: string;
+  after?: string;
+  afterCommentId?: string;
 }
 
 export const listTaskComments = async (request: ListTaskCommentsRequest) => {
@@ -185,8 +187,14 @@ export const listTaskComments = async (request: ListTaskCommentsRequest) => {
   if (request.before) {
     searchParams.set('before', request.before);
   }
-  if (request.commentId) {
-    searchParams.set('comment_id', request.commentId);
+  if (request.beforeCommentId) {
+    searchParams.set('comment_id', request.beforeCommentId);
+  }
+  if (request.after) {
+    searchParams.set('after', request.after);
+  }
+  if (request.afterCommentId) {
+    searchParams.set('after_comment_id', request.afterCommentId);
   }
 
   const response = await api.get(`tasks/${request.taskId}/comments`, {

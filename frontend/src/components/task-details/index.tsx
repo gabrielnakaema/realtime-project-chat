@@ -12,11 +12,20 @@ import { useTaskDetails } from '@/hooks/use-task-details';
 interface TaskDetailsProps {
   taskId: string;
   open: boolean;
+  targetCommentId?: string;
+  targetCommentCreatedAt?: string;
   onOpenChange: (open: boolean) => void;
   onEdit: () => void;
 }
 
-export const TaskDetails = ({ taskId, open, onOpenChange, onEdit }: TaskDetailsProps) => {
+export const TaskDetails = ({
+  taskId,
+  open,
+  targetCommentId,
+  targetCommentCreatedAt,
+  onOpenChange,
+  onEdit,
+}: TaskDetailsProps) => {
   const { task, isLoading, archive, isArchiving } = useTaskDetails(taskId, open, () => onOpenChange(false));
 
   if (isLoading) {
@@ -74,7 +83,13 @@ export const TaskDetails = ({ taskId, open, onOpenChange, onEdit }: TaskDetailsP
             </div>
           </ScrollArea>
 
-          <TaskComments taskId={taskId} projectId={task.project_id} open={open} />
+          <TaskComments
+            taskId={taskId}
+            projectId={task.project_id}
+            open={open}
+            targetCommentId={targetCommentId}
+            targetCommentCreatedAt={targetCommentCreatedAt}
+          />
         </div>
       </DialogContent>
     </Dialog>

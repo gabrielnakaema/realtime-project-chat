@@ -1,6 +1,15 @@
 import type { ListTasksRequest } from '@/types/task';
 import type { SearchTasksForUserRequest } from './tasks';
 
+export interface TaskCommentsQueryKeyState {
+  taskId: string;
+  commentId: string | null;
+  commentCreatedAt: string | null;
+  limit: number | null;
+}
+
+export type TaskCommentsQueryKey = readonly ['tasks', 'comments', TaskCommentsQueryKeyState];
+
 export const userQueryKeys = {
   me: ['users', 'me'],
 } as const;
@@ -18,7 +27,23 @@ export const taskQueryKeys = {
   all: ['tasks'],
   listByProjectId: (projectId: string) => ['tasks', 'list', { projectId }],
   details: (id: string) => ['tasks', 'details', id],
-  comments: (taskId: string) => ['tasks', 'comments', taskId],
+  comments: (
+    taskId: string,
+    options?: {
+      commentId?: string | null;
+      commentCreatedAt?: string | null;
+      limit?: number | null;
+    },
+  ): TaskCommentsQueryKey => [
+    'tasks',
+    'comments',
+    {
+      taskId,
+      commentId: options?.commentId ?? null,
+      commentCreatedAt: options?.commentCreatedAt ?? null,
+      limit: options?.limit ?? null,
+    },
+  ],
   list: (request: ListTasksRequest) => ['tasks', 'list', request],
   listGroupedByProjectId: (request: ListTasksRequest) => ['tasks', 'list', 'grouped', request],
   countByColumn: (projectId: string, projectColumnIds: string[]) => ['tasks', 'count', { projectId, projectColumnIds }],

@@ -1,4 +1,5 @@
 import { MessageSquare, Reply, SendHorizontal } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { Button } from '../button';
 import { LoadingSpinner } from '../loading';
 import { TextEditor } from '../text-editor';
@@ -14,15 +15,26 @@ interface TaskCommentsProps {
   taskId: string;
   projectId?: string;
   open: boolean;
+  targetCommentId?: string;
+  targetCommentCreatedAt?: string;
 }
 
-export const TaskComments = ({ taskId, projectId, open }: TaskCommentsProps) => {
+export const TaskComments = ({
+  taskId,
+  projectId,
+  open,
+  targetCommentId,
+  targetCommentCreatedAt,
+}: TaskCommentsProps) => {
   const { user } = useAuth();
   const {
     comments,
     isLoading,
     isSubmitting,
+    hasPreviousPage,
     isFetchingNextPage,
+    isFetchingPreviousPage,
+    fetchPreviousPage,
     sentinelRef,
     commentDraft,
     setCommentDraft,
@@ -35,7 +47,51 @@ export const TaskComments = ({ taskId, projectId, open }: TaskCommentsProps) => 
     startReply,
     cancelReply,
     submitReply,
-  } = useTaskComments({ taskId, projectId, open });
+  } = useTaskComments({ taskId, projectId, open, targetCommentId, targetCommentCreatedAt });
+  const hasScrolledToTargetRef = useRef(false);
+  const highlightAnimationRef = useRef<Animation | null>(null);
+
+  useEffect(() => {
+    hasScrolledToTargetRef.current = false;
+    highlightAnimationRef.current?.cancel();
+    highlightAnimationRef.current = null;
+  }, [targetCommentId, open]);
+
+  useEffect(() => {
+    if (!open || !targetCommentId || hasScrolledToTargetRef.current) {
+      return;
+    }
+
+    const targetElement = document.getElementById(`task-comment-${targetCommentId}`);
+    if (!targetElement) {
+      return;
+    }
+
+    hasScrolledToTargetRef.current = true;
+    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    highlightAnimationRef.current?.cancel();
+    highlightAnimationRef.current = targetElement.animate(
+      [
+        { boxShadow: '0 0 0 0 rgba(59, 130, 246, 0)', transform: 'translateY(0)' },
+        { boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.35)', transform: 'translateY(-1px)', offset: 0.15 },
+        { boxShadow: '0 0 0 0 rgba(59, 130, 246, 0)', transform: 'translateY(0)' },
+      ],
+      {
+        duration: 3000,
+        easing: 'ease-out',
+      },
+    );
+    highlightAnimationRef.current.onfinish = () => {
+      if (highlightAnimationRef.current?.playState === 'finished') {
+        highlightAnimationRef.current = null;
+      }
+    };
+
+    return () => {
+      highlightAnimationRef.current?.cancel();
+      highlightAnimationRef.current = null;
+    };
+  }, [comments, open, targetCommentId]);
 
   const renderComments = () => {
     if (isLoading) {
@@ -60,6 +116,19 @@ export const TaskComments = ({ taskId, projectId, open }: TaskCommentsProps) => 
 
     return (
       <>
+        {(hasPreviousPage || isFetchingPreviousPage) && (
+          <div className="flex justify-center pb-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => fetchPreviousPage()}
+              disabled={isFetchingPreviousPage}
+              className="text-slate-500 dark:bg-transparent dark:text-gray-100 dark:hover:bg-gray-900"
+            >
+              {isFetchingPreviousPage ? <LoadingSpinner size="1rem" /> : 'Load recent comments'}
+            </Button>
+          </div>
+        )}
         {comments.map((comment) => (
           <TaskCommentItem
             key={comment.id}
@@ -160,7 +229,10 @@ const TaskCommentItem = ({
 
   return (
     <div className={cn('space-y-3', depth > 0 && 'ml-4 border-l border-slate-200 pl-4 dark:border-slate-700')}>
-      <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <article
+        id={`task-comment-${comment.id}`}
+        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-700 dark:bg-slate-900"
+      >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">

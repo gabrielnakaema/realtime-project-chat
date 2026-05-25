@@ -4,14 +4,33 @@ import type { InfiniteData } from '@tanstack/react-query';
 import type { CursorPaginated } from '@/types/paginated';
 import type { TaskComment } from '@/types/task';
 import type { SocketEvent } from '@/types/websocket';
+import type { CommentsPageParam } from '@/hooks/task-comments-pagination';
 import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
+import {
+  TASK_COMMENTS_PAGE_SIZE,
+  buildTaskCommentsQueryKey,
+  buildTaskCommentsRequest,
+  getNextCommentsPageParam,
+  getPreviousCommentsPageParam,
+} from '@/hooks/task-comments-pagination';
 import { useSocket } from '@/hooks/use-socket';
 import { createTaskComment, listTaskComments } from '@/services/tasks';
-import { taskQueryKeys } from '@/services/query-keys';
 
-type CommentsInfiniteData = InfiniteData<CursorPaginated<TaskComment>, string | null>;
+type CommentsInfiniteData = InfiniteData<CursorPaginated<TaskComment>, CommentsPageParam>;
 
-export const useTaskComments = ({ taskId, projectId, open }: { taskId: string; projectId?: string; open: boolean }) => {
+export const useTaskComments = ({
+  taskId,
+  projectId,
+  open,
+  targetCommentId,
+  targetCommentCreatedAt,
+}: {
+  taskId: string;
+  projectId?: string;
+  open: boolean;
+  targetCommentId?: string;
+  targetCommentCreatedAt?: string;
+}) => {
   const queryClient = useQueryClient();
   const { status, subscribe } = useSocket();
   const [commentDraft, setCommentDraft] = useState('');
@@ -20,30 +39,59 @@ export const useTaskComments = ({ taskId, projectId, open }: { taskId: string; p
   const [composerKey, setComposerKey] = useState(0);
   const [replyEditorKey, setReplyEditorKey] = useState(0);
 
-  const queryKey = taskQueryKeys.comments(taskId);
+  const commentsQueryKey = buildTaskCommentsQueryKey({
+    taskId,
+    targetCommentId,
+    targetCommentCreatedAt,
+  });
 
-  const { data, isLoading, fetchNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: taskQueryKeys.comments(taskId),
-    queryFn: ({ pageParam }) => listTaskComments({ taskId, limit: 20, before: pageParam ?? undefined }),
-    getNextPageParam: (lastPage) => {
-      if (!lastPage.has_next) return undefined;
-      return lastPage.data[lastPage.data.length - 1]?.created_at ?? undefined;
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    fetchPreviousPage,
+    hasPreviousPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchingPreviousPage,
+  } = useInfiniteQuery({
+    queryKey: commentsQueryKey,
+    queryFn: ({ pageParam, queryKey }) => {
+      const [, , key] = queryKey;
+
+      return listTaskComments(
+        buildTaskCommentsRequest({
+          taskId: key.taskId,
+          pageParam,
+          targetCommentId: key.commentId ?? undefined,
+          targetCommentCreatedAt: key.commentCreatedAt ?? undefined,
+          limit: key.limit ?? TASK_COMMENTS_PAGE_SIZE,
+        }),
+      );
     },
-    initialPageParam: null as string | null,
+    getNextPageParam: getNextCommentsPageParam,
+    getPreviousPageParam: getPreviousCommentsPageParam,
+    initialPageParam: { direction: 'initial' } as CommentsPageParam,
     enabled: open,
   });
 
   const comments = data?.pages.flatMap((page) => page.data) ?? [];
 
   const sentinelRef = useInfiniteScrollObserver<HTMLDivElement>({
-    onLoadMore: fetchNextPage,
+    onLoadMore: () => {
+      if (!hasNextPage || isFetchingNextPage) {
+        return;
+      }
+
+      fetchNextPage();
+    },
   });
 
   const { mutate: submitMutation, isPending: isSubmitting } = useMutation({
     mutationFn: ({ content, parentCommentId }: { content: string; parentCommentId?: string | null }) =>
       createTaskComment({ taskId, content, parentCommentId }),
     onSuccess: (created, variables) => {
-      queryClient.setQueryData<CommentsInfiniteData>(queryKey, (current) =>
+      queryClient.setQueryData<CommentsInfiniteData>(commentsQueryKey, (current) =>
         prependCommentToInfiniteData(current, created),
       );
 
@@ -62,7 +110,7 @@ export const useTaskComments = ({ taskId, projectId, open }: { taskId: string; p
     if (event.type !== 'task_comment_created') return;
     if (event.data.task?.id !== taskId) return;
 
-    queryClient.setQueryData<CommentsInfiniteData>(queryKey, (current) =>
+    queryClient.setQueryData<CommentsInfiniteData>(commentsQueryKey, (current) =>
       prependCommentToInfiniteData(current, event.data),
     );
   });
@@ -77,7 +125,11 @@ export const useTaskComments = ({ taskId, projectId, open }: { taskId: string; p
     comments,
     isLoading,
     isSubmitting,
+    hasPreviousPage: Boolean(hasPreviousPage),
+    hasNextPage: Boolean(hasNextPage),
     isFetchingNextPage,
+    isFetchingPreviousPage,
+    fetchPreviousPage,
     sentinelRef,
     commentDraft,
     setCommentDraft,
@@ -104,8 +156,8 @@ const prependCommentToInfiniteData = (
   incoming: TaskComment,
 ): CommentsInfiniteData => {
   const baseData: CommentsInfiniteData = current ?? {
-    pages: [{ data: [], has_next: false }],
-    pageParams: [null],
+    pages: [{ data: [], has_next: false, has_previous: false }],
+    pageParams: [{ direction: 'initial' }],
   };
 
   const allComments = baseData.pages.flatMap((page) => page.data);

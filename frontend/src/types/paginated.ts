@@ -8,4 +8,5 @@ export interface Paginated<T> {
 export interface CursorPaginated<T> {
   data: T[];
   has_next: boolean;
+  has_previous: boolean;
 }
