@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { Button } from './button';
 import { Input } from './input';
+import type { FormEvent } from 'react';
 import { cn } from '@/lib/utils';
+import { hasSearchQuery, normalizeSearchQuery } from '@/utils/search';
 
 interface SearchBarProps {
   action: string;
@@ -12,8 +15,26 @@ interface SearchBarProps {
 }
 
 export const SearchBar = ({ action, searchName, formClassName, initialValue }: SearchBarProps) => {
+  const [value, setValue] = useState(initialValue ?? '');
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    const normalizedValue = normalizeSearchQuery(value);
+    if (!normalizedValue) {
+      event.preventDefault();
+      return;
+    }
+
+    if (normalizedValue !== value) {
+      const input = event.currentTarget.elements.namedItem(searchName);
+      if (input instanceof HTMLInputElement) {
+        input.value = normalizedValue;
+      }
+      setValue(normalizedValue);
+    }
+  };
+
   return (
-    <form action={action} method="GET" className={cn('flex items-center gap-2', formClassName)}>
+    <form action={action} method="GET" className={cn('flex items-center gap-2', formClassName)} onSubmit={handleSubmit}>
       <label htmlFor={searchName} className="sr-only">
         Search projects and tasks
       </label>
@@ -22,11 +43,12 @@ export const SearchBar = ({ action, searchName, formClassName, initialValue }: S
         label=""
         type="search"
         name={searchName}
-        placeholder="Search"
+        placeholder="Search projects and tasks"
         required
-        defaultValue={initialValue}
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
       />
-      <Button type="submit" className="p-3">
+      <Button type="submit" className="p-3" disabled={!hasSearchQuery(value)}>
         <Search className="h-4 w-4" />
       </Button>
     </form>

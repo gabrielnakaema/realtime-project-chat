@@ -1,11 +1,13 @@
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Search } from 'lucide-react';
 import { z } from 'zod';
 import { HeaderUser } from '@/components/header-user';
 import { NotificationBell } from '@/components/notification-bell';
+import { SearchEmptyState } from '@/components/search/empty-state';
 import { ProjectSearchResults } from '@/components/search/project-search-results';
 import { SearchBar } from '@/components/search-bar';
 import { TaskSearchResults } from '@/components/search/task-search-results';
+import { normalizeSearchQuery } from '@/utils/search';
 
 export const Route = createFileRoute('/search/')({
   component: RouteComponent,
@@ -16,6 +18,8 @@ export const Route = createFileRoute('/search/')({
 
 function RouteComponent() {
   const { query } = Route.useSearch();
+  const normalizedQuery = normalizeSearchQuery(query);
+  const hasQuery = normalizedQuery.length > 0;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -33,7 +37,13 @@ function RouteComponent() {
               <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">TaskFlow</h1>
             </div>
 
-            <SearchBar action="/search" searchName="query" formClassName="w-full max-w-md" initialValue={query} />
+            <SearchBar
+              key={normalizedQuery}
+              action="/search"
+              searchName="query"
+              formClassName="w-full max-w-md"
+              initialValue={normalizedQuery}
+            />
             <div className="flex items-center gap-4">
               <NotificationBell />
               <HeaderUser />
@@ -42,12 +52,21 @@ function RouteComponent() {
         </div>
       </header>
       <div className="flex w-full flex-col gap-8 px-6 py-12">
-        <p className="text-lg font-medium text-slate-900 dark:text-slate-400">
-          Showing results for <span className="text-slate-500 dark:text-slate-100">&quot;{query}&quot;</span>
-        </p>
-        <ProjectSearchResults query={query} />
-
-        <TaskSearchResults query={query} />
+        {hasQuery ? (
+          <>
+            <p className="text-lg font-medium text-slate-900 dark:text-slate-400">
+              Showing results for <span className="text-slate-500 dark:text-slate-100">&quot;{normalizedQuery}&quot;</span>
+            </p>
+            <ProjectSearchResults query={normalizedQuery} />
+            <TaskSearchResults query={normalizedQuery} />
+          </>
+        ) : (
+          <SearchEmptyState
+            icon={<Search className="h-4 w-4" />}
+            title="Search across your workspace"
+            description="Look up projects and tasks to jump back into ongoing work."
+          />
+        )}
       </div>
     </div>
   );

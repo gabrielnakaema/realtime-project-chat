@@ -5,24 +5,28 @@ import type { Task } from '@/types/task';
 import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { taskQueryKeys } from '@/services/query-keys';
 import { searchTasksForUser } from '@/services/tasks';
+import { normalizeSearchQuery } from '@/utils/search';
 
 const PAGE_SIZE = 15;
 
 export const useSearchTasks = (query?: string) => {
+  const normalizedQuery = normalizeSearchQuery(query);
+
   const result = useInfiniteQuery({
     queryKey: taskQueryKeys.search({
-      searchQuery: query || '',
+      searchQuery: normalizedQuery,
       limit: PAGE_SIZE,
       cursorDueDate: null,
       cursorUpdatedAt: null,
     }),
     queryFn: ({ pageParam }) =>
       searchTasksForUser({
-        searchQuery: query || '',
+        searchQuery: normalizedQuery,
         limit: PAGE_SIZE,
         cursorDueDate: pageParam.cursorDueDate,
         cursorUpdatedAt: pageParam.cursorUpdatedAt,
       }),
+    enabled: normalizedQuery.length > 0,
     getNextPageParam: (lastPage: CursorPaginated<Task>) => {
       if (!lastPage.has_next) return undefined;
       const last = lastPage.data[lastPage.data.length - 1];

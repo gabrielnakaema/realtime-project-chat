@@ -1,9 +1,9 @@
 import { Bell, CheckCheck, Loader2 } from 'lucide-react';
+import type { Notification } from '@/types/notification';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useNotifications } from '@/hooks/use-notifications';
 import { cn } from '@/lib/utils';
-import type { Notification } from '@/types/notification';
 import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
 
 export const NotificationBell = () => {
