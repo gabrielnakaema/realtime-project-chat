@@ -101,7 +101,8 @@ func (ps *ProjectService) Create(ctx context.Context, request CreateProjectReque
 	}
 
 	err = ps.publisher.Publish(ctx, events.ProjectCreated, &events.ProjectCreatedPayload{
-		Project: project,
+		Project:      project,
+		ActionOrigin: domain.ActionOriginFromContext(ctx),
 		User: domain.User{
 			Id: request.UserId,
 		},
@@ -297,7 +298,8 @@ func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectReque
 	project.Columns = request.Columns
 
 	err = ps.publisher.Publish(ctx, events.ProjectUpdated, &events.ProjectUpdatedPayload{
-		Project: *project,
+		Project:      *project,
+		ActionOrigin: domain.ActionOriginFromContext(ctx),
 		User: domain.User{
 			Id: request.UserId,
 		},
@@ -426,6 +428,7 @@ func (ps *ProjectService) CreateMember(ctx context.Context, request CreateMember
 
 	err = ps.publisher.Publish(ctx, events.ProjectMemberCreated, &events.ProjectMemberCreatedPayload{
 		ProjectMember: member,
+		ActionOrigin:  domain.ActionOriginFromContext(ctx),
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
@@ -589,6 +592,7 @@ func (ps *ProjectService) RemoveMember(ctx context.Context, request RemoveMember
 
 	err = ps.publisher.Publish(ctx, events.ProjectMemberRemoved, &events.ProjectMemberRemovedPayload{
 		ProjectMember: member,
+		ActionOrigin:  domain.ActionOriginFromContext(ctx),
 		User: domain.User{
 			Id: request.RequestUserId,
 		},

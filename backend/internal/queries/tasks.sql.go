@@ -135,17 +135,23 @@ func (q *Queries) CreateTaskTag(ctx context.Context, arg CreateTaskTagParams) er
 }
 
 const createTaskUpdate = `-- name: CreateTaskUpdate :one
-INSERT INTO task_updates (task_id, user_id, update_type) VALUES ($1, $2, $3) returning id
+INSERT INTO task_updates (task_id, user_id, update_type, action_origin) VALUES ($1, $2, $3, $4) returning id
 `
 
 type CreateTaskUpdateParams struct {
-	TaskID     uuid.UUID
-	UserID     uuid.UUID
-	UpdateType string
+	TaskID       uuid.UUID
+	UserID       uuid.UUID
+	UpdateType   string
+	ActionOrigin string
 }
 
 func (q *Queries) CreateTaskUpdate(ctx context.Context, arg CreateTaskUpdateParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, createTaskUpdate, arg.TaskID, arg.UserID, arg.UpdateType)
+	row := q.db.QueryRow(ctx, createTaskUpdate,
+		arg.TaskID,
+		arg.UserID,
+		arg.UpdateType,
+		arg.ActionOrigin,
+	)
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
@@ -306,6 +312,7 @@ WITH task_tags_cte AS (
     tu.task_id as task_update_task_id,
     tu.user_id as task_update_user_id,
     tu.update_type as task_update_update_type,
+    tu.action_origin as task_update_action_origin,
     tu.created_at as task_update_created_at,
     u.name as task_update_user_name,
     u.email as task_update_user_email,
@@ -385,6 +392,7 @@ SELECT
       'task_id', tu.task_update_task_id,
       'user_id', tu.task_update_user_id,
       'update_type', tu.task_update_update_type,
+      'action_origin', tu.task_update_action_origin,
       'created_at', tu.task_update_created_at,
       'user', jsonb_build_object(
         'id', tu.task_update_user_id,

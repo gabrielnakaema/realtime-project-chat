@@ -175,7 +175,8 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 	}
 
 	err = ts.publisher.Publish(ctx, events.TaskCreated, &events.TaskCreatedPayload{
-		Task: task,
+		Task:         task,
+		ActionOrigin: domain.ActionOriginFromContext(ctx),
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
@@ -200,120 +201,12 @@ type UpdateTaskRequest struct {
 }
 
 func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*domain.Task, error) {
-	if request.RequestUserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
-	}
-
-	task, err := ts.taskRepository.GetById(ctx, request.TaskId)
-	if err != nil {
-		var domainErr domain.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("task not found")
-			}
-			return nil, domainErr
-		}
-		return nil, domain.ServerError("failed to get task", err)
-	}
-
-	project, err := ts.projectRepository.GetById(ctx, task.ProjectId)
-	if err != nil {
-		var domainErr domain.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("project not found")
-			}
-			return nil, domainErr
-		}
-		return nil, domain.ServerError("failed to get project", err)
-	}
-
-	if !project.IsMember(request.RequestUserId) {
-		return nil, domain.ForbiddenError("forbidden")
-	}
-
-	if request.ResponsibleId != nil && *request.ResponsibleId != uuid.Nil {
-		if !project.IsMember(*request.ResponsibleId) {
-			return nil, domain.BusinessValidationError("responsible is not a member of the project")
-		}
-	}
-
-	projectColumn, err := findProjectColumn(project, request.ProjectColumnId)
+	task, project, err := ts.getTaskAndProjectForUser(ctx, request.TaskId, request.RequestUserId)
 	if err != nil {
 		return nil, err
 	}
 
-	responsible := task.Responsible
-	if request.ResponsibleId == nil || *request.ResponsibleId == uuid.Nil {
-		responsible = nil
-	} else if task.ResponsibleId == nil || *task.ResponsibleId != *request.ResponsibleId || task.Responsible == nil {
-		responsible, err = ts.userRepository.GetById(ctx, *request.ResponsibleId)
-		if err != nil {
-			return nil, domain.ServerError("failed to get responsible user", err)
-		}
-	}
-
-	oldProjectColumnID := task.ProjectColumnId
-
-	formattedTags := []string{}
-	for _, tag := range request.Tags {
-		if strings.TrimSpace(tag) == "" {
-			continue
-		}
-		formattedTags = append(formattedTags, tag)
-	}
-
-	updatedTask := domain.Task{
-		Id:              task.Id,
-		ProjectId:       task.ProjectId,
-		ProjectColumnId: request.ProjectColumnId,
-		AuthorId:        task.AuthorId,
-		CreatedAt:       task.CreatedAt,
-		Author:          task.Author,
-		Order:           task.Order,
-		Title:           request.Title,
-		Description:     request.Description,
-		Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
-		Priority:        request.Priority,
-		ResponsibleId:   request.ResponsibleId,
-		Responsible:     responsible,
-		DueDate:         request.DueDate,
-		Tags:            formattedTags,
-		UpdatedAt:       time.Now(),
-		Updates:         []domain.TaskUpdate{},
-		ProjectColumn:   projectColumn,
-		ArchivedAt:      task.ArchivedAt,
-	}
-
-	if projectColumn.IsDoneColumn {
-		now := time.Now()
-		updatedTask.DoneAt = &now
-	}
-
-	err = ts.taskRepository.Update(ctx, &updatedTask)
-	if err != nil {
-		return nil, domain.ServerError("failed to update task", err)
-	}
-
-	// Only include previous status if it changed
-	var previousProjectColumnID *uuid.UUID
-	if oldProjectColumnID != updatedTask.ProjectColumnId {
-		previousProjectColumnID = &oldProjectColumnID
-	}
-
-	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
-		Task:         updatedTask,
-		PreviousTask: task,
-		User: domain.User{
-			Id: request.RequestUserId,
-		},
-		PreviousProjectColumnID: previousProjectColumnID,
-	})
-	if err != nil {
-		return nil, domain.ServerError("failed to publish task updated event", err)
-	}
-
-	return &updatedTask, nil
+	return ts.updateLoadedTask(ctx, task, project, request)
 }
 
 type ListTasksRequest struct {
@@ -357,38 +250,10 @@ func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) (*uti
 }
 
 func (ts *TaskService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error) {
-	if userId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
-	}
-
-	task, err := ts.taskRepository.GetById(ctx, id)
+	task, _, err := ts.getTaskAndProjectForUser(ctx, id, userId)
 	if err != nil {
-		var domainErr domain.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("task not found")
-			}
-			return nil, domainErr
-		}
-		return nil, domain.ServerError("failed to get task", err)
+		return nil, err
 	}
-
-	project, err := ts.projectRepository.GetById(ctx, task.ProjectId)
-	if err != nil {
-		var domainErr domain.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("project not found")
-			}
-			return nil, domainErr
-		}
-		return nil, domain.ServerError("failed to get project", err)
-	}
-
-	if !project.IsMember(userId) {
-		return nil, domain.ForbiddenError("forbidden")
-	}
-
 	return task, nil
 }
 
@@ -517,6 +382,7 @@ func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) 
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
 		Task:         archivedTask,
 		PreviousTask: task,
+		ActionOrigin: domain.ActionOriginFromContext(ctx),
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
@@ -600,6 +466,7 @@ func (ts *TaskService) Restore(ctx context.Context, request RestoreTaskRequest) 
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
 		Task:         restoredTask,
 		PreviousTask: task,
+		ActionOrigin: domain.ActionOriginFromContext(ctx),
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
@@ -641,30 +508,75 @@ type MoveTaskRequest struct {
 }
 
 func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*domain.Task, error) {
-	if request.RequestUserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
-	}
-
-	oldTask, err := ts.taskRepository.GetById(ctx, request.TaskId)
+	oldTask, project, err := ts.getTaskAndProjectForUser(ctx, request.TaskId, request.RequestUserId)
 	if err != nil {
-		var domainErr domain.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("task not found")
-			}
-			return nil, domainErr
-		}
-		return nil, domain.ServerError("failed to get task", err)
+		return nil, err
 	}
-	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
+
+	if oldTask.ProjectId != request.ProjectId {
+		return nil, domain.BusinessValidationError("task does not belong to the provided project_id")
+	}
+
+	return ts.moveLoadedTask(ctx, oldTask, project, request)
+}
+
+type MarkTaskDoneRequest struct {
+	TaskId        uuid.UUID
+	RequestUserId uuid.UUID
+}
+
+func (ts *TaskService) MarkTaskDone(ctx context.Context, request MarkTaskDoneRequest) (*domain.Task, error) {
+	task, project, err := ts.getTaskAndProjectForUser(ctx, request.TaskId, request.RequestUserId)
 	if err != nil {
-		return nil, domain.ServerError("failed to get project", err)
+		return nil, err
 	}
 
-	if !project.IsMember(request.RequestUserId) {
-		return nil, domain.ForbiddenError("forbidden")
+	doneColumn, err := resolveDoneColumn(project)
+	if err != nil {
+		return nil, err
 	}
 
+	if task.ProjectColumnId == doneColumn.Id && task.DoneAt != nil {
+		return task, nil
+	}
+
+	return ts.moveLoadedTask(ctx, task, project, MoveTaskRequest{
+		TaskId:          task.Id,
+		RequestUserId:   request.RequestUserId,
+		ProjectId:       task.ProjectId,
+		ProjectColumnId: doneColumn.Id,
+	})
+}
+
+type AssignTaskToSelfRequest struct {
+	TaskId        uuid.UUID
+	RequestUserId uuid.UUID
+}
+
+func (ts *TaskService) AssignTaskToSelf(ctx context.Context, request AssignTaskToSelfRequest) (*domain.Task, error) {
+	task, project, err := ts.getTaskAndProjectForUser(ctx, request.TaskId, request.RequestUserId)
+	if err != nil {
+		return nil, err
+	}
+
+	if task.ResponsibleId != nil && *task.ResponsibleId == request.RequestUserId {
+		return task, nil
+	}
+
+	return ts.updateLoadedTask(ctx, task, project, UpdateTaskRequest{
+		TaskId:          task.Id,
+		Title:           task.Title,
+		Description:     task.Description,
+		ProjectColumnId: task.ProjectColumnId,
+		RequestUserId:   request.RequestUserId,
+		Priority:        task.Priority,
+		DueDate:         task.DueDate,
+		ResponsibleId:   &request.RequestUserId,
+		Tags:            task.Tags,
+	})
+}
+
+func (ts *TaskService) moveLoadedTask(ctx context.Context, oldTask *domain.Task, project *domain.Project, request MoveTaskRequest) (*domain.Task, error) {
 	projectColumn, err := findProjectColumn(project, request.ProjectColumnId)
 	if err != nil {
 		return nil, err
@@ -717,6 +629,7 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
 		Task:         *updatedTask,
 		PreviousTask: oldTask,
+		ActionOrigin: domain.ActionOriginFromContext(ctx),
 		User: domain.User{
 			Id: request.RequestUserId,
 		},
@@ -727,6 +640,127 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 	}
 
 	return updatedTask, nil
+}
+
+func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, project *domain.Project, request UpdateTaskRequest) (*domain.Task, error) {
+	if request.ResponsibleId != nil && *request.ResponsibleId != uuid.Nil {
+		if !project.IsMember(*request.ResponsibleId) {
+			return nil, domain.BusinessValidationError("responsible is not a member of the project")
+		}
+	}
+
+	projectColumn, err := findProjectColumn(project, request.ProjectColumnId)
+	if err != nil {
+		return nil, err
+	}
+
+	responsible := task.Responsible
+	if request.ResponsibleId == nil || *request.ResponsibleId == uuid.Nil {
+		responsible = nil
+	} else if task.ResponsibleId == nil || *task.ResponsibleId != *request.ResponsibleId || task.Responsible == nil {
+		responsible, err = ts.userRepository.GetById(ctx, *request.ResponsibleId)
+		if err != nil {
+			return nil, domain.ServerError("failed to get responsible user", err)
+		}
+	}
+
+	oldProjectColumnID := task.ProjectColumnId
+
+	formattedTags := []string{}
+	for _, tag := range request.Tags {
+		if strings.TrimSpace(tag) == "" {
+			continue
+		}
+		formattedTags = append(formattedTags, tag)
+	}
+
+	updatedTask := domain.Task{
+		Id:              task.Id,
+		ProjectId:       task.ProjectId,
+		ProjectColumnId: request.ProjectColumnId,
+		AuthorId:        task.AuthorId,
+		CreatedAt:       task.CreatedAt,
+		Author:          task.Author,
+		Order:           task.Order,
+		Title:           request.Title,
+		Description:     request.Description,
+		Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
+		Priority:        request.Priority,
+		ResponsibleId:   request.ResponsibleId,
+		Responsible:     responsible,
+		DueDate:         request.DueDate,
+		Tags:            formattedTags,
+		UpdatedAt:       time.Now(),
+		Updates:         []domain.TaskUpdate{},
+		ProjectColumn:   projectColumn,
+		ArchivedAt:      task.ArchivedAt,
+	}
+
+	if projectColumn.IsDoneColumn {
+		now := time.Now()
+		updatedTask.DoneAt = &now
+	}
+
+	err = ts.taskRepository.Update(ctx, &updatedTask)
+	if err != nil {
+		return nil, domain.ServerError("failed to update task", err)
+	}
+
+	var previousProjectColumnID *uuid.UUID
+	if oldProjectColumnID != updatedTask.ProjectColumnId {
+		previousProjectColumnID = &oldProjectColumnID
+	}
+
+	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
+		Task:         updatedTask,
+		PreviousTask: task,
+		ActionOrigin: domain.ActionOriginFromContext(ctx),
+		User: domain.User{
+			Id: request.RequestUserId,
+		},
+		PreviousProjectColumnID: previousProjectColumnID,
+	})
+	if err != nil {
+		return nil, domain.ServerError("failed to publish task updated event", err)
+	}
+
+	return &updatedTask, nil
+}
+
+func (ts *TaskService) getTaskAndProjectForUser(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (*domain.Task, *domain.Project, error) {
+	if userID == uuid.Nil {
+		return nil, nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	task, err := ts.taskRepository.GetById(ctx, taskID)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, nil, domain.NotFoundError("task not found")
+			}
+			return nil, nil, domainErr
+		}
+		return nil, nil, domain.ServerError("failed to get task", err)
+	}
+
+	project, err := ts.projectRepository.GetById(ctx, task.ProjectId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, nil, domain.NotFoundError("project not found")
+			}
+			return nil, nil, domainErr
+		}
+		return nil, nil, domain.ServerError("failed to get project", err)
+	}
+
+	if !project.IsMember(userID) {
+		return nil, nil, domain.ForbiddenError("forbidden")
+	}
+
+	return task, project, nil
 }
 
 func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskRequest) (string, error) {
@@ -845,4 +879,20 @@ func validateProjectColumnIDs(project *domain.Project, statusIDs []uuid.UUID) er
 	}
 
 	return nil
+}
+
+func resolveDoneColumn(project *domain.Project) (*domain.ProjectColumn, error) {
+	doneColumns := make([]domain.ProjectColumn, 0, 1)
+	for _, column := range project.Columns {
+		if column.IsDoneColumn {
+			doneColumns = append(doneColumns, column)
+		}
+	}
+
+	if len(doneColumns) != 1 {
+		return nil, domain.BusinessValidationError("project must have exactly one done column")
+	}
+
+	column := doneColumns[0]
+	return &column, nil
 }

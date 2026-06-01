@@ -1,5 +1,5 @@
 -- name: CreateTaskComment :one
-INSERT INTO task_comments (task_id, user_id, content, parent_comment_id) VALUES ($1, $2, $3, $4) returning id;
+INSERT INTO task_comments (task_id, user_id, content, parent_comment_id, action_origin) VALUES ($1, $2, $3, $4, $5) returning id;
 
 -- name: ListTaskComments :many
 WITH recursive paginated_parent_comments AS (
@@ -9,6 +9,7 @@ WITH recursive paginated_parent_comments AS (
     c.user_id,
     c.content,
     c.parent_comment_id,
+    c.action_origin,
     c.created_at,
     c.updated_at
   FROM task_comments c
@@ -25,6 +26,7 @@ comment_tree AS (
     p.user_id,
     p.content,
     p.parent_comment_id,
+    p.action_origin,
     p.created_at,
     p.updated_at,
     0 as level,
@@ -43,6 +45,7 @@ comment_tree AS (
     c.user_id,
     c.content,
     c.parent_comment_id,
+    c.action_origin,
     c.created_at,
     c.updated_at,
     ct.level + 1 as level,
@@ -69,6 +72,7 @@ WITH recursive paginated_parent_comments AS (
     c.user_id,
     c.content,
     c.parent_comment_id,
+    c.action_origin,
     c.created_at,
     c.updated_at
   FROM task_comments c
@@ -85,6 +89,7 @@ comment_tree AS (
     p.user_id,
     p.content,
     p.parent_comment_id,
+    p.action_origin,
     p.created_at,
     p.updated_at,
     0 as level,
@@ -103,6 +108,7 @@ comment_tree AS (
     c.user_id,
     c.content,
     c.parent_comment_id,
+    c.action_origin,
     c.created_at,
     c.updated_at,
     ct.level + 1 as level,

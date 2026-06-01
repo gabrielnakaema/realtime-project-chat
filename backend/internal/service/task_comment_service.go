@@ -97,12 +97,13 @@ func (s *TaskCommentService) Create(ctx context.Context, request CreateTaskComme
 
 	now := time.Now()
 	comment := domain.TaskComment{
-		Task:      task,
-		User:      user,
-		Content:   request.Content,
-		CreatedAt: now,
-		UpdatedAt: now,
-		Replies:   []domain.TaskComment{},
+		Task:         task,
+		User:         user,
+		Content:      request.Content,
+		ActionOrigin: domain.ActionOriginFromContext(ctx),
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		Replies:      []domain.TaskComment{},
 	}
 
 	err = s.taskCommentRepository.Create(ctx, &comment, request.ParentCommentID)
@@ -111,7 +112,8 @@ func (s *TaskCommentService) Create(ctx context.Context, request CreateTaskComme
 	}
 
 	err = s.publisher.Publish(ctx, events.TaskCommentCreated, &events.TaskCommentCreatedPayload{
-		TaskComment: comment,
+		TaskComment:  comment,
+		ActionOrigin: domain.ActionOriginFromContext(ctx),
 		User: domain.User{
 			Id: request.RequestUserID,
 		},

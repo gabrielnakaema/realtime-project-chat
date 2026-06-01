@@ -38,73 +38,83 @@ func (a *Api) Router() http.Handler {
 
 	r.Use(middleware.Timeout(30 * time.Second))
 
-	r.Use(a.handlers.AuthMiddleware.IdentifyUser)
+	r.Handle("/mcp", a.handlers.MCP)
 
-	r.Route("/users", func(r chi.Router) {
-		r.Post("/", a.handlers.User.Create)
-		r.Get("/me", a.handlers.User.GetMe)
-		r.Get("/", a.handlers.User.ListUsers)
-	})
+	r.Group(func(r chi.Router) {
+		r.Use(a.handlers.AuthMiddleware.IdentifyUser)
 
-	r.Route("/auth", func(r chi.Router) {
-		r.Post("/login", a.handlers.User.Login)
-		r.Post("/refresh-token", a.handlers.User.RefreshToken)
-		r.Post("/logout", a.handlers.User.Logout)
-	})
+		r.Route("/users", func(r chi.Router) {
+			r.Post("/", a.handlers.User.Create)
+			r.Get("/me", a.handlers.User.GetMe)
+			r.Get("/", a.handlers.User.ListUsers)
+			r.Route("/me/mcp-api-keys", func(r chi.Router) {
+				r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
+				r.Post("/", a.handlers.MCPAPIKey.Create)
+				r.Get("/", a.handlers.MCPAPIKey.List)
+				r.Delete("/{id}", a.handlers.MCPAPIKey.Revoke)
+			})
+		})
 
-	r.Route("/projects", func(r chi.Router) {
-		r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
-		r.Post("/", a.handlers.Project.Create)
-		r.Get("/", a.handlers.Project.List)
-		r.Get("/activities", a.handlers.Project.ListUsersProjectActivities)
-		r.Get("/{id}", a.handlers.Project.Get)
-		r.Put("/{id}", a.handlers.Project.Update)
-		r.Get("/{id}/activities", a.handlers.Project.ListActivitiesByProject)
-		r.Post("/{id}/members", a.handlers.Project.CreateMember)
-		r.Get("/{id}/members", a.handlers.Project.ListMembersByProjectId)
-		r.Delete("/{id}/members/{member_id}", a.handlers.Project.RemoveMember)
-		r.Get("/{id}/chat", a.handlers.Chat.GetChatByProjectId)
-		r.Get("/{id}/chat/messages", a.handlers.Chat.ListMessagesByProjectId)
-	})
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/login", a.handlers.User.Login)
+			r.Post("/refresh-token", a.handlers.User.RefreshToken)
+			r.Post("/logout", a.handlers.User.Logout)
+		})
 
-	r.Route("/chats", func(r chi.Router) {
-		r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
-		r.Post("/", a.handlers.Chat.GetOrCreateGeneralChat)
-		r.Get("/", a.handlers.Chat.ListGeneralChats)
-		r.Get("/{chatId}", a.handlers.Chat.GetChatById)
-		r.Get("/{chatId}/messages", a.handlers.Chat.ListChatMessages)
-		r.Get("/{chatId}/messages/{messageId}/reads", a.handlers.Chat.ListMessageReads)
-		r.Post("/{chatId}/read", a.handlers.Chat.MarkChatRead)
-		r.Post("/messages", a.handlers.Chat.CreateMessage)
-	})
+		r.Route("/projects", func(r chi.Router) {
+			r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
+			r.Post("/", a.handlers.Project.Create)
+			r.Get("/", a.handlers.Project.List)
+			r.Get("/activities", a.handlers.Project.ListUsersProjectActivities)
+			r.Get("/{id}", a.handlers.Project.Get)
+			r.Put("/{id}", a.handlers.Project.Update)
+			r.Get("/{id}/activities", a.handlers.Project.ListActivitiesByProject)
+			r.Post("/{id}/members", a.handlers.Project.CreateMember)
+			r.Get("/{id}/members", a.handlers.Project.ListMembersByProjectId)
+			r.Delete("/{id}/members/{member_id}", a.handlers.Project.RemoveMember)
+			r.Get("/{id}/chat", a.handlers.Chat.GetChatByProjectId)
+			r.Get("/{id}/chat/messages", a.handlers.Chat.ListMessagesByProjectId)
+		})
 
-	r.Route("/tasks", func(r chi.Router) {
-		r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
-		r.Get("/group-by-column", a.handlers.Task.GroupByColumn)
-		r.Get("/count-by-column", a.handlers.Task.CountByColumn)
-		r.Get("/", a.handlers.Task.List)
-		r.Post("/", a.handlers.Task.Create)
-		r.Get("/user", a.handlers.Task.ListUserDueTasks)
-		r.Get("/{id}", a.handlers.Task.Get)
-		r.Get("/{id}/comments", a.handlers.TaskComment.ListByTaskID)
-		r.Post("/{id}/comments", a.handlers.TaskComment.Create)
-		r.Post("/{id}/restore", a.handlers.Task.Restore)
-		r.Put("/{id}", a.handlers.Task.Update)
-		r.Delete("/{id}", a.handlers.Task.Archive)
-		r.Patch("/{id}/move", a.handlers.Task.Move)
-		r.Get("/search", a.handlers.Task.SearchTasksForUser)
-	})
+		r.Route("/chats", func(r chi.Router) {
+			r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
+			r.Post("/", a.handlers.Chat.GetOrCreateGeneralChat)
+			r.Get("/", a.handlers.Chat.ListGeneralChats)
+			r.Get("/{chatId}", a.handlers.Chat.GetChatById)
+			r.Get("/{chatId}/messages", a.handlers.Chat.ListChatMessages)
+			r.Get("/{chatId}/messages/{messageId}/reads", a.handlers.Chat.ListMessageReads)
+			r.Post("/{chatId}/read", a.handlers.Chat.MarkChatRead)
+			r.Post("/messages", a.handlers.Chat.CreateMessage)
+		})
 
-	r.Route("/notifications", func(r chi.Router) {
-		r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
-		r.Get("/", a.handlers.Notification.List)
-		r.Get("/unread-count", a.handlers.Notification.CountUnread)
-		r.Post("/read-all", a.handlers.Notification.MarkAllRead)
-		r.Post("/{id}/read", a.handlers.Notification.MarkRead)
-	})
+		r.Route("/tasks", func(r chi.Router) {
+			r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
+			r.Get("/group-by-column", a.handlers.Task.GroupByColumn)
+			r.Get("/count-by-column", a.handlers.Task.CountByColumn)
+			r.Get("/", a.handlers.Task.List)
+			r.Post("/", a.handlers.Task.Create)
+			r.Get("/user", a.handlers.Task.ListUserDueTasks)
+			r.Get("/{id}", a.handlers.Task.Get)
+			r.Get("/{id}/comments", a.handlers.TaskComment.ListByTaskID)
+			r.Post("/{id}/comments", a.handlers.TaskComment.Create)
+			r.Post("/{id}/restore", a.handlers.Task.Restore)
+			r.Put("/{id}", a.handlers.Task.Update)
+			r.Delete("/{id}", a.handlers.Task.Archive)
+			r.Patch("/{id}/move", a.handlers.Task.Move)
+			r.Get("/search", a.handlers.Task.SearchTasksForUser)
+		})
 
-	r.Route("/ws", func(r chi.Router) {
-		r.Get("/", a.Ws.Handler)
+		r.Route("/notifications", func(r chi.Router) {
+			r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
+			r.Get("/", a.handlers.Notification.List)
+			r.Get("/unread-count", a.handlers.Notification.CountUnread)
+			r.Post("/read-all", a.handlers.Notification.MarkAllRead)
+			r.Post("/{id}/read", a.handlers.Notification.MarkRead)
+		})
+
+		r.Route("/ws", func(r chi.Router) {
+			r.Get("/", a.Ws.Handler)
+		})
 	})
 
 	return r

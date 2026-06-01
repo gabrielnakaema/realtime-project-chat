@@ -64,11 +64,12 @@ var (
 )
 
 type TaskUpdate struct {
-	Id         uuid.UUID      `json:"id"`
-	TaskId     uuid.UUID      `json:"task_id"`
-	UserId     uuid.UUID      `json:"user_id"`
-	UpdateType TaskUpdateType `json:"update_type"`
-	CreatedAt  time.Time      `json:"created_at"`
+	Id           uuid.UUID      `json:"id"`
+	TaskId       uuid.UUID      `json:"task_id"`
+	UserId       uuid.UUID      `json:"user_id"`
+	UpdateType   TaskUpdateType `json:"update_type"`
+	ActionOrigin ActionOrigin   `json:"action_origin"`
+	CreatedAt    time.Time      `json:"created_at"`
 
 	User    *User        `json:"user,omitempty"`
 	Changes []TaskChange `json:"changes,omitempty"`
@@ -92,11 +93,12 @@ type TaskChange struct {
 
 func NewTaskCreatedUpdate(task *Task, author *User) TaskUpdate {
 	return TaskUpdate{
-		TaskId:     task.Id,
-		UserId:     author.Id,
-		UpdateType: TaskUpdateTypeCreated,
-		Changes:    []TaskChange{},
-		CreatedAt:  time.Now(),
+		TaskId:       task.Id,
+		UserId:       author.Id,
+		UpdateType:   TaskUpdateTypeCreated,
+		ActionOrigin: ActionOriginUser,
+		Changes:      []TaskChange{},
+		CreatedAt:    time.Now(),
 	}
 }
 
@@ -216,11 +218,12 @@ func NewTaskUpdate(old *Task, new *Task, author *User) TaskUpdate {
 	changes := buildTaskChanges(old, new)
 
 	return TaskUpdate{
-		TaskId:     old.Id,
-		UserId:     author.Id,
-		UpdateType: determineTaskUpdateType(changes),
-		CreatedAt:  time.Now(),
-		Changes:    changes,
+		TaskId:       old.Id,
+		UserId:       author.Id,
+		UpdateType:   determineTaskUpdateType(changes),
+		ActionOrigin: ActionOriginUser,
+		CreatedAt:    time.Now(),
+		Changes:      changes,
 	}
 }
 

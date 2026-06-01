@@ -29,22 +29,29 @@ func (par *ProjectActivityRepository) Create(ctx context.Context, activity *doma
 		return err
 	}
 
-	q := queries.New(par.pool)
-	params := queries.CreateProjectActivityLogParams{
-		ProjectID:    activity.Project.Id,
-		ActorID:      activity.Actor.Id,
-		ActivityType: string(activity.ActivityType),
-		ActivityData: bytes,
-		EntityType:   pgtype.Text{String: string(activity.EntityType), Valid: true},
-		EntityID:     pgtype.UUID{Bytes: activity.EntityId, Valid: true},
-	}
-
-	result, err := q.CreateProjectActivityLog(ctx, params)
+	err = par.pool.QueryRow(
+		ctx,
+		`INSERT INTO project_activity_logs (
+			project_id,
+			actor_id,
+			activity_type,
+			activity_data,
+			entity_type,
+			entity_id,
+			action_origin
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id`,
+		activity.Project.Id,
+		activity.Actor.Id,
+		string(activity.ActivityType),
+		bytes,
+		pgtype.Text{String: string(activity.EntityType), Valid: true},
+		pgtype.UUID{Bytes: activity.EntityId, Valid: true},
+		string(activity.ActionOrigin.OrUser()),
+	).Scan(&activity.Id)
 	if err != nil {
 		return err
 	}
-
-	activity.Id = result
 
 	return nil
 }
@@ -112,6 +119,7 @@ func (par *ProjectActivityRepository) List(ctx context.Context, params ListProje
 				Email: result.ActorEmail,
 			},
 			ActivityType: domain.ActivityType(result.ActivityType),
+			ActionOrigin: domain.ActionOrigin(result.ActionOrigin),
 			EntityType:   domain.EntityType(result.EntityType.String),
 			EntityId:     result.EntityID.Bytes,
 			CreatedAt:    result.CreatedAt.Time,

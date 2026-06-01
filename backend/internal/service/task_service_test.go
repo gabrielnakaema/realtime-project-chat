@@ -1267,3 +1267,194 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 		})
 	}
 }
+
+func TestTaskService_MarkTaskDone(t *testing.T) {
+	requestUserID := uuid.New()
+	projectID := uuid.New()
+	taskID := uuid.New()
+	pendingColumnID := uuid.New()
+	doneColumnID := uuid.New()
+
+	project := &domain.Project{
+		Id: projectID,
+		Members: []domain.ProjectMember{
+			{UserId: requestUserID},
+		},
+		Columns: []domain.ProjectColumn{
+			{Id: pendingColumnID, ProjectId: projectID, Name: "Pending"},
+			{Id: doneColumnID, ProjectId: projectID, Name: "Done", IsDoneColumn: true},
+		},
+	}
+	task := &domain.Task{
+		Id:              taskID,
+		ProjectId:       projectID,
+		ProjectColumnId: pendingColumnID,
+		Status:          domain.TaskStatusPending,
+	}
+
+	t.Run("moves task into the single done column", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+
+		mockRepo.On("GetById", mock.Anything, taskID).Return(task, nil)
+		mockProjectRepo.On("GetById", mock.Anything, projectID).Return(project, nil)
+		mockRepo.On("GetFirstTaskInColumn", mock.Anything, projectID, doneColumnID).Return(nil, domain.NotFoundError("not found"))
+		mockRepo.On("MoveTask", mock.Anything, mock.MatchedBy(func(updated *domain.Task) bool {
+			return updated.ProjectColumnId == doneColumnID && updated.DoneAt != nil
+		}), requestUserID).Return(&domain.Task{
+			Id:              taskID,
+			ProjectId:       projectID,
+			ProjectColumnId: doneColumnID,
+			Status:          domain.TaskStatusDone,
+			DoneAt:          func() *time.Time { now := time.Now(); return &now }(),
+		}, nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		result, err := svc.MarkTaskDone(context.Background(), service.MarkTaskDoneRequest{
+			TaskId:        taskID,
+			RequestUserId: requestUserID,
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, doneColumnID, result.ProjectColumnId)
+		assert.NotNil(t, result.DoneAt)
+
+		mockRepo.AssertExpectations(t)
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("fails when the project does not have exactly one done column", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+
+		projectWithMultipleDoneColumns := &domain.Project{
+			Id: projectID,
+			Members: []domain.ProjectMember{
+				{UserId: requestUserID},
+			},
+			Columns: []domain.ProjectColumn{
+				{Id: pendingColumnID, ProjectId: projectID, Name: "Pending"},
+				{Id: doneColumnID, ProjectId: projectID, Name: "Done", IsDoneColumn: true},
+				{Id: uuid.New(), ProjectId: projectID, Name: "Verified", IsDoneColumn: true},
+			},
+		}
+
+		mockRepo.On("GetById", mock.Anything, taskID).Return(task, nil)
+		mockProjectRepo.On("GetById", mock.Anything, projectID).Return(projectWithMultipleDoneColumns, nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		result, err := svc.MarkTaskDone(context.Background(), service.MarkTaskDoneRequest{
+			TaskId:        taskID,
+			RequestUserId: requestUserID,
+		})
+
+		require.Error(t, err)
+		require.Nil(t, result)
+
+		var domainErr domain.DomainError
+		require.ErrorAs(t, err, &domainErr)
+		assert.Equal(t, string(domain.BusinessValidationErrorCode), string(domainErr.Code))
+		assert.Equal(t, "project must have exactly one done column", domainErr.Message)
+
+		mockRepo.AssertExpectations(t)
+		mockProjectRepo.AssertExpectations(t)
+	})
+}
+
+func TestTaskService_AssignTaskToSelf(t *testing.T) {
+	requestUserID := uuid.New()
+	projectID := uuid.New()
+	taskID := uuid.New()
+	columnID := uuid.New()
+
+	project := &domain.Project{
+		Id: projectID,
+		Members: []domain.ProjectMember{
+			{UserId: requestUserID},
+		},
+		Columns: []domain.ProjectColumn{
+			{Id: columnID, ProjectId: projectID, Name: "Doing"},
+		},
+	}
+	user := &domain.User{
+		Id:    requestUserID,
+		Name:  "Agent Owner",
+		Email: "owner@example.com",
+	}
+
+	t.Run("assigns the task to the authenticated user", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+
+		task := &domain.Task{
+			Id:              taskID,
+			ProjectId:       projectID,
+			ProjectColumnId: columnID,
+			ProjectColumn:   &domain.ProjectColumn{Id: columnID, ProjectId: projectID, Name: "Doing"},
+			Title:           "Task",
+			Description:     "Desc",
+			Priority:        domain.TaskPriorityMedium,
+			Tags:            []string{"backend"},
+		}
+
+		mockRepo.On("GetById", mock.Anything, taskID).Return(task, nil)
+		mockProjectRepo.On("GetById", mock.Anything, projectID).Return(project, nil)
+		mockUserRepo.On("GetById", mock.Anything, requestUserID).Return(user, nil)
+		mockRepo.On("Update", mock.Anything, mock.MatchedBy(func(updated *domain.Task) bool {
+			return updated.ResponsibleId != nil && *updated.ResponsibleId == requestUserID
+		})).Return(nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		result, err := svc.AssignTaskToSelf(context.Background(), service.AssignTaskToSelfRequest{
+			TaskId:        taskID,
+			RequestUserId: requestUserID,
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, result.ResponsibleId)
+		assert.Equal(t, requestUserID, *result.ResponsibleId)
+
+		mockRepo.AssertExpectations(t)
+		mockProjectRepo.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+	})
+
+	t.Run("returns the existing task when it is already assigned to the user", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+
+		task := &domain.Task{
+			Id:              taskID,
+			ProjectId:       projectID,
+			ProjectColumnId: columnID,
+			ResponsibleId:   &requestUserID,
+			Title:           "Task",
+			Description:     "Desc",
+			Priority:        domain.TaskPriorityMedium,
+		}
+
+		mockRepo.On("GetById", mock.Anything, taskID).Return(task, nil)
+		mockProjectRepo.On("GetById", mock.Anything, projectID).Return(project, nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		result, err := svc.AssignTaskToSelf(context.Background(), service.AssignTaskToSelfRequest{
+			TaskId:        taskID,
+			RequestUserId: requestUserID,
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.NotNil(t, result.ResponsibleId)
+		assert.Equal(t, requestUserID, *result.ResponsibleId)
+
+		mockRepo.AssertExpectations(t)
+		mockProjectRepo.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+	})
+}

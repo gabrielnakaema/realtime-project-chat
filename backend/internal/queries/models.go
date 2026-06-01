@@ -40,6 +40,23 @@ type ChatMessageRead struct {
 	ReadAt        pgtype.Timestamptz
 }
 
+type McpApiKey struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	Name       string
+	KeyPrefix  string
+	SecretHash string
+	CreatedAt  pgtype.Timestamptz
+	LastUsedAt pgtype.Timestamptz
+	RevokedAt  pgtype.Timestamptz
+}
+
+type McpApiKeyScope struct {
+	ApiKeyID  uuid.UUID
+	Scope     string
+	CreatedAt pgtype.Timestamptz
+}
+
 type Notification struct {
 	ID            uuid.UUID
 	UserID        uuid.UUID
@@ -72,6 +89,7 @@ type ProjectActivityLog struct {
 	EntityID     pgtype.UUID
 	CreatedAt    pgtype.Timestamptz
 	UpdatedAt    pgtype.Timestamptz
+	ActionOrigin string
 }
 
 type ProjectColumn struct {
@@ -140,6 +158,7 @@ type TaskComment struct {
 	ParentCommentID pgtype.UUID
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
+	ActionOrigin    string
 }
 
 type TaskTag struct {
@@ -149,11 +168,12 @@ type TaskTag struct {
 }
 
 type TaskUpdate struct {
-	ID         uuid.UUID
-	TaskID     uuid.UUID
-	UserID     uuid.UUID
-	UpdateType string
-	CreatedAt  pgtype.Timestamptz
+	ID           uuid.UUID
+	TaskID       uuid.UUID
+	UserID       uuid.UUID
+	UpdateType   string
+	CreatedAt    pgtype.Timestamptz
+	ActionOrigin string
 }
 
 type User struct {

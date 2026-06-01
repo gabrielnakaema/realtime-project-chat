@@ -64,7 +64,9 @@ func (s *TaskUpdateSubscriber) handleTaskCreated(ctx context.Context, message Me
 	}
 
 	update := domain.NewTaskCreatedUpdate(&payload.Task, &payload.User)
+	update.ActionOrigin = payload.ActionOrigin.OrUser()
 
+	ctx = domain.WithActionOrigin(ctx, payload.ActionOrigin)
 	if err := s.repository.CreateUpdates(ctx, &payload.Task, []domain.TaskUpdate{update}); err != nil {
 		return domain.ServerError("failed to create task update for created task", err)
 	}
@@ -84,10 +86,12 @@ func (s *TaskUpdateSubscriber) handleTaskUpdated(ctx context.Context, message Me
 	}
 
 	update := domain.NewTaskUpdate(payload.PreviousTask, &payload.Task, &payload.User)
+	update.ActionOrigin = payload.ActionOrigin.OrUser()
 	if len(update.Changes) == 0 {
 		return nil
 	}
 
+	ctx = domain.WithActionOrigin(ctx, payload.ActionOrigin)
 	if err := s.repository.CreateUpdates(ctx, &payload.Task, []domain.TaskUpdate{update}); err != nil {
 		return domain.ServerError("failed to create task update", err)
 	}

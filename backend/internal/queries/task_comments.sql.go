@@ -13,7 +13,7 @@ import (
 )
 
 const createTaskComment = `-- name: CreateTaskComment :one
-INSERT INTO task_comments (task_id, user_id, content, parent_comment_id) VALUES ($1, $2, $3, $4) returning id
+INSERT INTO task_comments (task_id, user_id, content, parent_comment_id, action_origin) VALUES ($1, $2, $3, $4, $5) returning id
 `
 
 type CreateTaskCommentParams struct {
@@ -21,6 +21,7 @@ type CreateTaskCommentParams struct {
 	UserID          uuid.UUID
 	Content         string
 	ParentCommentID pgtype.UUID
+	ActionOrigin    string
 }
 
 func (q *Queries) CreateTaskComment(ctx context.Context, arg CreateTaskCommentParams) (uuid.UUID, error) {
@@ -29,6 +30,7 @@ func (q *Queries) CreateTaskComment(ctx context.Context, arg CreateTaskCommentPa
 		arg.UserID,
 		arg.Content,
 		arg.ParentCommentID,
+		arg.ActionOrigin,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)
@@ -43,6 +45,7 @@ WITH recursive paginated_parent_comments AS (
     c.user_id,
     c.content,
     c.parent_comment_id,
+    c.action_origin,
     c.created_at,
     c.updated_at
   FROM task_comments c
@@ -59,6 +62,7 @@ comment_tree AS (
     p.user_id,
     p.content,
     p.parent_comment_id,
+    p.action_origin,
     p.created_at,
     p.updated_at,
     0 as level,
@@ -77,6 +81,7 @@ comment_tree AS (
     c.user_id,
     c.content,
     c.parent_comment_id,
+    c.action_origin,
     c.created_at,
     c.updated_at,
     ct.level + 1 as level,
@@ -91,7 +96,7 @@ comment_tree AS (
   JOIN comment_tree ct ON c.parent_comment_id = ct.id
 )
 SELECT
-  id, task_id, user_id, content, parent_comment_id, created_at, updated_at, level, root_created_at, comment_user_id, comment_user_name, comment_user_email, comment_user_created_at, comment_user_updated_at
+  id, task_id, user_id, content, parent_comment_id, action_origin, created_at, updated_at, level, root_created_at, comment_user_id, comment_user_name, comment_user_email, comment_user_created_at, comment_user_updated_at
 FROM comment_tree
 ORDER BY root_created_at DESC, created_at ASC, id ASC
 `
@@ -109,6 +114,7 @@ type ListTaskCommentsRow struct {
 	UserID               uuid.UUID
 	Content              string
 	ParentCommentID      pgtype.UUID
+	ActionOrigin         string
 	CreatedAt            pgtype.Timestamptz
 	UpdatedAt            pgtype.Timestamptz
 	Level                int32
@@ -140,6 +146,7 @@ func (q *Queries) ListTaskComments(ctx context.Context, arg ListTaskCommentsPara
 			&i.UserID,
 			&i.Content,
 			&i.ParentCommentID,
+			&i.ActionOrigin,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Level,
@@ -168,6 +175,7 @@ WITH recursive paginated_parent_comments AS (
     c.user_id,
     c.content,
     c.parent_comment_id,
+    c.action_origin,
     c.created_at,
     c.updated_at
   FROM task_comments c
@@ -184,6 +192,7 @@ comment_tree AS (
     p.user_id,
     p.content,
     p.parent_comment_id,
+    p.action_origin,
     p.created_at,
     p.updated_at,
     0 as level,
@@ -202,6 +211,7 @@ comment_tree AS (
     c.user_id,
     c.content,
     c.parent_comment_id,
+    c.action_origin,
     c.created_at,
     c.updated_at,
     ct.level + 1 as level,
@@ -216,7 +226,7 @@ comment_tree AS (
   JOIN comment_tree ct ON c.parent_comment_id = ct.id
 )
 SELECT
-  id, task_id, user_id, content, parent_comment_id, created_at, updated_at, level, root_created_at, comment_user_id, comment_user_name, comment_user_email, comment_user_created_at, comment_user_updated_at
+  id, task_id, user_id, content, parent_comment_id, action_origin, created_at, updated_at, level, root_created_at, comment_user_id, comment_user_name, comment_user_email, comment_user_created_at, comment_user_updated_at
 FROM comment_tree
 ORDER BY root_created_at ASC, created_at ASC, id ASC
 `
@@ -234,6 +244,7 @@ type ListTaskCommentsAfterRow struct {
 	UserID               uuid.UUID
 	Content              string
 	ParentCommentID      pgtype.UUID
+	ActionOrigin         string
 	CreatedAt            pgtype.Timestamptz
 	UpdatedAt            pgtype.Timestamptz
 	Level                int32
@@ -265,6 +276,7 @@ func (q *Queries) ListTaskCommentsAfter(ctx context.Context, arg ListTaskComment
 			&i.UserID,
 			&i.Content,
 			&i.ParentCommentID,
+			&i.ActionOrigin,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Level,

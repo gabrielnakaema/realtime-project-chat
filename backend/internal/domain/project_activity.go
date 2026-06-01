@@ -31,6 +31,7 @@ type ProjectActivity struct {
 	Project       Project        `json:"project"`
 	Actor         User           `json:"actor"`
 	ActivityType  ActivityType   `json:"activity_type"`
+	ActionOrigin  ActionOrigin   `json:"action_origin"`
 	ActivityData  any            `json:"activity_data"`
 	EntityType    EntityType     `json:"entity_type"`
 	EntityId      uuid.UUID      `json:"entity_id"`
@@ -45,6 +46,7 @@ func ProjectCreatedActivity(project Project, actor User) ProjectActivity {
 		Project:      project,
 		ActivityType: ProjectCreated,
 		Actor:        actor,
+		ActionOrigin: ActionOriginUser,
 		ActivityData: make(map[string]interface{}),
 		EntityType:   ProjectEntityType,
 		EntityId:     project.Id,
@@ -58,6 +60,7 @@ func TaskCreatedActivity(project Project, task Task, actor User) ProjectActivity
 		Project:      project,
 		ActivityType: TaskCreated,
 		Actor:        actor,
+		ActionOrigin: ActionOriginUser,
 		EntityType:   TaskEntityType,
 		EntityId:     task.Id,
 		ActivityData: make(map[string]interface{}),
@@ -71,6 +74,7 @@ func ProjectUpdatedActivity(project Project, actor User) ProjectActivity {
 		Project:      project,
 		ActivityType: ProjectUpdated,
 		Actor:        actor,
+		ActionOrigin: ActionOriginUser,
 		ActivityData: make(map[string]interface{}),
 		EntityType:   ProjectEntityType,
 		EntityId:     project.Id,
@@ -84,6 +88,7 @@ func ProjectMemberCreatedActivity(project Project, projectMember ProjectMember, 
 		Project:      project,
 		ActivityType: ProjectMemberCreated,
 		Actor:        actor,
+		ActionOrigin: ActionOriginUser,
 		ActivityData: make(map[string]interface{}),
 		EntityType:   ProjectMemberEntityType,
 		EntityId:     projectMember.Id,
@@ -97,6 +102,7 @@ func ProjectMemberDeletedActivity(project Project, projectMember ProjectMember, 
 		Project:      project,
 		ActivityType: ProjectMemberDeleted,
 		Actor:        actor,
+		ActionOrigin: ActionOriginUser,
 		ActivityData: map[string]interface{}{
 			"project_member": projectMember,
 		},
@@ -112,6 +118,7 @@ func TaskUpdatedActivity(project Project, task Task, actor User) ProjectActivity
 		Project:      project,
 		ActivityType: TaskUpdated,
 		Actor:        actor,
+		ActionOrigin: ActionOriginUser,
 		EntityType:   TaskEntityType,
 		EntityId:     task.Id,
 		ActivityData: make(map[string]interface{}),
@@ -125,6 +132,7 @@ func TaskDeletedActivity(project Project, task Task, actor User) ProjectActivity
 		Project:      project,
 		ActivityType: TaskDeleted,
 		Actor:        actor,
+		ActionOrigin: ActionOriginUser,
 		EntityType:   TaskEntityType,
 		EntityId:     task.Id,
 		ActivityData: make(map[string]interface{}),

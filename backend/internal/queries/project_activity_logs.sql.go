@@ -60,6 +60,7 @@ activity_logs AS (
     pal.project_id,
     pal.actor_id,
     pal.activity_type,
+    pal.action_origin,
     COALESCE(pal.activity_data, '{}'::jsonb) as activity_data,
     pal.entity_type,
     pal.entity_id,
@@ -127,6 +128,7 @@ SELECT
   al.project_id,
   al.actor_id,
   al.activity_type,
+  al.action_origin,
   al.activity_data,
   al.entity_type,
   al.entity_id,
@@ -173,6 +175,7 @@ type ListProjectActivityLogsRow struct {
 	ProjectID          uuid.UUID
 	ActorID            uuid.UUID
 	ActivityType       string
+	ActionOrigin       string
 	ActivityData       []byte
 	EntityType         pgtype.Text
 	EntityID           pgtype.UUID
@@ -209,6 +212,7 @@ func (q *Queries) ListProjectActivityLogs(ctx context.Context, arg ListProjectAc
 			&i.ProjectID,
 			&i.ActorID,
 			&i.ActivityType,
+			&i.ActionOrigin,
 			&i.ActivityData,
 			&i.EntityType,
 			&i.EntityID,

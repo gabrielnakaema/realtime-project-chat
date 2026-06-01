@@ -16,6 +16,7 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/db"
 	"github.com/gabrielnakaema/project-chat/internal/handlers"
 	"github.com/gabrielnakaema/project-chat/internal/logger"
+	"github.com/gabrielnakaema/project-chat/internal/mcp"
 	"github.com/gabrielnakaema/project-chat/internal/publisher"
 	"github.com/gabrielnakaema/project-chat/internal/repository"
 	"github.com/gabrielnakaema/project-chat/internal/service"
@@ -40,6 +41,8 @@ type Handlers struct {
 	AuthMiddleware *handlers.AuthMiddleware
 	Chat           *handlers.ChatHandler
 	Notification   *handlers.NotificationHandler
+	MCPAPIKey      *handlers.MCPAPIKeyHandler
+	MCP            *mcp.Handler
 	Project        *handlers.ProjectHandler
 	Task           *handlers.TaskHandler
 	TaskComment    *handlers.TaskCommentHandler
@@ -76,6 +79,7 @@ func NewApi() (*Api, error) {
 	userRepo := repository.NewUserRepository(pool)
 	activityRepo := repository.NewProjectActivityRepository(pool)
 	notificationRepo := repository.NewNotificationRepository(pool)
+	mcpAPIKeyRepo := repository.NewMCPAPIKeyRepository(pool)
 
 	projectService := service.NewProjectService(projectRepo, userRepo, pub, activityRepo)
 	projectHandler := handlers.NewProjectHandler(projectService)
@@ -134,15 +138,20 @@ func NewApi() (*Api, error) {
 
 	userService := service.NewUserService(jwtProvider, userRepo)
 	userHandler := handlers.NewUserHandler(userService, config)
+	mcpAPIKeyService := service.NewMCPAPIKeyService(mcpAPIKeyRepo)
+	mcpAPIKeyHandler := handlers.NewMCPAPIKeyHandler(mcpAPIKeyService)
 
 	taskService := service.NewTaskService(taskRepo, projectRepo, userRepo, pub)
 	taskHandler := handlers.NewTaskHandler(taskService)
 	taskCommentService := service.NewTaskCommentService(taskCommentRepo, taskRepo, projectRepo, userRepo, pub)
 	taskCommentHandler := handlers.NewTaskCommentHandler(taskCommentService)
+	mcpHandler := mcp.NewHandler(mcpAPIKeyService, projectService, taskService, taskCommentService)
 
 	handlers := Handlers{
 		AuthMiddleware: authMiddleware,
 		Chat:           chatHandler,
+		MCPAPIKey:      mcpAPIKeyHandler,
+		MCP:            mcpHandler,
 		Notification:   notificationHandler,
 		Project:        projectHandler,
 		Task:           taskHandler,

@@ -12,8 +12,9 @@ type Payload interface {
 }
 
 type TaskCreatedPayload struct {
-	Task domain.Task `json:"task"`
-	User domain.User `json:"user"`
+	Task         domain.Task         `json:"task"`
+	User         domain.User         `json:"user"`
+	ActionOrigin domain.ActionOrigin `json:"action_origin,omitempty"`
 }
 
 func (t *TaskCreatedPayload) ToMessage() ([]byte, error) {
@@ -21,10 +22,11 @@ func (t *TaskCreatedPayload) ToMessage() ([]byte, error) {
 }
 
 type TaskUpdatedPayload struct {
-	Task                    domain.Task  `json:"task"`
-	PreviousTask            *domain.Task `json:"previous_task,omitempty"`
-	User                    domain.User  `json:"user"`
-	PreviousProjectColumnID *uuid.UUID   `json:"previous_project_column_id,omitempty"`
+	Task                    domain.Task         `json:"task"`
+	PreviousTask            *domain.Task        `json:"previous_task,omitempty"`
+	User                    domain.User         `json:"user"`
+	PreviousProjectColumnID *uuid.UUID          `json:"previous_project_column_id,omitempty"`
+	ActionOrigin            domain.ActionOrigin `json:"action_origin,omitempty"`
 }
 
 func (t *TaskUpdatedPayload) ToMessage() ([]byte, error) {
@@ -32,8 +34,9 @@ func (t *TaskUpdatedPayload) ToMessage() ([]byte, error) {
 }
 
 type TaskCommentCreatedPayload struct {
-	TaskComment domain.TaskComment `json:"task_comment"`
-	User        domain.User        `json:"user"`
+	TaskComment  domain.TaskComment  `json:"task_comment"`
+	User         domain.User         `json:"user"`
+	ActionOrigin domain.ActionOrigin `json:"action_origin,omitempty"`
 }
 
 func (t *TaskCommentCreatedPayload) ToMessage() ([]byte, error) {
@@ -41,8 +44,9 @@ func (t *TaskCommentCreatedPayload) ToMessage() ([]byte, error) {
 }
 
 type ProjectCreatedPayload struct {
-	Project domain.Project `json:"project"`
-	User    domain.User    `json:"user"`
+	Project      domain.Project      `json:"project"`
+	User         domain.User         `json:"user"`
+	ActionOrigin domain.ActionOrigin `json:"action_origin,omitempty"`
 }
 
 func (p *ProjectCreatedPayload) ToMessage() ([]byte, error) {
@@ -50,8 +54,9 @@ func (p *ProjectCreatedPayload) ToMessage() ([]byte, error) {
 }
 
 type ProjectUpdatedPayload struct {
-	Project domain.Project `json:"project"`
-	User    domain.User    `json:"user"`
+	Project      domain.Project      `json:"project"`
+	User         domain.User         `json:"user"`
+	ActionOrigin domain.ActionOrigin `json:"action_origin,omitempty"`
 }
 
 func (p *ProjectUpdatedPayload) ToMessage() ([]byte, error) {
@@ -61,6 +66,7 @@ func (p *ProjectUpdatedPayload) ToMessage() ([]byte, error) {
 type ProjectMemberCreatedPayload struct {
 	ProjectMember domain.ProjectMember `json:"project_member"`
 	User          domain.User          `json:"user"`
+	ActionOrigin  domain.ActionOrigin  `json:"action_origin,omitempty"`
 }
 
 func (p *ProjectMemberCreatedPayload) ToMessage() ([]byte, error) {
@@ -107,6 +113,7 @@ func (c *ChatMemberCreatedPayload) ToMessage() ([]byte, error) {
 type ProjectMemberRemovedPayload struct {
 	ProjectMember domain.ProjectMember `json:"project_member"`
 	User          domain.User          `json:"user"`
+	ActionOrigin  domain.ActionOrigin  `json:"action_origin,omitempty"`
 }
 
 func (p *ProjectMemberRemovedPayload) ToMessage() ([]byte, error) {

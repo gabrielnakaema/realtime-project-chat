@@ -49,6 +49,7 @@ func compatibilityTaskStatus(projectColumnName string, archivedAt *time.Time) do
 
 func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 	q := queries.New(tr.pool)
+	actionOrigin := domain.ActionOriginFromContext(ctx)
 
 	tx, err := tr.pool.Begin(ctx)
 	if err != nil {
@@ -98,9 +99,10 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 
 	for idx, update := range task.Updates {
 		params := queries.CreateTaskUpdateParams{
-			TaskID:     task.Id,
-			UserID:     update.UserId,
-			UpdateType: string(update.UpdateType),
+			TaskID:       task.Id,
+			UserID:       update.UserId,
+			UpdateType:   string(update.UpdateType),
+			ActionOrigin: string(actionOrigin.OrUser()),
 		}
 
 		id, err = qtx.CreateTaskUpdate(ctx, params)
@@ -410,12 +412,14 @@ func (tr *TaskRepository) CreateUpdates(ctx context.Context, task *domain.Task, 
 
 	q := queries.New(tr.pool)
 	qtx := q.WithTx(tx)
+	actionOrigin := domain.ActionOriginFromContext(ctx)
 
 	for idx, update := range updates {
 		params := queries.CreateTaskUpdateParams{
-			TaskID:     task.Id,
-			UserID:     update.UserId,
-			UpdateType: string(update.UpdateType),
+			TaskID:       task.Id,
+			UserID:       update.UserId,
+			UpdateType:   string(update.UpdateType),
+			ActionOrigin: string(actionOrigin.OrUser()),
 		}
 
 		id, err := qtx.CreateTaskUpdate(ctx, params)

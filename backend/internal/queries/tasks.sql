@@ -45,6 +45,7 @@ WITH task_tags_cte AS (
     tu.task_id as task_update_task_id,
     tu.user_id as task_update_user_id,
     tu.update_type as task_update_update_type,
+    tu.action_origin as task_update_action_origin,
     tu.created_at as task_update_created_at,
     u.name as task_update_user_name,
     u.email as task_update_user_email,
@@ -124,6 +125,7 @@ SELECT
       'task_id', tu.task_update_task_id,
       'user_id', tu.task_update_user_id,
       'update_type', tu.task_update_update_type,
+      'action_origin', tu.task_update_action_origin,
       'created_at', tu.task_update_created_at,
       'user', jsonb_build_object(
         'id', tu.task_update_user_id,
@@ -223,7 +225,7 @@ LIMIT $2;
 UPDATE tasks SET title = $1, description = $2, project_column_id = $3, task_order = $4, priority = $5, due_date = $6, responsible_id = $7, done_at = $8, archived_at = $9, updated_at = CURRENT_TIMESTAMP WHERE id = $10;
 
 -- name: CreateTaskUpdate :one
-INSERT INTO task_updates (task_id, user_id, update_type) VALUES ($1, $2, $3) returning id;
+INSERT INTO task_updates (task_id, user_id, update_type, action_origin) VALUES ($1, $2, $3, $4) returning id;
 
 -- name: CreateTaskChange :one
 INSERT INTO task_changes (update_id, field, old_value, new_value, subject_id, old_value_id, new_value_id, old_display_value, new_display_value) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id;

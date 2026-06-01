@@ -30,11 +30,13 @@ func NewTaskCommentRepository(pool *pgxpool.Pool) *TaskCommentRepository {
 
 func (r *TaskCommentRepository) Create(ctx context.Context, comment *domain.TaskComment, parentCommentID *uuid.UUID) error {
 	q := queries.New(r.pool)
+	actionOrigin := domain.ActionOriginFromContext(ctx)
 
 	params := queries.CreateTaskCommentParams{
-		TaskID:  comment.Task.Id,
-		UserID:  comment.User.Id,
-		Content: comment.Content,
+		TaskID:       comment.Task.Id,
+		UserID:       comment.User.Id,
+		Content:      comment.Content,
+		ActionOrigin: string(actionOrigin.OrUser()),
 	}
 
 	if parentCommentID != nil && *parentCommentID != uuid.Nil {
@@ -141,10 +143,11 @@ func (r *TaskCommentRepository) buildPaginatedComments(
 
 		node := &taskCommentNode{
 			comment: domain.TaskComment{
-				ID:        row.ID.String(),
-				Content:   row.Content,
-				CreatedAt: row.CreatedAt.Time,
-				UpdatedAt: row.UpdatedAt.Time,
+				ID:           row.ID.String(),
+				Content:      row.Content,
+				ActionOrigin: row.ActionOrigin.OrUser(),
+				CreatedAt:    row.CreatedAt.Time,
+				UpdatedAt:    row.UpdatedAt.Time,
 				User: &domain.User{
 					Id:        row.CommentUserID,
 					Name:      row.CommentUserName,
@@ -221,6 +224,7 @@ type normalizedTaskCommentRow struct {
 	UserID               uuid.UUID
 	Content              string
 	ParentCommentID      pgtype.UUID
+	ActionOrigin         domain.ActionOrigin
 	CreatedAt            pgtype.Timestamptz
 	UpdatedAt            pgtype.Timestamptz
 	Level                int32
@@ -241,6 +245,7 @@ func normalizeTaskCommentRows(rows interface{}) []normalizedTaskCommentRow {
 				UserID:               row.UserID,
 				Content:              row.Content,
 				ParentCommentID:      row.ParentCommentID,
+				ActionOrigin:         domain.ActionOrigin(row.ActionOrigin),
 				CreatedAt:            row.CreatedAt,
 				UpdatedAt:            row.UpdatedAt,
 				Level:                row.Level,
@@ -260,6 +265,7 @@ func normalizeTaskCommentRows(rows interface{}) []normalizedTaskCommentRow {
 				UserID:               row.UserID,
 				Content:              row.Content,
 				ParentCommentID:      row.ParentCommentID,
+				ActionOrigin:         domain.ActionOrigin(row.ActionOrigin),
 				CreatedAt:            row.CreatedAt,
 				UpdatedAt:            row.UpdatedAt,
 				Level:                row.Level,

@@ -76,6 +76,7 @@ func (pas *ProjectActivitySubscriber) handleProjectCreated(ctx context.Context, 
 	}
 
 	activity := domain.ProjectCreatedActivity(payload.Project, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
 	err = pas.repository.Create(ctx, &activity)
 	if err != nil {
 		return domain.ServerError("failed to create project created activity", err)
@@ -97,6 +98,7 @@ func (pas *ProjectActivitySubscriber) handleProjectUpdated(ctx context.Context, 
 	}
 
 	activity := domain.ProjectUpdatedActivity(payload.Project, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
 	err = pas.repository.Create(ctx, &activity)
 	if err != nil {
 		return domain.ServerError("failed to create project updated activity", err)
@@ -120,6 +122,7 @@ func (pas *ProjectActivitySubscriber) handleProjectMemberCreated(ctx context.Con
 	activity := domain.ProjectMemberCreatedActivity(domain.Project{
 		Id: payload.ProjectMember.ProjectId,
 	}, payload.ProjectMember, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
 	err = pas.repository.Create(ctx, &activity)
 	if err != nil {
 		return domain.ServerError("failed to create project member created activity", err)
@@ -143,6 +146,7 @@ func (pas *ProjectActivitySubscriber) handleProjectMemberRemoved(ctx context.Con
 	activity := domain.ProjectMemberDeletedActivity(domain.Project{
 		Id: payload.ProjectMember.ProjectId,
 	}, payload.ProjectMember, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
 	err = pas.repository.Create(ctx, &activity)
 	if err != nil {
 		return domain.ServerError("failed to create project member deleted activity", err)
@@ -166,6 +170,7 @@ func (pas *ProjectActivitySubscriber) handleTaskCreated(ctx context.Context, mes
 	activity := domain.TaskCreatedActivity(domain.Project{
 		Id: payload.Task.ProjectId,
 	}, payload.Task, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
 	err = pas.repository.Create(ctx, &activity)
 	if err != nil {
 		return domain.ServerError("failed to create task created activity", err)
@@ -189,6 +194,7 @@ func (pas *ProjectActivitySubscriber) handleTaskUpdated(ctx context.Context, mes
 	activity := domain.TaskUpdatedActivity(domain.Project{
 		Id: payload.Task.ProjectId,
 	}, payload.Task, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
 	err = pas.repository.Create(ctx, &activity)
 	if err != nil {
 		return domain.ServerError("failed to create task updated activity", err)

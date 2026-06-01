@@ -8,6 +8,7 @@ type TaskComment struct {
 	User            *User         `json:"user"`
 	Content         string        `json:"content"`
 	ParentCommentID *string       `json:"parent_comment_id,omitempty"`
+	ActionOrigin    ActionOrigin  `json:"action_origin"`
 	CreatedAt       time.Time     `json:"created_at"`
 	UpdatedAt       time.Time     `json:"updated_at"`
 	Replies         []TaskComment `json:"replies"`
