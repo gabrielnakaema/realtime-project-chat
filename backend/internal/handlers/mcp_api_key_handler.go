@@ -15,6 +15,7 @@ import (
 type mcpAPIKeyService interface {
 	ListAvailableScopes() []domain.MCPAPIScopeDefinition
 	Create(ctx context.Context, request service.CreateMCPAPIKeyRequest) (*service.CreateMCPAPIKeyResult, error)
+	Update(ctx context.Context, request service.UpdateMCPAPIKeyRequest) (*domain.MCPAPIKey, error)
 	ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain.MCPAPIKey, error)
 	Revoke(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
 }
@@ -70,6 +71,42 @@ func (h *MCPAPIKeyHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := utils.WriteJSON(w, http.StatusOK, keys, nil); err != nil {
+		ErrorResponse(w, r, err)
+	}
+}
+
+func (h *MCPAPIKeyHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	var request UpdateMCPAPIKeyRequest
+	if err := utils.ReadJSON(w, r, &request); err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	v := validator.New()
+	request.Validate(v)
+	if !v.Valid() {
+		ValidationFailedResponse(w, v)
+		return
+	}
+
+	key, err := h.service.Update(r.Context(), service.UpdateMCPAPIKeyRequest{
+		ID:     id,
+		UserID: UserIdFromContext(r.Context()),
+		Name:   request.Name,
+		Scopes: request.Scopes,
+	})
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	if err := utils.WriteJSON(w, http.StatusOK, key, nil); err != nil {
 		ErrorResponse(w, r, err)
 	}
 }

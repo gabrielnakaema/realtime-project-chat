@@ -19,6 +19,7 @@ const mcpAPIKeyLastUsedWriteInterval = 5 * time.Minute
 
 type mcpAPIKeyRepository interface {
 	Create(ctx context.Context, key *domain.MCPAPIKey) error
+	Update(ctx context.Context, key *domain.MCPAPIKey) error
 	ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain.MCPAPIKey, error)
 	GetByIDForUser(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*domain.MCPAPIKey, error)
 	GetByPrefix(ctx context.Context, prefix string) (*domain.MCPAPIKey, error)
@@ -45,6 +46,13 @@ type CreateMCPAPIKeyResult struct {
 	RawSecret string            `json:"raw_secret"`
 }
 
+type UpdateMCPAPIKeyRequest struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+	Name   string
+	Scopes []domain.MCPAPIScope
+}
+
 func (s *MCPAPIKeyService) ListAvailableScopes() []domain.MCPAPIScopeDefinition {
 	scopes := make([]domain.MCPAPIScopeDefinition, len(domain.MCPAPIScopeDefinitions))
 	copy(scopes, domain.MCPAPIScopeDefinitions)
@@ -57,12 +65,7 @@ func (s *MCPAPIKeyService) Create(ctx context.Context, request CreateMCPAPIKeyRe
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
 
-	name := strings.TrimSpace(request.Name)
-	if name == "" {
-		return nil, domain.BusinessValidationError("name is required")
-	}
-
-	scopes, err := normalizeMCPScopes(request.Scopes)
+	name, scopes, err := normalizeMCPAPIKeyInput(request.Name, request.Scopes)
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +100,52 @@ func (s *MCPAPIKeyService) Create(ctx context.Context, request CreateMCPAPIKeyRe
 		Key:       key,
 		RawSecret: rawSecret,
 	}, nil
+}
+
+func (s *MCPAPIKeyService) Update(ctx context.Context, request UpdateMCPAPIKeyRequest) (*domain.MCPAPIKey, error) {
+	if request.UserID == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	key, err := s.repository.GetByIDForUser(ctx, request.ID, request.UserID)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to get mcp api key", err)
+	}
+
+	if key.IsRevoked() {
+		return nil, domain.BusinessValidationError("mcp api key is already revoked")
+	}
+
+	name, scopes, err := normalizeMCPAPIKeyInput(request.Name, request.Scopes)
+	if err != nil {
+		return nil, err
+	}
+
+	key.Name = name
+	key.Scopes = scopes
+
+	if err := s.repository.Update(ctx, key); err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to update mcp api key", err)
+	}
+
+	updatedKey, err := s.repository.GetByIDForUser(ctx, request.ID, request.UserID)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			return nil, domainErr
+		}
+		return nil, domain.ServerError("failed to get mcp api key", err)
+	}
+
+	return updatedKey, nil
 }
 
 func (s *MCPAPIKeyService) ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain.MCPAPIKey, error) {
@@ -178,6 +227,20 @@ func (s *MCPAPIKeyService) Authenticate(ctx context.Context, bearerSecret string
 	}
 
 	return &AuthenticateMCPAPIKeyResult{Key: key}, nil
+}
+
+func normalizeMCPAPIKeyInput(name string, scopes []domain.MCPAPIScope) (string, []domain.MCPAPIScope, error) {
+	normalizedName := strings.TrimSpace(name)
+	if normalizedName == "" {
+		return "", nil, domain.BusinessValidationError("name is required")
+	}
+
+	normalizedScopes, err := normalizeMCPScopes(scopes)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return normalizedName, normalizedScopes, nil
 }
 
 func normalizeMCPScopes(scopes []domain.MCPAPIScope) ([]domain.MCPAPIScope, error) {

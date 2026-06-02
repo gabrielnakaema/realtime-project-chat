@@ -86,6 +86,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	projectID := project["id"].(string)
 	columns := project["columns"].([]any)
 	pendingColumnID := columns[0].(map[string]any)["id"].(string)
+	doneColumnID := columns[1].(map[string]any)["id"].(string)
 
 	taskResp, err := client.POST("/tasks", map[string]any{
 		"project_id":        projectID,
@@ -176,6 +177,63 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	keyID := keyMetadata["id"].(string)
 	assert.Equal(t, "Read Only Agent", keyMetadata["name"])
 
+	updateResp, err := client.PUT(fmt.Sprintf("/users/me/mcp-api-keys/%s", keyID), map[string]any{
+		"name": "  Board mover  ",
+		"scopes": []string{
+			"projects:read",
+			"tasks:read",
+			"tasks:move",
+			"tasks:move",
+		},
+	})
+	require.NoError(t, err)
+	defer updateResp.Body.Close()
+	require.Equal(t, http.StatusOK, updateResp.StatusCode)
+
+	var updatedKey map[string]any
+	err = json.NewDecoder(updateResp.Body).Decode(&updatedKey)
+	require.NoError(t, err)
+	assert.Equal(t, "Board mover", updatedKey["name"])
+	assert.Equal(t, []any{"projects:read", "tasks:move", "tasks:read"}, updatedKey["scopes"])
+
+	invalidScopeResp, err := client.PUT(fmt.Sprintf("/users/me/mcp-api-keys/%s", keyID), map[string]any{
+		"name":   "Invalid key",
+		"scopes": []string{"tasks:read", "tasks:teleport"},
+	})
+	require.NoError(t, err)
+	defer invalidScopeResp.Body.Close()
+	require.Equal(t, http.StatusUnprocessableEntity, invalidScopeResp.StatusCode)
+
+	var invalidScopeBody map[string]any
+	err = json.NewDecoder(invalidScopeResp.Body).Decode(&invalidScopeBody)
+	require.NoError(t, err)
+	assert.Equal(t, "invalid mcp api key scope", invalidScopeBody["message"])
+
+	emptyScopeResp, err := client.PUT(fmt.Sprintf("/users/me/mcp-api-keys/%s", keyID), map[string]any{
+		"name":   "Empty scopes",
+		"scopes": []string{},
+	})
+	require.NoError(t, err)
+	defer emptyScopeResp.Body.Close()
+	require.Equal(t, http.StatusUnprocessableEntity, emptyScopeResp.StatusCode)
+
+	var emptyScopeBody map[string]any
+	err = json.NewDecoder(emptyScopeResp.Body).Decode(&emptyScopeBody)
+	require.NoError(t, err)
+	assert.Equal(t, "Validation Failed", emptyScopeBody["message"])
+
+	otherClient := shared.NewHTTPClient(testAPI.GetBaseURL())
+	_, err = otherClient.CreateUserAndLogin("mcp-other@example.com", "password123")
+	require.NoError(t, err)
+
+	notFoundUpdateResp, err := otherClient.PUT(fmt.Sprintf("/users/me/mcp-api-keys/%s", keyID), map[string]any{
+		"name":   "Other user edit",
+		"scopes": []string{"tasks:read"},
+	})
+	require.NoError(t, err)
+	defer notFoundUpdateResp.Body.Close()
+	require.Equal(t, http.StatusNotFound, notFoundUpdateResp.StatusCode)
+
 	listResp, err := client.GET("/users/me/mcp-api-keys")
 	require.NoError(t, err)
 	defer listResp.Body.Close()
@@ -250,11 +308,10 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 		"id":      "3",
 		"method":  "tools/call",
 		"params": map[string]any{
-			"name": "move_task",
+			"name": "add_task_comment",
 			"arguments": map[string]any{
-				"task_id":                  task["id"].(string),
-				"project_id":               projectID,
-				"target_project_column_id": pendingColumnID,
+				"task_id": task["id"].(string),
+				"content": "This should fail without comment scope",
 			},
 		},
 	})
@@ -262,6 +319,22 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	assert.Equal(t, true, result["isError"])
 	structured := result["structuredContent"].(map[string]any)
 	assert.Equal(t, "missing_scope", structured["error"].(map[string]any)["type"])
+
+	moveTaskResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.25",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "move_task",
+			"arguments": map[string]any{
+				"task_id":                  task["id"].(string),
+				"project_id":               projectID,
+				"target_project_column_id": doneColumnID,
+			},
+		},
+	})
+	moveTaskStructured := moveTaskResp["result"].(map[string]any)["structuredContent"].(map[string]any)
+	assert.Equal(t, doneColumnID, moveTaskStructured["task"].(map[string]any)["project_column_id"])
 
 	missingCommentsScopeResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
 		"jsonrpc": "2.0",
@@ -371,6 +444,19 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	require.NoError(t, err)
 	defer revokeResp.Body.Close()
 	require.Equal(t, http.StatusNoContent, revokeResp.StatusCode)
+
+	revokedUpdateResp, err := client.PUT(fmt.Sprintf("/users/me/mcp-api-keys/%s", keyID), map[string]any{
+		"name":   "Revoked edit",
+		"scopes": []string{"projects:read", "tasks:read"},
+	})
+	require.NoError(t, err)
+	defer revokedUpdateResp.Body.Close()
+	require.Equal(t, http.StatusUnprocessableEntity, revokedUpdateResp.StatusCode)
+
+	var revokedUpdateBody map[string]any
+	err = json.NewDecoder(revokedUpdateResp.Body).Decode(&revokedUpdateBody)
+	require.NoError(t, err)
+	assert.Equal(t, "mcp api key is already revoked", revokedUpdateBody["message"])
 
 	reuseBody, err := json.Marshal(map[string]any{
 		"jsonrpc": "2.0",

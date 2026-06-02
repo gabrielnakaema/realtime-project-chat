@@ -7,6 +7,15 @@ RETURNING id;
 INSERT INTO mcp_api_key_scopes (api_key_id, scope, created_at)
 VALUES ($1, $2, $3);
 
+-- name: UpdateMCPAPIKeyName :execrows
+UPDATE mcp_api_keys
+SET name = $3
+WHERE id = $1 AND user_id = $2;
+
+-- name: DeleteMCPAPIKeyScopes :exec
+DELETE FROM mcp_api_key_scopes
+WHERE api_key_id = $1;
+
 -- name: ListMCPAPIKeysByUserID :many
 SELECT
   k.id,

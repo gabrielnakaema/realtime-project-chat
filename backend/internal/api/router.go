@@ -52,6 +52,7 @@ func (a *Api) Router() http.Handler {
 				r.Get("/scopes", a.handlers.MCPAPIKey.ListAvailableScopes)
 				r.Post("/", a.handlers.MCPAPIKey.Create)
 				r.Get("/", a.handlers.MCPAPIKey.List)
+				r.Put("/{id}", a.handlers.MCPAPIKey.Update)
 				r.Delete("/{id}", a.handlers.MCPAPIKey.Revoke)
 			})
 		})

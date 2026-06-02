@@ -55,6 +55,16 @@ func (q *Queries) CreateMCPAPIKeyScope(ctx context.Context, arg CreateMCPAPIKeyS
 	return err
 }
 
+const deleteMCPAPIKeyScopes = `-- name: DeleteMCPAPIKeyScopes :exec
+DELETE FROM mcp_api_key_scopes
+WHERE api_key_id = $1
+`
+
+func (q *Queries) DeleteMCPAPIKeyScopes(ctx context.Context, apiKeyID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteMCPAPIKeyScopes, apiKeyID)
+	return err
+}
+
 const getMCPAPIKeyByIDForUser = `-- name: GetMCPAPIKeyByIDForUser :one
 SELECT
   k.id,
@@ -247,4 +257,24 @@ type TouchMCPAPIKeyLastUsedAtParams struct {
 func (q *Queries) TouchMCPAPIKeyLastUsedAt(ctx context.Context, arg TouchMCPAPIKeyLastUsedAtParams) error {
 	_, err := q.db.Exec(ctx, touchMCPAPIKeyLastUsedAt, arg.ID, arg.LastUsedAt, arg.CutoffAt)
 	return err
+}
+
+const updateMCPAPIKeyName = `-- name: UpdateMCPAPIKeyName :execrows
+UPDATE mcp_api_keys
+SET name = $3
+WHERE id = $1 AND user_id = $2
+`
+
+type UpdateMCPAPIKeyNameParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+	Name   string
+}
+
+func (q *Queries) UpdateMCPAPIKeyName(ctx context.Context, arg UpdateMCPAPIKeyNameParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateMCPAPIKeyName, arg.ID, arg.UserID, arg.Name)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

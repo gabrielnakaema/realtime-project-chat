@@ -63,6 +63,51 @@ func (r *MCPAPIKeyRepository) Create(ctx context.Context, key *domain.MCPAPIKey)
 	return tx.Commit(ctx)
 }
 
+func (r *MCPAPIKeyRepository) Update(ctx context.Context, key *domain.MCPAPIKey) error {
+	q := queries.New(r.pool)
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := q.WithTx(tx)
+
+	affected, err := qtx.UpdateMCPAPIKeyName(ctx, queries.UpdateMCPAPIKeyNameParams{
+		ID:     key.ID,
+		UserID: key.UserID,
+		Name:   key.Name,
+	})
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return domain.NotFoundError("mcp api key not found")
+	}
+
+	if err := qtx.DeleteMCPAPIKeyScopes(ctx, key.ID); err != nil {
+		return err
+	}
+
+	now := time.Now()
+	createdAt := pgtype.Timestamptz{
+		Time:  now,
+		Valid: true,
+	}
+	for _, scope := range key.Scopes {
+		if err := qtx.CreateMCPAPIKeyScope(ctx, queries.CreateMCPAPIKeyScopeParams{
+			ApiKeyID:  key.ID,
+			Scope:     string(scope),
+			CreatedAt: createdAt,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (r *MCPAPIKeyRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain.MCPAPIKey, error) {
 	q := queries.New(r.pool)
 
