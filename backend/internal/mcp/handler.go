@@ -28,6 +28,7 @@ type projectService interface {
 }
 
 type taskService interface {
+	Create(ctx context.Context, request service.CreateTaskRequest) (*domain.Task, error)
 	GroupByColumn(ctx context.Context, request service.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error)
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error)
 	Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error)
@@ -244,7 +245,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		}
 		return map[string]any{"projects": projects}, nil
 	case "list_project_board":
-		if err := requireScope(principal, domain.MCPAPIScopeProjectsRead); err != nil {
+		if err := requireScope(principal, domain.MCPAPIScopeProjectsBoardRead); err != nil {
 			return nil, err
 		}
 		projectID, err := requiredUUIDArg(params.Arguments, "project_id")
@@ -276,6 +277,58 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			"columns":         project.Columns,
 			"tasks_by_column": grouped,
 		}, nil
+	case "create_task":
+		if err := requireScope(principal, domain.MCPAPIScopeTasksCreate); err != nil {
+			return nil, err
+		}
+		projectID, err := requiredUUIDArg(params.Arguments, "project_id")
+		if err != nil {
+			return nil, err
+		}
+		projectColumnID, err := requiredUUIDArg(params.Arguments, "project_column_id")
+		if err != nil {
+			return nil, err
+		}
+		title, err := requiredStringArg(params.Arguments, "title")
+		if err != nil {
+			return nil, err
+		}
+		description, err := requiredStringArg(params.Arguments, "description")
+		if err != nil {
+			return nil, err
+		}
+		priority, err := requiredTaskPriorityArg(params.Arguments, "priority")
+		if err != nil {
+			return nil, err
+		}
+		responsibleID, err := optionalUUIDArg(params.Arguments, "responsible_id")
+		if err != nil {
+			return nil, err
+		}
+		dueDate, err := optionalTimeArg(params.Arguments, "due_date")
+		if err != nil {
+			return nil, err
+		}
+		tags, err := optionalStringSliceArg(params.Arguments, "tags")
+		if err != nil {
+			return nil, err
+		}
+		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
+		task, err := h.taskService.Create(ctx, service.CreateTaskRequest{
+			ProjectId:       projectID,
+			ProjectColumnId: projectColumnID,
+			Title:           title,
+			Description:     description,
+			RequestUserId:   principal.UserID,
+			Priority:        string(priority),
+			ResponsibleId:   responsibleID,
+			DueDate:         dueDate,
+			Tags:            tags,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"task": task}, nil
 	case "get_task":
 		if err := requireScope(principal, domain.MCPAPIScopeTasksRead); err != nil {
 			return nil, err
@@ -290,6 +343,9 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		}
 		includeComments := optionalBoolArg(params.Arguments, "include_comments", false)
 		if includeComments {
+			if err := requireScope(principal, domain.MCPAPIScopeTasksCommentsRead); err != nil {
+				return nil, err
+			}
 			commentsLimit := optionalIntArg(params.Arguments, "comments_limit", 10)
 			comments, err := h.taskCommentService.ListByTaskID(ctx, service.ListTaskCommentsRequest{
 				TaskID:        taskID,
@@ -300,6 +356,76 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 				return nil, err
 			}
 			task.Comments = comments.Data
+		}
+		return map[string]any{"task": task}, nil
+	case "list_task_comments":
+		if err := requireScope(principal, domain.MCPAPIScopeTasksCommentsRead); err != nil {
+			return nil, err
+		}
+		taskID, err := requiredUUIDArg(params.Arguments, "task_id")
+		if err != nil {
+			return nil, err
+		}
+		commentsLimit := optionalIntArg(params.Arguments, "limit", 10)
+		comments, err := h.taskCommentService.ListByTaskID(ctx, service.ListTaskCommentsRequest{
+			TaskID:        taskID,
+			RequestUserID: principal.UserID,
+			Limit:         commentsLimit,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"comments": comments.Data}, nil
+	case "update_task":
+		if err := requireScope(principal, domain.MCPAPIScopeTasksUpdate); err != nil {
+			return nil, err
+		}
+		taskID, err := requiredUUIDArg(params.Arguments, "task_id")
+		if err != nil {
+			return nil, err
+		}
+		projectColumnID, err := requiredUUIDArg(params.Arguments, "project_column_id")
+		if err != nil {
+			return nil, err
+		}
+		title, err := requiredStringArg(params.Arguments, "title")
+		if err != nil {
+			return nil, err
+		}
+		description, err := requiredStringArg(params.Arguments, "description")
+		if err != nil {
+			return nil, err
+		}
+		priority, err := requiredTaskPriorityArg(params.Arguments, "priority")
+		if err != nil {
+			return nil, err
+		}
+		responsibleID, err := optionalUUIDArg(params.Arguments, "responsible_id")
+		if err != nil {
+			return nil, err
+		}
+		dueDate, err := optionalTimeArg(params.Arguments, "due_date")
+		if err != nil {
+			return nil, err
+		}
+		tags, err := optionalStringSliceArg(params.Arguments, "tags")
+		if err != nil {
+			return nil, err
+		}
+		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
+		task, err := h.taskService.Update(ctx, service.UpdateTaskRequest{
+			TaskId:          taskID,
+			Title:           title,
+			Description:     description,
+			ProjectColumnId: projectColumnID,
+			RequestUserId:   principal.UserID,
+			Priority:        priority,
+			ResponsibleId:   responsibleID,
+			DueDate:         dueDate,
+			Tags:            tags,
+		})
+		if err != nil {
+			return nil, err
 		}
 		return map[string]any{"task": task}, nil
 	case "move_task":
@@ -413,6 +539,20 @@ func toolDefinitions() []map[string]any {
 			},
 			"required": []string{"project_id"},
 		}),
+		toolDefinition("create_task", "Create a task in a project column.", map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"project_id":        map[string]any{"type": "string", "format": "uuid"},
+				"project_column_id": map[string]any{"type": "string", "format": "uuid"},
+				"title":             map[string]any{"type": "string"},
+				"description":       map[string]any{"type": "string"},
+				"priority":          map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
+				"responsible_id":    map[string]any{"type": "string", "format": "uuid"},
+				"due_date":          map[string]any{"type": "string", "format": "date-time"},
+				"tags":              map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+			},
+			"required": []string{"project_id", "project_column_id", "title", "description", "priority"},
+		}),
 		toolDefinition("get_task", "Get a task and optionally its recent comments.", map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -421,6 +561,28 @@ func toolDefinitions() []map[string]any {
 				"comments_limit":   map[string]any{"type": "integer", "minimum": 1, "maximum": 100},
 			},
 			"required": []string{"task_id"},
+		}),
+		toolDefinition("list_task_comments", "List recent comments for a task.", map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"task_id": map[string]any{"type": "string", "format": "uuid"},
+				"limit":   map[string]any{"type": "integer", "minimum": 1, "maximum": 100},
+			},
+			"required": []string{"task_id"},
+		}),
+		toolDefinition("update_task", "Update a task's editable fields.", map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"task_id":           map[string]any{"type": "string", "format": "uuid"},
+				"project_column_id": map[string]any{"type": "string", "format": "uuid"},
+				"title":             map[string]any{"type": "string"},
+				"description":       map[string]any{"type": "string"},
+				"priority":          map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
+				"responsible_id":    map[string]any{"type": "string", "format": "uuid"},
+				"due_date":          map[string]any{"type": "string", "format": "date-time"},
+				"tags":              map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+			},
+			"required": []string{"task_id", "project_column_id", "title", "description", "priority"},
 		}),
 		toolDefinition("move_task", "Move a task to another project column.", map[string]any{
 			"type": "object",
@@ -530,11 +692,6 @@ func toolErrorResult(err error) map[string]any {
 	}
 }
 
-func isUnauthorized(err error) bool {
-	var domainErr domain.DomainError
-	return errors.As(err, &domainErr) && domainErr.Code == domain.UnauthorizedErrorCode
-}
-
 func requiredUUIDArg(args map[string]any, key string) (uuid.UUID, error) {
 	raw, err := requiredStringArg(args, key)
 	if err != nil {
@@ -635,6 +792,64 @@ func optionalBoolArg(args map[string]any, key string, defaultValue bool) bool {
 	}
 
 	return value
+}
+
+func requiredTaskPriorityArg(args map[string]any, key string) (domain.TaskPriority, error) {
+	value, err := requiredStringArg(args, key)
+	if err != nil {
+		return "", err
+	}
+
+	priority := domain.TaskPriority(strings.ToLower(value))
+	for _, allowed := range domain.AllowedTaskPriorities {
+		if priority == allowed {
+			return priority, nil
+		}
+	}
+
+	return "", domain.BusinessValidationError(fmt.Sprintf("%s must be one of: low, medium, high", key))
+}
+
+func optionalTimeArg(args map[string]any, key string) (*time.Time, error) {
+	raw, ok := args[key]
+	if !ok || raw == nil {
+		return nil, nil
+	}
+
+	value, ok := raw.(string)
+	if !ok || strings.TrimSpace(value) == "" {
+		return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be a valid RFC3339 datetime", key))
+	}
+
+	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(value))
+	if err != nil {
+		return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be a valid RFC3339 datetime", key))
+	}
+
+	return &parsed, nil
+}
+
+func optionalStringSliceArg(args map[string]any, key string) ([]string, error) {
+	raw, ok := args[key]
+	if !ok || raw == nil {
+		return nil, nil
+	}
+
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be an array of strings", key))
+	}
+
+	values := make([]string, 0, len(items))
+	for _, item := range items {
+		value, ok := item.(string)
+		if !ok {
+			return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be an array of strings", key))
+		}
+		values = append(values, strings.TrimSpace(value))
+	}
+
+	return values, nil
 }
 
 func writeHTTPError(w http.ResponseWriter, status int, message string) {

@@ -27,14 +27,24 @@ func (s *stubProjectService) GetById(ctx context.Context, id uuid.UUID, userId u
 }
 
 type stubTaskService struct {
+	createRequest     *service.CreateTaskRequest
 	task              *domain.Task
 	grouped           map[string]utils.CursorPaginated[domain.Task]
+	updateRequest     *service.UpdateTaskRequest
 	moveRequest       *service.MoveTaskRequest
 	markDoneRequest   *service.MarkTaskDoneRequest
 	assignSelfRequest *service.AssignTaskToSelfRequest
+	createOrigin      domain.ActionOrigin
+	updateOrigin      domain.ActionOrigin
 	moveOrigin        domain.ActionOrigin
 	markDoneOrigin    domain.ActionOrigin
 	assignSelfOrigin  domain.ActionOrigin
+}
+
+func (s *stubTaskService) Create(ctx context.Context, request service.CreateTaskRequest) (*domain.Task, error) {
+	s.createRequest = &request
+	s.createOrigin = domain.ActionOriginFromContext(ctx)
+	return s.task, nil
 }
 
 func (s *stubTaskService) GroupByColumn(ctx context.Context, request service.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error) {
@@ -52,6 +62,8 @@ func (s *stubTaskService) Move(ctx context.Context, request service.MoveTaskRequ
 }
 
 func (s *stubTaskService) Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error) {
+	s.updateRequest = &request
+	s.updateOrigin = domain.ActionOriginFromContext(ctx)
 	return s.task, nil
 }
 
@@ -144,6 +156,22 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, projectID.String(), boardResult["project"].(*domain.Project).Id.String())
 
+	_, err = handler.callTool(context.Background(), principal, toolCallParams{
+		Name: "create_task",
+		Arguments: map[string]any{
+			"project_id":        projectID.String(),
+			"project_column_id": columnID.String(),
+			"title":             "New Task",
+			"description":       "Created via MCP",
+			"priority":          "medium",
+			"tags":              []any{"backend", "mcp"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ActionOriginMCPAgent, taskSvc.createOrigin)
+	require.NotNil(t, taskSvc.createRequest)
+	assert.Equal(t, projectID, taskSvc.createRequest.ProjectId)
+
 	taskResult, err := handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "get_task",
 		Arguments: map[string]any{
@@ -154,6 +182,36 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, taskResult["task"].(*domain.Task).Comments, 1)
+	require.NotNil(t, commentSvc.listRequest)
+	assert.Equal(t, 5, commentSvc.listRequest.Limit)
+
+	listCommentsResult, err := handler.callTool(context.Background(), principal, toolCallParams{
+		Name: "list_task_comments",
+		Arguments: map[string]any{
+			"task_id": taskID.String(),
+			"limit":   float64(3),
+		},
+	})
+	require.NoError(t, err)
+	assert.Len(t, listCommentsResult["comments"].([]domain.TaskComment), 1)
+	require.NotNil(t, commentSvc.listRequest)
+	assert.Equal(t, 3, commentSvc.listRequest.Limit)
+
+	_, err = handler.callTool(context.Background(), principal, toolCallParams{
+		Name: "update_task",
+		Arguments: map[string]any{
+			"task_id":           taskID.String(),
+			"project_column_id": columnID.String(),
+			"title":             "Task Updated",
+			"description":       "Updated via MCP",
+			"priority":          "high",
+			"tags":              []any{"backend", "updated"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.ActionOriginMCPAgent, taskSvc.updateOrigin)
+	require.NotNil(t, taskSvc.updateRequest)
+	assert.Equal(t, taskID, taskSvc.updateRequest.TaskId)
 
 	_, err = handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "move_task",

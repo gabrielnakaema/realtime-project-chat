@@ -13,6 +13,7 @@ import (
 )
 
 type mcpAPIKeyService interface {
+	ListAvailableScopes() []domain.MCPAPIScopeDefinition
 	Create(ctx context.Context, request service.CreateMCPAPIKeyRequest) (*service.CreateMCPAPIKeyResult, error)
 	ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain.MCPAPIKey, error)
 	Revoke(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
@@ -51,6 +52,12 @@ func (h *MCPAPIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := utils.WriteJSON(w, http.StatusCreated, result, nil); err != nil {
+		ErrorResponse(w, r, err)
+	}
+}
+
+func (h *MCPAPIKeyHandler) ListAvailableScopes(w http.ResponseWriter, r *http.Request) {
+	if err := utils.WriteJSON(w, http.StatusOK, h.service.ListAvailableScopes(), nil); err != nil {
 		ErrorResponse(w, r, err)
 	}
 }

@@ -103,6 +103,36 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	err = json.NewDecoder(taskResp.Body).Decode(&task)
 	require.NoError(t, err)
 
+	scopeResp, err := client.GET("/users/me/mcp-api-keys/scopes")
+	require.NoError(t, err)
+	defer scopeResp.Body.Close()
+	require.Equal(t, http.StatusOK, scopeResp.StatusCode)
+
+	var availableScopes []map[string]any
+	err = json.NewDecoder(scopeResp.Body).Decode(&availableScopes)
+	require.NoError(t, err)
+	require.NotEmpty(t, availableScopes)
+	assert.Contains(t, availableScopes, map[string]any{
+		"scope": "projects:board:read",
+		"label": "Read project boards",
+		"title": "Inspect board columns and the tasks grouped inside them.",
+	})
+	assert.Contains(t, availableScopes, map[string]any{
+		"scope": "tasks:create",
+		"label": "Create tasks",
+		"title": "Create new tasks in project columns you can access.",
+	})
+	assert.Contains(t, availableScopes, map[string]any{
+		"scope": "tasks:update",
+		"label": "Update tasks",
+		"title": "Edit task details such as title, description, assignee, due date, and tags.",
+	})
+	assert.Contains(t, availableScopes, map[string]any{
+		"scope": "tasks:comments:read",
+		"label": "Read task comments",
+		"title": "Load recent task comments when an MCP client requests extra context.",
+	})
+
 	keyResp, err := client.POST("/users/me/mcp-api-keys", map[string]any{
 		"name":   "Read Only Agent",
 		"scopes": []string{"projects:read", "tasks:read"},
@@ -119,6 +149,29 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	require.True(t, ok)
 	require.NotEmpty(t, rawSecret)
 
+	editorKeyResp, err := client.POST("/users/me/mcp-api-keys", map[string]any{
+		"name": "Editor Agent",
+		"scopes": []string{
+			"projects:board:read",
+			"tasks:create",
+			"tasks:read",
+			"tasks:update",
+			"tasks:comments:read",
+			"tasks:comment",
+		},
+	})
+	require.NoError(t, err)
+	defer editorKeyResp.Body.Close()
+	require.Equal(t, http.StatusCreated, editorKeyResp.StatusCode)
+
+	var editorCreated map[string]any
+	err = json.NewDecoder(editorKeyResp.Body).Decode(&editorCreated)
+	require.NoError(t, err)
+
+	editorRawSecret, ok := editorCreated["raw_secret"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, editorRawSecret)
+
 	keyMetadata := created["key"].(map[string]any)
 	keyID := keyMetadata["id"].(string)
 	assert.Equal(t, "Read Only Agent", keyMetadata["name"])
@@ -131,10 +184,16 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	var listed []map[string]any
 	err = json.NewDecoder(listResp.Body).Decode(&listed)
 	require.NoError(t, err)
-	require.Len(t, listed, 1)
-	assert.Equal(t, keyID, listed[0]["id"])
-	_, hasRawSecret := listed[0]["raw_secret"]
-	assert.False(t, hasRawSecret)
+	require.Len(t, listed, 2)
+	foundReadOnlyKey := false
+	for _, listedKey := range listed {
+		if listedKey["id"] == keyID {
+			foundReadOnlyKey = true
+		}
+		_, hasRawSecret := listedKey["raw_secret"]
+		assert.False(t, hasRawSecret)
+	}
+	assert.True(t, foundReadOnlyKey)
 
 	initializeResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
 		"jsonrpc": "2.0",
@@ -159,6 +218,21 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 		"params":  map[string]any{},
 	})
 	assert.Empty(t, resourcesResp["result"].(map[string]any)["resources"])
+
+	toolsResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "1.75",
+		"method":  "tools/list",
+		"params":  map[string]any{},
+	})
+	tools := toolsResp["result"].(map[string]any)["tools"].([]any)
+	toolNames := make([]string, 0, len(tools))
+	for _, rawTool := range tools {
+		toolNames = append(toolNames, rawTool.(map[string]any)["name"].(string))
+	}
+	assert.Contains(t, toolNames, "create_task")
+	assert.Contains(t, toolNames, "update_task")
+	assert.Contains(t, toolNames, "list_task_comments")
 
 	listProjectsResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
 		"jsonrpc": "2.0",
@@ -188,6 +262,107 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	assert.Equal(t, true, result["isError"])
 	structured := result["structuredContent"].(map[string]any)
 	assert.Equal(t, "missing_scope", structured["error"].(map[string]any)["type"])
+
+	missingCommentsScopeResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.5",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "get_task",
+			"arguments": map[string]any{
+				"task_id":          task["id"].(string),
+				"include_comments": true,
+			},
+		},
+	})
+	missingCommentsResult := missingCommentsScopeResp["result"].(map[string]any)
+	assert.Equal(t, true, missingCommentsResult["isError"])
+	missingCommentsStructured := missingCommentsResult["structuredContent"].(map[string]any)
+	assert.Equal(t, "missing_scope", missingCommentsStructured["error"].(map[string]any)["type"])
+
+	boardResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.75",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "list_project_board",
+			"arguments": map[string]any{
+				"project_id": projectID,
+			},
+		},
+	})
+	boardStructured := boardResp["result"].(map[string]any)["structuredContent"].(map[string]any)
+	assert.Equal(t, projectID, boardStructured["project"].(map[string]any)["id"])
+
+	createTaskResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.8",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "create_task",
+			"arguments": map[string]any{
+				"project_id":        projectID,
+				"project_column_id": pendingColumnID,
+				"title":             "MCP Created Task",
+				"description":       "Created through MCP",
+				"priority":          "high",
+				"tags":              []string{"mcp", "created"},
+			},
+		},
+	})
+	createdTask := createTaskResp["result"].(map[string]any)["structuredContent"].(map[string]any)["task"].(map[string]any)
+	createdTaskID := createdTask["id"].(string)
+	assert.Equal(t, "MCP Created Task", createdTask["title"])
+
+	updateTaskResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.9",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "update_task",
+			"arguments": map[string]any{
+				"task_id":           createdTaskID,
+				"project_column_id": pendingColumnID,
+				"title":             "MCP Updated Task",
+				"description":       "Updated through MCP",
+				"priority":          "medium",
+				"tags":              []string{"mcp", "updated"},
+			},
+		},
+	})
+	updatedTask := updateTaskResp["result"].(map[string]any)["structuredContent"].(map[string]any)["task"].(map[string]any)
+	assert.Equal(t, "MCP Updated Task", updatedTask["title"])
+
+	addCommentResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "4.0",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "add_task_comment",
+			"arguments": map[string]any{
+				"task_id": createdTaskID,
+				"content": "Comment added through MCP",
+			},
+		},
+	})
+	addedComment := addCommentResp["result"].(map[string]any)["structuredContent"].(map[string]any)["comment"].(map[string]any)
+	assert.Equal(t, "Comment added through MCP", addedComment["content"])
+
+	listCommentsResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "4.1",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "list_task_comments",
+			"arguments": map[string]any{
+				"task_id": createdTaskID,
+				"limit":   10,
+			},
+		},
+	})
+	comments := listCommentsResp["result"].(map[string]any)["structuredContent"].(map[string]any)["comments"].([]any)
+	require.NotEmpty(t, comments)
+	assert.Equal(t, "Comment added through MCP", comments[0].(map[string]any)["content"])
 
 	revokeReq, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/users/me/mcp-api-keys/%s", testAPI.GetBaseURL(), keyID), nil)
 	require.NoError(t, err)

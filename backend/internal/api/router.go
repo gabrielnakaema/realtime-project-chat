@@ -49,6 +49,7 @@ func (a *Api) Router() http.Handler {
 			r.Get("/", a.handlers.User.ListUsers)
 			r.Route("/me/mcp-api-keys", func(r chi.Router) {
 				r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
+				r.Get("/scopes", a.handlers.MCPAPIKey.ListAvailableScopes)
 				r.Post("/", a.handlers.MCPAPIKey.Create)
 				r.Get("/", a.handlers.MCPAPIKey.List)
 				r.Delete("/{id}", a.handlers.MCPAPIKey.Revoke)

@@ -45,6 +45,13 @@ type CreateMCPAPIKeyResult struct {
 	RawSecret string            `json:"raw_secret"`
 }
 
+func (s *MCPAPIKeyService) ListAvailableScopes() []domain.MCPAPIScopeDefinition {
+	scopes := make([]domain.MCPAPIScopeDefinition, len(domain.MCPAPIScopeDefinitions))
+	copy(scopes, domain.MCPAPIScopeDefinitions)
+
+	return scopes
+}
+
 func (s *MCPAPIKeyService) Create(ctx context.Context, request CreateMCPAPIKeyRequest) (*CreateMCPAPIKeyResult, error) {
 	if request.UserID == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
