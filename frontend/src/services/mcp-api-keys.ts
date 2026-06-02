@@ -1,15 +1,6 @@
 import { api, baseApiUrl } from './api';
 
-export const mcpApiScopeValues = [
-  'projects:read',
-  'tasks:read',
-  'tasks:move',
-  'tasks:comment',
-  'tasks:mark_done',
-  'tasks:assign:self',
-] as const;
-
-export type MCPAPIScope = (typeof mcpApiScopeValues)[number];
+export type MCPAPIScope = string;
 
 export interface MCPAPIKey {
   id: string;
@@ -31,48 +22,20 @@ export interface CreateMCPAPIKeyResponse {
   raw_secret: string;
 }
 
-export interface MCPAccessScopeOption {
-  value: MCPAPIScope;
+export interface MCPAPIAvailableScope {
+  scope: MCPAPIScope;
   label: string;
-  description: string;
+  title: string;
 }
-
-export const mcpAccessScopeOptions: MCPAccessScopeOption[] = [
-  {
-    value: 'projects:read',
-    label: 'Read projects',
-    description: 'View project details and browse the workspace structure.',
-  },
-  {
-    value: 'tasks:read',
-    label: 'Read tasks',
-    description: 'Inspect task fields, status, assignments, and other task metadata.',
-  },
-  {
-    value: 'tasks:move',
-    label: 'Move tasks',
-    description: 'Change where a task sits in the workflow.',
-  },
-  {
-    value: 'tasks:comment',
-    label: 'Comment on tasks',
-    description: 'Post task comments on your behalf from an MCP client.',
-  },
-  {
-    value: 'tasks:mark_done',
-    label: 'Mark tasks done',
-    description: 'Complete tasks by moving them into a done state when supported.',
-  },
-  {
-    value: 'tasks:assign:self',
-    label: 'Assign tasks to me',
-    description: 'Let an MCP client assign tasks to your own account only.',
-  },
-];
 
 export const listMCPAPIKeys = async () => {
   const response = await api.get('users/me/mcp-api-keys');
   return response.json<MCPAPIKey[]>();
+};
+
+export const listAvailableMCPAPIScopes = async () => {
+  const response = await api.get('users/me/mcp-api-keys/scopes');
+  return response.json<MCPAPIAvailableScope[]>();
 };
 
 export const createMCPAPIKey = async (payload: CreateMCPAPIKeyPayload) => {

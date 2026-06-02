@@ -1,10 +1,7 @@
-import type { MCPAPIKey, MCPAPIScope } from '@/services/mcp-api-keys';
-import { mcpAccessScopeOptions } from '@/services/mcp-api-keys';
+import type { MCPAPIAvailableScope, MCPAPIKey, MCPAPIScope } from '@/services/mcp-api-keys';
 import { formatDateTime } from '@/utils/date';
 
 export type CreateModalMode = 'create' | 'reveal';
-
-const scopeOptionsByValue = new Map(mcpAccessScopeOptions.map((scope) => [scope.value, scope]));
 
 export const sortMCPAPIKeys = (keys: MCPAPIKey[]) =>
   [...keys].sort((left, right) => {
@@ -19,6 +16,6 @@ export const formatMCPAPIKeyLastUsed = (date: string | null) => {
   return formatDateTime(date, 'Never used');
 };
 
-export const getMCPAccessScopeLabel = (scope: MCPAPIScope) => {
-  return scopeOptionsByValue.get(scope)?.label ?? scope;
+export const getMCPAccessScopeLabel = (scope: MCPAPIScope, availableScopes: MCPAPIAvailableScope[] = []) => {
+  return availableScopes.find((option) => option.scope === scope)?.label ?? scope;
 };

@@ -88,4 +88,5 @@ export const userListQueryKeys = {
 export const mcpAPIKeyQueryKeys = {
   all: ['mcp-api-keys'],
   list: ['mcp-api-keys', 'list'],
+  scopes: ['mcp-api-keys', 'scopes'],
 } as const;
