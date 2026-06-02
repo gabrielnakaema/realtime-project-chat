@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as McpAccessRouteImport } from './routes/mcp-access'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SearchRouteRouteImport } from './routes/search/route'
 import { Route as ProjectsRouteRouteImport } from './routes/projects/route'
@@ -22,6 +23,11 @@ import { Route as ProjectsProjectIdChatRouteImport } from './routes/projects/$pr
 const SignUpRoute = SignUpRouteImport.update({
   id: '/sign-up',
   path: '/sign-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const McpAccessRoute = McpAccessRouteImport.update({
+  id: '/mcp-access',
+  path: '/mcp-access',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/projects': typeof ProjectsRouteRouteWithChildren
   '/search': typeof SearchRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/mcp-access': typeof McpAccessRoute
   '/sign-up': typeof SignUpRoute
   '/projects/': typeof ProjectsIndexRoute
   '/search/': typeof SearchIndexRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/mcp-access': typeof McpAccessRoute
   '/sign-up': typeof SignUpRoute
   '/projects': typeof ProjectsIndexRoute
   '/search': typeof SearchIndexRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   '/projects': typeof ProjectsRouteRouteWithChildren
   '/search': typeof SearchRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/mcp-access': typeof McpAccessRoute
   '/sign-up': typeof SignUpRoute
   '/projects/': typeof ProjectsIndexRoute
   '/search/': typeof SearchIndexRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/search'
     | '/login'
+    | '/mcp-access'
     | '/sign-up'
     | '/projects/'
     | '/search/'
@@ -113,6 +123,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/mcp-access'
     | '/sign-up'
     | '/projects'
     | '/search'
@@ -124,6 +135,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/search'
     | '/login'
+    | '/mcp-access'
     | '/sign-up'
     | '/projects/'
     | '/search/'
@@ -136,6 +148,7 @@ export interface RootRouteChildren {
   ProjectsRouteRoute: typeof ProjectsRouteRouteWithChildren
   SearchRouteRoute: typeof SearchRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
+  McpAccessRoute: typeof McpAccessRoute
   SignUpRoute: typeof SignUpRoute
 }
 
@@ -146,6 +159,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-up'
       fullPath: '/sign-up'
       preLoaderRoute: typeof SignUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mcp-access': {
+      id: '/mcp-access'
+      path: '/mcp-access'
+      fullPath: '/mcp-access'
+      preLoaderRoute: typeof McpAccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProjectsRouteRoute: ProjectsRouteRouteWithChildren,
   SearchRouteRoute: SearchRouteRouteWithChildren,
   LoginRoute: LoginRoute,
+  McpAccessRoute: McpAccessRoute,
   SignUpRoute: SignUpRoute,
 }
 export const routeTree = rootRouteImport

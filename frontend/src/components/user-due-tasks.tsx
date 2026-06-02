@@ -3,13 +3,9 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useUserDueTasks } from '@/hooks/use-user-due-tasks';
 import { TaskLinkRow } from '@/components/task-link-row';
 import { cn } from '@/lib/utils';
+import { formatMonthDay } from '@/utils/date';
 
 const BADGE_BASE = 'text-xs font-medium rounded-md px-2 py-0.5';
-
-function formatDueDate(date: string | null): string {
-  if (!date) return '-';
-  return new Date(date).toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
 
 function DueBadge({ date }: { date: string | null }) {
   if (!date) return null;
@@ -48,7 +44,7 @@ export const UserDueTasks = () => {
             task={task}
             trailingContent={
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500 dark:text-slate-400">{formatDueDate(task.due_date)}</span>
+                <span className="text-sm text-slate-500 dark:text-slate-400">{formatMonthDay(task.due_date)}</span>
                 <DueBadge date={task.due_date} />
               </div>
             }

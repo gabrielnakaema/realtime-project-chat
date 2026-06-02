@@ -1,5 +1,6 @@
 import type { Chat } from '@/types/chat';
 import type { User } from '@/types/user';
+import { formatMonthDay } from '@/utils/date';
 
 export const AVATAR_COLORS = [
   'bg-violet-500',
@@ -20,7 +21,7 @@ export const getAvatarColorClass = (name: string) => {
 
 export const formatTime = (ts: string) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-export const formatDate = (ts: string) => new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
+export const formatDate = (ts: string) => formatMonthDay(ts);
 
 export const getOtherMembers = (chat: Chat, currentUserId?: string): User[] => {
   return chat.members

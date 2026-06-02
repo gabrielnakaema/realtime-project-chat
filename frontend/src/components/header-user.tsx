@@ -1,8 +1,10 @@
-import { LogOut } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { KeyRound, LogOut } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/use-auth';
@@ -27,7 +29,14 @@ export const HeaderUser = () => {
           </div>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem asChild>
+          <Link to="/mcp-access">
+            <KeyRound className="h-4 w-4" />
+            MCP Access
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <button type="button" onClick={logout} className="w-full">
             <LogOut className="h-4 w-4" />

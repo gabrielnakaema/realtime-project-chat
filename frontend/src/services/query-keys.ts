@@ -84,3 +84,8 @@ export const notificationQueryKeys = {
 export const userListQueryKeys = {
   all: ['users', 'list'],
 } as const;
+
+export const mcpAPIKeyQueryKeys = {
+  all: ['mcp-api-keys'],
+  list: ['mcp-api-keys', 'list'],
+} as const;

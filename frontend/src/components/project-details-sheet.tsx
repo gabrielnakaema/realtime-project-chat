@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui
 import { ProjectActivity } from './project-activity';
 import type { Project } from '@/types/project';
 import { sanitizeHTML } from '@/utils/html';
+import { formatLongDate } from '@/utils/date';
 import { ProjectMemberRole } from '@/types/project';
 import { useProjectActivities } from '@/hooks/use-project-activities';
 
@@ -15,11 +16,7 @@ export const ProjectDetailsSheetTrigger = SheetTrigger;
 
 export const ProjectDetailsSheet = ({ project, children }: ProjectDetailsSheetProps) => {
   const creator = project.members.find((m) => m.role === ProjectMemberRole.Creator);
-  const formattedDate = new Date(project.created_at).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  const formattedDate = formatLongDate(project.created_at);
 
   const { data: activities, queryResult, sentinelRef } = useProjectActivities(project.id);
   const { isFetchingNextPage } = queryResult;

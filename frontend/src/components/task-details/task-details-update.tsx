@@ -3,6 +3,7 @@ import { Avatar } from '../avatar';
 import { TaskPriorityBadge } from '../task-priority-badge';
 import { TaskStatusBadge } from '../task-status-badge';
 import type { TaskChange, TaskPriority, TaskUpdate } from '@/types/task';
+import { formatTaskDueDate } from '@/utils/date';
 import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
 
 const fieldLabels: Record<string, string> = {
@@ -13,18 +14,6 @@ const fieldLabels: Record<string, string> = {
   responsible_id: 'Responsible',
   due_date: 'Due date',
   done_at: 'Done at',
-};
-
-const formatDateString = (date: string | null) => {
-  if (!date) {
-    return '-';
-  }
-
-  return new Date(date).toLocaleDateString([], {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
 };
 
 export const TaskDetailsUpdate = ({ update, isLast }: { update: TaskUpdate; isLast: boolean }) => {
@@ -175,9 +164,9 @@ const ChangeRow = ({ change }: { change: TaskChange }) => {
     return (
       <div className="flex items-center gap-1.5">
         <span className="w-20 shrink-0 text-xs text-slate-400 dark:text-slate-500">{fieldLabels.due_date}</span>
-        <span className="text-xs text-slate-400 dark:text-slate-500">{formatDateString(change.old_value)}</span>
+        <span className="text-xs text-slate-400 dark:text-slate-500">{formatTaskDueDate(change.old_value)}</span>
         <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
-        <span className="text-xs text-slate-700 dark:text-slate-200">{formatDateString(change.new_value)}</span>
+        <span className="text-xs text-slate-700 dark:text-slate-200">{formatTaskDueDate(change.new_value)}</span>
       </div>
     );
   }

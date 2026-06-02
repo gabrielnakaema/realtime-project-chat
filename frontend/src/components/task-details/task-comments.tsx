@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { Button } from '../button';
 import { LoadingSpinner } from '../loading';
 import { TextEditor } from '../text-editor';
-import { ScrollArea, ScrollBar } from '../ui/scroll-area';
+import { ScrollArea } from '../ui/scroll-area';
 import type { TaskComment } from '@/types/task';
 import { useAuth } from '@/hooks/use-auth';
 import { useTaskComments } from '@/hooks/use-task-comments';
@@ -186,11 +186,10 @@ export const TaskComments = ({
           </div>
         </div>
 
-        <ScrollArea className="xl:min-h-0 xl:flex-1">
-          <div className="min-w-max px-6 py-5">
+        <ScrollArea className="min-w-0 xl:min-h-0 xl:flex-1">
+          <div className="min-w-0 px-6 py-5">
             <div className="flex flex-col gap-4">{renderComments()}</div>
           </div>
-          <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </div>
     </div>
@@ -228,7 +227,7 @@ const TaskCommentItem = ({
   const isOwnComment = currentUserId === comment.user.id;
 
   return (
-    <div className={cn('space-y-3', depth > 0 && 'ml-4 border-l border-slate-200 pl-4 dark:border-slate-700')}>
+    <div className={cn('min-w-0 space-y-3', depth > 0 && 'ml-4 border-l border-slate-200 pl-4 dark:border-slate-700')}>
       <article
         id={`task-comment-${comment.id}`}
         className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors dark:border-slate-700 dark:bg-slate-900"
@@ -257,7 +256,7 @@ const TaskCommentItem = ({
         </div>
 
         <div
-          className="prose prose-sm prose-slate dark:prose-invert max-w-none"
+          className="prose prose-sm prose-slate dark:prose-invert max-w-none text-[0.95rem] leading-7 text-pretty [overflow-wrap:anywhere] [&_*]:max-w-full [&_a]:break-words [&_code]:whitespace-pre-wrap [&_li]:marker:text-slate-400 [&_ol]:pl-5 [&_p]:my-3 [&_pre]:overflow-x-auto [&_pre]:break-words [&_pre]:whitespace-pre-wrap [&_ul]:pl-5"
           dangerouslySetInnerHTML={{ __html: sanitizeHTML(comment.content) }}
         />
 

@@ -1,8 +1,5 @@
 import type { ChatMessage } from '@/types/chat';
-
-const formatDate = (timestamp: string) => {
-  return new Date(timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' });
-};
+import { formatDate } from './utils';
 
 type MessagesTimelineItem =
   | {

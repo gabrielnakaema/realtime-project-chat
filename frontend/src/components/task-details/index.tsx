@@ -47,7 +47,7 @@ export const TaskDetails = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="flex max-h-[calc(100vh-5rem)] flex-col gap-0 overflow-y-auto p-0 sm:max-h-[calc(100vh-5rem)] sm:max-w-6xl xl:overflow-hidden"
+        className="flex max-h-[calc(100vh-5rem)] flex-col gap-0 overflow-y-auto p-0 sm:max-h-[calc(100vh-5rem)] sm:max-w-[calc(100vw-3rem)] xl:max-w-7xl xl:overflow-hidden 2xl:max-w-[96rem]"
         autoFocus={false}
         showCloseButton={false}
       >
