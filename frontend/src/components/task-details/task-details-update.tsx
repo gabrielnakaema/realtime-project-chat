@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import { ActionOriginBadge } from '../action-origin-badge';
 import { Avatar } from '../avatar';
 import { TaskPriorityBadge } from '../task-priority-badge';
 import { TaskStatusBadge } from '../task-status-badge';
@@ -16,7 +17,15 @@ const fieldLabels: Record<string, string> = {
   done_at: 'Done at',
 };
 
-export const TaskDetailsUpdate = ({ update, isLast }: { update: TaskUpdate; isLast: boolean }) => {
+export const TaskDetailsUpdate = ({
+  update,
+  isLast,
+  currentUserId,
+}: {
+  update: TaskUpdate;
+  isLast: boolean;
+  currentUserId?: string;
+}) => {
   return (
     <div className="relative flex gap-3">
       {!isLast && <div className="absolute top-6 bottom-0 left-[11px] w-px bg-slate-200 dark:bg-slate-700" />}
@@ -24,7 +33,7 @@ export const TaskDetailsUpdate = ({ update, isLast }: { update: TaskUpdate; isLa
         <Avatar name={update.user.name} size="sm" />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 pb-5">
-        <UpdateSummary update={update} />
+        <UpdateSummary update={update} currentUserId={currentUserId} />
         <span className="text-xs text-slate-400 dark:text-slate-500">
           {formatRelativeActivityDateString(update.created_at)}
         </span>
@@ -34,18 +43,36 @@ export const TaskDetailsUpdate = ({ update, isLast }: { update: TaskUpdate; isLa
   );
 };
 
-const Actor = ({ name }: { name: string }) => (
-  <span className="font-medium text-slate-900 dark:text-slate-100">{name}</span>
+const Actor = ({
+  name,
+  actionOrigin,
+  isCurrentUser = false,
+}: {
+  name: string;
+  actionOrigin?: TaskUpdate['action_origin'];
+  isCurrentUser?: boolean;
+}) => (
+  <span className="inline-flex flex-wrap items-center gap-1.5 align-middle">
+    <span className="font-medium text-slate-900 dark:text-slate-100">{name}</span>
+    <ActionOriginBadge origin={actionOrigin} />
+    {isCurrentUser && (
+      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+        You
+      </span>
+    )}
+  </span>
 );
 
-const UpdateSummary = ({ update }: { update: TaskUpdate }) => {
+const UpdateSummary = ({ update, currentUserId }: { update: TaskUpdate; currentUserId?: string }) => {
   const changes = update.changes ?? [];
   const responsibleChange = changes.find((change) => change.field === 'responsible_id');
+  const isCurrentUser = currentUserId === update.user.id;
 
   if (update.update_type === 'created') {
     return (
       <p className="text-sm text-slate-600 dark:text-slate-300">
-        <Actor name={update.user.name} /> created the task
+        <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> created the
+        task
       </p>
     );
   }
@@ -54,7 +81,7 @@ const UpdateSummary = ({ update }: { update: TaskUpdate }) => {
     const subject = responsibleChange?.subject?.name ?? getDisplayValue(responsibleChange, 'new');
     return (
       <p className="text-sm text-slate-600 dark:text-slate-300">
-        <Actor name={update.user.name} /> assigned to{' '}
+        <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> assigned to{' '}
         <span className="font-medium text-slate-900 dark:text-slate-100">{subject}</span>
       </p>
     );
@@ -63,7 +90,8 @@ const UpdateSummary = ({ update }: { update: TaskUpdate }) => {
   if (update.update_type === 'unassigned') {
     return (
       <p className="text-sm text-slate-600 dark:text-slate-300">
-        <Actor name={update.user.name} /> removed the assignee
+        <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> removed the
+        assignee
       </p>
     );
   }
@@ -71,7 +99,8 @@ const UpdateSummary = ({ update }: { update: TaskUpdate }) => {
   if (update.update_type === 'done') {
     return (
       <p className="text-sm text-slate-600 dark:text-slate-300">
-        <Actor name={update.user.name} /> marked as done
+        <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> marked as
+        done
       </p>
     );
   }
@@ -84,7 +113,7 @@ const UpdateSummary = ({ update }: { update: TaskUpdate }) => {
   if (isColumnOnly) {
     return (
       <p className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
-        <Actor name={update.user.name} /> moved to{' '}
+        <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> moved to{' '}
         <TaskStatusBadge status={changes[0].new_value} label={changes[0].new_display_value ?? changes[0].new_value} />
       </p>
     );
@@ -95,8 +124,8 @@ const UpdateSummary = ({ update }: { update: TaskUpdate }) => {
   if (isPriorityOnly) {
     return (
       <p className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
-        <Actor name={update.user.name} /> set priority to{' '}
-        <TaskPriorityBadge priority={changes[0].new_value as TaskPriority} />
+        <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> set priority
+        to <TaskPriorityBadge priority={changes[0].new_value as TaskPriority} />
       </p>
     );
   }
@@ -105,7 +134,8 @@ const UpdateSummary = ({ update }: { update: TaskUpdate }) => {
 
   return (
     <p className="text-sm text-slate-600 dark:text-slate-300">
-      <Actor name={update.user.name} /> updated <span className="text-slate-700 dark:text-slate-200">{fieldNames}</span>
+      <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> updated{' '}
+      <span className="text-slate-700 dark:text-slate-200">{fieldNames}</span>
     </p>
   );
 };

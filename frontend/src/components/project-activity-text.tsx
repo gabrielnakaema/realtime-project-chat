@@ -1,3 +1,4 @@
+import { ActionOriginBadge } from './action-origin-badge';
 import type {
   ProjectActivity,
   ProjectMemberProjectActivity,
@@ -59,7 +60,7 @@ const Subject = ({ children }: { children: React.ReactNode }) => {
 const GenericActivityText = ({ activity }: { activity: ProjectActivity }) => {
   return (
     <GeneralText>
-      <Actor>{activity.actor?.name}</Actor> performed an action
+      <ActorWithOrigin name={activity.actor?.name} actionOrigin={activity.action_origin} /> performed an action
     </GeneralText>
   );
 };
@@ -67,7 +68,8 @@ const GenericActivityText = ({ activity }: { activity: ProjectActivity }) => {
 const TaskCreatedActivityText = ({ activity }: { activity: TaskProjectActivity }) => {
   return (
     <GeneralText>
-      <Actor>{activity.actor?.name}</Actor> created task <Subject>{activity.task?.title}</Subject>
+      <ActorWithOrigin name={activity.actor?.name} actionOrigin={activity.action_origin} /> created task{' '}
+      <Subject>{activity.task?.title}</Subject>
     </GeneralText>
   );
 };
@@ -75,7 +77,8 @@ const TaskCreatedActivityText = ({ activity }: { activity: TaskProjectActivity }
 const TaskUpdatedActivityText = ({ activity }: { activity: TaskProjectActivity }) => {
   return (
     <GeneralText>
-      <Actor>{activity.actor?.name}</Actor> updated task <Subject>{activity.task?.title}</Subject>
+      <ActorWithOrigin name={activity.actor?.name} actionOrigin={activity.action_origin} /> updated task{' '}
+      <Subject>{activity.task?.title}</Subject>
     </GeneralText>
   );
 };
@@ -83,7 +86,8 @@ const TaskUpdatedActivityText = ({ activity }: { activity: TaskProjectActivity }
 const TaskDeletedActivityText = ({ activity }: { activity: TaskProjectActivity }) => {
   return (
     <GeneralText>
-      <Actor>{activity.actor?.name}</Actor> deleted task <Subject>{activity.task?.title}</Subject>
+      <ActorWithOrigin name={activity.actor?.name} actionOrigin={activity.action_origin} /> deleted task{' '}
+      <Subject>{activity.task?.title}</Subject>
     </GeneralText>
   );
 };
@@ -91,7 +95,7 @@ const TaskDeletedActivityText = ({ activity }: { activity: TaskProjectActivity }
 const ProjectCreatedActivityText = ({ activity }: { activity: ProjectProjectActivity }) => {
   return (
     <GeneralText>
-      <Actor>{activity.actor?.name}</Actor> created this project
+      <ActorWithOrigin name={activity.actor?.name} actionOrigin={activity.action_origin} /> created this project
     </GeneralText>
   );
 };
@@ -99,7 +103,7 @@ const ProjectCreatedActivityText = ({ activity }: { activity: ProjectProjectActi
 const ProjectUpdatedActivityText = ({ activity }: { activity: ProjectProjectActivity }) => {
   return (
     <GeneralText>
-      <Actor>{activity.actor?.name}</Actor> updated this project
+      <ActorWithOrigin name={activity.actor?.name} actionOrigin={activity.action_origin} /> updated this project
     </GeneralText>
   );
 };
@@ -107,7 +111,8 @@ const ProjectUpdatedActivityText = ({ activity }: { activity: ProjectProjectActi
 const ProjectMemberCreatedActivityText = ({ activity }: { activity: ProjectMemberProjectActivity }) => {
   return (
     <GeneralText>
-      <Actor>{activity.actor?.name}</Actor> added a new member to the project
+      <ActorWithOrigin name={activity.actor?.name} actionOrigin={activity.action_origin} /> added a new member to the
+      project
     </GeneralText>
   );
 };
@@ -115,7 +120,23 @@ const ProjectMemberCreatedActivityText = ({ activity }: { activity: ProjectMembe
 const ProjectMemberDeletedActivityText = ({ activity }: { activity: ProjectMemberProjectActivity }) => {
   return (
     <GeneralText>
-      <Actor>{activity.actor?.name}</Actor> removed a member from the project
+      <ActorWithOrigin name={activity.actor?.name} actionOrigin={activity.action_origin} /> removed a member from the
+      project
     </GeneralText>
+  );
+};
+
+const ActorWithOrigin = ({
+  name,
+  actionOrigin,
+}: {
+  name?: React.ReactNode;
+  actionOrigin?: ProjectActivity['action_origin'];
+}) => {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5 align-middle">
+      <Actor>{name ?? 'Someone'}</Actor>
+      <ActionOriginBadge origin={actionOrigin} />
+    </span>
   );
 };

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { TaskDetailsUpdate } from './task-details-update';
 import type { TaskUpdate } from '@/types/task';
+import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 
 interface TaskActivityTimelineProps {
@@ -10,6 +11,7 @@ interface TaskActivityTimelineProps {
 }
 
 export const TaskActivityTimeline = ({ updates = [] }: TaskActivityTimelineProps) => {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
 
   return (
@@ -39,7 +41,12 @@ export const TaskActivityTimeline = ({ updates = [] }: TaskActivityTimelineProps
           {updates.length > 0 && (
             <div className="flex flex-col">
               {updates.map((update, index) => (
-                <TaskDetailsUpdate key={update.id} update={update} isLast={index === updates.length - 1} />
+                <TaskDetailsUpdate
+                  key={update.id}
+                  update={update}
+                  isLast={index === updates.length - 1}
+                  currentUserId={user?.id}
+                />
               ))}
             </div>
           )}

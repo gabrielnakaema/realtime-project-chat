@@ -1,3 +1,4 @@
+import type { ActionOrigin } from './action-origin';
 import type { Member, Project } from './project';
 import type { Task } from './task';
 import type { User } from './user';
@@ -24,6 +25,7 @@ interface BaseProjectActivity {
   project: Project | null;
   actor: User | null;
   activity_type: ProjectActivityType;
+  action_origin?: ActionOrigin | null;
   activity_data: any;
   entity_id: string;
   created_at: string;

@@ -1,5 +1,6 @@
 import { MessageSquare, Reply, SendHorizontal } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { ActionOriginBadge } from '../action-origin-badge';
 import { Button } from '../button';
 import { LoadingSpinner } from '../loading';
 import { TextEditor } from '../text-editor';
@@ -236,6 +237,7 @@ const TaskCommentItem = ({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{comment.user.name}</p>
+              <ActionOriginBadge origin={comment.action_origin} />
               {isOwnComment && (
                 <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                   You

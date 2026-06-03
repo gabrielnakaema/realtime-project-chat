@@ -1,3 +1,4 @@
+import type { ActionOrigin } from './action-origin';
 import type { Project, ProjectColumn } from './project';
 import type { User } from './user';
 
@@ -35,6 +36,7 @@ export interface TaskComment {
   user: User;
   content: string;
   parent_comment_id?: string | null;
+  action_origin?: ActionOrigin | null;
   created_at: string;
   updated_at: string;
   replies: TaskComment[];
@@ -45,6 +47,7 @@ export interface TaskUpdate {
   task_id: string;
   user_id: string;
   update_type: string;
+  action_origin?: ActionOrigin | null;
   created_at: string;
   user: User;
   changes: TaskChange[] | null;

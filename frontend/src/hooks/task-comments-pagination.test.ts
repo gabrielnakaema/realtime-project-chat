@@ -20,6 +20,7 @@ const createComment = (id: string, createdAt: string): TaskComment => ({
     email: 'user@example.com',
   },
   content: '<p>Comment</p>',
+  action_origin: 'user',
   created_at: createdAt,
   updated_at: createdAt,
   replies: [],
