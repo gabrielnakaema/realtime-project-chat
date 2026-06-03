@@ -49,9 +49,15 @@ func (s *TaskUpdateSubscriber) Close() error {
 func (s *TaskUpdateSubscriber) handleTaskUpdateEvents(ctx context.Context, message Message) error {
 	switch message.Topic {
 	case events.TaskCreated:
-		return s.handleTaskCreated(ctx, message)
+		if err := s.handleTaskCreated(ctx, message); err != nil {
+			s.logger.Error("skipping task created update event", "topic", message.Topic, "error", err.Error())
+		}
+		return nil
 	case events.TaskUpdated:
-		return s.handleTaskUpdated(ctx, message)
+		if err := s.handleTaskUpdated(ctx, message); err != nil {
+			s.logger.Error("skipping task updated event", "topic", message.Topic, "error", err.Error())
+		}
+		return nil
 	default:
 		return nil
 	}
