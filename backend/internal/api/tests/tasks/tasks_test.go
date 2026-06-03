@@ -153,3 +153,85 @@ func TestTaskArchiveAndRestoreEndpoints(t *testing.T) {
 	assert.Empty(t, archivedTasks)
 	assert.NotEqual(t, archivedTaskID, activeTaskID)
 }
+
+func TestTaskCodeFieldFlowsThroughTaskEndpoints(t *testing.T) {
+	testAPI, cleanup := shared.SetupTestAPI(t)
+	defer cleanup()
+
+	testAPI.TruncateTables(t)
+
+	client := shared.NewHTTPClient(testAPI.GetBaseURL())
+	_, err := client.CreateUserAndLogin("task-code@example.com", "password123")
+	require.NoError(t, err)
+
+	projectResp, err := client.POST("/projects", taskProjectPayload())
+	require.NoError(t, err)
+	defer projectResp.Body.Close()
+	require.Equal(t, http.StatusCreated, projectResp.StatusCode)
+
+	var project map[string]any
+	err = json.NewDecoder(projectResp.Body).Decode(&project)
+	require.NoError(t, err)
+
+	projectID := project["id"].(string)
+	columns := project["columns"].([]any)
+	pendingColumnID := columns[0].(map[string]any)["id"].(string)
+
+	createResp, err := client.POST("/tasks", map[string]any{
+		"project_id":        projectID,
+		"project_column_id": pendingColumnID,
+		"title":             "Code task",
+		"description":       "Task with code",
+		"code":              "  TASK-301  ",
+		"priority":          "medium",
+		"tags":              []string{"backend"},
+	})
+	require.NoError(t, err)
+	defer createResp.Body.Close()
+	require.Equal(t, http.StatusCreated, createResp.StatusCode)
+
+	var createdTask map[string]any
+	err = json.NewDecoder(createResp.Body).Decode(&createdTask)
+	require.NoError(t, err)
+	assert.Equal(t, "TASK-301", createdTask["code"])
+
+	taskID := createdTask["id"].(string)
+
+	getResp, err := client.GET(fmt.Sprintf("/tasks/%s", taskID))
+	require.NoError(t, err)
+	defer getResp.Body.Close()
+	require.Equal(t, http.StatusOK, getResp.StatusCode)
+
+	var fetchedTask map[string]any
+	err = json.NewDecoder(getResp.Body).Decode(&fetchedTask)
+	require.NoError(t, err)
+	assert.Equal(t, "TASK-301", fetchedTask["code"])
+
+	groupedResp, err := client.GET(fmt.Sprintf("/tasks/group-by-column?project_id=%s&project_column_ids=%s&archived=false&limit=15", projectID, pendingColumnID))
+	require.NoError(t, err)
+	defer groupedResp.Body.Close()
+	require.Equal(t, http.StatusOK, groupedResp.StatusCode)
+
+	var grouped map[string]cursorPage
+	err = json.NewDecoder(groupedResp.Body).Decode(&grouped)
+	require.NoError(t, err)
+	require.Len(t, grouped[pendingColumnID].Data, 1)
+	assert.Equal(t, "TASK-301", grouped[pendingColumnID].Data[0]["code"])
+
+	updateResp, err := client.PUT(fmt.Sprintf("/tasks/%s", taskID), map[string]any{
+		"title":             "Code task updated",
+		"description":       "Task with cleared code",
+		"code":              "   ",
+		"project_column_id": pendingColumnID,
+		"priority":          "high",
+		"tags":              []string{"backend", "updated"},
+	})
+	require.NoError(t, err)
+	defer updateResp.Body.Close()
+	require.Equal(t, http.StatusOK, updateResp.StatusCode)
+
+	var updatedTask map[string]any
+	err = json.NewDecoder(updateResp.Body).Decode(&updatedTask)
+	require.NoError(t, err)
+	assert.Equal(t, "", updatedTask["code"])
+}

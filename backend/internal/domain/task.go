@@ -31,6 +31,7 @@ type Task struct {
 	AuthorId        uuid.UUID    `json:"author_id"`
 	Title           string       `json:"title"`
 	Description     string       `json:"description"`
+	Code            string       `json:"code"`
 	Status          TaskStatus   `json:"status"`
 	ProjectColumnId uuid.UUID    `json:"project_column_id"`
 	Priority        TaskPriority `json:"priority"`
@@ -119,6 +120,20 @@ var taskChangeDefinitions = []taskChangeDefinition{
 				Field:    "title",
 				OldValue: old.Title,
 				NewValue: new.Title,
+			}
+		},
+	},
+	{
+		field: "code",
+		build: func(old *Task, new *Task) *TaskChange {
+			if old.Code == new.Code {
+				return nil
+			}
+
+			return &TaskChange{
+				Field:    "code",
+				OldValue: old.Code,
+				NewValue: new.Code,
 			}
 		},
 	},

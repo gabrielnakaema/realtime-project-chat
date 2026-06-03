@@ -134,6 +134,7 @@ type Task struct {
 	TaskOrder       string
 	ProjectColumnID uuid.UUID
 	ArchivedAt      pgtype.Timestamptz
+	Code            pgtype.Text
 }
 
 type TaskChange struct {

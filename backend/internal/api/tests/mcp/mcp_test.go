@@ -93,6 +93,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 		"project_column_id": pendingColumnID,
 		"title":             "MCP Task",
 		"description":       "Created for MCP",
+		"code":              "MCP-1",
 		"priority":          "medium",
 		"tags":              []string{"mcp"},
 	})
@@ -378,6 +379,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 				"project_column_id": pendingColumnID,
 				"title":             "MCP Created Task",
 				"description":       "Created through MCP",
+				"code":              "MCP-2",
 				"priority":          "high",
 				"tags":              []string{"mcp", "created"},
 			},
@@ -386,6 +388,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	createdTask := createTaskResp["result"].(map[string]any)["structuredContent"].(map[string]any)["task"].(map[string]any)
 	createdTaskID := createdTask["id"].(string)
 	assert.Equal(t, "MCP Created Task", createdTask["title"])
+	assert.Equal(t, "MCP-2", createdTask["code"])
 
 	updateTaskResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
 		"jsonrpc": "2.0",
@@ -398,6 +401,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 				"project_column_id": pendingColumnID,
 				"title":             "MCP Updated Task",
 				"description":       "Updated through MCP",
+				"code":              "MCP-3",
 				"priority":          "medium",
 				"tags":              []string{"mcp", "updated"},
 			},
@@ -405,6 +409,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	})
 	updatedTask := updateTaskResp["result"].(map[string]any)["structuredContent"].(map[string]any)["task"].(map[string]any)
 	assert.Equal(t, "MCP Updated Task", updatedTask["title"])
+	assert.Equal(t, "MCP-3", updatedTask["code"])
 
 	addCommentResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
 		"jsonrpc": "2.0",

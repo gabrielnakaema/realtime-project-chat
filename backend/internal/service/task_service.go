@@ -61,6 +61,7 @@ type CreateTaskRequest struct {
 	ProjectColumnId uuid.UUID
 	Title           string
 	Description     string
+	Code            string
 	RequestUserId   uuid.UUID
 	Priority        string
 	DueDate         *time.Time
@@ -148,6 +149,7 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		ProjectId:       request.ProjectId,
 		Title:           request.Title,
 		Description:     request.Description,
+		Code:            normalizeTaskCode(request.Code),
 		Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
 		AuthorId:        request.RequestUserId,
 		ProjectColumnId: request.ProjectColumnId,
@@ -192,6 +194,7 @@ type UpdateTaskRequest struct {
 	TaskId          uuid.UUID
 	Title           string
 	Description     string
+	Code            string
 	ProjectColumnId uuid.UUID
 	RequestUserId   uuid.UUID
 	Priority        domain.TaskPriority
@@ -684,6 +687,7 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 		Order:           task.Order,
 		Title:           request.Title,
 		Description:     request.Description,
+		Code:            normalizeTaskCode(request.Code),
 		Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
 		Priority:        request.Priority,
 		ResponsibleId:   request.ResponsibleId,
@@ -725,6 +729,10 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 	}
 
 	return &updatedTask, nil
+}
+
+func normalizeTaskCode(value string) string {
+	return strings.TrimSpace(value)
 }
 
 func (ts *TaskService) getTaskAndProjectForUser(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (*domain.Task, *domain.Project, error) {

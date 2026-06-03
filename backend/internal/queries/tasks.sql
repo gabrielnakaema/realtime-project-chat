@@ -1,6 +1,6 @@
 -- name: CreateTask :one
-INSERT INTO tasks (project_id, title, description, project_column_id, author_id, responsible_id, priority, due_date, done_at, task_order)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id;
+INSERT INTO tasks (project_id, title, description, code, project_column_id, author_id, responsible_id, priority, due_date, done_at, task_order)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id;
 
 -- name: CreateTaskTag :exec
 INSERT INTO task_tags (task_id, name) VALUES ($1, $2);
@@ -92,6 +92,7 @@ SELECT
   t.project_id as task_project_id,
   t.title as task_title,
   t.description as task_description,
+  t.code as task_code,
   t.project_column_id as task_project_column_id,
   t.priority as task_priority,
   t.responsible_id as task_responsible_id,
@@ -222,7 +223,7 @@ ORDER BY t.due_date ASC, t.updated_at DESC
 LIMIT $2;
 
 -- name: UpdateTask :exec
-UPDATE tasks SET title = $1, description = $2, project_column_id = $3, task_order = $4, priority = $5, due_date = $6, responsible_id = $7, done_at = $8, archived_at = $9, updated_at = CURRENT_TIMESTAMP WHERE id = $10;
+UPDATE tasks SET title = $1, description = $2, code = $3, project_column_id = $4, task_order = $5, priority = $6, due_date = $7, responsible_id = $8, done_at = $9, archived_at = $10, updated_at = CURRENT_TIMESTAMP WHERE id = $11;
 
 -- name: CreateTaskUpdate :one
 INSERT INTO task_updates (task_id, user_id, update_type, action_origin) VALUES ($1, $2, $3, $4) returning id;
@@ -231,7 +232,7 @@ INSERT INTO task_updates (task_id, user_id, update_type, action_origin) VALUES (
 INSERT INTO task_changes (update_id, field, old_value, new_value, subject_id, old_value_id, new_value_id, old_display_value, new_display_value) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id;
 
 -- name: GetFirstTaskInColumn :one
-SELECT id, project_id, title, description, project_column_id, created_at, updated_at, author_id, priority, due_date, done_at, archived_at, responsible_id, task_order
+SELECT id, project_id, title, description, code, project_column_id, created_at, updated_at, author_id, priority, due_date, done_at, archived_at, responsible_id, task_order
 FROM tasks
 WHERE project_id = $1
   AND project_column_id = $2
@@ -312,7 +313,7 @@ LEFT JOIN users a ON a.id = t.author_id
 JOIN projects p ON p.id = t.project_id
 JOIN project_ids_cte pi ON pi.project_id = t.project_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
-WHERE (sqlc.narg('query')::text IS NULL OR (t.title ILIKE '%' || sqlc.narg('query')::text || '%' OR t.description ILIKE '%' || sqlc.narg('query')::text || '%'))
+WHERE (sqlc.narg('query')::text IS NULL OR (t.title ILIKE '%' || sqlc.narg('query')::text || '%' OR t.description ILIKE '%' || sqlc.narg('query')::text || '%' OR t.code ILIKE '%' || sqlc.narg('query')::text || '%'))
 AND t.archived_at IS NULL
 AND ps.is_done_column = false
 AND (

@@ -63,10 +63,18 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 		ProjectID:       task.ProjectId,
 		Title:           task.Title,
 		Description:     task.Description,
+		Code:            pgtype.Text{},
 		ProjectColumnID: task.ProjectColumnId,
 		AuthorID:        task.AuthorId,
 		Priority:        string(task.Priority),
 		TaskOrder:       task.Order,
+	}
+
+	if task.Code != "" {
+		params.Code = pgtype.Text{
+			String: task.Code,
+			Valid:  true,
+		}
 	}
 
 	if task.ResponsibleId != nil {
@@ -145,6 +153,7 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 		AuthorId:        result.TaskAuthorID,
 		Title:           result.TaskTitle,
 		Description:     result.TaskDescription,
+		Code:            "",
 		ProjectColumnId: result.TaskProjectColumnID,
 		Priority:        domain.TaskPriority(result.TaskPriority),
 		Order:           result.TaskOrder,
@@ -174,6 +183,10 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 
 	if result.TaskDueDate.Valid {
 		task.DueDate = &result.TaskDueDate.Time
+	}
+
+	if result.TaskCode.Valid {
+		task.Code = result.TaskCode.String
 	}
 
 	if result.TaskDoneAt.Valid {
@@ -258,6 +271,7 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 			AuthorId:        result.AuthorID,
 			Title:           result.Title,
 			Description:     result.Description,
+			Code:            "",
 			ProjectColumnId: result.ProjectColumnID,
 			Priority:        domain.TaskPriority(result.Priority),
 			Order:           result.TaskOrder,
@@ -307,6 +321,10 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 			task.DueDate = &result.DueDate.Time
 		}
 
+		if result.Code.Valid {
+			task.Code = result.Code.String
+		}
+
 		if result.DoneAt.Valid {
 			task.DoneAt = &result.DoneAt.Time
 		}
@@ -344,6 +362,7 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 	params := queries.UpdateTaskParams{
 		Title:           task.Title,
 		Description:     task.Description,
+		Code:            pgtype.Text{},
 		ProjectColumnID: task.ProjectColumnId,
 		ID:              task.Id,
 		TaskOrder:       task.Order,
@@ -375,6 +394,13 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 		params.ArchivedAt = pgtype.Timestamptz{
 			Time:  *task.ArchivedAt,
 			Valid: true,
+		}
+	}
+
+	if task.Code != "" {
+		params.Code = pgtype.Text{
+			String: task.Code,
+			Valid:  true,
 		}
 	}
 
@@ -509,6 +535,7 @@ func (tr *TaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uu
 		AuthorId:        result.AuthorID,
 		Title:           result.Title,
 		Description:     result.Description,
+		Code:            "",
 		ProjectColumnId: result.ProjectColumnID,
 		Priority:        domain.TaskPriority(result.Priority),
 		Order:           result.TaskOrder,
@@ -516,6 +543,10 @@ func (tr *TaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uu
 		UpdatedAt:       result.UpdatedAt.Time,
 	}
 	task.Status = compatibilityTaskStatus("", nil)
+
+	if result.Code.Valid {
+		task.Code = result.Code.String
+	}
 
 	return &task, nil
 }
@@ -542,6 +573,7 @@ func (tr *TaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.UUI
 		AuthorId:        result.AuthorID,
 		Title:           result.Title,
 		Description:     result.Description,
+		Code:            "",
 		ProjectColumnId: result.ProjectColumnID,
 		Priority:        domain.TaskPriority(result.Priority),
 		Order:           result.TaskOrder,
@@ -549,6 +581,10 @@ func (tr *TaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.UUI
 		UpdatedAt:       result.UpdatedAt.Time,
 	}
 	task.Status = compatibilityTaskStatus("", nil)
+
+	if result.Code.Valid {
+		task.Code = result.Code.String
+	}
 
 	return &task, nil
 }
@@ -671,6 +707,7 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 			ResponsibleId:   (*uuid.UUID)(result.ResponsibleResponsibleID.Bytes[:]),
 			Title:           result.Title,
 			Description:     result.Description,
+			Code:            "",
 			ProjectColumnId: result.ProjectColumnID,
 			Priority:        domain.TaskPriority(result.Priority),
 			Order:           result.TaskOrder,
@@ -709,6 +746,10 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 
 		if result.DueDate.Valid {
 			task.DueDate = &result.DueDate.Time
+		}
+
+		if result.Code.Valid {
+			task.Code = result.Code.String
 		}
 
 		if result.DoneAt.Valid {
@@ -776,6 +817,7 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 			ProjectId:       result.ProjectID,
 			Title:           result.Title,
 			Description:     result.Description,
+			Code:            "",
 			ProjectColumnId: result.ProjectColumnID,
 			Priority:        domain.TaskPriority(result.Priority),
 			Order:           result.TaskOrder,
@@ -808,6 +850,10 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 
 		if result.DueDate.Valid {
 			task.DueDate = &result.DueDate.Time
+		}
+
+		if result.Code.Valid {
+			task.Code = result.Code.String
 		}
 
 		if result.DoneAt.Valid {

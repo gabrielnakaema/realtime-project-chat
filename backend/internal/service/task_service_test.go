@@ -183,6 +183,7 @@ func TestTaskService_Create(t *testing.T) {
 				ProjectColumnId: pendingStatusID,
 				Title:           "Test Task",
 				Description:     "Test Description",
+				Code:            "  TASK-101  ",
 				RequestUserId:   validUserId,
 				Priority:        string(domain.TaskPriorityLow),
 				ResponsibleId:   nil,
@@ -198,6 +199,9 @@ func TestTaskService_Create(t *testing.T) {
 			expectedTask:  &validTask,
 			shouldSucceed: true,
 			expectedError: nil,
+			checkFunc: func(t *testing.T, task *domain.Task) bool {
+				return assert.Equal(t, "TASK-101", task.Code)
+			},
 		},
 		{
 			name: "unauthorized error",
@@ -445,6 +449,7 @@ func TestTaskService_Update(t *testing.T) {
 				TaskId:          validTaskId,
 				Title:           "Updated Task",
 				Description:     "Updated Deascription",
+				Code:            "  TASK-202  ",
 				ProjectColumnId: doneStatusID,
 				RequestUserId:   validUserId,
 				Priority:        domain.TaskPriorityHigh,
@@ -461,6 +466,9 @@ func TestTaskService_Update(t *testing.T) {
 			shouldSucceed:             true,
 			expectedError:             nil,
 			expectedTaskUpdatesLength: 0,
+			checkFunc: func(t *testing.T, task *domain.Task) bool {
+				return assert.Equal(t, "TASK-202", task.Code)
+			},
 		},
 		{
 			name: "unauthorized error",

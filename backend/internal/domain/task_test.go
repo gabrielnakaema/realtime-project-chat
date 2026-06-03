@@ -57,6 +57,27 @@ func TestNewTaskUpdate(t *testing.T) {
 			},
 		},
 		{
+			name: "code change",
+			oldTask: &Task{
+				Id:              taskID,
+				ProjectColumnId: pendingStatusID,
+				Code:            "TASK-1",
+			},
+			newTask: &Task{
+				Id:              taskID,
+				ProjectColumnId: pendingStatusID,
+				Code:            "TASK-2",
+			},
+			assertChanges: func(t *testing.T, update TaskUpdate) {
+				require.Len(t, update.Changes, 1)
+				change := update.Changes[0]
+				assert.Equal(t, TaskUpdateTypeUpdated, update.UpdateType)
+				assert.Equal(t, "code", change.Field)
+				assert.Equal(t, "TASK-1", change.OldValue)
+				assert.Equal(t, "TASK-2", change.NewValue)
+			},
+		},
+		{
 			name: "assigned responsible",
 			oldTask: &Task{
 				Id:              taskID,

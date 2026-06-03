@@ -110,6 +110,7 @@ func TestCallToolSuccessPaths(t *testing.T) {
 		ProjectColumnId: columnID,
 		Title:           "Task",
 		Description:     "Desc",
+		Code:            "TASK-1",
 		Priority:        domain.TaskPriorityMedium,
 		Tags:            []string{"backend"},
 	}
@@ -163,6 +164,7 @@ func TestCallToolSuccessPaths(t *testing.T) {
 			"project_column_id": columnID.String(),
 			"title":             "New Task",
 			"description":       "Created via MCP",
+			"code":              "  TASK-123  ",
 			"priority":          "medium",
 			"tags":              []any{"backend", "mcp"},
 		},
@@ -171,6 +173,7 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	assert.Equal(t, domain.ActionOriginMCPAgent, taskSvc.createOrigin)
 	require.NotNil(t, taskSvc.createRequest)
 	assert.Equal(t, projectID, taskSvc.createRequest.ProjectId)
+	assert.Equal(t, "TASK-123", taskSvc.createRequest.Code)
 
 	taskResult, err := handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "get_task",
@@ -204,6 +207,7 @@ func TestCallToolSuccessPaths(t *testing.T) {
 			"project_column_id": columnID.String(),
 			"title":             "Task Updated",
 			"description":       "Updated via MCP",
+			"code":              "TASK-456",
 			"priority":          "high",
 			"tags":              []any{"backend", "updated"},
 		},
@@ -212,6 +216,7 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	assert.Equal(t, domain.ActionOriginMCPAgent, taskSvc.updateOrigin)
 	require.NotNil(t, taskSvc.updateRequest)
 	assert.Equal(t, taskID, taskSvc.updateRequest.TaskId)
+	assert.Equal(t, "TASK-456", taskSvc.updateRequest.Code)
 
 	_, err = handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "move_task",

@@ -313,12 +313,17 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		if err != nil {
 			return nil, err
 		}
+		code, err := optionalTrimmedStringArg(params.Arguments, "code")
+		if err != nil {
+			return nil, err
+		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
 		task, err := h.taskService.Create(ctx, service.CreateTaskRequest{
 			ProjectId:       projectID,
 			ProjectColumnId: projectColumnID,
 			Title:           title,
 			Description:     description,
+			Code:            code,
 			RequestUserId:   principal.UserID,
 			Priority:        string(priority),
 			ResponsibleId:   responsibleID,
@@ -412,11 +417,16 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		if err != nil {
 			return nil, err
 		}
+		code, err := optionalTrimmedStringArg(params.Arguments, "code")
+		if err != nil {
+			return nil, err
+		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
 		task, err := h.taskService.Update(ctx, service.UpdateTaskRequest{
 			TaskId:          taskID,
 			Title:           title,
 			Description:     description,
+			Code:            code,
 			ProjectColumnId: projectColumnID,
 			RequestUserId:   principal.UserID,
 			Priority:        priority,
@@ -546,6 +556,7 @@ func toolDefinitions() []map[string]any {
 				"project_column_id": map[string]any{"type": "string", "format": "uuid"},
 				"title":             map[string]any{"type": "string"},
 				"description":       map[string]any{"type": "string"},
+				"code":              map[string]any{"type": "string"},
 				"priority":          map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
 				"responsible_id":    map[string]any{"type": "string", "format": "uuid"},
 				"due_date":          map[string]any{"type": "string", "format": "date-time"},
@@ -577,6 +588,7 @@ func toolDefinitions() []map[string]any {
 				"project_column_id": map[string]any{"type": "string", "format": "uuid"},
 				"title":             map[string]any{"type": "string"},
 				"description":       map[string]any{"type": "string"},
+				"code":              map[string]any{"type": "string"},
 				"priority":          map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
 				"responsible_id":    map[string]any{"type": "string", "format": "uuid"},
 				"due_date":          map[string]any{"type": "string", "format": "date-time"},
@@ -850,6 +862,20 @@ func optionalStringSliceArg(args map[string]any, key string) ([]string, error) {
 	}
 
 	return values, nil
+}
+
+func optionalTrimmedStringArg(args map[string]any, key string) (string, error) {
+	raw, ok := args[key]
+	if !ok || raw == nil {
+		return "", nil
+	}
+
+	value, ok := raw.(string)
+	if !ok {
+		return "", domain.BusinessValidationError(fmt.Sprintf("%s must be a string", key))
+	}
+
+	return strings.TrimSpace(value), nil
 }
 
 func writeHTTPError(w http.ResponseWriter, status int, message string) {

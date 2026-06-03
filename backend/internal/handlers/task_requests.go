@@ -14,6 +14,7 @@ type CreateTaskRequest struct {
 	ProjectColumnId uuid.UUID  `json:"project_column_id"`
 	Title           string     `json:"title"`
 	Description     string     `json:"description"`
+	Code            string     `json:"code"`
 	Priority        string     `json:"priority"`
 	ResponsibleId   *uuid.UUID `json:"responsible_id"`
 	DueDate         *time.Time `json:"due_date"`
@@ -37,6 +38,7 @@ func (r *CreateTaskRequest) Validate(v *validator.Validator) {
 type UpdateTaskRequest struct {
 	Title           string     `json:"title"`
 	Description     string     `json:"description"`
+	Code            string     `json:"code"`
 	ProjectColumnId uuid.UUID  `json:"project_column_id"`
 	Priority        string     `json:"priority"`
 	ResponsibleId   *uuid.UUID `json:"responsible_id"`

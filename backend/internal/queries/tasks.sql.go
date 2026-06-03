@@ -52,14 +52,15 @@ func (q *Queries) CountTasksByProjectIdAndColumn(ctx context.Context, arg CountT
 }
 
 const createTask = `-- name: CreateTask :one
-INSERT INTO tasks (project_id, title, description, project_column_id, author_id, responsible_id, priority, due_date, done_at, task_order)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id
+INSERT INTO tasks (project_id, title, description, code, project_column_id, author_id, responsible_id, priority, due_date, done_at, task_order)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id
 `
 
 type CreateTaskParams struct {
 	ProjectID       uuid.UUID
 	Title           string
 	Description     string
+	Code            pgtype.Text
 	ProjectColumnID uuid.UUID
 	AuthorID        uuid.UUID
 	ResponsibleID   pgtype.UUID
@@ -74,6 +75,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (uuid.UU
 		arg.ProjectID,
 		arg.Title,
 		arg.Description,
+		arg.Code,
 		arg.ProjectColumnID,
 		arg.AuthorID,
 		arg.ResponsibleID,
@@ -181,7 +183,7 @@ func (q *Queries) DeleteTaskTag(ctx context.Context, arg DeleteTaskTagParams) er
 }
 
 const getFirstTaskInColumn = `-- name: GetFirstTaskInColumn :one
-SELECT id, project_id, title, description, project_column_id, created_at, updated_at, author_id, priority, due_date, done_at, archived_at, responsible_id, task_order
+SELECT id, project_id, title, description, code, project_column_id, created_at, updated_at, author_id, priority, due_date, done_at, archived_at, responsible_id, task_order
 FROM tasks
 WHERE project_id = $1
   AND project_column_id = $2
@@ -200,6 +202,7 @@ type GetFirstTaskInColumnRow struct {
 	ProjectID       uuid.UUID
 	Title           string
 	Description     string
+	Code            pgtype.Text
 	ProjectColumnID uuid.UUID
 	CreatedAt       pgtype.Timestamptz
 	UpdatedAt       pgtype.Timestamptz
@@ -220,6 +223,7 @@ func (q *Queries) GetFirstTaskInColumn(ctx context.Context, arg GetFirstTaskInCo
 		&i.ProjectID,
 		&i.Title,
 		&i.Description,
+		&i.Code,
 		&i.ProjectColumnID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -235,7 +239,7 @@ func (q *Queries) GetFirstTaskInColumn(ctx context.Context, arg GetFirstTaskInCo
 }
 
 const getProjectTaskAfterId = `-- name: GetProjectTaskAfterId :one
-SELECT t.id, t.project_id, t.title, t.description, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order, t.project_column_id, t.archived_at 
+SELECT t.id, t.project_id, t.title, t.description, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order, t.project_column_id, t.archived_at, t.code 
 FROM tasks t
 JOIN tasks current ON current.id = $1
 WHERE t.project_id = $2
@@ -274,6 +278,7 @@ func (q *Queries) GetProjectTaskAfterId(ctx context.Context, arg GetProjectTaskA
 		&i.TaskOrder,
 		&i.ProjectColumnID,
 		&i.ArchivedAt,
+		&i.Code,
 	)
 	return i, err
 }
@@ -359,6 +364,7 @@ SELECT
   t.project_id as task_project_id,
   t.title as task_title,
   t.description as task_description,
+  t.code as task_code,
   t.project_column_id as task_project_column_id,
   t.priority as task_priority,
   t.responsible_id as task_responsible_id,
@@ -416,6 +422,7 @@ type GetTaskByIdRow struct {
 	TaskProjectID            uuid.UUID
 	TaskTitle                string
 	TaskDescription          string
+	TaskCode                 pgtype.Text
 	TaskProjectColumnID      uuid.UUID
 	TaskPriority             string
 	TaskResponsibleID        pgtype.UUID
@@ -445,6 +452,7 @@ func (q *Queries) GetTaskById(ctx context.Context, id uuid.UUID) (GetTaskByIdRow
 		&i.TaskProjectID,
 		&i.TaskTitle,
 		&i.TaskDescription,
+		&i.TaskCode,
 		&i.TaskProjectColumnID,
 		&i.TaskPriority,
 		&i.TaskResponsibleID,
@@ -470,7 +478,7 @@ func (q *Queries) GetTaskById(ctx context.Context, id uuid.UUID) (GetTaskByIdRow
 
 const listTasksByProjectId = `-- name: ListTasksByProjectId :many
 SELECT
-  t.id, t.project_id, t.title, t.description, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order, t.project_column_id, t.archived_at,
+  t.id, t.project_id, t.title, t.description, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order, t.project_column_id, t.archived_at, t.code,
   ps.id as project_column_id_2,
   ps.project_id as project_column_project_id,
   ps.name as project_column_name,
@@ -532,6 +540,7 @@ type ListTasksByProjectIdRow struct {
 	TaskOrder                 string
 	ProjectColumnID           uuid.UUID
 	ArchivedAt                pgtype.Timestamptz
+	Code                      pgtype.Text
 	ProjectColumnID2          uuid.UUID
 	ProjectColumnProjectID    uuid.UUID
 	ProjectColumnName         string
@@ -578,6 +587,7 @@ func (q *Queries) ListTasksByProjectId(ctx context.Context, arg ListTasksByProje
 			&i.TaskOrder,
 			&i.ProjectColumnID,
 			&i.ArchivedAt,
+			&i.Code,
 			&i.ProjectColumnID2,
 			&i.ProjectColumnProjectID,
 			&i.ProjectColumnName,
@@ -604,7 +614,7 @@ func (q *Queries) ListTasksByProjectId(ctx context.Context, arg ListTasksByProje
 
 const listUserDueTasks = `-- name: ListUserDueTasks :many
 SELECT
-  t.id, t.project_id, t.title, t.description, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order, t.project_column_id, t.archived_at,
+  t.id, t.project_id, t.title, t.description, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order, t.project_column_id, t.archived_at, t.code,
   ps.id as project_column_id_2,
   ps.project_id as project_column_project_id,
   ps.name as project_column_name,
@@ -664,6 +674,7 @@ type ListUserDueTasksRow struct {
 	TaskOrder                 string
 	ProjectColumnID           uuid.UUID
 	ArchivedAt                pgtype.Timestamptz
+	Code                      pgtype.Text
 	ProjectColumnID2          uuid.UUID
 	ProjectColumnProjectID    uuid.UUID
 	ProjectColumnName         string
@@ -712,6 +723,7 @@ func (q *Queries) ListUserDueTasks(ctx context.Context, arg ListUserDueTasksPara
 			&i.TaskOrder,
 			&i.ProjectColumnID,
 			&i.ArchivedAt,
+			&i.Code,
 			&i.ProjectColumnID2,
 			&i.ProjectColumnProjectID,
 			&i.ProjectColumnName,
@@ -786,7 +798,7 @@ WITH project_ids_cte AS (
   FROM project_members pm
   WHERE pm.user_id = $1
 )
-SELECT t.id, t.project_id, t.title, t.description, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order, t.project_column_id, t.archived_at,
+SELECT t.id, t.project_id, t.title, t.description, t.created_at, t.updated_at, t.author_id, t.priority, t.due_date, t.done_at, t.responsible_id, t.task_order, t.project_column_id, t.archived_at, t.code,
   ps.id as project_column_id_2,
   ps.project_id as project_column_project_id,
   ps.name as project_column_name,
@@ -817,7 +829,7 @@ LEFT JOIN users a ON a.id = t.author_id
 JOIN projects p ON p.id = t.project_id
 JOIN project_ids_cte pi ON pi.project_id = t.project_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
-WHERE ($3::text IS NULL OR (t.title ILIKE '%' || $3::text || '%' OR t.description ILIKE '%' || $3::text || '%'))
+WHERE ($3::text IS NULL OR (t.title ILIKE '%' || $3::text || '%' OR t.description ILIKE '%' || $3::text || '%' OR t.code ILIKE '%' || $3::text || '%'))
 AND t.archived_at IS NULL
 AND ps.is_done_column = false
 AND (
@@ -854,6 +866,7 @@ type SearchTasksForUserRow struct {
 	TaskOrder                 string
 	ProjectColumnID           uuid.UUID
 	ArchivedAt                pgtype.Timestamptz
+	Code                      pgtype.Text
 	ProjectColumnID2          uuid.UUID
 	ProjectColumnProjectID    uuid.UUID
 	ProjectColumnName         string
@@ -909,6 +922,7 @@ func (q *Queries) SearchTasksForUser(ctx context.Context, arg SearchTasksForUser
 			&i.TaskOrder,
 			&i.ProjectColumnID,
 			&i.ArchivedAt,
+			&i.Code,
 			&i.ProjectColumnID2,
 			&i.ProjectColumnProjectID,
 			&i.ProjectColumnName,
@@ -944,12 +958,13 @@ func (q *Queries) SearchTasksForUser(ctx context.Context, arg SearchTasksForUser
 }
 
 const updateTask = `-- name: UpdateTask :exec
-UPDATE tasks SET title = $1, description = $2, project_column_id = $3, task_order = $4, priority = $5, due_date = $6, responsible_id = $7, done_at = $8, archived_at = $9, updated_at = CURRENT_TIMESTAMP WHERE id = $10
+UPDATE tasks SET title = $1, description = $2, code = $3, project_column_id = $4, task_order = $5, priority = $6, due_date = $7, responsible_id = $8, done_at = $9, archived_at = $10, updated_at = CURRENT_TIMESTAMP WHERE id = $11
 `
 
 type UpdateTaskParams struct {
 	Title           string
 	Description     string
+	Code            pgtype.Text
 	ProjectColumnID uuid.UUID
 	TaskOrder       string
 	Priority        string
@@ -964,6 +979,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) error {
 	_, err := q.db.Exec(ctx, updateTask,
 		arg.Title,
 		arg.Description,
+		arg.Code,
 		arg.ProjectColumnID,
 		arg.TaskOrder,
 		arg.Priority,
