@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { RefreshCcw, Trash2 } from 'lucide-react';
+import { Pencil, RefreshCcw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '../button';
 import { LoadingSpinner } from '../loading';
 import { CreateMCPKeyButton } from './create-mcp-key-dialog';
+import { EditMCPKeyDialog } from './edit-mcp-key-dialog';
 import { formatMCPAPIKeyLastUsed, getMCPAccessScopeLabel, sortMCPAPIKeys } from './mcp-access-utils';
 import { RevokeMCPKeyDialog } from './revoke-mcp-key-dialog';
 import type { MCPAPIAvailableScope, MCPAPIKey } from '@/services/mcp-api-keys';
@@ -105,6 +106,7 @@ const activeClassNames = {
 
 const MCPKeyCard = ({ keyData, availableScopes }: { keyData: MCPAPIKey; availableScopes: MCPAPIAvailableScope[] }) => {
   const isRevoked = !!keyData.revoked_at;
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [revokeDialogOpen, setRevokeDialogOpen] = useState(false);
 
   const classNames = isRevoked ? revokedClassNames : activeClassNames;
@@ -124,15 +126,21 @@ const MCPKeyCard = ({ keyData, availableScopes }: { keyData: MCPAPIKey; availabl
           </div>
 
           {!isRevoked && (
-            <Button
-              type="button"
-              variant="secondary"
-              className="bg-gray-600 text-white hover:bg-gray-700 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
-              onClick={() => setRevokeDialogOpen(true)}
-            >
-              <Trash2 className="h-4 w-4" />
-              Revoke
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="secondary" onClick={() => setEditDialogOpen(true)}>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="bg-gray-600 text-white hover:bg-gray-700 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                onClick={() => setRevokeDialogOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Revoke
+              </Button>
+            </div>
           )}
         </div>
 
@@ -164,6 +172,7 @@ const MCPKeyCard = ({ keyData, availableScopes }: { keyData: MCPAPIKey; availabl
       {!isRevoked && (
         <RevokeMCPKeyDialog isOpen={revokeDialogOpen} keyData={keyData} onOpenChange={setRevokeDialogOpen} />
       )}
+      {!isRevoked && <EditMCPKeyDialog isOpen={editDialogOpen} keyData={keyData} onOpenChange={setEditDialogOpen} />}
     </>
   );
 };

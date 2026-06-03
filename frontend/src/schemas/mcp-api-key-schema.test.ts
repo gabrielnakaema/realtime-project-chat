@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createMCPAPIKeySchema } from './mcp-api-key-schema';
+import { mcpAPIKeySchema } from './mcp-api-key-schema';
 
 describe('mcp api key schema', () => {
   it('requires a non-empty name after trimming', () => {
-    const result = createMCPAPIKeySchema.safeParse({
+    const result = mcpAPIKeySchema.safeParse({
       name: '   ',
       scopes: ['tasks:read'],
     });
@@ -13,7 +13,7 @@ describe('mcp api key schema', () => {
   });
 
   it('requires at least one scope', () => {
-    const result = createMCPAPIKeySchema.safeParse({
+    const result = mcpAPIKeySchema.safeParse({
       name: 'Claude Desktop',
       scopes: [],
     });
@@ -23,7 +23,7 @@ describe('mcp api key schema', () => {
   });
 
   it('returns trimmed values for valid payloads', () => {
-    const result = createMCPAPIKeySchema.safeParse({
+    const result = mcpAPIKeySchema.safeParse({
       name: '  Claude Desktop  ',
       scopes: ['tasks:read', 'tasks:comment'],
     });

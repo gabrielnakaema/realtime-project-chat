@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const createMCPAPIKeySchema = z.object({
+export const mcpAPIKeySchema = z.object({
   name: z
     .string({
       error: 'Name is required',
@@ -10,9 +10,9 @@ export const createMCPAPIKeySchema = z.object({
   scopes: z.array(z.string().trim().min(1)).min(1, { message: 'Select at least one scope' }),
 });
 
-export type ICreateMCPAPIKeyForm = z.infer<typeof createMCPAPIKeySchema>;
+export type IMCPAPIKeyForm = z.infer<typeof mcpAPIKeySchema>;
 
-export const createMCPAPIKeyDefaultValues: ICreateMCPAPIKeyForm = {
+export const mcpAPIKeyDefaultValues: IMCPAPIKeyForm = {
   name: '',
   scopes: [],
 };

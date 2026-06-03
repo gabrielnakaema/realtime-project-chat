@@ -1,11 +1,7 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, Copy, KeyRound, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
 import { Button } from '../button';
-import { Input } from '../input';
-import { LoadingSpinner } from '../loading';
 import {
   Dialog,
   DialogContent,
@@ -15,16 +11,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../ui/dialog';
+import { MCPAPIKeyForm } from './mcp-key-form';
 import { sortMCPAPIKeys } from './mcp-access-utils';
 import { MCPHelpDialog } from './mcp-help-dialog';
 import type { CreateModalMode } from './mcp-access-utils';
-import type { ICreateMCPAPIKeyForm } from '@/schemas/mcp-api-key-schema';
-import type { CreateMCPAPIKeyResponse, MCPAPIAvailableScope, MCPAPIKey } from '@/services/mcp-api-keys';
-import { createMCPAPIKeyDefaultValues, createMCPAPIKeySchema } from '@/schemas/mcp-api-key-schema';
-import { createMCPAPIKey, getMCPServerURL, listAvailableMCPAPIScopes } from '@/services/mcp-api-keys';
+import type { CreateMCPAPIKeyResponse, MCPAPIKey } from '@/services/mcp-api-keys';
+import { mcpAPIKeyDefaultValues } from '@/schemas/mcp-api-key-schema';
+import { createMCPAPIKey, getMCPServerURL } from '@/services/mcp-api-keys';
 import { mcpAPIKeyQueryKeys } from '@/services/query-keys';
 import { useCopyFeedback } from '@/hooks/use-copy-feedback';
-import { cn } from '@/lib/utils';
 import { getErrorMessage } from '@/utils/handle-error';
 import { handleSuccess } from '@/utils/handle-success';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -42,6 +37,7 @@ export const CreateMCPKeyButton = ({ className }: CreateMCPKeyButtonProps) => {
   const [rawSecret, setRawSecret] = useState('');
   const [hasCopiedSecret, setHasCopiedSecret] = useState(false);
   const [dismissRevealPromptOpen, setDismissRevealPromptOpen] = useState(false);
+  const [createErrorMessage, setCreateErrorMessage] = useState<string | null>(null);
 
   const isRevealMode = mode === 'reveal';
 
@@ -50,6 +46,7 @@ export const CreateMCPKeyButton = ({ className }: CreateMCPKeyButtonProps) => {
     setRawSecret('');
     setHasCopiedSecret(false);
     setDismissRevealPromptOpen(false);
+    setCreateErrorMessage(null);
     resetCopiedValue();
   };
 
@@ -92,6 +89,14 @@ export const CreateMCPKeyButton = ({ className }: CreateMCPKeyButtonProps) => {
     setMode('reveal');
     updateCachedKeys(queryClient, response);
   };
+
+  const createMutation = useMutation({
+    mutationFn: createMCPAPIKey,
+    onSuccess: handleCreated,
+    onError: async (error) => {
+      setCreateErrorMessage(await getErrorMessage(error));
+    },
+  });
 
   return (
     <>
@@ -137,7 +142,15 @@ export const CreateMCPKeyButton = ({ className }: CreateMCPKeyButtonProps) => {
               </DialogFooter>
             </>
           ) : (
-            <CreateMCPKeyForm onCancel={closeDialog} onCreated={handleCreated} />
+            <MCPAPIKeyForm
+              defaultValues={mcpAPIKeyDefaultValues}
+              errorMessage={createErrorMessage}
+              isSubmitting={createMutation.isPending}
+              submitLabel="Create key"
+              onCancel={closeDialog}
+              onFormChange={() => setCreateErrorMessage(null)}
+              onSubmit={createMutation.mutate}
+            />
           )}
         </DialogContent>
       </Dialog>
@@ -162,178 +175,6 @@ export const CreateMCPKeyButton = ({ className }: CreateMCPKeyButtonProps) => {
         </DialogContent>
       </Dialog>
     </>
-  );
-};
-
-const CreateMCPKeyForm = ({
-  onCancel,
-  onCreated,
-}: {
-  onCancel: () => void;
-  onCreated: (response: CreateMCPAPIKeyResponse) => void;
-}) => {
-  const scopesQuery = useQuery<MCPAPIAvailableScope[]>({
-    queryKey: mcpAPIKeyQueryKeys.scopes,
-    queryFn: listAvailableMCPAPIScopes,
-  });
-  const availableScopes = scopesQuery.data ?? [];
-  const isLoadingScopes = scopesQuery.isLoading && availableScopes.length === 0;
-  const scopeLoadFailed = scopesQuery.isError && availableScopes.length === 0;
-
-  const {
-    control,
-    register,
-    handleSubmit,
-    formState: { errors },
-    clearErrors,
-    setError,
-  } = useForm<ICreateMCPAPIKeyForm>({
-    resolver: zodResolver(createMCPAPIKeySchema),
-    defaultValues: createMCPAPIKeyDefaultValues,
-    mode: 'onChange',
-  });
-
-  const createMutation = useMutation({
-    mutationFn: createMCPAPIKey,
-    onSuccess: onCreated,
-    onError: async (error) => {
-      setError('root', {
-        message: await getErrorMessage(error),
-      });
-    },
-  });
-
-  const onSubmit = (form: ICreateMCPAPIKeyForm) => {
-    createMutation.mutate({
-      name: form.name.trim(),
-      scopes: form.scopes,
-    });
-  };
-
-  if (isLoadingScopes) {
-    return (
-      <>
-        <div className="flex min-h-72 flex-1 items-center justify-center px-6 py-5">
-          <LoadingSpinner size="2rem" />
-        </div>
-
-        <DialogFooter className="border-t border-slate-200 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
-          <Button type="button" variant="secondary" onClick={onCancel}>
-            Cancel
-          </Button>
-        </DialogFooter>
-      </>
-    );
-  }
-
-  if (scopeLoadFailed) {
-    return (
-      <>
-        <div className="px-6 py-5">
-          <div className="space-y-3 rounded-2xl border border-red-200 bg-red-50 p-5 dark:border-red-900/80 dark:bg-red-950/30">
-            <div className="space-y-1">
-              <p className="font-semibold text-red-900 dark:text-red-100">Could not load available scopes</p>
-              <p className="text-sm text-red-700 dark:text-red-300">
-                Retry to load the current MCP permissions before creating a key.
-              </p>
-            </div>
-            <Button type="button" variant="secondary" onClick={() => void scopesQuery.refetch()}>
-              Retry
-            </Button>
-          </div>
-        </div>
-
-        <DialogFooter className="border-t border-slate-200 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
-          <Button type="button" variant="secondary" onClick={onCancel}>
-            Cancel
-          </Button>
-        </DialogFooter>
-      </>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-6 py-5">
-        <section className="space-y-4">
-          <Input
-            id="mcp-key-name"
-            label="Key name"
-            placeholder="Example: Claude desktop"
-            error={errors.name?.message}
-            {...register('name', {
-              onChange: () => clearErrors('root'),
-            })}
-          />
-
-          <div className="space-y-2">
-            <div>
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Scopes</p>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Select one or more permissions for this MCP client.
-              </p>
-            </div>
-
-            <Controller
-              control={control}
-              name="scopes"
-              render={({ field }) => {
-                const selectedScopes = field.value;
-
-                return (
-                  <div className="grid gap-3">
-                    {availableScopes.map((scope) => {
-                      const selected = selectedScopes.includes(scope.scope);
-
-                      return (
-                        <label
-                          key={scope.scope}
-                          className={cn(
-                            'flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors',
-                            selected
-                              ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30'
-                              : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:bg-slate-900',
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => {
-                              clearErrors('root');
-                              const nextScopes = selected
-                                ? selectedScopes.filter((value) => value !== scope.scope)
-                                : [...selectedScopes, scope.scope];
-                              field.onChange(nextScopes);
-                            }}
-                            className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                          />
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{scope.label}</p>
-                            <p className="text-sm text-slate-600 dark:text-slate-400">{scope.title}</p>
-                          </div>
-                        </label>
-                      );
-                    })}
-                  </div>
-                );
-              }}
-            />
-
-            {errors.scopes?.message && <p className="text-sm text-red-500">{errors.scopes.message}</p>}
-            {errors.root?.message && <p className="text-sm text-red-500">{errors.root.message}</p>}
-          </div>
-        </section>
-      </div>
-
-      <DialogFooter className="border-t border-slate-200 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={createMutation.isPending}>
-          {createMutation.isPending ? <LoadingSpinner size="1.25rem" /> : 'Create key'}
-        </Button>
-      </DialogFooter>
-    </form>
   );
 };
 

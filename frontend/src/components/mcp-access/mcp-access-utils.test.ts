@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatMCPAPIKeyLastUsed, sortMCPAPIKeys } from './mcp-access-utils';
+import { formatMCPAPIKeyLastUsed, getMCPAccessScopeLabel, sortMCPAPIKeys } from './mcp-access-utils';
 import type { MCPAPIKey } from '@/services/mcp-api-keys';
 import { formatDateTime } from '@/utils/date';
 
@@ -27,5 +27,11 @@ describe('mcp access utils', () => {
   it('formats last-used dates with the shared fallback', () => {
     expect(formatMCPAPIKeyLastUsed(null)).toBe('Never used');
     expect(formatMCPAPIKeyLastUsed('2026-06-02T15:45:00.000Z')).toBe(formatDateTime('2026-06-02T15:45:00.000Z'));
+  });
+
+  it('falls back to the raw scope when the scope catalog has not loaded it yet', () => {
+    expect(
+      getMCPAccessScopeLabel('tasks:review', [{ scope: 'tasks:read', label: 'Read tasks', title: 'Read tasks' }]),
+    ).toBe('tasks:review');
   });
 });

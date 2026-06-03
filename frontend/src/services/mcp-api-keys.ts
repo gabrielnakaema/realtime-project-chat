@@ -12,7 +12,7 @@ export interface MCPAPIKey {
   revoked_at: string | null;
 }
 
-export interface CreateMCPAPIKeyPayload {
+export interface MCPAPIKeyPayload {
   name: string;
   scopes: MCPAPIScope[];
 }
@@ -38,12 +38,20 @@ export const listAvailableMCPAPIScopes = async () => {
   return response.json<MCPAPIAvailableScope[]>();
 };
 
-export const createMCPAPIKey = async (payload: CreateMCPAPIKeyPayload) => {
+export const createMCPAPIKey = async (payload: MCPAPIKeyPayload) => {
   const response = await api.post('users/me/mcp-api-keys', {
     json: payload,
   });
 
   return response.json<CreateMCPAPIKeyResponse>();
+};
+
+export const updateMCPAPIKey = async (id: string, payload: MCPAPIKeyPayload) => {
+  const response = await api.put(`users/me/mcp-api-keys/${id}`, {
+    json: payload,
+  });
+
+  return response.json<MCPAPIKey>();
 };
 
 export const revokeMCPAPIKey = async (id: string) => {
