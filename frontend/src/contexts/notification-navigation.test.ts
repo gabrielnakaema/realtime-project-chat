@@ -39,6 +39,7 @@ describe('getNotificationNavigationTarget', () => {
           project_id: 'project-1',
           title: 'Task',
           description: '',
+          code: 'TASK-1',
           status: 'todo',
           project_column_id: 'column-1',
           project_column: null,

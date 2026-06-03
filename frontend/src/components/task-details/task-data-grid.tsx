@@ -1,4 +1,5 @@
-import { Calendar, CircleCheck, ClockArrowUp, Tag, User } from 'lucide-react';
+import { Calendar, CircleCheck, ClockArrowUp, Hash, Tag, User } from 'lucide-react';
+import { TaskCodeBadge } from '../task-code-badge';
 import { TaskPriorityBadge } from '../task-priority-badge';
 import { TaskStatusBadge } from '../task-status-badge';
 import type { Task } from '@/types/task';
@@ -19,6 +20,16 @@ export const TaskDataGrid = ({ task }: TaskDataGridProps) => {
 
   return (
     <div className="grid gap-4 rounded-2xl border border-slate-200 p-5 md:grid-cols-2 dark:border-slate-700">
+      <div className={infoFieldClassNames}>
+        <Hash className={infoIconClassNames} />
+        <p className={infoTitleClassNames}>Code</p>
+        {task.code ? (
+          <TaskCodeBadge code={task.code} className="col-start-2 w-fit" />
+        ) : (
+          <p className={infoValueClassNames}>No code assigned.</p>
+        )}
+      </div>
+
       <div className={infoFieldClassNames}>
         <CircleCheck className={infoIconClassNames} />
         <p className={infoTitleClassNames}>Status</p>

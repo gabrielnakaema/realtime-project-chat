@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { LoadingSpinner } from '../loading';
+import { TaskCodeBadge } from '../task-code-badge';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { ScrollArea } from '../ui/scroll-area';
 import { TaskComments } from './task-comments';
@@ -52,7 +53,8 @@ export const TaskDetails = ({
         showCloseButton={false}
       >
         <DialogHeader className="bg-background flex flex-row items-center justify-between gap-4 border-b border-slate-200 px-6 py-5 dark:border-slate-700">
-          <div className="min-w-0">
+          <div className="min-w-0 space-y-2">
+            <TaskCodeBadge code={task.code} className="max-w-full" />
             <DialogTitle className="truncate text-2xl font-semibold text-slate-900 dark:text-slate-100">
               {task.title}
             </DialogTitle>

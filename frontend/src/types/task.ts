@@ -11,6 +11,7 @@ export interface Task {
   project_id: string;
   title: string;
   description: string;
+  code: string;
   status: TaskStatus;
   project_column_id: string;
   project_column: ProjectColumn | null;

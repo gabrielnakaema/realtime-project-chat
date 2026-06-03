@@ -77,23 +77,25 @@ export const CreateTask = ({ projectId, projectMembers, projectColumns }: Create
           Create task
         </Button>
       </DialogTrigger>
-      <DialogContent className="md:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 md:max-w-5xl">
+        <DialogHeader className="shrink-0 border-b border-slate-200 px-6 py-5 dark:border-slate-700">
           <DialogTitle>Create task</DialogTitle>
           <DialogDescription>Create a new task for the project</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex w-full flex-col gap-4">
-          <input type="hidden" value={projectColumns[0]?.id} {...register('project_column_id')} />
-          <TaskFormFields
-            control={control}
-            register={register}
-            setValue={setValue}
-            errors={errors}
-            memberOptions={memberOptions}
-            descriptionInitialValue=""
-          />
-          <div className="flex w-full items-center justify-end gap-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <input type="hidden" value={projectColumns[0]?.id} {...register('project_column_id')} />
+            <TaskFormFields
+              control={control}
+              register={register}
+              setValue={setValue}
+              errors={errors}
+              memberOptions={memberOptions}
+              descriptionInitialValue=""
+            />
+          </div>
+          <div className="flex w-full shrink-0 items-center justify-end gap-4 border-t border-slate-200 px-6 py-4 dark:border-slate-700">
             <DialogClose asChild>
               <Button type="button" variant="secondary">
                 Cancel

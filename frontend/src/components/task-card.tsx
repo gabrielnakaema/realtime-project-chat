@@ -5,6 +5,7 @@ import { draggable, dropTargetForElements } from '@atlaskit/pragmatic-drag-and-d
 import { Calendar } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from './avatar';
+import { TaskCodeBadge } from './task-code-badge';
 import { TaskPriorityBadge } from './task-priority-badge';
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import type { Task } from '@/types/task';
@@ -88,8 +89,11 @@ export const TaskCard = ({ task, onDrop, onTaskClick }: TaskCardProps) => {
         onClick={() => onTaskClick?.(task.id)}
       >
         <div className="pb-3">
-          <div className="flex items-start justify-between">
-            <h4 className="text-sm leading-tight font-medium text-slate-900 dark:text-slate-100">{task.title}</h4>
+          {task.code && <TaskCodeBadge code={task.code} className="mb-2" />}
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="min-w-0 flex-1 text-sm leading-tight font-medium text-slate-900 dark:text-slate-100">
+              {task.title}
+            </h4>
             <TaskPriorityBadge priority={task.priority} />
           </div>
           {task.description && (

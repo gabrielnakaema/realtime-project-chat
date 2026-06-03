@@ -156,43 +156,43 @@ export const TaskComments = ({
   };
 
   return (
-    <div className="border-t border-slate-200 bg-slate-50/40 xl:min-h-0 xl:overflow-hidden xl:border-t-0 xl:border-l dark:border-slate-700 dark:bg-slate-950/20">
-      <div className="flex flex-col xl:h-full xl:min-h-0">
-        <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-700">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="rounded-full bg-slate-100 p-2 dark:bg-slate-800">
-              <MessageSquare className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+    <div className="border-t border-slate-200 bg-slate-50/40 xl:h-full xl:min-h-0 xl:overflow-hidden xl:border-t-0 xl:border-l dark:border-slate-700 dark:bg-slate-950/20">
+      <ScrollArea className="xl:h-full xl:min-h-0">
+        <div className="flex min-h-full flex-col">
+          <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-700">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="rounded-full bg-slate-100 p-2 dark:bg-slate-800">
+                <MessageSquare className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Comments</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Comments</p>
+
+            <TextEditor
+              key={composerKey}
+              initialValue=""
+              onChange={setCommentDraft}
+              placeholder="Share context, decisions, or blockers..."
+            />
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <Button
+                type="button"
+                onClick={submitComment}
+                disabled={isSubmitting || isHtmlContentEmpty(commentDraft)}
+                className="ml-auto shrink-0"
+              >
+                {isSubmitting ? <LoadingSpinner size="1rem" /> : <SendHorizontal className="h-4 w-4" />}
+                Comment
+              </Button>
             </div>
           </div>
 
-          <TextEditor
-            key={composerKey}
-            initialValue=""
-            onChange={setCommentDraft}
-            placeholder="Share context, decisions, or blockers..."
-          />
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <Button
-              type="button"
-              onClick={submitComment}
-              disabled={isSubmitting || isHtmlContentEmpty(commentDraft)}
-              className="ml-auto shrink-0"
-            >
-              {isSubmitting ? <LoadingSpinner size="1rem" /> : <SendHorizontal className="h-4 w-4" />}
-              Comment
-            </Button>
-          </div>
-        </div>
-
-        <ScrollArea className="min-w-0 xl:min-h-0 xl:flex-1">
           <div className="min-w-0 px-6 py-5">
             <div className="flex flex-col gap-4">{renderComments()}</div>
           </div>
-        </ScrollArea>
-      </div>
+        </div>
+      </ScrollArea>
     </div>
   );
 };

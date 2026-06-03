@@ -89,6 +89,7 @@ interface CreateTaskRequest {
 
 export const createTask = async (request: CreateTaskRequest) => {
   const formattedDueDate = formatDateForApi(request.form.due_date);
+  const normalizedCode = request.form.code?.trim() || null;
 
   const formTags = request.form.tags ? request.form.tags.split(',').map((tag) => tag.trim()) : null;
   const uniqueTags = formTags?.length ? Array.from(new Set(formTags)) : null;
@@ -98,6 +99,7 @@ export const createTask = async (request: CreateTaskRequest) => {
     project_column_id: request.form.project_column_id,
     title: request.form.title,
     description: request.form.description,
+    code: normalizedCode,
     priority: request.form.priority,
     responsible_id: request.form.responsible_id,
     due_date: formattedDueDate,
@@ -116,6 +118,7 @@ interface UpdateTaskRequest {
   id: string;
   title: string;
   description: string;
+  code: string | null;
   project_column_id: string;
 
   priority: string;
@@ -126,10 +129,12 @@ interface UpdateTaskRequest {
 
 export const updateTask = async (request: UpdateTaskRequest) => {
   const formattedDueDate = formatDateForApi(request.due_date);
+  const normalizedCode = request.code?.trim() || null;
 
   const payload = {
     title: request.title,
     description: request.description,
+    code: normalizedCode,
     project_column_id: request.project_column_id,
     priority: request.priority,
     due_date: formattedDueDate,

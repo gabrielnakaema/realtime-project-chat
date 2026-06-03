@@ -4,6 +4,7 @@ export type ITaskForm = z.infer<typeof taskSchema>;
 
 export const taskSchema = z.object({
   project_column_id: z.string().optional(),
+  code: z.string().trim().optional().nullable(),
   title: z
     .string({
       error: 'Title is required',
