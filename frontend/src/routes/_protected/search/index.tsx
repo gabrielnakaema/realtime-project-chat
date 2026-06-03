@@ -9,7 +9,7 @@ import { SearchBar } from '@/components/search-bar';
 import { TaskSearchResults } from '@/components/search/task-search-results';
 import { normalizeSearchQuery } from '@/utils/search';
 
-export const Route = createFileRoute('/search/')({
+export const Route = createFileRoute('/_protected/search/')({
   component: RouteComponent,
   validateSearch: z.object({
     query: z.coerce.string().optional(),

@@ -1,13 +1,11 @@
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { getRouteApi } from '@tanstack/react-router';
 import { useState } from 'react';
 
+const projectRouteApi = getRouteApi('/_protected/projects/$projectId/');
+
 export const useTaskDetailsRouting = () => {
-  const search = useSearch({
-    from: '/projects/$projectId/',
-  });
-  const navigate = useNavigate({
-    from: '/projects/$projectId',
-  });
+  const search = projectRouteApi.useSearch();
+  const navigate = projectRouteApi.useNavigate();
 
   const { taskId, commentId, commentCreatedAt } = search;
   const [isEditingTaskOpen, setIsEditingTaskOpen] = useState(false);

@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { listGeneralChats } from '@/services/general-chat';
 import { generalChatQueryKeys } from '@/services/query-keys';
 
-export const Route = createFileRoute('/projects/')({
+export const Route = createFileRoute('/_protected/projects/')({
   component: RouteComponent,
 });
 

@@ -1,7 +1,7 @@
 import { Navigate, Outlet, createFileRoute } from '@tanstack/react-router';
 import { useAuth } from '@/hooks/use-auth';
 
-export const Route = createFileRoute('/projects')({
+export const Route = createFileRoute('/_protected')({
   component: RouteComponent,
 });
 

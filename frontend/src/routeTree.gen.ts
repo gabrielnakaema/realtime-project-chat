@@ -10,24 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignUpRouteImport } from './routes/sign-up'
-import { Route as McpAccessRouteImport } from './routes/mcp-access'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as SearchRouteRouteImport } from './routes/search/route'
-import { Route as ProjectsRouteRouteImport } from './routes/projects/route'
+import { Route as ProtectedRouteRouteImport } from './routes/_protected/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SearchIndexRouteImport } from './routes/search/index'
-import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
-import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
-import { Route as ProjectsProjectIdChatRouteImport } from './routes/projects/$projectId/chat'
+import { Route as ProtectedMcpAccessRouteImport } from './routes/_protected/mcp-access'
+import { Route as ProtectedSearchRouteRouteImport } from './routes/_protected/search/route'
+import { Route as ProtectedProjectsRouteRouteImport } from './routes/_protected/projects/route'
+import { Route as ProtectedSearchIndexRouteImport } from './routes/_protected/search/index'
+import { Route as ProtectedProjectsIndexRouteImport } from './routes/_protected/projects/index'
+import { Route as ProtectedProjectsProjectIdIndexRouteImport } from './routes/_protected/projects/$projectId/index'
+import { Route as ProtectedProjectsProjectIdChatRouteImport } from './routes/_protected/projects/$projectId/chat'
 
 const SignUpRoute = SignUpRouteImport.update({
   id: '/sign-up',
   path: '/sign-up',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const McpAccessRoute = McpAccessRouteImport.update({
-  id: '/mcp-access',
-  path: '/mcp-access',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -35,14 +31,8 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SearchRouteRoute = SearchRouteRouteImport.update({
-  id: '/search',
-  path: '/search',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectsRouteRoute = ProjectsRouteRouteImport.update({
-  id: '/projects',
-  path: '/projects',
+const ProtectedRouteRoute = ProtectedRouteRouteImport.update({
+  id: '/_protected',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -50,71 +40,89 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SearchIndexRoute = SearchIndexRouteImport.update({
+const ProtectedMcpAccessRoute = ProtectedMcpAccessRouteImport.update({
+  id: '/mcp-access',
+  path: '/mcp-access',
+  getParentRoute: () => ProtectedRouteRoute,
+} as any)
+const ProtectedSearchRouteRoute = ProtectedSearchRouteRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => ProtectedRouteRoute,
+} as any)
+const ProtectedProjectsRouteRoute = ProtectedProjectsRouteRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => ProtectedRouteRoute,
+} as any)
+const ProtectedSearchIndexRoute = ProtectedSearchIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => SearchRouteRoute,
+  getParentRoute: () => ProtectedSearchRouteRoute,
 } as any)
-const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
+const ProtectedProjectsIndexRoute = ProtectedProjectsIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => ProjectsRouteRoute,
+  getParentRoute: () => ProtectedProjectsRouteRoute,
 } as any)
-const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
-  id: '/$projectId/',
-  path: '/$projectId/',
-  getParentRoute: () => ProjectsRouteRoute,
-} as any)
-const ProjectsProjectIdChatRoute = ProjectsProjectIdChatRouteImport.update({
-  id: '/$projectId/chat',
-  path: '/$projectId/chat',
-  getParentRoute: () => ProjectsRouteRoute,
-} as any)
+const ProtectedProjectsProjectIdIndexRoute =
+  ProtectedProjectsProjectIdIndexRouteImport.update({
+    id: '/$projectId/',
+    path: '/$projectId/',
+    getParentRoute: () => ProtectedProjectsRouteRoute,
+  } as any)
+const ProtectedProjectsProjectIdChatRoute =
+  ProtectedProjectsProjectIdChatRouteImport.update({
+    id: '/$projectId/chat',
+    path: '/$projectId/chat',
+    getParentRoute: () => ProtectedProjectsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/projects': typeof ProjectsRouteRouteWithChildren
-  '/search': typeof SearchRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/mcp-access': typeof McpAccessRoute
   '/sign-up': typeof SignUpRoute
-  '/projects/': typeof ProjectsIndexRoute
-  '/search/': typeof SearchIndexRoute
-  '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
-  '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/projects': typeof ProtectedProjectsRouteRouteWithChildren
+  '/search': typeof ProtectedSearchRouteRouteWithChildren
+  '/mcp-access': typeof ProtectedMcpAccessRoute
+  '/projects/': typeof ProtectedProjectsIndexRoute
+  '/search/': typeof ProtectedSearchIndexRoute
+  '/projects/$projectId/chat': typeof ProtectedProjectsProjectIdChatRoute
+  '/projects/$projectId': typeof ProtectedProjectsProjectIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/mcp-access': typeof McpAccessRoute
   '/sign-up': typeof SignUpRoute
-  '/projects': typeof ProjectsIndexRoute
-  '/search': typeof SearchIndexRoute
-  '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
-  '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/mcp-access': typeof ProtectedMcpAccessRoute
+  '/projects': typeof ProtectedProjectsIndexRoute
+  '/search': typeof ProtectedSearchIndexRoute
+  '/projects/$projectId/chat': typeof ProtectedProjectsProjectIdChatRoute
+  '/projects/$projectId': typeof ProtectedProjectsProjectIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/projects': typeof ProjectsRouteRouteWithChildren
-  '/search': typeof SearchRouteRouteWithChildren
+  '/_protected': typeof ProtectedRouteRouteWithChildren
   '/login': typeof LoginRoute
-  '/mcp-access': typeof McpAccessRoute
   '/sign-up': typeof SignUpRoute
-  '/projects/': typeof ProjectsIndexRoute
-  '/search/': typeof SearchIndexRoute
-  '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
-  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/_protected/projects': typeof ProtectedProjectsRouteRouteWithChildren
+  '/_protected/search': typeof ProtectedSearchRouteRouteWithChildren
+  '/_protected/mcp-access': typeof ProtectedMcpAccessRoute
+  '/_protected/projects/': typeof ProtectedProjectsIndexRoute
+  '/_protected/search/': typeof ProtectedSearchIndexRoute
+  '/_protected/projects/$projectId/chat': typeof ProtectedProjectsProjectIdChatRoute
+  '/_protected/projects/$projectId/': typeof ProtectedProjectsProjectIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/login'
+    | '/sign-up'
     | '/projects'
     | '/search'
-    | '/login'
     | '/mcp-access'
-    | '/sign-up'
     | '/projects/'
     | '/search/'
     | '/projects/$projectId/chat'
@@ -123,8 +131,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
-    | '/mcp-access'
     | '/sign-up'
+    | '/mcp-access'
     | '/projects'
     | '/search'
     | '/projects/$projectId/chat'
@@ -132,23 +140,22 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/projects'
-    | '/search'
+    | '/_protected'
     | '/login'
-    | '/mcp-access'
     | '/sign-up'
-    | '/projects/'
-    | '/search/'
-    | '/projects/$projectId/chat'
-    | '/projects/$projectId/'
+    | '/_protected/projects'
+    | '/_protected/search'
+    | '/_protected/mcp-access'
+    | '/_protected/projects/'
+    | '/_protected/search/'
+    | '/_protected/projects/$projectId/chat'
+    | '/_protected/projects/$projectId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ProjectsRouteRoute: typeof ProjectsRouteRouteWithChildren
-  SearchRouteRoute: typeof SearchRouteRouteWithChildren
+  ProtectedRouteRoute: typeof ProtectedRouteRouteWithChildren
   LoginRoute: typeof LoginRoute
-  McpAccessRoute: typeof McpAccessRoute
   SignUpRoute: typeof SignUpRoute
 }
 
@@ -161,13 +168,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignUpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/mcp-access': {
-      id: '/mcp-access'
-      path: '/mcp-access'
-      fullPath: '/mcp-access'
-      preLoaderRoute: typeof McpAccessRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -175,18 +175,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/search': {
-      id: '/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof SearchRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/projects': {
-      id: '/projects'
-      path: '/projects'
-      fullPath: '/projects'
-      preLoaderRoute: typeof ProjectsRouteRouteImport
+    '/_protected': {
+      id: '/_protected'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof ProtectedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -196,71 +189,107 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/search/': {
-      id: '/search/'
+    '/_protected/mcp-access': {
+      id: '/_protected/mcp-access'
+      path: '/mcp-access'
+      fullPath: '/mcp-access'
+      preLoaderRoute: typeof ProtectedMcpAccessRouteImport
+      parentRoute: typeof ProtectedRouteRoute
+    }
+    '/_protected/search': {
+      id: '/_protected/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof ProtectedSearchRouteRouteImport
+      parentRoute: typeof ProtectedRouteRoute
+    }
+    '/_protected/projects': {
+      id: '/_protected/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProtectedProjectsRouteRouteImport
+      parentRoute: typeof ProtectedRouteRoute
+    }
+    '/_protected/search/': {
+      id: '/_protected/search/'
       path: '/'
       fullPath: '/search/'
-      preLoaderRoute: typeof SearchIndexRouteImport
-      parentRoute: typeof SearchRouteRoute
+      preLoaderRoute: typeof ProtectedSearchIndexRouteImport
+      parentRoute: typeof ProtectedSearchRouteRoute
     }
-    '/projects/': {
-      id: '/projects/'
+    '/_protected/projects/': {
+      id: '/_protected/projects/'
       path: '/'
       fullPath: '/projects/'
-      preLoaderRoute: typeof ProjectsIndexRouteImport
-      parentRoute: typeof ProjectsRouteRoute
+      preLoaderRoute: typeof ProtectedProjectsIndexRouteImport
+      parentRoute: typeof ProtectedProjectsRouteRoute
     }
-    '/projects/$projectId/': {
-      id: '/projects/$projectId/'
+    '/_protected/projects/$projectId/': {
+      id: '/_protected/projects/$projectId/'
       path: '/$projectId'
       fullPath: '/projects/$projectId'
-      preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
-      parentRoute: typeof ProjectsRouteRoute
+      preLoaderRoute: typeof ProtectedProjectsProjectIdIndexRouteImport
+      parentRoute: typeof ProtectedProjectsRouteRoute
     }
-    '/projects/$projectId/chat': {
-      id: '/projects/$projectId/chat'
+    '/_protected/projects/$projectId/chat': {
+      id: '/_protected/projects/$projectId/chat'
       path: '/$projectId/chat'
       fullPath: '/projects/$projectId/chat'
-      preLoaderRoute: typeof ProjectsProjectIdChatRouteImport
-      parentRoute: typeof ProjectsRouteRoute
+      preLoaderRoute: typeof ProtectedProjectsProjectIdChatRouteImport
+      parentRoute: typeof ProtectedProjectsRouteRoute
     }
   }
 }
 
-interface ProjectsRouteRouteChildren {
-  ProjectsIndexRoute: typeof ProjectsIndexRoute
-  ProjectsProjectIdChatRoute: typeof ProjectsProjectIdChatRoute
-  ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
+interface ProtectedProjectsRouteRouteChildren {
+  ProtectedProjectsIndexRoute: typeof ProtectedProjectsIndexRoute
+  ProtectedProjectsProjectIdChatRoute: typeof ProtectedProjectsProjectIdChatRoute
+  ProtectedProjectsProjectIdIndexRoute: typeof ProtectedProjectsProjectIdIndexRoute
 }
 
-const ProjectsRouteRouteChildren: ProjectsRouteRouteChildren = {
-  ProjectsIndexRoute: ProjectsIndexRoute,
-  ProjectsProjectIdChatRoute: ProjectsProjectIdChatRoute,
-  ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
+const ProtectedProjectsRouteRouteChildren: ProtectedProjectsRouteRouteChildren =
+  {
+    ProtectedProjectsIndexRoute: ProtectedProjectsIndexRoute,
+    ProtectedProjectsProjectIdChatRoute: ProtectedProjectsProjectIdChatRoute,
+    ProtectedProjectsProjectIdIndexRoute: ProtectedProjectsProjectIdIndexRoute,
+  }
+
+const ProtectedProjectsRouteRouteWithChildren =
+  ProtectedProjectsRouteRoute._addFileChildren(
+    ProtectedProjectsRouteRouteChildren,
+  )
+
+interface ProtectedSearchRouteRouteChildren {
+  ProtectedSearchIndexRoute: typeof ProtectedSearchIndexRoute
 }
 
-const ProjectsRouteRouteWithChildren = ProjectsRouteRoute._addFileChildren(
-  ProjectsRouteRouteChildren,
-)
-
-interface SearchRouteRouteChildren {
-  SearchIndexRoute: typeof SearchIndexRoute
+const ProtectedSearchRouteRouteChildren: ProtectedSearchRouteRouteChildren = {
+  ProtectedSearchIndexRoute: ProtectedSearchIndexRoute,
 }
 
-const SearchRouteRouteChildren: SearchRouteRouteChildren = {
-  SearchIndexRoute: SearchIndexRoute,
+const ProtectedSearchRouteRouteWithChildren =
+  ProtectedSearchRouteRoute._addFileChildren(ProtectedSearchRouteRouteChildren)
+
+interface ProtectedRouteRouteChildren {
+  ProtectedProjectsRouteRoute: typeof ProtectedProjectsRouteRouteWithChildren
+  ProtectedSearchRouteRoute: typeof ProtectedSearchRouteRouteWithChildren
+  ProtectedMcpAccessRoute: typeof ProtectedMcpAccessRoute
 }
 
-const SearchRouteRouteWithChildren = SearchRouteRoute._addFileChildren(
-  SearchRouteRouteChildren,
+const ProtectedRouteRouteChildren: ProtectedRouteRouteChildren = {
+  ProtectedProjectsRouteRoute: ProtectedProjectsRouteRouteWithChildren,
+  ProtectedSearchRouteRoute: ProtectedSearchRouteRouteWithChildren,
+  ProtectedMcpAccessRoute: ProtectedMcpAccessRoute,
+}
+
+const ProtectedRouteRouteWithChildren = ProtectedRouteRoute._addFileChildren(
+  ProtectedRouteRouteChildren,
 )
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ProjectsRouteRoute: ProjectsRouteRouteWithChildren,
-  SearchRouteRoute: SearchRouteRouteWithChildren,
+  ProtectedRouteRoute: ProtectedRouteRouteWithChildren,
   LoginRoute: LoginRoute,
-  McpAccessRoute: McpAccessRoute,
   SignUpRoute: SignUpRoute,
 }
 export const routeTree = rootRouteImport

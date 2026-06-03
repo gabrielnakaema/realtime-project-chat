@@ -5,7 +5,7 @@ import { ProjectChatHeader } from '@/components/project-chat-header';
 import { useAuth } from '@/hooks/use-auth';
 import { useProjectChatView } from '@/hooks/use-chat';
 
-export const Route = createFileRoute('/projects/$projectId/chat')({
+export const Route = createFileRoute('/_protected/projects/$projectId/chat')({
   component: RouteComponent,
 });
 

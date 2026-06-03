@@ -18,7 +18,7 @@ import { getChatByProjectId } from '@/services/chat';
 import { projectChatQueryKeys, projectQueryKeys } from '@/services/query-keys';
 import { sanitizeHTML } from '@/utils/html';
 
-export const Route = createFileRoute('/projects/$projectId/')({
+export const Route = createFileRoute('/_protected/projects/$projectId/')({
   component: RouteComponent,
   validateSearch: z.object({
     taskId: z.string().optional(),

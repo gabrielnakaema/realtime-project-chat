@@ -1,5 +1,5 @@
-import type { ChatMessage } from '@/types/chat';
 import { formatDate } from './utils';
+import type { ChatMessage } from '@/types/chat';
 
 type MessagesTimelineItem =
   | {
