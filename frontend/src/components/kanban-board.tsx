@@ -19,7 +19,7 @@ interface KanbanBoardProps {
 export const KanbanBoard = ({ project, onTaskClick }: KanbanBoardProps) => {
   const projectId = project.id;
   const projectColumnIds = useMemo(() => {
-    return project.columns.map((column) => column.id!).filter(Boolean);
+    return project.columns.map((column) => column.id).filter(Boolean);
   }, [project.columns]);
 
   useRealtimeTaskSync(projectId, projectColumnIds);
@@ -33,13 +33,13 @@ export const KanbanBoard = ({ project, onTaskClick }: KanbanBoardProps) => {
 
   const columns = useMemo(() => {
     return project.columns.map((column, index) => ({
-      id: column.id!,
+      id: column.id,
       color: column.color || getDefaultProjectColumnColor(index),
       title: column.name,
-      columnId: column.id!,
+      columnId: column.id,
       isDoneColumn: column.is_done_column,
       project_id: project.id,
-      total: countData?.[column.id!] || 0,
+      total: countData?.[column.id] || 0,
     }));
   }, [project.columns, project.id, countData]);
 

@@ -309,7 +309,7 @@ export const ProjectColumnsEditor = ({
           <div className="grid gap-3">
             {removedColumns.map((removedColumn) => {
               const removal = deletedColumns.find((item) => item.id === removedColumn.id);
-              const targetOptions = availableReassignmentTargets(removedColumn.id!);
+              const targetOptions = availableReassignmentTargets(removedColumn.id);
 
               return (
                 <div

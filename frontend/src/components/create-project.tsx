@@ -18,7 +18,7 @@ import { handleSuccess } from '@/utils/handle-success';
 import { projectQueryKeys } from '@/services/query-keys';
 import { buildProjectColumnSurface, getDefaultProjectColumnColor } from '@/lib/project-column-colors';
 
-type ProjectPreviewColumn = Pick<ProjectColumn, 'id' | 'name'>;
+type ProjectPreviewColumn = Partial<Pick<ProjectColumn, 'id' | 'name'>>;
 
 const defaultColumns = (): Pick<ProjectColumn, 'name' | 'color' | 'is_done_column'>[] => [
   { name: 'Pending', color: getDefaultProjectColumnColor(0), is_done_column: false },
