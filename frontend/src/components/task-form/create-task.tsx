@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { FormProvider, useForm } from 'react-hook-form';
 import { Button } from '../button';
 import { LoadingSpinner } from '../loading';
 import {
@@ -15,9 +15,11 @@ import {
   DialogTrigger,
 } from '../ui/dialog';
 import { TaskFormFields } from './task-form-fields';
+import { getTaskMemberOptions } from './task-form-utils';
 import type { SubmitHandler } from 'react-hook-form';
-import type { Member, ProjectColumn } from '@/types/project';
+import type { ProjectColumn } from '@/types/project';
 import type { ITaskForm } from '@/schemas/task-schema';
+import { useProjectMembers } from '@/hooks/use-project-members';
 import { handleSuccess } from '@/utils/handle-success';
 import { createTask } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
@@ -25,32 +27,22 @@ import { taskSchema } from '@/schemas/task-schema';
 
 interface CreateTaskModalProps {
   projectId: string;
-  projectMembers: Member[];
   projectColumns: ProjectColumn[];
 }
 
-export const CreateTask = ({ projectId, projectMembers, projectColumns }: CreateTaskModalProps) => {
+export const CreateTask = ({ projectId, projectColumns }: CreateTaskModalProps) => {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { data: projectMembers, isLoading: isProjectMembersLoading } = useProjectMembers(projectId, open);
+  const memberOptions = getTaskMemberOptions(projectMembers ?? []);
 
-  const memberOptions = projectMembers.map((member) => ({
-    label: member.user.name,
-    value: member.user.id,
-  }));
-
-  const {
-    control,
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    setValue,
-  } = useForm<ITaskForm>({
+  const form = useForm<ITaskForm>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
       project_column_id: projectColumns[0]?.id,
     },
   });
+  const { reset } = form;
 
   const { mutate, isPending } = useMutation({
     mutationFn: createTask,
@@ -62,10 +54,10 @@ export const CreateTask = ({ projectId, projectMembers, projectColumns }: Create
     },
   });
 
-  const onSubmit: SubmitHandler<ITaskForm> = (form) => {
+  const onSubmit: SubmitHandler<ITaskForm> = (data) => {
     mutate({
       projectId,
-      form,
+      form: data,
     });
   };
 
@@ -83,29 +75,30 @@ export const CreateTask = ({ projectId, projectMembers, projectColumns }: Create
           <DialogDescription>Create a new task for the project</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-6 py-5">
-            <input type="hidden" value={projectColumns[0]?.id} {...register('project_column_id')} />
-            <TaskFormFields
-              control={control}
-              register={register}
-              setValue={setValue}
-              errors={errors}
-              memberOptions={memberOptions}
-              descriptionInitialValue=""
-            />
-          </div>
-          <div className="flex w-full shrink-0 items-center justify-end gap-4 border-t border-slate-200 px-6 py-4 dark:border-slate-700">
-            <DialogClose asChild>
-              <Button type="button" variant="secondary">
-                Cancel
+        <FormProvider {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              <input type="hidden" value={projectColumns[0]?.id} {...form.register('project_column_id')} />
+              {isProjectMembersLoading ? (
+                <div className="flex min-h-50 items-center justify-center">
+                  <LoadingSpinner size="3rem" />
+                </div>
+              ) : (
+                <TaskFormFields memberOptions={memberOptions} descriptionInitialValue="" />
+              )}
+            </div>
+            <div className="flex w-full shrink-0 items-center justify-end gap-4 border-t border-slate-200 px-6 py-4 dark:border-slate-700">
+              <DialogClose asChild>
+                <Button type="button" variant="secondary">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={isPending}>
+                {isPending ? <LoadingSpinner size="1.5em" /> : 'Create task'}
               </Button>
-            </DialogClose>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? <LoadingSpinner size="1.5em" /> : 'Create task'}
-            </Button>
-          </div>
-        </form>
+            </div>
+          </form>
+        </FormProvider>
       </DialogContent>
     </Dialog>
   );

@@ -54,7 +54,7 @@ export const KanbanBoard = ({ project, onTaskClick }: KanbanBoardProps) => {
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Task Board</h2>
           {isOwner && <ArchivedTasksModal project={project} />}
         </div>
-        <CreateTask projectId={projectId} projectMembers={project.members} projectColumns={project.columns} />
+        <CreateTask projectId={projectId} projectColumns={project.columns} />
       </div>
 
       <div

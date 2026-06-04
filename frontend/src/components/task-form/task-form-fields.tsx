@@ -1,36 +1,30 @@
-import { Controller } from 'react-hook-form';
+import { Controller, useFormContext } from 'react-hook-form';
 import { Input } from '../input';
 import { Select } from '../select';
 import { TextEditor } from '../text-editor';
 import { TagPreviewList } from './tag-preview-list';
 import { parseUniqueTags, priorityOptions } from './task-form-utils';
-import type { Control, FieldErrors, UseFormRegister, UseFormSetValue } from 'react-hook-form';
 import type { ITaskForm } from '@/schemas/task-schema';
-
-interface TaskMemberOption {
-  label: string;
-  value: string;
-}
+import type { TaskMemberOption } from './task-form-utils';
 
 interface TaskFormFieldsProps {
-  control: Control<ITaskForm>;
-  register: UseFormRegister<ITaskForm>;
-  setValue: UseFormSetValue<ITaskForm>;
-  errors: FieldErrors<ITaskForm>;
   memberOptions: TaskMemberOption[];
   descriptionInitialValue: string;
   descriptionEditorKey?: string;
 }
 
 export const TaskFormFields = ({
-  control,
-  register,
-  setValue,
-  errors,
   memberOptions,
   descriptionInitialValue,
   descriptionEditorKey,
 }: TaskFormFieldsProps) => {
+  const {
+    control,
+    register,
+    setValue,
+    formState: { errors },
+  } = useFormContext<ITaskForm>();
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.35fr)]">
       <div className="flex min-w-0 flex-col gap-4">
