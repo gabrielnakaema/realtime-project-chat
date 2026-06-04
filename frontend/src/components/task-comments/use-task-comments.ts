@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 import type { InfiniteData } from '@tanstack/react-query';
+import type { RefCallback } from 'react';
 import type { CursorPaginated } from '@/types/paginated';
 import type { TaskComment } from '@/types/task';
 import type { SocketEvent } from '@/types/websocket';
@@ -18,26 +19,42 @@ import { createTaskComment, listTaskComments } from '@/services/tasks';
 
 type CommentsInfiniteData = InfiniteData<CursorPaginated<TaskComment>, CommentsPageParam>;
 
+export interface UseTaskCommentsParams {
+  taskId: string;
+  projectId?: string;
+  open: boolean;
+  targetCommentId?: string;
+  targetCommentCreatedAt?: string;
+}
+
+export interface SubmitTaskCommentInput {
+  content: string;
+  parentCommentId?: string | null;
+}
+
+export type SubmitTaskComment = (input: SubmitTaskCommentInput) => Promise<TaskComment>;
+
+export interface UseTaskCommentsResult {
+  comments: TaskComment[];
+  isLoading: boolean;
+  isSubmitting: boolean;
+  hasPreviousPage: boolean;
+  isFetchingNextPage: boolean;
+  isFetchingPreviousPage: boolean;
+  fetchPreviousPage: () => Promise<unknown>;
+  sentinelRef: RefCallback<HTMLDivElement>;
+  submitComment: SubmitTaskComment;
+}
+
 export const useTaskComments = ({
   taskId,
   projectId,
   open,
   targetCommentId,
   targetCommentCreatedAt,
-}: {
-  taskId: string;
-  projectId?: string;
-  open: boolean;
-  targetCommentId?: string;
-  targetCommentCreatedAt?: string;
-}) => {
+}: UseTaskCommentsParams): UseTaskCommentsResult => {
   const queryClient = useQueryClient();
   const { status, subscribe } = useSocket();
-  const [commentDraft, setCommentDraft] = useState('');
-  const [replyDraft, setReplyDraft] = useState('');
-  const [replyingToId, setReplyingToId] = useState<string | null>(null);
-  const [composerKey, setComposerKey] = useState(0);
-  const [replyEditorKey, setReplyEditorKey] = useState(0);
 
   const commentsQueryKey = buildTaskCommentsQueryKey({
     taskId,
@@ -87,22 +104,13 @@ export const useTaskComments = ({
     },
   });
 
-  const { mutate: submitMutation, isPending: isSubmitting } = useMutation({
-    mutationFn: ({ content, parentCommentId }: { content: string; parentCommentId?: string | null }) =>
+  const { mutateAsync: submitComment, isPending: isSubmitting } = useMutation({
+    mutationFn: ({ content, parentCommentId }: SubmitTaskCommentInput) =>
       createTaskComment({ taskId, content, parentCommentId }),
-    onSuccess: (created, variables) => {
+    onSuccess: (created) => {
       queryClient.setQueryData<CommentsInfiniteData>(commentsQueryKey, (current) =>
         prependCommentToInfiniteData(current, created),
       );
-
-      if (variables.parentCommentId) {
-        setReplyDraft('');
-        setReplyingToId(null);
-        setReplyEditorKey((k) => k + 1);
-      } else {
-        setCommentDraft('');
-        setComposerKey((k) => k + 1);
-      }
     },
   });
 
@@ -126,32 +134,15 @@ export const useTaskComments = ({
     isLoading,
     isSubmitting,
     hasPreviousPage: Boolean(hasPreviousPage),
-    hasNextPage: Boolean(hasNextPage),
     isFetchingNextPage,
     isFetchingPreviousPage,
-    fetchPreviousPage,
+    fetchPreviousPage: async () => fetchPreviousPage(),
     sentinelRef,
-    commentDraft,
-    setCommentDraft,
-    composerKey,
-    replyDraft,
-    setReplyDraft,
-    replyEditorKey,
-    replyingToId,
-    submitComment: () => submitMutation({ content: commentDraft, parentCommentId: null }),
-    startReply: (commentId: string) => {
-      setReplyingToId((current) => (current === commentId ? null : commentId));
-      setReplyDraft('');
-    },
-    cancelReply: () => {
-      setReplyingToId(null);
-      setReplyDraft('');
-    },
-    submitReply: (parentCommentId: string) => submitMutation({ content: replyDraft, parentCommentId }),
+    submitComment,
   };
 };
 
-const prependCommentToInfiniteData = (
+export const prependCommentToInfiniteData = (
   current: CommentsInfiniteData | undefined,
   incoming: TaskComment,
 ): CommentsInfiniteData => {
@@ -167,11 +158,21 @@ const prependCommentToInfiniteData = (
   }
 
   if (incoming.parent_comment_id) {
+    const parentCommentId = incoming.parent_comment_id;
+
+    const parentLoaded = allComments.some(
+      (c) => c.id === parentCommentId || commentExists(c.replies, parentCommentId),
+    );
+
+    if (!parentLoaded) {
+      return baseData;
+    }
+
     return {
       ...baseData,
       pages: baseData.pages.map((page) => ({
         ...page,
-        data: insertReply(page.data, incoming.parent_comment_id!, incoming),
+        data: insertReply(page.data, parentCommentId, incoming),
       })),
     };
   }
@@ -196,7 +197,9 @@ const insertReply = (comments: TaskComment[], parentId: string, incoming: TaskCo
       };
     }
 
-    if (comment.replies.length === 0) return comment;
+    if (comment.replies.length === 0) {
+      return comment;
+    }
 
     return { ...comment, replies: insertReply(comment.replies, parentId, incoming) };
   });

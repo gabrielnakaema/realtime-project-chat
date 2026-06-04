@@ -3,7 +3,7 @@ import { LoadingSpinner } from '../loading';
 import { TaskCodeBadge } from '../task-code-badge';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { ScrollArea } from '../ui/scroll-area';
-import { TaskComments } from './task-comments';
+import { TaskComments } from '../task-comments';
 import { TaskActivityTimeline } from './task-activity-timeline';
 import { TaskDetailsHeaderActions } from './task-details-header-actions';
 import { TaskDetailsStateDialog } from './task-details-state-dialog';

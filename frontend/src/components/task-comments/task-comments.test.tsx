@@ -1,22 +1,26 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { TaskComments } from './task-comments';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useTaskComments } from './use-task-comments';
+import { TaskComments } from '.';
 import { useAuth } from '@/hooks/use-auth';
-import { useTaskComments } from '@/hooks/use-task-comments';
 
 vi.mock('@/hooks/use-auth', () => ({
   useAuth: vi.fn(),
 }));
 
-vi.mock('@/hooks/use-task-comments', () => ({
+vi.mock('./use-task-comments', () => ({
   useTaskComments: vi.fn(),
 }));
 
 vi.mock('../text-editor', () => ({
-  TextEditor: ({ onChange }: { onChange: (value: string) => void }) => (
-    <textarea aria-label="Comment editor" onChange={(event) => onChange(event.currentTarget.value)} />
+  TextEditor: ({ onChange, placeholder }: { onChange: (value: string) => void; placeholder?: string }) => (
+    <textarea
+      aria-label={placeholder ?? 'Comment editor'}
+      placeholder={placeholder}
+      onChange={(event) => onChange(event.currentTarget.value)}
+    />
   ),
 }));
 
@@ -26,9 +30,15 @@ vi.mock('../ui/scroll-area', () => ({
 
 const mockUseAuth = vi.mocked(useAuth);
 const mockUseTaskComments = vi.mocked(useTaskComments);
+const submitComment = vi.fn();
 
 afterEach(() => {
   document.body.innerHTML = '';
+});
+
+beforeEach(() => {
+  submitComment.mockReset();
+  submitComment.mockResolvedValue(undefined);
 });
 
 const baseHookValue = {
@@ -36,22 +46,11 @@ const baseHookValue = {
   isLoading: false,
   isSubmitting: false,
   hasPreviousPage: false,
-  hasNextPage: false,
   isFetchingNextPage: false,
   isFetchingPreviousPage: false,
   fetchPreviousPage: vi.fn(),
   sentinelRef: vi.fn(),
-  commentDraft: '',
-  setCommentDraft: vi.fn(),
-  composerKey: 0,
-  replyDraft: '',
-  setReplyDraft: vi.fn(),
-  replyEditorKey: 0,
-  replyingToId: null,
-  submitComment: vi.fn(),
-  startReply: vi.fn(),
-  cancelReply: vi.fn(),
-  submitReply: vi.fn(),
+  submitComment,
 };
 
 describe('TaskComments', () => {
@@ -116,5 +115,50 @@ describe('TaskComments', () => {
 
     expect(screen.queryByText('AI Agent')).toBeNull();
     expect(screen.getByText('Taylor')).not.toBeNull();
+  });
+
+  it('submits a reply from the selected comment using local reply state', async () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-2', name: 'Jamie', email: 'jamie@example.com' },
+      isAuthenticated: true,
+      logout: vi.fn(),
+      authenticate: vi.fn(),
+      authStatus: 'authenticated',
+    });
+
+    mockUseTaskComments.mockReturnValue({
+      ...baseHookValue,
+      comments: [
+        {
+          id: 'comment-3',
+          task: null,
+          user: { id: 'user-3', name: 'Taylor', email: 'taylor@example.com' },
+          content: '<p>Hello</p>',
+          parent_comment_id: null,
+          created_at: '2026-06-03T11:00:00.000Z',
+          updated_at: '2026-06-03T11:00:00.000Z',
+          replies: [],
+        },
+      ],
+    });
+
+    render(<TaskComments taskId="task-1" projectId="project-1" open />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reply' }));
+    fireEvent.change(screen.getByPlaceholderText('Reply to Taylor...'), {
+      target: { value: 'Following up' },
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Reply' })[1]);
+
+    await waitFor(() => {
+      expect(submitComment).toHaveBeenCalledWith({
+        content: 'Following up',
+        parentCommentId: 'comment-3',
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText('Reply to Taylor...')).toBeNull();
+    });
   });
 });
