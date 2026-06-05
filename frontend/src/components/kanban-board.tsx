@@ -13,10 +13,9 @@ import { getDefaultProjectColumnColor } from '@/lib/project-column-colors';
 
 interface KanbanBoardProps {
   project: Project;
-  onTaskClick?: (taskId: string) => void;
 }
 
-export const KanbanBoard = ({ project, onTaskClick }: KanbanBoardProps) => {
+export const KanbanBoard = ({ project }: KanbanBoardProps) => {
   const projectId = project.id;
   const projectColumnIds = useMemo(() => {
     return project.columns.map((column) => column.id).filter(Boolean);
@@ -62,7 +61,7 @@ export const KanbanBoard = ({ project, onTaskClick }: KanbanBoardProps) => {
         style={{ gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(0, 1fr))` }}
       >
         {columns.map((column) => (
-          <BoardColumn column={column} key={column.id} onTaskClick={onTaskClick} />
+          <BoardColumn column={column} key={column.id} />
         ))}
       </div>
     </div>

@@ -9,19 +9,20 @@ import { TaskCodeBadge } from './task-code-badge';
 import { TaskPriorityBadge } from './task-priority-badge';
 import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import type { Task } from '@/types/task';
+import { useTaskDetailsRouting } from '@/hooks/use-task-details-routing';
 import { cn } from '@/lib/utils';
 import { sanitizeHTML } from '@/utils/html';
 
 interface TaskCardProps {
   task: Task;
   onDrop: (edge: Edge | null, droppedTaskId: string) => void;
-  onTaskClick?: (taskId: string) => void;
 }
 
-export const TaskCard = ({ task, onDrop, onTaskClick }: TaskCardProps) => {
+export const TaskCard = ({ task, onDrop }: TaskCardProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [closestEdge, setClosestEdge] = useState<Edge | null>(null);
+  const { openTask } = useTaskDetailsRouting();
 
   useEffect(() => {
     const el = ref.current;
@@ -86,7 +87,7 @@ export const TaskCard = ({ task, onDrop, onTaskClick }: TaskCardProps) => {
           'cursor-pointer rounded-lg border border-slate-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-900',
           isDragging && 'opacity-40 transition-opacity',
         )}
-        onClick={() => onTaskClick?.(task.id)}
+        onClick={() => openTask(task.id)}
       >
         <div className="pb-3">
           {task.code && <TaskCodeBadge code={task.code} className="mb-2" />}

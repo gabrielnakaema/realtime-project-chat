@@ -8,15 +8,15 @@ export const useTaskDetailsRouting = () => {
   const navigate = projectRouteApi.useNavigate();
 
   const { taskId, commentId, commentCreatedAt } = search;
-  const [isEditingTaskOpen, setIsEditingTaskOpen] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
   const selectedTaskId = taskId ?? '';
   const selectedCommentId = commentId;
   const selectedCommentCreatedAt = commentCreatedAt;
-  const isEditingTask = Boolean(selectedTaskId) && isEditingTaskOpen;
+  const isEditingTask = Boolean(selectedTaskId) && editingTaskId === selectedTaskId;
 
   const openTask = (nextTaskId: string) => {
-    setIsEditingTaskOpen(false);
+    setEditingTaskId(null);
     navigate({
       search: (prev) => ({ ...prev, taskId: nextTaskId, commentId: undefined, commentCreatedAt: undefined }),
       replace: true,
@@ -24,7 +24,7 @@ export const useTaskDetailsRouting = () => {
   };
 
   const closeTask = () => {
-    setIsEditingTaskOpen(false);
+    setEditingTaskId(null);
     navigate({
       search: (prev) => ({ ...prev, taskId: undefined, commentId: undefined, commentCreatedAt: undefined }),
       replace: true,
@@ -36,11 +36,11 @@ export const useTaskDetailsRouting = () => {
       return;
     }
 
-    setIsEditingTaskOpen(true);
+    setEditingTaskId(selectedTaskId);
   };
 
   const stopEditingTask = () => {
-    setIsEditingTaskOpen(false);
+    setEditingTaskId(null);
   };
 
   return {

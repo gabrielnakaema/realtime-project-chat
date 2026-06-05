@@ -33,7 +33,6 @@ function RouteComponent() {
     selectedCommentId,
     selectedCommentCreatedAt,
     isEditingTask,
-    openTask,
     closeTask,
     startEditingTask,
     stopEditingTask,
@@ -115,7 +114,7 @@ function RouteComponent() {
 
       {project && (
         <div className="p-6">
-          <KanbanBoard project={project} onTaskClick={openTask} />
+          <KanbanBoard project={project} />
         </div>
       )}
 
