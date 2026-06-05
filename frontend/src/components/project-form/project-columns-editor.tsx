@@ -1,7 +1,8 @@
 import { ArrowDown, ArrowUp, CheckCircle2, Flag, Plus, RotateCcw, Trash2 } from 'lucide-react';
-import { Button } from './button';
-import { Input } from './input';
-import { Select } from './select';
+import { Button } from '../button';
+import { Input } from '../input';
+import { Select } from '../select';
+import { createDefaultProjectColumns } from './project-form-utils';
 import type { IProjectForm } from '@/schemas/project-schema';
 import type { ProjectColumn } from '@/types/project';
 import { cn } from '@/lib/utils';
@@ -20,12 +21,6 @@ interface ProjectColumnsEditorProps {
   mode: 'create' | 'settings';
   error?: string;
 }
-
-const defaultColumns = (): FormColumn[] => [
-  { name: 'Pending', color: getDefaultProjectColumnColor(0), is_done_column: false },
-  { name: 'Doing', color: getDefaultProjectColumnColor(1), is_done_column: false },
-  { name: 'Done', color: getDefaultProjectColumnColor(2), is_done_column: true },
-];
 
 const ensureSingleDoneColumn = (columns: FormColumn[], preferredIndex = 0) =>
   columns.map((column, index) => ({
@@ -140,7 +135,7 @@ export const ProjectColumnsEditor = ({
               type="button"
               variant="secondary"
               className="px-3 py-2 text-sm"
-              onClick={() => onChange(defaultColumns())}
+              onClick={() => onChange(createDefaultProjectColumns())}
             >
               <RotateCcw className="h-4 w-4" />
               Use default flow

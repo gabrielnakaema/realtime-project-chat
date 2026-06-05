@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { CreateProject } from './create-project';
+import { CreateProject } from './project-form/create-project';
 import { ProjectCard, ProjectCardSkeleton } from './project-card';
 import { listProjects } from '@/services/projects';
 import { projectQueryKeys } from '@/services/query-keys';

@@ -5,18 +5,17 @@ import { z } from 'zod';
 import { AddProjectMember } from '@/components/add-project-member';
 import { KanbanBoard } from '@/components/kanban-board';
 import { MembersAvatarList } from '@/components/members-avatar-list';
-import { UnreadCountBadge } from '@/components/unread-count-badge';
 import { ProjectDetailsSheet, ProjectDetailsSheetTrigger } from '@/components/project-details-sheet';
+import { ProjectSettings } from '@/components/project-form/project-settings';
 import { ProjectMembersModal } from '@/components/project-members-modal';
-import { ProjectSettings } from '@/components/project-settings';
 import { TaskDetails } from '@/components/task-details';
 import { EditTask } from '@/components/task-form/edit-task';
+import { UnreadCountBadge } from '@/components/unread-count-badge';
 import { useOnlineUsers } from '@/hooks/use-online-users';
 import { useTaskDetailsRouting } from '@/hooks/use-task-details-routing';
-import { getProject } from '@/services/projects';
 import { getChatByProjectId } from '@/services/chat';
+import { getProject } from '@/services/projects';
 import { projectChatQueryKeys, projectQueryKeys } from '@/services/query-keys';
-import { sanitizeHTML } from '@/utils/html';
 
 export const Route = createFileRoute('/_protected/projects/$projectId/')({
   component: RouteComponent,
@@ -73,12 +72,6 @@ function RouteComponent() {
                 {project && (
                   <ProjectDetailsSheet project={project}>
                     <div className="flex items-center gap-1">
-                      {project.description && (
-                        <p
-                          className="line-clamp-1 text-sm text-slate-600 dark:text-slate-400"
-                          dangerouslySetInnerHTML={{ __html: sanitizeHTML(project.description) }}
-                        />
-                      )}
                       <ProjectDetailsSheetTrigger asChild>
                         <button
                           type="button"

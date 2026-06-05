@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { MessageSquare } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { CreateProject } from '@/components/create-project';
+import { CreateProject } from '@/components/project-form/create-project';
 import { HeaderUser } from '@/components/header-user';
 import { NotificationBell } from '@/components/notification-bell';
 import { UnreadCountBadge } from '@/components/unread-count-badge';
