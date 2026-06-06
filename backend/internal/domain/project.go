@@ -55,6 +55,7 @@ type ProjectColumn struct {
 	Id           uuid.UUID `json:"id"`
 	ProjectId    uuid.UUID `json:"project_id"`
 	Name         string    `json:"name"`
+	Description  string    `json:"description"`
 	Color        string    `json:"color"`
 	Position     int       `json:"position"`
 	IsDoneColumn bool      `json:"is_done_column"`

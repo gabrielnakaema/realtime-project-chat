@@ -18,16 +18,19 @@ func validProjectColumnsPayload() []map[string]any {
 	return []map[string]any{
 		{
 			"name":           "Pending",
+			"description":    "Items waiting to be picked up.",
 			"color":          "#64748B",
 			"is_done_column": false,
 		},
 		{
 			"name":           "Doing",
+			"description":    "Items currently being worked on.",
 			"color":          "#2563EB",
 			"is_done_column": false,
 		},
 		{
 			"name":           "Done",
+			"description":    "Completed items.",
 			"color":          "#059669",
 			"is_done_column": true,
 		},
@@ -56,6 +59,7 @@ func projectColumnsPayloadFromResponse(t *testing.T, rawColumns any) []map[strin
 		payload = append(payload, map[string]any{
 			"id":             column["id"],
 			"name":           column["name"],
+			"description":    column["description"],
 			"color":          column["color"],
 			"is_done_column": column["is_done_column"],
 		})
@@ -73,13 +77,14 @@ func assertProjectColumnsContract(t *testing.T, rawColumns any, expectedProjectI
 
 	expectedColumns := []struct {
 		name         string
+		description  string
 		color        string
 		position     float64
 		isDoneColumn bool
 	}{
-		{name: "Pending", color: "#64748B", position: 0, isDoneColumn: false},
-		{name: "Doing", color: "#2563EB", position: 1, isDoneColumn: false},
-		{name: "Done", color: "#059669", position: 2, isDoneColumn: true},
+		{name: "Pending", description: "Items waiting to be picked up.", color: "#64748B", position: 0, isDoneColumn: false},
+		{name: "Doing", description: "Items currently being worked on.", color: "#2563EB", position: 1, isDoneColumn: false},
+		{name: "Done", description: "Completed items.", color: "#059669", position: 2, isDoneColumn: true},
 	}
 
 	for i, rawColumn := range columns {
@@ -89,6 +94,7 @@ func assertProjectColumnsContract(t *testing.T, rawColumns any, expectedProjectI
 		assert.Contains(t, column, "id")
 		assert.Equal(t, expectedProjectID, column["project_id"])
 		assert.Equal(t, expectedColumns[i].name, column["name"])
+		assert.Equal(t, expectedColumns[i].description, column["description"])
 		assert.Equal(t, expectedColumns[i].color, column["color"])
 		assert.Equal(t, expectedColumns[i].position, column["position"])
 		assert.Equal(t, expectedColumns[i].isDoneColumn, column["is_done_column"])

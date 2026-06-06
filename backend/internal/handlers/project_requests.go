@@ -17,6 +17,7 @@ type ProjectRequest struct {
 type ProjectColumnRequest struct {
 	Id           *uuid.UUID `json:"id"`
 	Name         string     `json:"name"`
+	Description  string     `json:"description"`
 	Color        string     `json:"color"`
 	IsDoneColumn bool       `json:"is_done_column"`
 }

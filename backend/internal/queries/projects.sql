@@ -6,9 +6,9 @@ VALUES
 
 -- name: CreateProjectColumn :one
 INSERT INTO
-  project_columns (project_id, name, color, position, is_done_column)
+  project_columns (project_id, name, description, color, position, is_done_column)
 VALUES
-  ($1, $2, $3, $4, $5) returning id;
+  ($1, $2, $3, $4, $5, $6) returning id;
 
 -- name: CreateProjectMember :one
 INSERT INTO
@@ -38,6 +38,7 @@ WITH project_members_cte AS (
     ps.id,
     ps.project_id,
     ps.name,
+    ps.description,
     ps.color,
     ps.position,
     ps.is_done_column,
@@ -85,6 +86,7 @@ SELECT
         'id', ps.id,
         'project_id', ps.project_id,
         'name', ps.name,
+        'description', ps.description,
         'color', ps.color,
         'position', ps.position,
         'is_done_column', ps.is_done_column,
@@ -123,6 +125,7 @@ WITH project_members_cte AS (
     ps.id,
     ps.project_id,
     ps.name,
+    ps.description,
     ps.color,
     ps.position,
     ps.is_done_column,
@@ -169,6 +172,7 @@ SELECT
         'id', ps.id,
         'project_id', ps.project_id,
         'name', ps.name,
+        'description', ps.description,
         'color', ps.color,
         'position', ps.position,
         'is_done_column', ps.is_done_column,
@@ -213,13 +217,14 @@ UPDATE
   project_columns
 SET
   name = $1,
-  color = $2,
-  position = $3,
-  is_done_column = $4,
+  description = $2,
+  color = $3,
+  position = $4,
+  is_done_column = $5,
   updated_at = CURRENT_TIMESTAMP
 WHERE
-  id = $5
-  AND project_id = $6;
+  id = $6
+  AND project_id = $7;
 
 -- name: DeleteProjectColumn :exec
 DELETE FROM project_columns
@@ -239,7 +244,7 @@ SET
 WHERE project_column_id = $3;
 
 -- name: GetProjectColumnById :one
-SELECT *
+SELECT id, project_id, name, description, color, position, is_done_column, created_at, updated_at
 FROM project_columns
 WHERE id = $1;
 

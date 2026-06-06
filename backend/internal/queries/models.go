@@ -101,6 +101,7 @@ type ProjectColumn struct {
 	IsDoneColumn bool
 	CreatedAt    pgtype.Timestamptz
 	UpdatedAt    pgtype.Timestamptz
+	Description  string
 }
 
 type ProjectMember struct {

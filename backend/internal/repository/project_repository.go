@@ -67,6 +67,7 @@ func (pr *ProjectRepository) Create(ctx context.Context, project *domain.Project
 		statusID, err := qtx.CreateProjectColumn(ctx, queries.CreateProjectColumnParams{
 			ProjectID:    project.Id,
 			Name:         column.Name,
+			Description:  column.Description,
 			Color:        column.Color,
 			Position:     int32(column.Position),
 			IsDoneColumn: column.IsDoneColumn,
@@ -305,6 +306,7 @@ func (pr *ProjectRepository) CreateColumn(ctx context.Context, status *domain.Pr
 	id, err := q.CreateProjectColumn(ctx, queries.CreateProjectColumnParams{
 		ProjectID:    status.ProjectId,
 		Name:         status.Name,
+		Description:  status.Description,
 		Color:        status.Color,
 		Position:     int32(status.Position),
 		IsDoneColumn: status.IsDoneColumn,
@@ -322,6 +324,7 @@ func (pr *ProjectRepository) UpdateColumn(ctx context.Context, status *domain.Pr
 
 	return q.UpdateProjectColumn(ctx, queries.UpdateProjectColumnParams{
 		Name:         status.Name,
+		Description:  status.Description,
 		Color:        status.Color,
 		Position:     int32(status.Position),
 		IsDoneColumn: status.IsDoneColumn,
@@ -364,6 +367,7 @@ func (pr *ProjectRepository) GetColumnById(ctx context.Context, id uuid.UUID) (*
 		Id:           status.ID,
 		ProjectId:    status.ProjectID,
 		Name:         status.Name,
+		Description:  status.Description,
 		Color:        status.Color,
 		Position:     int(status.Position),
 		IsDoneColumn: status.IsDoneColumn,

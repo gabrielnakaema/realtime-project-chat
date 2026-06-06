@@ -34,14 +34,15 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (u
 
 const createProjectColumn = `-- name: CreateProjectColumn :one
 INSERT INTO
-  project_columns (project_id, name, color, position, is_done_column)
+  project_columns (project_id, name, description, color, position, is_done_column)
 VALUES
-  ($1, $2, $3, $4, $5) returning id
+  ($1, $2, $3, $4, $5, $6) returning id
 `
 
 type CreateProjectColumnParams struct {
 	ProjectID    uuid.UUID
 	Name         string
+	Description  string
 	Color        string
 	Position     int32
 	IsDoneColumn bool
@@ -51,6 +52,7 @@ func (q *Queries) CreateProjectColumn(ctx context.Context, arg CreateProjectColu
 	row := q.db.QueryRow(ctx, createProjectColumn,
 		arg.ProjectID,
 		arg.Name,
+		arg.Description,
 		arg.Color,
 		arg.Position,
 		arg.IsDoneColumn,
@@ -118,6 +120,7 @@ WITH project_members_cte AS (
     ps.id,
     ps.project_id,
     ps.name,
+    ps.description,
     ps.color,
     ps.position,
     ps.is_done_column,
@@ -165,6 +168,7 @@ SELECT
         'id', ps.id,
         'project_id', ps.project_id,
         'name', ps.name,
+        'description', ps.description,
         'color', ps.color,
         'position', ps.position,
         'is_done_column', ps.is_done_column,
@@ -212,18 +216,31 @@ func (q *Queries) GetProjectById(ctx context.Context, id uuid.UUID) (GetProjectB
 }
 
 const getProjectColumnById = `-- name: GetProjectColumnById :one
-SELECT id, project_id, name, color, position, is_done_column, created_at, updated_at
+SELECT id, project_id, name, description, color, position, is_done_column, created_at, updated_at
 FROM project_columns
 WHERE id = $1
 `
 
-func (q *Queries) GetProjectColumnById(ctx context.Context, id uuid.UUID) (ProjectColumn, error) {
+type GetProjectColumnByIdRow struct {
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	Name         string
+	Description  string
+	Color        string
+	Position     int32
+	IsDoneColumn bool
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
+func (q *Queries) GetProjectColumnById(ctx context.Context, id uuid.UUID) (GetProjectColumnByIdRow, error) {
 	row := q.db.QueryRow(ctx, getProjectColumnById, id)
-	var i ProjectColumn
+	var i GetProjectColumnByIdRow
 	err := row.Scan(
 		&i.ID,
 		&i.ProjectID,
 		&i.Name,
+		&i.Description,
 		&i.Color,
 		&i.Position,
 		&i.IsDoneColumn,
@@ -335,6 +352,7 @@ WITH project_members_cte AS (
     ps.id,
     ps.project_id,
     ps.name,
+    ps.description,
     ps.color,
     ps.position,
     ps.is_done_column,
@@ -381,6 +399,7 @@ SELECT
         'id', ps.id,
         'project_id', ps.project_id,
         'name', ps.name,
+        'description', ps.description,
         'color', ps.color,
         'position', ps.position,
         'is_done_column', ps.is_done_column,
@@ -552,17 +571,19 @@ UPDATE
   project_columns
 SET
   name = $1,
-  color = $2,
-  position = $3,
-  is_done_column = $4,
+  description = $2,
+  color = $3,
+  position = $4,
+  is_done_column = $5,
   updated_at = CURRENT_TIMESTAMP
 WHERE
-  id = $5
-  AND project_id = $6
+  id = $6
+  AND project_id = $7
 `
 
 type UpdateProjectColumnParams struct {
 	Name         string
+	Description  string
 	Color        string
 	Position     int32
 	IsDoneColumn bool
@@ -573,6 +594,7 @@ type UpdateProjectColumnParams struct {
 func (q *Queries) UpdateProjectColumn(ctx context.Context, arg UpdateProjectColumnParams) error {
 	_, err := q.db.Exec(ctx, updateProjectColumn,
 		arg.Name,
+		arg.Description,
 		arg.Color,
 		arg.Position,
 		arg.IsDoneColumn,

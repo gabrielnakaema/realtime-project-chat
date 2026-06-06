@@ -189,6 +189,7 @@ func mapProjectColumnsRequest(columns []ProjectColumnRequest) []domain.ProjectCo
 			mapped[i].Id = *column.Id
 		}
 		mapped[i].Name = column.Name
+		mapped[i].Description = column.Description
 		mapped[i].Color = column.Color
 		mapped[i].Position = i
 		mapped[i].IsDoneColumn = column.IsDoneColumn
