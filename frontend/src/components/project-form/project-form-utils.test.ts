@@ -7,6 +7,7 @@ describe('project form utils', () => {
 
     expect(columns).toHaveLength(3);
     expect(columns.map((column) => column.name)).toEqual(['Pending', 'Doing', 'Done']);
+    expect(columns.map((column) => column.description)).toEqual(['', '', '']);
     expect(columns.filter((column) => column.is_done_column)).toHaveLength(1);
     expect(columns[2]?.is_done_column).toBe(true);
   });
@@ -24,6 +25,7 @@ describe('project form utils', () => {
         {
           id: 'col-1',
           name: 'Backlog',
+          description: 'Waiting for prioritization',
           color: '#123456',
           position: 0,
           is_done_column: false,
@@ -31,6 +33,7 @@ describe('project form utils', () => {
         {
           id: 'col-2',
           name: 'Done',
+          description: 'Finished work',
           color: '#654321',
           position: 1,
           is_done_column: true,
@@ -45,12 +48,14 @@ describe('project form utils', () => {
         {
           id: 'col-1',
           name: 'Backlog',
+          description: 'Waiting for prioritization',
           color: '#123456',
           is_done_column: false,
         },
         {
           id: 'col-2',
           name: 'Done',
+          description: 'Finished work',
           color: '#654321',
           is_done_column: true,
         },

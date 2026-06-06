@@ -6,9 +6,9 @@ type ProjectFormColumn = IProjectForm['columns'][number];
 type ColumnKeyItem = Pick<ProjectColumn, 'id'> | Pick<ProjectFormColumn, 'id'>;
 
 export const createDefaultProjectColumns = (): ProjectFormColumn[] => [
-  { name: 'Pending', color: getDefaultProjectColumnColor(0), is_done_column: false },
-  { name: 'Doing', color: getDefaultProjectColumnColor(1), is_done_column: false },
-  { name: 'Done', color: getDefaultProjectColumnColor(2), is_done_column: true },
+  { name: 'Pending', description: '', color: getDefaultProjectColumnColor(0), is_done_column: false },
+  { name: 'Doing', description: '', color: getDefaultProjectColumnColor(1), is_done_column: false },
+  { name: 'Done', description: '', color: getDefaultProjectColumnColor(2), is_done_column: true },
 ];
 
 export const getProjectColumnKey = (column: ColumnKeyItem, index: number) => column.id ?? `new-column-${index}`;
@@ -19,6 +19,7 @@ export const getProjectFormValues = (project: Project): IProjectForm => ({
   columns: project.columns.map((column) => ({
     id: column.id,
     name: column.name,
+    description: column.description,
     color: column.color,
     is_done_column: column.is_done_column,
   })),

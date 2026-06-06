@@ -6,6 +6,7 @@ export interface IProjectForm {
   columns: {
     id?: string;
     name: string;
+    description: string;
     color: string;
     is_done_column: boolean;
   }[];
@@ -31,6 +32,7 @@ export const projectSchema: z.ZodType<IProjectForm> = z.object({
       z.object({
         id: z.string().optional(),
         name: z.string().nonempty({ message: 'Column name is required' }),
+        description: z.string(),
         color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, { message: 'Column color must be a valid hex value' }),
         is_done_column: z.boolean(),
       }),

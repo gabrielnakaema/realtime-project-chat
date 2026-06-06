@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, CheckCircle2, Flag, Plus, RotateCcw, Trash2 } from 
 import { Button } from '../button';
 import { Input } from '../input';
 import { Select } from '../select';
+import { Textarea } from '../textarea';
 import { createDefaultProjectColumns } from './project-form-utils';
 import type { IProjectForm } from '@/schemas/project-schema';
 import type { ProjectColumn } from '@/types/project';
@@ -102,6 +103,7 @@ export const ProjectColumnsEditor = ({
       {
         id: removedColumn.id,
         name: removedColumn.name,
+        description: removedColumn.description,
         color: removedColumn.color,
         is_done_column: removedColumn.is_done_column,
       },
@@ -148,7 +150,12 @@ export const ProjectColumnsEditor = ({
             onClick={() =>
               onChange([
                 ...columns,
-                { name: '', color: getDefaultProjectColumnColor(columns.length), is_done_column: false },
+                {
+                  name: '',
+                  description: '',
+                  color: getDefaultProjectColumnColor(columns.length),
+                  is_done_column: false,
+                },
               ])
             }
           >
@@ -184,22 +191,19 @@ export const ProjectColumnsEditor = ({
                     <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_150px]">
                       <Input
                         id={`column-${index}`}
-                        label={index === 0 ? 'Column name' : ' '}
+                        label="Column name"
                         placeholder={index === 0 ? 'Backlog' : 'Column name'}
                         value={column.name}
                         onChange={(event) => updateColumn(index, { name: event.target.value })}
                       />
 
                       <div className="space-y-2">
-                        {index === 0 && (
-                          <label
-                            htmlFor={`column-color-${index}`}
-                            className="block text-sm font-medium text-slate-700 dark:text-slate-300"
-                          >
-                            Color
-                          </label>
-                        )}
-                        {index !== 0 && <div className="h-5" aria-hidden="true" />}
+                        <label
+                          htmlFor={`column-color-${index}`}
+                          className="block text-sm font-medium text-slate-700 dark:text-slate-300"
+                        >
+                          Color
+                        </label>
                         <div
                           className="flex items-center gap-3 rounded-xl border px-3 py-2"
                           style={{ backgroundColor: surface.backgroundColor, borderColor: surface.borderColor }}
@@ -220,6 +224,16 @@ export const ProjectColumnsEditor = ({
                         </div>
                       </div>
                     </div>
+
+                    <Textarea
+                      id={`column-description-${index}`}
+                      label="Column description"
+                      rows={3}
+                      value={column.description}
+                      onChange={(event) => updateColumn(index, { description: event.target.value })}
+                      placeholder="Optional guidance or instructions for this column."
+                    />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Optional.</p>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span

@@ -15,6 +15,7 @@ export interface ProjectColumn {
   id: string;
   project_id?: string;
   name: string;
+  description: string;
   color: string;
   position: number;
   is_done_column: boolean;
