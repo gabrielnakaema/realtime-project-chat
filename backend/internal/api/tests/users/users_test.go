@@ -127,4 +127,113 @@ func TestUserEndpoints(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
 	})
+
+	t.Run("PUT /users/me/password - unauthorized", func(t *testing.T) {
+		resp, err := client.PUT("/users/me/password", map[string]string{
+			"old_password":              "password123",
+			"new_password":              "newpassword123",
+			"new_password_confirmation": "newpassword123",
+		})
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	})
+
+	t.Run("PUT /users/me/password - success", func(t *testing.T) {
+		authenticatedClient := shared.NewHTTPClient(testAPI.GetBaseURL())
+		_, err := authenticatedClient.CreateUserAndLogin("changepassword@example.com", "password123")
+		require.NoError(t, err)
+
+		resp, err := authenticatedClient.PUT("/users/me/password", map[string]string{
+			"old_password":              "password123",
+			"new_password":              "newpassword123",
+			"new_password_confirmation": "newpassword123",
+		})
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		oldPasswordClient := shared.NewHTTPClient(testAPI.GetBaseURL())
+		oldPasswordResp, err := oldPasswordClient.POST("/auth/login", map[string]string{
+			"email":    "changepassword@example.com",
+			"password": "password123",
+		})
+		require.NoError(t, err)
+		defer oldPasswordResp.Body.Close()
+		assert.Equal(t, http.StatusUnauthorized, oldPasswordResp.StatusCode)
+
+		newPasswordClient := shared.NewHTTPClient(testAPI.GetBaseURL())
+		newPasswordResp, err := newPasswordClient.POST("/auth/login", map[string]string{
+			"email":    "changepassword@example.com",
+			"password": "newpassword123",
+		})
+		require.NoError(t, err)
+		defer newPasswordResp.Body.Close()
+		assert.Equal(t, http.StatusOK, newPasswordResp.StatusCode)
+	})
+
+	t.Run("PUT /users/me/password - incorrect old password", func(t *testing.T) {
+		authenticatedClient := shared.NewHTTPClient(testAPI.GetBaseURL())
+		_, err := authenticatedClient.CreateUserAndLogin("wrongoldpassword@example.com", "password123")
+		require.NoError(t, err)
+
+		resp, err := authenticatedClient.PUT("/users/me/password", map[string]string{
+			"old_password":              "wrongpassword",
+			"new_password":              "newpassword123",
+			"new_password_confirmation": "newpassword123",
+		})
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+
+		stillOldPasswordClient := shared.NewHTTPClient(testAPI.GetBaseURL())
+		loginResp, err := stillOldPasswordClient.POST("/auth/login", map[string]string{
+			"email":    "wrongoldpassword@example.com",
+			"password": "password123",
+		})
+		require.NoError(t, err)
+		defer loginResp.Body.Close()
+		assert.Equal(t, http.StatusOK, loginResp.StatusCode)
+	})
+
+	t.Run("PUT /users/me/password - validation errors", func(t *testing.T) {
+		authenticatedClient := shared.NewHTTPClient(testAPI.GetBaseURL())
+		_, err := authenticatedClient.CreateUserAndLogin("passwordvalidation@example.com", "password123")
+		require.NoError(t, err)
+
+		testCases := []struct {
+			name    string
+			payload map[string]string
+		}{
+			{
+				name: "short new password",
+				payload: map[string]string{
+					"old_password":              "password123",
+					"new_password":              "123",
+					"new_password_confirmation": "123",
+				},
+			},
+			{
+				name: "confirmation mismatch",
+				payload: map[string]string{
+					"old_password":              "password123",
+					"new_password":              "newpassword123",
+					"new_password_confirmation": "differentpassword123",
+				},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				resp, err := authenticatedClient.PUT("/users/me/password", tc.payload)
+				require.NoError(t, err)
+				defer resp.Body.Close()
+
+				assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+			})
+		}
+	})
 }

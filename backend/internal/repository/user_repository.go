@@ -99,6 +99,23 @@ func (ur *UserRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Us
 	return &user, nil
 }
 
+func (ur *UserRepository) UpdatePassword(ctx context.Context, user *domain.User) error {
+	q := queries.New(ur.pool)
+
+	affected, err := q.UpdateUserPassword(ctx, queries.UpdateUserPasswordParams{
+		ID:       user.Id,
+		Password: user.Password,
+	})
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return domain.NotFoundError("user not found")
+	}
+
+	return nil
+}
+
 func (ur *UserRepository) GetRefreshToken(ctx context.Context, token string) (*domain.RefreshToken, error) {
 	q := queries.New(ur.pool)
 

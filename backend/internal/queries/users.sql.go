@@ -147,6 +147,25 @@ func (q *Queries) ListUsers(ctx context.Context, userID uuid.UUID) ([]ListUsersR
 	return items, nil
 }
 
+const updateUserPassword = `-- name: UpdateUserPassword :execrows
+UPDATE users
+SET password = $2, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+`
+
+type UpdateUserPasswordParams struct {
+	ID       uuid.UUID
+	Password string
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateUserPassword, arg.ID, arg.Password)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateRefreshToken = `-- name: UpdateRefreshToken :exec
 UPDATE refresh_tokens SET active = $1 WHERE token = $2
 `

@@ -34,3 +34,20 @@ type RefreshTokenRequest struct {
 func (req *RefreshTokenRequest) Validate(v *validator.Validator) {
 	v.Check("refresh_token", "refresh token is required", validator.NotBlank(req.RefreshToken))
 }
+
+type ChangePasswordRequest struct {
+	OldPassword             string `json:"old_password"`
+	NewPassword             string `json:"new_password"`
+	NewPasswordConfirmation string `json:"new_password_confirmation"`
+}
+
+func (req *ChangePasswordRequest) Validate(v *validator.Validator) {
+	v.Check("old_password", "old password is required", validator.NotBlank(req.OldPassword))
+	v.Check("new_password", "new password is required", validator.NotBlank(req.NewPassword))
+	v.Check("new_password", "password must be at least 6 characters", validator.MinLength(req.NewPassword, 6))
+	v.Check(
+		"new_password_confirmation",
+		"new password confirmation must match new password",
+		req.NewPassword == req.NewPasswordConfirmation,
+	)
+}

@@ -15,6 +15,11 @@ SELECT * FROM users WHERE id = $1;
 -- name: CreateUser :one
 INSERT INTO users (name, email, password) VALUES ($1, $2, $3) returning id;
 
+-- name: UpdateUserPassword :execrows
+UPDATE users
+SET password = $2, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1;
+
 -- name: CreateRefreshToken :one
 INSERT INTO refresh_tokens (user_id, token, expires_at, active) VALUES ($1, $2, $3, $4) returning id;
 

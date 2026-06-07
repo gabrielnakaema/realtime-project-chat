@@ -55,6 +55,11 @@ func (m *mockUserService) GetMe(ctx context.Context, id uuid.UUID) (*domain.User
 	return args.Get(0).(*domain.User), args.Error(1)
 }
 
+func (m *mockUserService) ChangePassword(ctx context.Context, request service.ChangePasswordRequest) error {
+	args := m.Called(ctx, request)
+	return args.Error(0)
+}
+
 func (m *mockUserService) Logout(ctx context.Context, userId uuid.UUID, token string) error {
 	args := m.Called(ctx, userId, token)
 	if args.Get(0) == nil {
@@ -330,6 +335,130 @@ func TestUserHandler_Login(t *testing.T) {
 				tt.checkResponse(t, w)
 			}
 
+			mockService.AssertExpectations(t)
+		})
+	}
+}
+
+func TestUserHandler_ChangePassword(t *testing.T) {
+	userID := uuid.New()
+
+	tests := []struct {
+		name           string
+		requestBody    interface{}
+		withUser       bool
+		mockSetup      func(*mockUserService)
+		expectedStatus int
+	}{
+		{
+			name: "successful password change",
+			requestBody: handlers.ChangePasswordRequest{
+				OldPassword:             "password123",
+				NewPassword:             "newpassword123",
+				NewPasswordConfirmation: "newpassword123",
+			},
+			withUser: true,
+			mockSetup: func(mockService *mockUserService) {
+				mockService.On("ChangePassword", mock.Anything, service.ChangePasswordRequest{
+					UserID:                  userID,
+					OldPassword:             "password123",
+					NewPassword:             "newpassword123",
+					NewPasswordConfirmation: "newpassword123",
+				}).Return(nil)
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "unauthorized without authenticated user",
+			requestBody:    handlers.ChangePasswordRequest{},
+			withUser:       false,
+			mockSetup:      func(mockService *mockUserService) {},
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name:           "invalid JSON",
+			requestBody:    `{"old_password":"password123","new_password":}`,
+			withUser:       true,
+			mockSetup:      func(mockService *mockUserService) {},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name: "validation error - missing old password",
+			requestBody: handlers.ChangePasswordRequest{
+				NewPassword:             "newpassword123",
+				NewPasswordConfirmation: "newpassword123",
+			},
+			withUser:       true,
+			mockSetup:      func(mockService *mockUserService) {},
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name: "validation error - short new password",
+			requestBody: handlers.ChangePasswordRequest{
+				OldPassword:             "password123",
+				NewPassword:             "123",
+				NewPasswordConfirmation: "123",
+			},
+			withUser:       true,
+			mockSetup:      func(mockService *mockUserService) {},
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name: "validation error - confirmation mismatch",
+			requestBody: handlers.ChangePasswordRequest{
+				OldPassword:             "password123",
+				NewPassword:             "newpassword123",
+				NewPasswordConfirmation: "differentpassword123",
+			},
+			withUser:       true,
+			mockSetup:      func(mockService *mockUserService) {},
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name: "service error - incorrect old password",
+			requestBody: handlers.ChangePasswordRequest{
+				OldPassword:             "wrongpassword",
+				NewPassword:             "newpassword123",
+				NewPasswordConfirmation: "newpassword123",
+			},
+			withUser: true,
+			mockSetup: func(mockService *mockUserService) {
+				mockService.On("ChangePassword", mock.Anything, service.ChangePasswordRequest{
+					UserID:                  userID,
+					OldPassword:             "wrongpassword",
+					NewPassword:             "newpassword123",
+					NewPasswordConfirmation: "newpassword123",
+				}).Return(domain.BusinessValidationError("old password is incorrect"))
+			},
+			expectedStatus: http.StatusUnprocessableEntity,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := &mockUserService{}
+			tt.mockSetup(mockService)
+
+			handler := handlers.NewUserHandler(mockService, &config.Config{Environment: "development"})
+
+			var body bytes.Buffer
+			if str, ok := tt.requestBody.(string); ok {
+				body.WriteString(str)
+			} else {
+				json.NewEncoder(&body).Encode(tt.requestBody)
+			}
+
+			req := httptest.NewRequest("PUT", "/users/me/password", &body)
+			req.Header.Set("Content-Type", "application/json")
+			if tt.withUser {
+				req = req.WithContext(context.WithValue(req.Context(), handlers.UserIdContextKey, userID))
+			}
+
+			w := httptest.NewRecorder()
+
+			handler.ChangePassword(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
 			mockService.AssertExpectations(t)
 		})
 	}

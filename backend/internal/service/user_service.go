@@ -17,6 +17,7 @@ type userRepository interface {
 	Create(ctx context.Context, user *domain.User) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
+	UpdatePassword(ctx context.Context, user *domain.User) error
 	CreateRefreshToken(ctx context.Context, refreshToken *domain.RefreshToken) error
 	GetRefreshToken(ctx context.Context, token string) (*domain.RefreshToken, error)
 	UpdateRefreshTokenActive(ctx context.Context, refreshToken *domain.RefreshToken) error
@@ -137,6 +138,55 @@ func (us *UserService) GetMe(ctx context.Context, id uuid.UUID) (*domain.User, e
 
 func (us *UserService) ListUsers(ctx context.Context, excludeId uuid.UUID) ([]domain.User, error) {
 	return us.userRepository.ListUsers(ctx, excludeId)
+}
+
+type ChangePasswordRequest struct {
+	UserID                  uuid.UUID
+	OldPassword             string
+	NewPassword             string
+	NewPasswordConfirmation string
+}
+
+func (us *UserService) ChangePassword(ctx context.Context, request ChangePasswordRequest) error {
+	if request.UserID == uuid.Nil {
+		return domain.UnauthorizedError("unauthorized")
+	}
+
+	if request.NewPassword != request.NewPasswordConfirmation {
+		return domain.BusinessValidationError("new password confirmation must match new password")
+	}
+
+	user, err := us.userRepository.GetById(ctx, request.UserID)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			return domainErr
+		}
+		return domain.ServerError("failed to get user", err)
+	}
+
+	equal, err := CompareHash(request.OldPassword, user.Password)
+	if err != nil || !equal {
+		return domain.BusinessValidationError("old password is incorrect")
+	}
+
+	hashed, err := HashPassword(request.NewPassword)
+	if err != nil {
+		return domain.ServerError("failed to hash password", err)
+	}
+
+	user.Password = hashed
+
+	err = us.userRepository.UpdatePassword(ctx, user)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			return domainErr
+		}
+		return domain.ServerError("failed to update password", err)
+	}
+
+	return nil
 }
 
 type RefreshTokenRequest struct {

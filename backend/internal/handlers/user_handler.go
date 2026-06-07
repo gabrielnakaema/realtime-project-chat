@@ -23,6 +23,7 @@ type userService interface {
 	Login(context.Context, service.LoginRequest) (*service.LoginResult, error)
 	RefreshToken(context.Context, service.RefreshTokenRequest) (*service.LoginResult, error)
 	GetMe(context.Context, uuid.UUID) (*domain.User, error)
+	ChangePassword(context.Context, service.ChangePasswordRequest) error
 	Logout(context.Context, uuid.UUID, string) error
 	ListUsers(context.Context, uuid.UUID) ([]domain.User, error)
 }
@@ -221,6 +222,42 @@ func (uh *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.WriteJSON(w, http.StatusOK, user, nil)
+}
+
+func (uh *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+	if userId == uuid.Nil {
+		UnauthorizedResponse(w, "unauthorized")
+		return
+	}
+
+	var request ChangePasswordRequest
+
+	err := utils.ReadJSON(w, r, &request)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	v := validator.New()
+	request.Validate(v)
+	if !v.Valid() {
+		ValidationFailedResponse(w, v)
+		return
+	}
+
+	err = uh.userService.ChangePassword(r.Context(), service.ChangePasswordRequest{
+		UserID:                  userId,
+		OldPassword:             request.OldPassword,
+		NewPassword:             request.NewPassword,
+		NewPasswordConfirmation: request.NewPasswordConfirmation,
+	})
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, nil, nil)
 }
 
 func (uh *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {

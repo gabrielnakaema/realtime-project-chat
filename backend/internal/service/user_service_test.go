@@ -25,6 +25,9 @@ func (m *mockUserRepository) Create(ctx context.Context, user *domain.User) erro
 
 func (m *mockUserRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*domain.User), args.Error(1)
 }
 
@@ -34,6 +37,11 @@ func (m *mockUserRepository) GetByEmail(ctx context.Context, email string) (*dom
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.User), args.Error(1)
+}
+
+func (m *mockUserRepository) UpdatePassword(ctx context.Context, user *domain.User) error {
+	args := m.Called(ctx, user)
+	return args.Error(0)
 }
 
 func (m *mockUserRepository) CreateRefreshToken(ctx context.Context, refreshToken *domain.RefreshToken) error {
@@ -244,6 +252,111 @@ func TestUserService_Login(t *testing.T) {
 
 			mockRepo.AssertExpectations(t)
 			mockJWT.AssertExpectations(t)
+		})
+	}
+}
+
+func TestUserService_ChangePassword(t *testing.T) {
+	oldPassword := "password123"
+	oldHash, err := service.HashPassword(oldPassword)
+	assert.NoError(t, err)
+	userID := uuid.New()
+
+	newValidUser := func() *domain.User {
+		return &domain.User{
+			Id:        userID,
+			Name:      "John Doe",
+			Email:     "john@example.com",
+			Password:  oldHash,
+			CreatedAt: time.Now(),
+		}
+	}
+
+	tests := []struct {
+		name          string
+		request       service.ChangePasswordRequest
+		mockSetup     func(*mockUserRepository)
+		expectedError string
+		shouldSucceed bool
+	}{
+		{
+			name: "successful password change",
+			request: service.ChangePasswordRequest{
+				UserID:                  userID,
+				OldPassword:             oldPassword,
+				NewPassword:             "newpassword123",
+				NewPasswordConfirmation: "newpassword123",
+			},
+			mockSetup: func(repo *mockUserRepository) {
+				validUser := newValidUser()
+				repo.On("GetById", mock.Anything, validUser.Id).Return(validUser, nil)
+				repo.On("UpdatePassword", mock.Anything, mock.AnythingOfType("*domain.User")).Return(nil).Run(func(args mock.Arguments) {
+					updatedUser := args.Get(1).(*domain.User)
+					assert.NotEqual(t, oldHash, updatedUser.Password)
+					matches, compareErr := service.CompareHash("newpassword123", updatedUser.Password)
+					assert.NoError(t, compareErr)
+					assert.True(t, matches)
+				})
+			},
+			shouldSucceed: true,
+		},
+		{
+			name: "unauthorized without user id",
+			request: service.ChangePasswordRequest{
+				OldPassword:             oldPassword,
+				NewPassword:             "newpassword123",
+				NewPasswordConfirmation: "newpassword123",
+			},
+			mockSetup:     func(repo *mockUserRepository) {},
+			expectedError: "unauthorized",
+			shouldSucceed: false,
+		},
+		{
+			name: "confirmation mismatch",
+			request: service.ChangePasswordRequest{
+				UserID:                  userID,
+				OldPassword:             oldPassword,
+				NewPassword:             "newpassword123",
+				NewPasswordConfirmation: "differentpassword123",
+			},
+			mockSetup:     func(repo *mockUserRepository) {},
+			expectedError: "new password confirmation must match new password",
+			shouldSucceed: false,
+		},
+		{
+			name: "incorrect old password",
+			request: service.ChangePasswordRequest{
+				UserID:                  userID,
+				OldPassword:             "wrongpassword",
+				NewPassword:             "newpassword123",
+				NewPasswordConfirmation: "newpassword123",
+			},
+			mockSetup: func(repo *mockUserRepository) {
+				validUser := newValidUser()
+				repo.On("GetById", mock.Anything, validUser.Id).Return(validUser, nil)
+			},
+			expectedError: "old password is incorrect",
+			shouldSucceed: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockUserRepository{}
+			mockJWT := &mockJWTProvider{}
+			tt.mockSetup(mockRepo)
+
+			service := service.NewUserService(mockJWT, mockRepo)
+			err := service.ChangePassword(context.Background(), tt.request)
+
+			if tt.shouldSucceed {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			}
+
+			mockRepo.AssertExpectations(t)
 		})
 	}
 }

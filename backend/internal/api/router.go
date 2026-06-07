@@ -46,6 +46,7 @@ func (a *Api) Router() http.Handler {
 		r.Route("/users", func(r chi.Router) {
 			r.Post("/", a.handlers.User.Create)
 			r.Get("/me", a.handlers.User.GetMe)
+			r.Put("/me/password", a.handlers.User.ChangePassword)
 			r.Get("/", a.handlers.User.ListUsers)
 			r.Route("/me/mcp-api-keys", func(r chi.Router) {
 				r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
