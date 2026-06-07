@@ -29,6 +29,7 @@ type projectRepository interface {
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Project, error)
 	ListByUserId(ctx context.Context, userId uuid.UUID, memberRole string, searchQuery string) ([]domain.Project, error)
 	Update(ctx context.Context, project *domain.Project) error
+	MarkUpdatedAt(ctx context.Context, projectId uuid.UUID) error
 	CreateColumn(ctx context.Context, status *domain.ProjectColumn) error
 	UpdateColumn(ctx context.Context, status *domain.ProjectColumn) error
 	DeleteColumn(ctx context.Context, projectId uuid.UUID, statusId uuid.UUID) error
@@ -185,6 +186,16 @@ type DeletedProjectColumnRequest struct {
 	MoveTasksToColumnId uuid.UUID
 }
 
+type UpdateProjectColumnRequest struct {
+	ProjectId    uuid.UUID
+	ColumnId     uuid.UUID
+	UserId       uuid.UUID
+	Name         string
+	Description  string
+	Color        string
+	IsDoneColumn bool
+}
+
 func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectRequest) (*domain.Project, error) {
 	if request.UserId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
@@ -311,6 +322,114 @@ func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectReque
 	return project, nil
 }
 
+func (ps *ProjectService) UpdateColumn(ctx context.Context, request UpdateProjectColumnRequest) (*domain.ProjectColumn, error) {
+	if request.UserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	project, err := ps.projectRepository.GetById(ctx, request.ProjectId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("project not found")
+			}
+			return nil, domainErr
+		}
+
+		return nil, domain.ServerError("failed to get project", err)
+	}
+
+	if project.UserId != request.UserId {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	column, err := ps.projectRepository.GetColumnById(ctx, request.ColumnId)
+	if err != nil {
+		var domainErr domain.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == domain.NotFoundErrorCode {
+				return nil, domain.NotFoundError("project column not found")
+			}
+			return nil, domainErr
+		}
+
+		return nil, domain.ServerError("failed to get project column", err)
+	}
+
+	if column.ProjectId != project.Id {
+		return nil, domain.NotFoundError("project column not found")
+	}
+
+	switchingToDoneColumn := request.IsDoneColumn && !column.IsDoneColumn
+
+	column.Name = request.Name
+	column.Description = request.Description
+	column.Color = request.Color
+
+	if err := validateSingleProjectColumn(*column); err != nil {
+		return nil, err
+	}
+
+	if request.IsDoneColumn != column.IsDoneColumn {
+		if !request.IsDoneColumn {
+			return nil, domain.BusinessValidationError("project must have exactly one done column")
+		}
+
+		for i := range project.Columns {
+			if project.Columns[i].Id == column.Id {
+				continue
+			}
+			if !project.Columns[i].IsDoneColumn {
+				continue
+			}
+
+			project.Columns[i].IsDoneColumn = false
+			if err := ps.projectRepository.UpdateColumn(ctx, &project.Columns[i]); err != nil {
+				return nil, domain.ServerError("failed to update previous done project column", err)
+			}
+			break
+		}
+	}
+
+	column.IsDoneColumn = request.IsDoneColumn
+	column.ProjectId = project.Id
+	now := time.Now()
+	column.UpdatedAt = now
+
+	if err := ps.projectRepository.UpdateColumn(ctx, column); err != nil {
+		return nil, domain.ServerError("failed to update project column", err)
+	}
+
+	if err := ps.projectRepository.MarkUpdatedAt(ctx, project.Id); err != nil {
+		return nil, domain.ServerError("failed to mark project updated at", err)
+	}
+
+	project.UpdatedAt = now
+	for i := range project.Columns {
+		if project.Columns[i].Id == column.Id {
+			project.Columns[i] = *column
+			continue
+		}
+		if switchingToDoneColumn && project.Columns[i].IsDoneColumn {
+			project.Columns[i].IsDoneColumn = false
+		}
+	}
+
+	err = ps.publisher.Publish(ctx, events.ProjectUpdated, &events.ProjectUpdatedPayload{
+		Project:      *project,
+		ActionOrigin: domain.ActionOriginFromContext(ctx),
+		User: domain.User{
+			Id: request.UserId,
+		},
+	})
+	if err != nil {
+		return nil, domain.ServerError("failed to publish project updated event", err)
+	}
+
+	return column, nil
+}
+
 func defaultProjectColumns(columns []domain.ProjectColumn) []domain.ProjectColumn {
 	if len(columns) > 0 {
 		for i := range columns {
@@ -349,6 +468,17 @@ func validateProjectColumns(columns []domain.ProjectColumn) error {
 
 	if doneColumns != 1 {
 		return domain.BusinessValidationError("project must have exactly one done column")
+	}
+
+	return nil
+}
+
+func validateSingleProjectColumn(column domain.ProjectColumn) error {
+	if column.Name == "" {
+		return domain.BusinessValidationError("project column name is required")
+	}
+	if !projectColumnColorPattern.MatchString(column.Color) {
+		return domain.BusinessValidationError("project column color must be a valid hex value")
 	}
 
 	return nil

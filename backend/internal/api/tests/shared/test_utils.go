@@ -82,6 +82,25 @@ func (c *HTTPClient) PUT(endpoint string, payload interface{}) (*http.Response, 
 	return c.Client.Do(req)
 }
 
+func (c *HTTPClient) PATCH(endpoint string, payload interface{}) (*http.Response, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", c.BaseURL+endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+
+	return c.Client.Do(req)
+}
+
 func (c *HTTPClient) DELETE(endpoint string) (*http.Response, error) {
 	req, err := http.NewRequest("DELETE", c.BaseURL+endpoint, nil)
 	if err != nil {

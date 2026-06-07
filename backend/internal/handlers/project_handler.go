@@ -19,6 +19,7 @@ type projectService interface {
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Project, error)
 	ListByUserId(ctx context.Context, request service.ListProjectsByUserIdRequest) ([]domain.Project, error)
 	Update(ctx context.Context, request service.UpdateProjectRequest) (*domain.Project, error)
+	UpdateColumn(ctx context.Context, request service.UpdateProjectColumnRequest) (*domain.ProjectColumn, error)
 	CreateMember(ctx context.Context, request service.CreateMemberRequest) (*domain.ProjectMember, error)
 	ListActivitiesByProject(ctx context.Context, request service.ListActivitiesByProjectRequest) (*utils.CursorPaginated[domain.ProjectActivity], error)
 	ListUsersProjectActivities(ctx context.Context, request service.ListUsersProjectActivitiesRequest) (*utils.CursorPaginated[domain.ProjectActivity], error)
@@ -176,6 +177,58 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, project, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *ProjectHandler) UpdateColumn(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+
+	projectID := chi.URLParam(r, "id")
+	parsedProjectID, err := uuid.Parse(projectID)
+	if err != nil {
+		BadRequestResponse(w, errors.New("invalid project id"))
+		return
+	}
+
+	columnID := chi.URLParam(r, "column_id")
+	parsedColumnID, err := uuid.Parse(columnID)
+	if err != nil {
+		BadRequestResponse(w, errors.New("invalid project column id"))
+		return
+	}
+
+	var request UpdateProjectColumnRequest
+	err = utils.ReadJSON(w, r, &request)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	v := validator.New()
+	request.Validate(v)
+	if !v.Valid() {
+		ValidationFailedResponse(w, v)
+		return
+	}
+
+	column, err := h.projectService.UpdateColumn(r.Context(), service.UpdateProjectColumnRequest{
+		ProjectId:    parsedProjectID,
+		ColumnId:     parsedColumnID,
+		UserId:       userId,
+		Name:         request.Name,
+		Description:  request.Description,
+		Color:        request.Color,
+		IsDoneColumn: request.IsDoneColumn,
+	})
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, column, nil)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

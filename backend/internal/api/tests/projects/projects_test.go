@@ -139,6 +139,15 @@ func TestProjectsEndpoints(t *testing.T) {
 		defer resp.Body.Close()
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
+		resp, err = client.PATCH("/projects/123e4567-e89b-12d3-a456-426614174000/columns/123e4567-e89b-12d3-a456-426614174001", map[string]string{
+			"name":        "Doing",
+			"description": "Updated",
+			"color":       "#2563EB",
+		})
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+
 		resp, err = client.POST("/projects/123e4567-e89b-12d3-a456-426614174000/members", map[string]string{
 			"email": "member@example.com",
 		})
@@ -371,6 +380,146 @@ func TestProjectsEndpoints(t *testing.T) {
 		assert.Contains(t, updateResponse, "members")
 		assert.Contains(t, updateResponse, "columns")
 		assertProjectColumnsContract(t, updateResponse["columns"], updateResponse["id"].(string))
+	})
+
+	t.Run("PATCH /projects/{id}/columns/{column_id} - update single column", func(t *testing.T) {
+		testAPI.TruncateTables(t)
+
+		client := shared.NewHTTPClient(testAPI.GetBaseURL())
+		client.CreateUserAndLogin("test@example.com", "password123")
+
+		resp, err := client.POST("/projects", validProjectPayload("Test Project", "Test Description"))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var createResponse map[string]any
+		err = json.NewDecoder(resp.Body).Decode(&createResponse)
+		require.NoError(t, err)
+
+		columns := createResponse["columns"].([]any)
+		firstColumn := columns[0].(map[string]any)
+
+		resp, err = client.PATCH("/projects/"+createResponse["id"].(string)+"/columns/"+firstColumn["id"].(string), map[string]any{
+			"name":           "Backlog",
+			"description":    "Freshly prioritized work.",
+			"color":          "#1D4ED8",
+			"is_done_column": false,
+		})
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var patchResponse map[string]any
+		err = json.NewDecoder(resp.Body).Decode(&patchResponse)
+		require.NoError(t, err)
+
+		assert.Equal(t, firstColumn["id"], patchResponse["id"])
+		assert.Equal(t, "Backlog", patchResponse["name"])
+		assert.Equal(t, "Freshly prioritized work.", patchResponse["description"])
+		assert.Equal(t, "#1D4ED8", patchResponse["color"])
+		assert.Equal(t, false, patchResponse["is_done_column"])
+
+		resp, err = client.GET("/projects/" + createResponse["id"].(string))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var getResponse map[string]any
+		err = json.NewDecoder(resp.Body).Decode(&getResponse)
+		require.NoError(t, err)
+
+		getColumns := getResponse["columns"].([]any)
+		updatedColumn := getColumns[0].(map[string]any)
+		assert.Equal(t, "Backlog", updatedColumn["name"])
+		assert.Equal(t, "Freshly prioritized work.", updatedColumn["description"])
+		assert.Equal(t, "#1D4ED8", updatedColumn["color"])
+	})
+
+	t.Run("PATCH /projects/{id}/columns/{column_id} - switches done column", func(t *testing.T) {
+		testAPI.TruncateTables(t)
+
+		client := shared.NewHTTPClient(testAPI.GetBaseURL())
+		client.CreateUserAndLogin("test@example.com", "password123")
+
+		resp, err := client.POST("/projects", validProjectPayload("Test Project", "Test Description"))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var createResponse map[string]any
+		err = json.NewDecoder(resp.Body).Decode(&createResponse)
+		require.NoError(t, err)
+
+		columns := createResponse["columns"].([]any)
+		firstColumn := columns[0].(map[string]any)
+		doneColumn := columns[2].(map[string]any)
+
+		resp, err = client.PATCH("/projects/"+createResponse["id"].(string)+"/columns/"+firstColumn["id"].(string), map[string]any{
+			"name":           firstColumn["name"],
+			"description":    firstColumn["description"],
+			"color":          firstColumn["color"],
+			"is_done_column": true,
+		})
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var patchResponse map[string]any
+		err = json.NewDecoder(resp.Body).Decode(&patchResponse)
+		require.NoError(t, err)
+		assert.Equal(t, true, patchResponse["is_done_column"])
+
+		resp, err = client.GET("/projects/" + createResponse["id"].(string))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var getResponse map[string]any
+		err = json.NewDecoder(resp.Body).Decode(&getResponse)
+		require.NoError(t, err)
+
+		getColumns := getResponse["columns"].([]any)
+		assert.Equal(t, true, getColumns[0].(map[string]any)["is_done_column"])
+		assert.Equal(t, doneColumn["id"], getColumns[2].(map[string]any)["id"])
+		assert.Equal(t, false, getColumns[2].(map[string]any)["is_done_column"])
+	})
+
+	t.Run("PATCH /projects/{id}/columns/{column_id} - forbidden for non-creator", func(t *testing.T) {
+		testAPI.TruncateTables(t)
+
+		ownerClient := shared.NewHTTPClient(testAPI.GetBaseURL())
+		ownerClient.CreateUserAndLogin("owner@example.com", "password123")
+
+		resp, err := ownerClient.POST("/projects", validProjectPayload("Test Project", "Test Description"))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var createResponse map[string]any
+		err = json.NewDecoder(resp.Body).Decode(&createResponse)
+		require.NoError(t, err)
+
+		memberClient := shared.NewHTTPClient(testAPI.GetBaseURL())
+		memberClient.CreateUserAndLogin("member@example.com", "password123")
+
+		resp, err = ownerClient.POST("/projects/"+createResponse["id"].(string)+"/members", map[string]string{
+			"email": "member@example.com",
+		})
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		firstColumn := createResponse["columns"].([]any)[0].(map[string]any)
+		resp, err = memberClient.PATCH("/projects/"+createResponse["id"].(string)+"/columns/"+firstColumn["id"].(string), map[string]any{
+			"name":           "Backlog",
+			"description":    "Freshly prioritized work.",
+			"color":          "#1D4ED8",
+			"is_done_column": false,
+		})
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 	})
 
 	t.Run("POST /projects/{id}/members - create member", func(t *testing.T) {

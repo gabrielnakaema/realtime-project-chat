@@ -77,6 +77,14 @@ func (m *mockProjectRepository) Update(ctx context.Context, project *domain.Proj
 	return args.Error(0)
 }
 
+func (m *mockProjectRepository) MarkUpdatedAt(ctx context.Context, projectId uuid.UUID) error {
+	args := m.Called(ctx, projectId)
+	if args.Get(0) == nil {
+		return args.Error(0)
+	}
+	return args.Error(0)
+}
+
 func (m *mockProjectRepository) CreateColumn(ctx context.Context, status *domain.ProjectColumn) error {
 	args := m.Called(ctx, status)
 	if args.Get(0) == nil {
@@ -587,6 +595,162 @@ func TestProjectService_Update(t *testing.T) {
 			} else {
 				require.Error(t, err)
 				require.Nil(t, project)
+
+				var domainErr domain.DomainError
+				if assert.ErrorAs(t, err, &domainErr) {
+					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
+				}
+			}
+
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestProjectService_UpdateColumn(t *testing.T) {
+	validUserID := uuid.New()
+	validProjectID := uuid.New()
+	backlogColumnID := uuid.New()
+	doneColumnID := uuid.New()
+
+	newBaseProject := func() *domain.Project {
+		return &domain.Project{
+			Id:          validProjectID,
+			Name:        "Test Project",
+			Description: "Test Description",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+			UserId:      validUserID,
+			Columns: []domain.ProjectColumn{
+				{Id: backlogColumnID, ProjectId: validProjectID, Name: "Backlog", Description: "Waiting work", Color: "#64748B", Position: 0, IsDoneColumn: false},
+				{Id: doneColumnID, ProjectId: validProjectID, Name: "Done", Description: "Completed", Color: "#059669", Position: 1, IsDoneColumn: true},
+			},
+		}
+	}
+
+	type testCase struct {
+		name              string
+		request           service.UpdateProjectColumnRequest
+		mockSetup         func(*mockProjectRepository)
+		expectedName      string
+		expectedIsDone    bool
+		expectedErrorCode string
+		shouldSucceed     bool
+	}
+
+	tests := []testCase{
+		{
+			name: "successful single column update",
+			request: service.UpdateProjectColumnRequest{
+				ProjectId:    validProjectID,
+				ColumnId:     backlogColumnID,
+				UserId:       validUserID,
+				Name:         "In Progress",
+				Description:  "Currently active",
+				Color:        "#2563EB",
+				IsDoneColumn: false,
+			},
+			mockSetup: func(repo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validProjectID).Return(newBaseProject(), nil)
+				repo.On("GetColumnById", mock.Anything, backlogColumnID).Return(&domain.ProjectColumn{
+					Id:           backlogColumnID,
+					ProjectId:    validProjectID,
+					Name:         "Backlog",
+					Description:  "Waiting work",
+					Color:        "#64748B",
+					Position:     0,
+					IsDoneColumn: false,
+				}, nil)
+				repo.On("UpdateColumn", mock.Anything, mock.MatchedBy(func(column *domain.ProjectColumn) bool {
+					return column.Id == backlogColumnID && column.Name == "In Progress" && column.Description == "Currently active" && column.Color == "#2563EB" && !column.IsDoneColumn
+				})).Return(nil)
+				repo.On("MarkUpdatedAt", mock.Anything, validProjectID).Return(nil)
+			},
+			expectedName:   "In Progress",
+			expectedIsDone: false,
+			shouldSucceed:  true,
+		},
+		{
+			name: "switches done column and clears previous one",
+			request: service.UpdateProjectColumnRequest{
+				ProjectId:    validProjectID,
+				ColumnId:     backlogColumnID,
+				UserId:       validUserID,
+				Name:         "Done Later",
+				Description:  "Now complete",
+				Color:        "#2563EB",
+				IsDoneColumn: true,
+			},
+			mockSetup: func(repo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validProjectID).Return(newBaseProject(), nil)
+				repo.On("GetColumnById", mock.Anything, backlogColumnID).Return(&domain.ProjectColumn{
+					Id:           backlogColumnID,
+					ProjectId:    validProjectID,
+					Name:         "Backlog",
+					Description:  "Waiting work",
+					Color:        "#64748B",
+					Position:     0,
+					IsDoneColumn: false,
+				}, nil)
+				repo.On("UpdateColumn", mock.Anything, mock.MatchedBy(func(column *domain.ProjectColumn) bool {
+					return column.Id == doneColumnID && !column.IsDoneColumn
+				})).Return(nil)
+				repo.On("UpdateColumn", mock.Anything, mock.MatchedBy(func(column *domain.ProjectColumn) bool {
+					return column.Id == backlogColumnID && column.IsDoneColumn
+				})).Return(nil)
+				repo.On("MarkUpdatedAt", mock.Anything, validProjectID).Return(nil)
+			},
+			expectedName:   "Done Later",
+			expectedIsDone: true,
+			shouldSucceed:  true,
+		},
+		{
+			name: "rejects removing the only done column",
+			request: service.UpdateProjectColumnRequest{
+				ProjectId:    validProjectID,
+				ColumnId:     doneColumnID,
+				UserId:       validUserID,
+				Name:         "Done",
+				Description:  "Completed",
+				Color:        "#059669",
+				IsDoneColumn: false,
+			},
+			mockSetup: func(repo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validProjectID).Return(newBaseProject(), nil)
+				repo.On("GetColumnById", mock.Anything, doneColumnID).Return(&domain.ProjectColumn{
+					Id:           doneColumnID,
+					ProjectId:    validProjectID,
+					Name:         "Done",
+					Description:  "Completed",
+					Color:        "#059669",
+					Position:     1,
+					IsDoneColumn: true,
+				}, nil)
+			},
+			expectedErrorCode: string(domain.BusinessValidationErrorCode),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockProjectRepository{}
+			mockUserRepo := &mockUserRepository{}
+			mockPublisher := &mockPublisher{}
+			mockActivityRepo := &mockActivityRepository{}
+			tt.mockSetup(mockRepo)
+
+			svc := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
+
+			column, err := svc.UpdateColumn(context.Background(), tt.request)
+
+			if tt.shouldSucceed {
+				require.NoError(t, err)
+				require.NotNil(t, column)
+				assert.Equal(t, tt.expectedName, column.Name)
+				assert.Equal(t, tt.expectedIsDone, column.IsDoneColumn)
+			} else {
+				require.Error(t, err)
+				require.Nil(t, column)
 
 				var domainErr domain.DomainError
 				if assert.ErrorAs(t, err, &domainErr) {

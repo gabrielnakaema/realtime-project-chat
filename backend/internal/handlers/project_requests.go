@@ -22,6 +22,13 @@ type ProjectColumnRequest struct {
 	IsDoneColumn bool       `json:"is_done_column"`
 }
 
+type UpdateProjectColumnRequest struct {
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	Color        string `json:"color"`
+	IsDoneColumn bool   `json:"is_done_column"`
+}
+
 var hexColorPattern = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
 type DeletedProjectColumnRequest struct {
@@ -53,6 +60,11 @@ func (r *ProjectRequest) Validate(v *validator.Validator) {
 		v.Check("deleted_columns", "deleted column id is invalid", deletedColumn.Id != uuid.Nil)
 		v.Check("deleted_columns", "move_tasks_to_column_id is invalid", deletedColumn.MoveTasksToColumnId != uuid.Nil)
 	}
+}
+
+func (r *UpdateProjectColumnRequest) Validate(v *validator.Validator) {
+	v.Check("name", "name is required", validator.NotBlank(r.Name))
+	v.Check("color", "color must be a valid hex value", hexColorPattern.MatchString(r.Color))
 }
 
 type CreateMemberRequest struct {
