@@ -13,9 +13,39 @@ export const createDefaultProjectColumns = (): ProjectFormColumn[] => [
 
 export const getProjectColumnKey = (column: ColumnKeyItem, index: number) => column.id ?? `new-column-${index}`;
 
+export const restoreMissingProjectColumnIds = (
+  columns: IProjectForm['columns'],
+  originalColumns: Project['columns'],
+  deletedColumns: IProjectForm['deleted_columns'] = [],
+): IProjectForm['columns'] => {
+  if (deletedColumns.length > 0 || columns.length !== originalColumns.length) {
+    return columns;
+  }
+
+  const hasMissingIds = columns.some((column) => !column.id);
+  if (!hasMissingIds) {
+    return columns;
+  }
+
+  const hasAnyIds = columns.some((column) => column.id);
+  if (hasAnyIds) {
+    return columns;
+  }
+
+  return columns.map((column, index) => ({
+    ...column,
+    id: originalColumns[index]?.id,
+  }));
+};
+
 export const getProjectFormValues = (project: Project): IProjectForm => ({
   name: project.name,
   description: project.description,
+  repository_url: project.repository_url,
+  repository_owner: project.repository_owner,
+  repository_name: project.repository_name,
+  default_branch: project.default_branch,
+  branch_name_prefix: project.branch_name_prefix,
   columns: project.columns.map((column) => ({
     id: column.id,
     name: column.name,

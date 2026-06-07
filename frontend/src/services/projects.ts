@@ -37,6 +37,11 @@ interface UpdateProjectRequest {
   id: string;
   name: string;
   description: string;
+  repository_url: string;
+  repository_owner: string;
+  repository_name: string;
+  default_branch: string;
+  branch_name_prefix: string;
   columns: IProjectForm['columns'];
   deleted_columns: IProjectForm['deleted_columns'];
 }
@@ -45,6 +50,11 @@ export const updateProject = async (request: UpdateProjectRequest) => {
   const payload = {
     name: request.name,
     description: request.description,
+    repository_url: request.repository_url,
+    repository_owner: request.repository_owner,
+    repository_name: request.repository_name,
+    default_branch: request.default_branch,
+    branch_name_prefix: request.branch_name_prefix,
     columns: request.columns,
     deleted_columns: request.deleted_columns,
   };

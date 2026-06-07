@@ -6,7 +6,7 @@ import { Button } from '../button';
 import { LoadingSpinner } from '../loading';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { ProjectFormFields } from './project-form-fields';
-import { getProjectFormValues } from './project-form-utils';
+import { getProjectFormValues, restoreMissingProjectColumnIds } from './project-form-utils';
 import { useProjectForm } from './use-project-form';
 import type { SubmitHandler } from 'react-hook-form';
 import type { IProjectForm } from '@/schemas/project-schema';
@@ -49,11 +49,20 @@ export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
   }, [data, resetForm]);
 
   const onSubmit: SubmitHandler<IProjectForm> = (values) => {
+    const columns = data
+      ? restoreMissingProjectColumnIds(values.columns, data.columns, values.deleted_columns)
+      : values.columns;
+
     mutate({
       description: values.description,
       name: values.name,
+      repository_url: values.repository_url,
+      repository_owner: values.repository_owner,
+      repository_name: values.repository_name,
+      default_branch: values.default_branch,
+      branch_name_prefix: values.branch_name_prefix,
       id: projectId,
-      columns: values.columns,
+      columns,
       deleted_columns: values.deleted_columns,
     });
   };

@@ -76,6 +76,55 @@ export const ProjectFormFields = ({
             error={errors.description?.message}
             placeholder={descriptionPlaceholder}
           />
+
+          <div className="space-y-1 pt-2">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Repository details</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Keep these optional fields filled in when this board maps to a code repository.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Input
+              id="repository_url"
+              label="Repository URL"
+              placeholder="https://github.com/acme/project-chat-pubsub"
+              error={errors.repository_url?.message}
+              {...register('repository_url')}
+            />
+
+            <Input
+              id="repository_owner"
+              label="Repository Owner"
+              placeholder="acme"
+              error={errors.repository_owner?.message}
+              {...register('repository_owner')}
+            />
+
+            <Input
+              id="repository_name"
+              label="Repository Name"
+              placeholder="project-chat-pubsub"
+              error={errors.repository_name?.message}
+              {...register('repository_name')}
+            />
+
+            <Input
+              id="default_branch"
+              label="Default Branch"
+              placeholder="main"
+              error={errors.default_branch?.message}
+              {...register('default_branch')}
+            />
+
+            <Input
+              id="branch_name_prefix"
+              label="Branch Name Prefix"
+              placeholder="task/"
+              error={errors.branch_name_prefix?.message}
+              {...register('branch_name_prefix')}
+            />
+          </div>
         </div>
       </div>
       <div className={previewClassName}>

@@ -3,6 +3,11 @@ import { z } from 'zod';
 export interface IProjectForm {
   name: string;
   description: string;
+  repository_url: string;
+  repository_owner: string;
+  repository_name: string;
+  default_branch: string;
+  branch_name_prefix: string;
   columns: {
     id?: string;
     name: string;
@@ -27,6 +32,11 @@ export const projectSchema: z.ZodType<IProjectForm> = z.object({
       error: 'Description is required',
     })
     .nonempty({ message: 'Description is required' }),
+  repository_url: z.string(),
+  repository_owner: z.string(),
+  repository_name: z.string(),
+  default_branch: z.string(),
+  branch_name_prefix: z.string(),
   columns: z
     .array(
       z.object({
