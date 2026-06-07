@@ -106,6 +106,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("MCP-Protocol-Version", protocolVersion)
+
 	secret, ok := bearerSecretFromHeader(r.Header.Get("Authorization"))
 	if !ok {
 		writeHTTPError(w, http.StatusUnauthorized, "unauthorized")
@@ -145,19 +147,36 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		resp.Result = map[string]any{
 			"protocolVersion": protocolVersion,
 			"capabilities": map[string]any{
-				"tools": map[string]any{},
+				"tools":     map[string]any{},
+				"resources": map[string]any{},
 			},
 			"serverInfo": map[string]any{
 				"name":    "project-chat-mcp",
 				"version": "1.0.0",
 			},
+			"instructions": initializeInstructions(principal),
 		}
 	case "tools/list":
 		toolName = "tools/list"
-		resp.Result = map[string]any{"tools": toolDefinitions()}
+		resp.Result = map[string]any{"tools": toolDefinitionsForPrincipal(principal)}
 	case "resources/list":
 		toolName = "resources/list"
-		resp.Result = map[string]any{"resources": []map[string]any{}}
+		resp.Result = map[string]any{"resources": resourceDefinitionsForPrincipal(principal)}
+	case "resources/read":
+		toolName = "resources/read"
+		uri, err := requiredStringArg(paramsFromRaw(req.Params), "uri")
+		if err != nil {
+			resp.Error = &rpcError{Code: -32602, Message: "invalid params"}
+			status = "failure"
+			break
+		}
+		result, readErr := readResource(uri, principal)
+		if readErr != nil {
+			status = "failure"
+			resp.Result = toolErrorResult(readErr)
+			break
+		}
+		resp.Result = result
 	case "prompts/list":
 		toolName = "prompts/list"
 		resp.Result = map[string]any{"prompts": []map[string]any{}}
@@ -180,7 +199,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"content": []map[string]any{
 				{
 					"type": "text",
-					"text": params.Name + " completed successfully",
+					"text": toolSuccessText(params.Name, result),
 				},
 			},
 			"structuredContent": result,
@@ -536,110 +555,6 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 	}
 }
 
-func toolDefinitions() []map[string]any {
-	return []map[string]any{
-		toolDefinition("list_projects", "List projects visible to the authenticated user.", map[string]any{"type": "object", "properties": map[string]any{}}),
-		toolDefinition("list_project_board", "List a project's columns and tasks grouped by column.", map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"project_id":         map[string]any{"type": "string", "format": "uuid"},
-				"project_column_ids": map[string]any{"type": "array", "items": map[string]any{"type": "string", "format": "uuid"}},
-				"limit_per_column":   map[string]any{"type": "integer", "minimum": 1, "maximum": 100},
-				"include_archived":   map[string]any{"type": "boolean"},
-			},
-			"required": []string{"project_id"},
-		}),
-		toolDefinition("create_task", "Create a task in a project column.", map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"project_id":        map[string]any{"type": "string", "format": "uuid"},
-				"project_column_id": map[string]any{"type": "string", "format": "uuid"},
-				"title":             map[string]any{"type": "string"},
-				"description":       map[string]any{"type": "string"},
-				"code":              map[string]any{"type": "string"},
-				"priority":          map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
-				"responsible_id":    map[string]any{"type": "string", "format": "uuid"},
-				"due_date":          map[string]any{"type": "string", "format": "date-time"},
-				"tags":              map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-			},
-			"required": []string{"project_id", "project_column_id", "title", "description", "priority"},
-		}),
-		toolDefinition("get_task", "Get a task and optionally its recent comments.", map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"task_id":          map[string]any{"type": "string", "format": "uuid"},
-				"include_comments": map[string]any{"type": "boolean"},
-				"comments_limit":   map[string]any{"type": "integer", "minimum": 1, "maximum": 100},
-			},
-			"required": []string{"task_id"},
-		}),
-		toolDefinition("list_task_comments", "List recent comments for a task.", map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"task_id": map[string]any{"type": "string", "format": "uuid"},
-				"limit":   map[string]any{"type": "integer", "minimum": 1, "maximum": 100},
-			},
-			"required": []string{"task_id"},
-		}),
-		toolDefinition("update_task", "Update a task's editable fields.", map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"task_id":           map[string]any{"type": "string", "format": "uuid"},
-				"project_column_id": map[string]any{"type": "string", "format": "uuid"},
-				"title":             map[string]any{"type": "string"},
-				"description":       map[string]any{"type": "string"},
-				"code":              map[string]any{"type": "string"},
-				"priority":          map[string]any{"type": "string", "enum": []string{"low", "medium", "high"}},
-				"responsible_id":    map[string]any{"type": "string", "format": "uuid"},
-				"due_date":          map[string]any{"type": "string", "format": "date-time"},
-				"tags":              map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-			},
-			"required": []string{"task_id", "project_column_id", "title", "description", "priority"},
-		}),
-		toolDefinition("move_task", "Move a task to another project column.", map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"task_id":                  map[string]any{"type": "string", "format": "uuid"},
-				"project_id":               map[string]any{"type": "string", "format": "uuid"},
-				"target_project_column_id": map[string]any{"type": "string", "format": "uuid"},
-				"after_task_id":            map[string]any{"type": "string", "format": "uuid"},
-			},
-			"required": []string{"task_id", "project_id", "target_project_column_id"},
-		}),
-		toolDefinition("add_task_comment", "Add a comment to a task.", map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"task_id":           map[string]any{"type": "string", "format": "uuid"},
-				"content":           map[string]any{"type": "string"},
-				"parent_comment_id": map[string]any{"type": "string", "format": "uuid"},
-			},
-			"required": []string{"task_id", "content"},
-		}),
-		toolDefinition("mark_task_done", "Move a task into the project's done column.", map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"task_id": map[string]any{"type": "string", "format": "uuid"},
-			},
-			"required": []string{"task_id"},
-		}),
-		toolDefinition("assign_task_to_self", "Assign the task to the authenticated user.", map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"task_id": map[string]any{"type": "string", "format": "uuid"},
-			},
-			"required": []string{"task_id"},
-		}),
-	}
-}
-
-func toolDefinition(name string, description string, inputSchema map[string]any) map[string]any {
-	return map[string]any{
-		"name":        name,
-		"description": description,
-		"inputSchema": inputSchema,
-	}
-}
-
 func requireScope(principal principal, scope domain.MCPAPIScope) error {
 	if principal.HasScope(scope) {
 		return nil
@@ -762,6 +677,19 @@ func optionalUUIDSliceArg(args map[string]any, key string) ([]uuid.UUID, error) 
 	}
 
 	return ids, nil
+}
+
+func paramsFromRaw(raw json.RawMessage) map[string]any {
+	if len(raw) == 0 {
+		return map[string]any{}
+	}
+
+	var params map[string]any
+	if err := json.Unmarshal(raw, &params); err != nil {
+		return map[string]any{}
+	}
+
+	return params
 }
 
 func requiredStringArg(args map[string]any, key string) (string, error) {

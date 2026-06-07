@@ -281,3 +281,45 @@ func TestCallToolMissingScope(t *testing.T) {
 	result := toolErrorResult(err)
 	assert.Equal(t, "missing_scope", result["structuredContent"].(map[string]any)["error"].(map[string]any)["type"])
 }
+
+func TestToolDefinitionsForPrincipalFiltersScopes(t *testing.T) {
+	principal := principal{
+		Scopes: []domain.MCPAPIScope{
+			domain.MCPAPIScopeProjectsRead,
+			domain.MCPAPIScopeTasksRead,
+		},
+	}
+
+	tools := toolDefinitionsForPrincipal(principal)
+	toolNames := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		toolNames = append(toolNames, tool["name"].(string))
+		assert.NotEmpty(t, tool["title"])
+		assert.NotNil(t, tool["outputSchema"])
+	}
+
+	assert.Contains(t, toolNames, "list_projects")
+	assert.Contains(t, toolNames, "get_task")
+	assert.NotContains(t, toolNames, "create_task")
+	assert.NotContains(t, toolNames, "list_task_comments")
+}
+
+func TestReadResourceBuildsScopeAwareGuide(t *testing.T) {
+	principal := principal{
+		Scopes: []domain.MCPAPIScope{
+			domain.MCPAPIScopeProjectsRead,
+			domain.MCPAPIScopeTasksRead,
+		},
+	}
+
+	result, err := readResource(serverGuideURI, principal)
+	require.NoError(t, err)
+
+	contents := result["contents"].([]map[string]any)
+	require.Len(t, contents, 1)
+	text := contents[0]["text"].(string)
+
+	assert.Contains(t, text, "Recommended workflow")
+	assert.Contains(t, text, "list_projects")
+	assert.NotContains(t, text, "create_task")
+}

@@ -260,7 +260,9 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 		"method":  "initialize",
 		"params":  map[string]any{},
 	})
-	assert.Equal(t, "2025-06-18", initializeResp["result"].(map[string]any)["protocolVersion"])
+	initializeResult := initializeResp["result"].(map[string]any)
+	assert.Equal(t, "2025-06-18", initializeResult["protocolVersion"])
+	assert.Contains(t, initializeResult["instructions"], "project-chat://server/guide")
 
 	initializedResp := postMCP(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
 		"jsonrpc": "2.0",
@@ -276,9 +278,26 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 		"method":  "resources/list",
 		"params":  map[string]any{},
 	})
-	assert.Empty(t, resourcesResp["result"].(map[string]any)["resources"])
+	resources := resourcesResp["result"].(map[string]any)["resources"].([]any)
+	require.Len(t, resources, 2)
+	assert.Equal(t, "project-chat://server/guide", resources[0].(map[string]any)["uri"])
 
-	toolsResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
+	readGuideResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "1.6",
+		"method":  "resources/read",
+		"params": map[string]any{
+			"uri": "project-chat://server/guide",
+		},
+	})
+	guideContents := readGuideResp["result"].(map[string]any)["contents"].([]any)
+	require.Len(t, guideContents, 1)
+	guideText := guideContents[0].(map[string]any)["text"].(string)
+	assert.Contains(t, guideText, "Recommended workflow")
+	assert.Contains(t, guideText, "list_projects")
+	assert.NotContains(t, guideText, "create_task")
+
+	toolsResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
 		"jsonrpc": "2.0",
 		"id":      "1.75",
 		"method":  "tools/list",
@@ -287,11 +306,30 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	tools := toolsResp["result"].(map[string]any)["tools"].([]any)
 	toolNames := make([]string, 0, len(tools))
 	for _, rawTool := range tools {
-		toolNames = append(toolNames, rawTool.(map[string]any)["name"].(string))
+		tool := rawTool.(map[string]any)
+		toolNames = append(toolNames, tool["name"].(string))
+		assert.NotEmpty(t, tool["title"])
+		assert.NotNil(t, tool["outputSchema"])
 	}
-	assert.Contains(t, toolNames, "create_task")
-	assert.Contains(t, toolNames, "update_task")
-	assert.Contains(t, toolNames, "list_task_comments")
+	assert.Contains(t, toolNames, "list_projects")
+	assert.Contains(t, toolNames, "get_task")
+	assert.NotContains(t, toolNames, "create_task")
+	assert.NotContains(t, toolNames, "list_task_comments")
+
+	editorToolsResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "1.8",
+		"method":  "tools/list",
+		"params":  map[string]any{},
+	})
+	editorTools := editorToolsResp["result"].(map[string]any)["tools"].([]any)
+	editorToolNames := make([]string, 0, len(editorTools))
+	for _, rawTool := range editorTools {
+		editorToolNames = append(editorToolNames, rawTool.(map[string]any)["name"].(string))
+	}
+	assert.Contains(t, editorToolNames, "create_task")
+	assert.Contains(t, editorToolNames, "update_task")
+	assert.Contains(t, editorToolNames, "list_task_comments")
 
 	listProjectsResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
 		"jsonrpc": "2.0",
@@ -303,6 +341,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 		},
 	})
 	assert.False(t, listProjectsResp["result"].(map[string]any)["isError"] == true)
+	assert.Contains(t, listProjectsResp["result"].(map[string]any)["content"].([]any)[0].(map[string]any)["text"], "Listed 1 visible project")
 
 	missingScopeResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
 		"jsonrpc": "2.0",
@@ -389,6 +428,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	createdTaskID := createdTask["id"].(string)
 	assert.Equal(t, "MCP Created Task", createdTask["title"])
 	assert.Equal(t, "MCP-2", createdTask["code"])
+	assert.Contains(t, createTaskResp["result"].(map[string]any)["content"].([]any)[0].(map[string]any)["text"], "MCP Created Task")
 
 	updateTaskResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
 		"jsonrpc": "2.0",
@@ -410,6 +450,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	updatedTask := updateTaskResp["result"].(map[string]any)["structuredContent"].(map[string]any)["task"].(map[string]any)
 	assert.Equal(t, "MCP Updated Task", updatedTask["title"])
 	assert.Equal(t, "MCP-3", updatedTask["code"])
+	assert.Contains(t, updateTaskResp["result"].(map[string]any)["content"].([]any)[0].(map[string]any)["text"], "MCP Updated Task")
 
 	addCommentResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
 		"jsonrpc": "2.0",
