@@ -1,5 +1,6 @@
 import { api } from './api';
 import type { User } from '@/types/user';
+import type { IChangePasswordForm } from '@/schemas/change-password-schema';
 import type { ISignUpForm } from '@/schemas/sign-up-schema';
 
 export const getMe = async () => {
@@ -22,6 +23,12 @@ export const createUser = async (form: ISignUpForm) => {
   const json = await response.json<User>();
 
   return json;
+};
+
+export const changePassword = async (form: IChangePasswordForm) => {
+  await api.put('users/me/password', {
+    json: form,
+  });
 };
 
 export const listUsers = async (): Promise<User[]> => {
