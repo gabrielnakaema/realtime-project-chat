@@ -341,7 +341,11 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 		},
 	})
 	assert.False(t, listProjectsResp["result"].(map[string]any)["isError"] == true)
-	assert.Contains(t, listProjectsResp["result"].(map[string]any)["content"].([]any)[0].(map[string]any)["text"], "Listed 1 visible project")
+	listProjectsResult := listProjectsResp["result"].(map[string]any)
+	listProjectsContent := listProjectsResult["content"].([]any)
+	assert.Contains(t, listProjectsContent[0].(map[string]any)["text"], "Listed 1 visible project")
+	assert.Contains(t, listProjectsContent[1].(map[string]any)["text"], `"projects"`)
+	assert.NotNil(t, listProjectsResult["structuredContent"])
 
 	missingScopeResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
 		"jsonrpc": "2.0",

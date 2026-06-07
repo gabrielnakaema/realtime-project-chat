@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -174,6 +175,36 @@ func toolSuccessText(name string, result map[string]any) string {
 	}
 
 	return name + " completed successfully"
+}
+
+func toolResultContent(summary string, structured any) ([]map[string]any, error) {
+	jsonBytes, err := json.Marshal(structured)
+	if err != nil {
+		return nil, fmt.Errorf("marshal tool structured content: %w", err)
+	}
+
+	return []map[string]any{
+		{
+			"type": "text",
+			"text": summary,
+		},
+		{
+			"type": "text",
+			"text": string(jsonBytes),
+		},
+	}, nil
+}
+
+func toolSuccessResult(name string, result map[string]any) (map[string]any, error) {
+	content, err := toolResultContent(toolSuccessText(name, result), result)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"content":           content,
+		"structuredContent": result,
+	}, nil
 }
 
 func toolCatalog() []toolSpec {

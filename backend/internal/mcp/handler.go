@@ -195,15 +195,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			resp.Result = toolErrorResult(callErr)
 			break
 		}
-		resp.Result = map[string]any{
-			"content": []map[string]any{
-				{
-					"type": "text",
-					"text": toolSuccessText(params.Name, result),
-				},
-			},
-			"structuredContent": result,
+		successResult, buildErr := toolSuccessResult(params.Name, result)
+		if buildErr != nil {
+			status = "failure"
+			resp.Result = toolErrorResult(buildErr)
+			break
 		}
+		resp.Result = successResult
 	default:
 		status = "failure"
 		resp.Error = &rpcError{Code: -32601, Message: "method not found"}
@@ -579,16 +577,7 @@ func bearerSecretFromHeader(header string) (string, bool) {
 func toolErrorResult(err error) map[string]any {
 	var domainErr domain.DomainError
 	if !errors.As(err, &domainErr) {
-		return map[string]any{
-			"content": []map[string]any{{"type": "text", "text": "internal server error"}},
-			"isError": true,
-			"structuredContent": map[string]any{
-				"error": map[string]any{
-					"type":    "server_error",
-					"message": "internal server error",
-				},
-			},
-		}
+		return buildToolErrorResult("internal server error", "server_error", "internal server error")
 	}
 
 	errorType := "server_error"
@@ -607,15 +596,35 @@ func toolErrorResult(err error) map[string]any {
 		errorType = "business_validation"
 	}
 
-	return map[string]any{
-		"content": []map[string]any{{"type": "text", "text": domainErr.Message}},
-		"isError": true,
-		"structuredContent": map[string]any{
-			"error": map[string]any{
-				"type":    errorType,
-				"message": domainErr.Message,
-			},
+	return buildToolErrorResult(domainErr.Message, errorType, domainErr.Message)
+}
+
+func buildToolErrorResult(summary string, errorType string, message string) map[string]any {
+	structuredContent := map[string]any{
+		"error": map[string]any{
+			"type":    errorType,
+			"message": message,
 		},
+	}
+
+	content, err := toolResultContent(summary, structuredContent)
+	if err != nil {
+		return map[string]any{
+			"content": []map[string]any{{"type": "text", "text": summary}},
+			"isError": true,
+			"structuredContent": map[string]any{
+				"error": map[string]any{
+					"type":    "server_error",
+					"message": summary,
+				},
+			},
+		}
+	}
+
+	return map[string]any{
+		"content":           content,
+		"isError":           true,
+		"structuredContent": structuredContent,
 	}
 }
 

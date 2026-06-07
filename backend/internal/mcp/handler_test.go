@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -280,6 +281,48 @@ func TestCallToolMissingScope(t *testing.T) {
 
 	result := toolErrorResult(err)
 	assert.Equal(t, "missing_scope", result["structuredContent"].(map[string]any)["error"].(map[string]any)["type"])
+}
+
+func TestToolSuccessResultIncludesSummaryAndStructuredJSON(t *testing.T) {
+	projectID := uuid.New()
+	projects := []domain.Project{
+		{
+			Id:   projectID,
+			Name: "Alpha",
+		},
+	}
+
+	result, err := toolSuccessResult("list_projects", map[string]any{
+		"projects": projects,
+	})
+	require.NoError(t, err)
+
+	content := result["content"].([]map[string]any)
+	require.Len(t, content, 2)
+	assert.Equal(t, "Listed 1 visible project(s).", content[0]["text"])
+	assert.Contains(t, content[1]["text"], projectID.String())
+
+	structured := result["structuredContent"].(map[string]any)
+	projectsPayload := structured["projects"].([]domain.Project)
+	require.Len(t, projectsPayload, 1)
+	assert.Equal(t, "Alpha", projectsPayload[0].Name)
+
+	var decoded map[string]any
+	err = json.Unmarshal([]byte(content[1]["text"].(string)), &decoded)
+	require.NoError(t, err)
+	assert.Contains(t, decoded, "projects")
+}
+
+func TestToolErrorResultIncludesSummaryAndStructuredJSON(t *testing.T) {
+	result := toolErrorResult(domain.ForbiddenError("missing required scope"))
+
+	content := result["content"].([]map[string]any)
+	require.Len(t, content, 2)
+	assert.Equal(t, "missing required scope", content[0]["text"])
+	assert.Contains(t, content[1]["text"], `"type":"missing_scope"`)
+
+	structured := result["structuredContent"].(map[string]any)
+	assert.Equal(t, "missing_scope", structured["error"].(map[string]any)["type"])
 }
 
 func TestToolDefinitionsForPrincipalFiltersScopes(t *testing.T) {
