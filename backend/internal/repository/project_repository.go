@@ -18,6 +18,17 @@ type ProjectRepository struct {
 	pool *pgxpool.Pool
 }
 
+func optionalText(value string) pgtype.Text {
+	if value == "" {
+		return pgtype.Text{}
+	}
+
+	return pgtype.Text{
+		String: value,
+		Valid:  true,
+	}
+}
+
 func NewProjectRepository(pool *pgxpool.Pool) *ProjectRepository {
 	return &ProjectRepository{
 		pool: pool,
@@ -35,9 +46,14 @@ func (pr *ProjectRepository) Create(ctx context.Context, project *domain.Project
 	qtx := q.WithTx(tx)
 
 	params := queries.CreateProjectParams{
-		UserID:      project.UserId,
-		Name:        project.Name,
-		Description: project.Description,
+		UserID:           project.UserId,
+		Name:             project.Name,
+		Description:      project.Description,
+		RepositoryUrl:    optionalText(project.RepositoryURL),
+		RepositoryOwner:  optionalText(project.RepositoryOwner),
+		RepositoryName:   optionalText(project.RepositoryName),
+		DefaultBranch:    optionalText(project.DefaultBranch),
+		BranchNamePrefix: optionalText(project.BranchNamePrefix),
 	}
 
 	id, err := qtx.CreateProject(ctx, params)
@@ -95,12 +111,17 @@ func (pr *ProjectRepository) GetById(ctx context.Context, id uuid.UUID) (*domain
 	}
 
 	project := domain.Project{
-		Id:          projectResult.ID,
-		UserId:      projectResult.UserID,
-		Name:        projectResult.Name,
-		Description: projectResult.Description,
-		CreatedAt:   projectResult.CreatedAt.Time,
-		UpdatedAt:   projectResult.UpdatedAt.Time,
+		Id:               projectResult.ID,
+		UserId:           projectResult.UserID,
+		Name:             projectResult.Name,
+		Description:      projectResult.Description,
+		CreatedAt:        projectResult.CreatedAt.Time,
+		UpdatedAt:        projectResult.UpdatedAt.Time,
+		RepositoryURL:    projectResult.RepositoryUrl.String,
+		RepositoryOwner:  projectResult.RepositoryOwner.String,
+		RepositoryName:   projectResult.RepositoryName.String,
+		DefaultBranch:    projectResult.DefaultBranch.String,
+		BranchNamePrefix: projectResult.BranchNamePrefix.String,
 	}
 
 	bytes, err := json.Marshal(projectResult.Members)
@@ -148,12 +169,17 @@ func (pr *ProjectRepository) ListByUserId(ctx context.Context, userId uuid.UUID,
 
 	for i, projectResult := range projectResults {
 		projects[i] = domain.Project{
-			Id:          projectResult.ID,
-			UserId:      projectResult.UserID,
-			Name:        projectResult.Name,
-			Description: projectResult.Description,
-			CreatedAt:   projectResult.CreatedAt.Time,
-			UpdatedAt:   projectResult.UpdatedAt.Time,
+			Id:               projectResult.ID,
+			UserId:           projectResult.UserID,
+			Name:             projectResult.Name,
+			Description:      projectResult.Description,
+			CreatedAt:        projectResult.CreatedAt.Time,
+			UpdatedAt:        projectResult.UpdatedAt.Time,
+			RepositoryURL:    projectResult.RepositoryUrl.String,
+			RepositoryOwner:  projectResult.RepositoryOwner.String,
+			RepositoryName:   projectResult.RepositoryName.String,
+			DefaultBranch:    projectResult.DefaultBranch.String,
+			BranchNamePrefix: projectResult.BranchNamePrefix.String,
 		}
 
 		bytes, err := json.Marshal(projectResult.Members)
@@ -183,9 +209,14 @@ func (pr *ProjectRepository) Update(ctx context.Context, project *domain.Project
 	q := queries.New(pr.pool)
 
 	params := queries.UpdateProjectParams{
-		Name:        project.Name,
-		Description: project.Description,
-		ID:          project.Id,
+		Name:             project.Name,
+		Description:      project.Description,
+		RepositoryUrl:    optionalText(project.RepositoryURL),
+		RepositoryOwner:  optionalText(project.RepositoryOwner),
+		RepositoryName:   optionalText(project.RepositoryName),
+		DefaultBranch:    optionalText(project.DefaultBranch),
+		BranchNamePrefix: optionalText(project.BranchNamePrefix),
+		ID:               project.Id,
 	}
 
 	err := q.UpdateProject(ctx, params)

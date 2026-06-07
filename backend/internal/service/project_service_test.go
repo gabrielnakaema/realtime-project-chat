@@ -174,9 +174,14 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name: "successful project creation",
 			request: service.CreateProjectRequest{
-				Name:        "Test Project",
-				Description: "Test Description",
-				UserId:      validUserId,
+				Name:             "Test Project",
+				Description:      "Test Description",
+				RepositoryURL:    "https://github.com/acme/project-chat-pubsub",
+				RepositoryOwner:  "acme",
+				RepositoryName:   "project-chat-pubsub",
+				DefaultBranch:    "main",
+				BranchNamePrefix: "task/",
+				UserId:           validUserId,
 			},
 			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Project")).Return(nil)
@@ -242,6 +247,11 @@ func TestProjectService_Create(t *testing.T) {
 			if tt.shouldSucceed {
 				assert.NoError(t, err)
 				assert.NotNil(t, project)
+				assert.Equal(t, tt.request.RepositoryURL, project.RepositoryURL)
+				assert.Equal(t, tt.request.RepositoryOwner, project.RepositoryOwner)
+				assert.Equal(t, tt.request.RepositoryName, project.RepositoryName)
+				assert.Equal(t, tt.request.DefaultBranch, project.DefaultBranch)
+				assert.Equal(t, tt.request.BranchNamePrefix, project.BranchNamePrefix)
 			} else {
 				require.Error(t, err)
 				require.Nil(t, project)
@@ -506,16 +516,50 @@ func TestProjectService_Update(t *testing.T) {
 		{
 			name: "successful project update",
 			request: service.UpdateProjectRequest{
-				Id:          validProjectId,
-				Name:        "Updated Project",
-				Description: "Updated Description",
-				UserId:      validUserId,
-				Columns:     updatedColumns,
+				Id:               validProjectId,
+				Name:             "Updated Project",
+				Description:      "Updated Description",
+				RepositoryURL:    "https://github.com/acme/project-chat-pubsub",
+				RepositoryOwner:  "acme",
+				RepositoryName:   "project-chat-pubsub",
+				DefaultBranch:    "main",
+				BranchNamePrefix: "task/",
+				UserId:           validUserId,
+				Columns:          updatedColumns,
 			},
 			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 				repo.On("Update", mock.Anything, &validProject).Return(nil)
 				repo.On("UpdateColumn", mock.Anything, mock.AnythingOfType("*domain.ProjectColumn")).Return(nil).Times(6)
+			},
+			expectedProject: &validProject,
+			shouldSucceed:   true,
+			expectedError:   nil,
+		},
+		{
+			name: "restores missing column ids for unchanged project updates",
+			request: service.UpdateProjectRequest{
+				Id:               validProjectId,
+				Name:             "Updated Project",
+				Description:      "Updated Description",
+				RepositoryURL:    "https://github.com/acme/project-chat-pubsub",
+				RepositoryOwner:  "acme",
+				RepositoryName:   "project-chat-pubsub",
+				DefaultBranch:    "main",
+				BranchNamePrefix: "task/",
+				UserId:           validUserId,
+				Columns: []domain.ProjectColumn{
+					{Name: "Backlog", Color: "#64748B", Position: 0},
+					{Name: "Doing", Color: "#2563EB", Position: 1},
+					{Name: "Done", Color: "#059669", Position: 2, IsDoneColumn: true},
+				},
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+				repo.On("Update", mock.Anything, &validProject).Return(nil)
+				repo.On("UpdateColumn", mock.Anything, mock.MatchedBy(func(column *domain.ProjectColumn) bool {
+					return column.Id != uuid.Nil
+				})).Return(nil).Times(6)
 			},
 			expectedProject: &validProject,
 			shouldSucceed:   true,
@@ -592,6 +636,11 @@ func TestProjectService_Update(t *testing.T) {
 				assert.Equal(t, tt.request.Id, project.Id)
 				assert.Equal(t, tt.request.Name, project.Name)
 				assert.Equal(t, tt.request.Description, project.Description)
+				assert.Equal(t, tt.request.RepositoryURL, project.RepositoryURL)
+				assert.Equal(t, tt.request.RepositoryOwner, project.RepositoryOwner)
+				assert.Equal(t, tt.request.RepositoryName, project.RepositoryName)
+				assert.Equal(t, tt.request.DefaultBranch, project.DefaultBranch)
+				assert.Equal(t, tt.request.BranchNamePrefix, project.BranchNamePrefix)
 			} else {
 				require.Error(t, err)
 				require.Nil(t, project)

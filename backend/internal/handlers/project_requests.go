@@ -8,10 +8,15 @@ import (
 )
 
 type ProjectRequest struct {
-	Name           string                        `json:"name"`
-	Description    string                        `json:"description"`
-	Columns        []ProjectColumnRequest        `json:"columns"`
-	DeletedColumns []DeletedProjectColumnRequest `json:"deleted_columns"`
+	Name             string                        `json:"name"`
+	Description      string                        `json:"description"`
+	RepositoryURL    string                        `json:"repository_url"`
+	RepositoryOwner  string                        `json:"repository_owner"`
+	RepositoryName   string                        `json:"repository_name"`
+	DefaultBranch    string                        `json:"default_branch"`
+	BranchNamePrefix string                        `json:"branch_name_prefix"`
+	Columns          []ProjectColumnRequest        `json:"columns"`
+	DeletedColumns   []DeletedProjectColumnRequest `json:"deleted_columns"`
 }
 
 type ProjectColumnRequest struct {

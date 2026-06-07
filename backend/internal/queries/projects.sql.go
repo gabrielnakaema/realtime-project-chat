@@ -14,19 +14,42 @@ import (
 
 const createProject = `-- name: CreateProject :one
 INSERT INTO
-  projects (user_id, name, description)
+  projects (
+    user_id,
+    name,
+    description,
+    repository_url,
+    repository_owner,
+    repository_name,
+    default_branch,
+    branch_name_prefix
+  )
 VALUES
-  ($1, $2, $3) returning id
+  ($1, $2, $3, $4, $5, $6, $7, $8) returning id
 `
 
 type CreateProjectParams struct {
-	UserID      uuid.UUID
-	Name        string
-	Description string
+	UserID           uuid.UUID
+	Name             string
+	Description      string
+	RepositoryUrl    pgtype.Text
+	RepositoryOwner  pgtype.Text
+	RepositoryName   pgtype.Text
+	DefaultBranch    pgtype.Text
+	BranchNamePrefix pgtype.Text
 }
 
 func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, createProject, arg.UserID, arg.Name, arg.Description)
+	row := q.db.QueryRow(ctx, createProject,
+		arg.UserID,
+		arg.Name,
+		arg.Description,
+		arg.RepositoryUrl,
+		arg.RepositoryOwner,
+		arg.RepositoryName,
+		arg.DefaultBranch,
+		arg.BranchNamePrefix,
+	)
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
@@ -130,7 +153,7 @@ WITH project_members_cte AS (
   WHERE ps.project_id = $1
 )
 SELECT
-  p.id, p.user_id, p.name, p.description, p.created_at, p.updated_at,
+  p.id, p.user_id, p.name, p.description, p.created_at, p.updated_at, p.repository_url, p.repository_owner, p.repository_name, p.default_branch, p.branch_name_prefix,
   coalesce(
     jsonb_agg(
       jsonb_build_object(
@@ -189,14 +212,19 @@ GROUP BY
 `
 
 type GetProjectByIdRow struct {
-	ID          uuid.UUID
-	UserID      uuid.UUID
-	Name        string
-	Description string
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
-	Members     interface{}
-	Columns     interface{}
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	Name             string
+	Description      string
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	RepositoryUrl    pgtype.Text
+	RepositoryOwner  pgtype.Text
+	RepositoryName   pgtype.Text
+	DefaultBranch    pgtype.Text
+	BranchNamePrefix pgtype.Text
+	Members          interface{}
+	Columns          interface{}
 }
 
 func (q *Queries) GetProjectById(ctx context.Context, id uuid.UUID) (GetProjectByIdRow, error) {
@@ -209,6 +237,11 @@ func (q *Queries) GetProjectById(ctx context.Context, id uuid.UUID) (GetProjectB
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RepositoryUrl,
+		&i.RepositoryOwner,
+		&i.RepositoryName,
+		&i.DefaultBranch,
+		&i.BranchNamePrefix,
 		&i.Members,
 		&i.Columns,
 	)
@@ -361,7 +394,7 @@ WITH project_members_cte AS (
   FROM project_columns ps
 )
 SELECT
-  p.id, p.user_id, p.name, p.description, p.created_at, p.updated_at,
+  p.id, p.user_id, p.name, p.description, p.created_at, p.updated_at, p.repository_url, p.repository_owner, p.repository_name, p.default_branch, p.branch_name_prefix,
   coalesce(
     jsonb_agg(
       jsonb_build_object(
@@ -437,14 +470,19 @@ type ListProjectsByUserIdParams struct {
 }
 
 type ListProjectsByUserIdRow struct {
-	ID          uuid.UUID
-	UserID      uuid.UUID
-	Name        string
-	Description string
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
-	Members     interface{}
-	Columns     interface{}
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	Name             string
+	Description      string
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	RepositoryUrl    pgtype.Text
+	RepositoryOwner  pgtype.Text
+	RepositoryName   pgtype.Text
+	DefaultBranch    pgtype.Text
+	BranchNamePrefix pgtype.Text
+	Members          interface{}
+	Columns          interface{}
 }
 
 func (q *Queries) ListProjectsByUserId(ctx context.Context, arg ListProjectsByUserIdParams) ([]ListProjectsByUserIdRow, error) {
@@ -463,6 +501,11 @@ func (q *Queries) ListProjectsByUserId(ctx context.Context, arg ListProjectsByUs
 			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RepositoryUrl,
+			&i.RepositoryOwner,
+			&i.RepositoryName,
+			&i.DefaultBranch,
+			&i.BranchNamePrefix,
 			&i.Members,
 			&i.Columns,
 		); err != nil {
@@ -550,19 +593,38 @@ UPDATE
 SET
   name = $1,
   description = $2,
+  repository_url = $3,
+  repository_owner = $4,
+  repository_name = $5,
+  default_branch = $6,
+  branch_name_prefix = $7,
   updated_at = CURRENT_TIMESTAMP
 WHERE
-  id = $3
+  id = $8
 `
 
 type UpdateProjectParams struct {
-	Name        string
-	Description string
-	ID          uuid.UUID
+	Name             string
+	Description      string
+	RepositoryUrl    pgtype.Text
+	RepositoryOwner  pgtype.Text
+	RepositoryName   pgtype.Text
+	DefaultBranch    pgtype.Text
+	BranchNamePrefix pgtype.Text
+	ID               uuid.UUID
 }
 
 func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) error {
-	_, err := q.db.Exec(ctx, updateProject, arg.Name, arg.Description, arg.ID)
+	_, err := q.db.Exec(ctx, updateProject,
+		arg.Name,
+		arg.Description,
+		arg.RepositoryUrl,
+		arg.RepositoryOwner,
+		arg.RepositoryName,
+		arg.DefaultBranch,
+		arg.BranchNamePrefix,
+		arg.ID,
+	)
 	return err
 }
 

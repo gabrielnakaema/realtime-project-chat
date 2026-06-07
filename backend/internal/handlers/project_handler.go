@@ -55,10 +55,15 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userId := UserIdFromContext(r.Context())
 
 	serviceRequest := service.CreateProjectRequest{
-		Name:        request.Name,
-		Description: request.Description,
-		UserId:      userId,
-		Columns:     mapProjectColumnsRequest(request.Columns),
+		Name:             request.Name,
+		Description:      request.Description,
+		RepositoryURL:    request.RepositoryURL,
+		RepositoryOwner:  request.RepositoryOwner,
+		RepositoryName:   request.RepositoryName,
+		DefaultBranch:    request.DefaultBranch,
+		BranchNamePrefix: request.BranchNamePrefix,
+		UserId:           userId,
+		Columns:          mapProjectColumnsRequest(request.Columns),
 	}
 
 	project, err := h.projectService.Create(r.Context(), serviceRequest)
@@ -162,12 +167,17 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serviceRequest := service.UpdateProjectRequest{
-		Id:             parsed,
-		Name:           request.Name,
-		Description:    request.Description,
-		UserId:         userId,
-		Columns:        mapProjectColumnsRequest(request.Columns),
-		DeletedColumns: mapDeletedProjectColumnsRequest(request.DeletedColumns),
+		Id:               parsed,
+		Name:             request.Name,
+		Description:      request.Description,
+		RepositoryURL:    request.RepositoryURL,
+		RepositoryOwner:  request.RepositoryOwner,
+		RepositoryName:   request.RepositoryName,
+		DefaultBranch:    request.DefaultBranch,
+		BranchNamePrefix: request.BranchNamePrefix,
+		UserId:           userId,
+		Columns:          mapProjectColumnsRequest(request.Columns),
+		DeletedColumns:   mapDeletedProjectColumnsRequest(request.DeletedColumns),
 	}
 
 	project, err := h.projectService.Update(r.Context(), serviceRequest)

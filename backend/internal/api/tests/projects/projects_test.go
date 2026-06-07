@@ -45,6 +45,16 @@ func validProjectPayload(name string, description string) map[string]any {
 	}
 }
 
+func validProjectRepositoryPayload() map[string]any {
+	return map[string]any{
+		"repository_url":     "https://github.com/acme/project-chat-pubsub",
+		"repository_owner":   "acme",
+		"repository_name":    "project-chat-pubsub",
+		"default_branch":     "main",
+		"branch_name_prefix": "task/",
+	}
+}
+
 func projectColumnsPayloadFromResponse(t *testing.T, rawColumns any) []map[string]any {
 	t.Helper()
 
@@ -101,6 +111,16 @@ func assertProjectColumnsContract(t *testing.T, rawColumns any, expectedProjectI
 		assert.Contains(t, column, "created_at")
 		assert.Contains(t, column, "updated_at")
 	}
+}
+
+func assertProjectRepositoryFields(t *testing.T, response map[string]interface{}, expected map[string]any) {
+	t.Helper()
+
+	assert.Equal(t, expected["repository_url"], response["repository_url"])
+	assert.Equal(t, expected["repository_owner"], response["repository_owner"])
+	assert.Equal(t, expected["repository_name"], response["repository_name"])
+	assert.Equal(t, expected["default_branch"], response["default_branch"])
+	assert.Equal(t, expected["branch_name_prefix"], response["branch_name_prefix"])
 }
 
 func TestProjectsEndpoints(t *testing.T) {
@@ -182,7 +202,38 @@ func TestProjectsEndpoints(t *testing.T) {
 		assert.Contains(t, response, "updated_at")
 		assert.Contains(t, response, "members")
 		assert.Contains(t, response, "columns")
+		assertProjectRepositoryFields(t, response, map[string]any{
+			"repository_url":     "",
+			"repository_owner":   "",
+			"repository_name":    "",
+			"default_branch":     "",
+			"branch_name_prefix": "",
+		})
 		assertProjectColumnsContract(t, response["columns"], response["id"].(string))
+	})
+
+	t.Run("POST /projects - create project with repository metadata", func(t *testing.T) {
+		testAPI.TruncateTables(t)
+
+		client := shared.NewHTTPClient(testAPI.GetBaseURL())
+		client.CreateUserAndLogin("test@example.com", "password123")
+
+		payload := validProjectPayload("Test Project", "Test Description")
+		for key, value := range validProjectRepositoryPayload() {
+			payload[key] = value
+		}
+
+		resp, err := client.POST("/projects", payload)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assertProjectRepositoryFields(t, response, validProjectRepositoryPayload())
 	})
 
 	t.Run("POST /projects - create project with invalid fields", func(t *testing.T) {
@@ -301,6 +352,13 @@ func TestProjectsEndpoints(t *testing.T) {
 		assert.Contains(t, response[0], "updated_at")
 		assert.Contains(t, response[0], "members")
 		assert.Contains(t, response[0], "columns")
+		assertProjectRepositoryFields(t, response[0], map[string]any{
+			"repository_url":     "",
+			"repository_owner":   "",
+			"repository_name":    "",
+			"default_branch":     "",
+			"branch_name_prefix": "",
+		})
 		assertProjectColumnsContract(t, response[0]["columns"], response[0]["id"].(string))
 	})
 
@@ -337,6 +395,13 @@ func TestProjectsEndpoints(t *testing.T) {
 		assert.Contains(t, getResponse, "updated_at")
 		assert.Contains(t, getResponse, "members")
 		assert.Contains(t, getResponse, "columns")
+		assertProjectRepositoryFields(t, getResponse, map[string]any{
+			"repository_url":     "",
+			"repository_owner":   "",
+			"repository_name":    "",
+			"default_branch":     "",
+			"branch_name_prefix": "",
+		})
 		assertProjectColumnsContract(t, getResponse["columns"], getResponse["id"].(string))
 	})
 
@@ -362,6 +427,9 @@ func TestProjectsEndpoints(t *testing.T) {
 			"description": "Updated Description",
 			"columns":     projectColumnsPayloadFromResponse(t, response["columns"]),
 		}
+		for key, value := range validProjectRepositoryPayload() {
+			payload[key] = value
+		}
 
 		resp, err = client.PUT("/projects/"+response["id"].(string), payload)
 		require.NoError(t, err)
@@ -379,6 +447,7 @@ func TestProjectsEndpoints(t *testing.T) {
 		assert.Contains(t, updateResponse, "updated_at")
 		assert.Contains(t, updateResponse, "members")
 		assert.Contains(t, updateResponse, "columns")
+		assertProjectRepositoryFields(t, updateResponse, validProjectRepositoryPayload())
 		assertProjectColumnsContract(t, updateResponse["columns"], updateResponse["id"].(string))
 	})
 

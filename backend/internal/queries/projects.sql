@@ -1,8 +1,17 @@
 -- name: CreateProject :one
 INSERT INTO
-  projects (user_id, name, description)
+  projects (
+    user_id,
+    name,
+    description,
+    repository_url,
+    repository_owner,
+    repository_name,
+    default_branch,
+    branch_name_prefix
+  )
 VALUES
-  ($1, $2, $3) returning id;
+  ($1, $2, $3, $4, $5, $6, $7, $8) returning id;
 
 -- name: CreateProjectColumn :one
 INSERT INTO
@@ -208,9 +217,14 @@ UPDATE
 SET
   name = $1,
   description = $2,
+  repository_url = $3,
+  repository_owner = $4,
+  repository_name = $5,
+  default_branch = $6,
+  branch_name_prefix = $7,
   updated_at = CURRENT_TIMESTAMP
 WHERE
-  id = $3;
+  id = $8;
 
 -- name: UpdateProjectColumn :exec
 UPDATE

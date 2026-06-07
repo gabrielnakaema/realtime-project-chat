@@ -71,12 +71,17 @@ type Notification struct {
 }
 
 type Project struct {
-	ID          uuid.UUID
-	UserID      uuid.UUID
-	Name        string
-	Description string
-	CreatedAt   pgtype.Timestamptz
-	UpdatedAt   pgtype.Timestamptz
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	Name             string
+	Description      string
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+	RepositoryUrl    pgtype.Text
+	RepositoryOwner  pgtype.Text
+	RepositoryName   pgtype.Text
+	DefaultBranch    pgtype.Text
+	BranchNamePrefix pgtype.Text
 }
 
 type ProjectActivityLog struct {

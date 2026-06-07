@@ -70,10 +70,15 @@ func NewProjectService(projectRepository projectRepository, userRepository proje
 }
 
 type CreateProjectRequest struct {
-	Name        string
-	Description string
-	UserId      uuid.UUID
-	Columns     []domain.ProjectColumn
+	Name             string
+	Description      string
+	RepositoryURL    string
+	RepositoryOwner  string
+	RepositoryName   string
+	DefaultBranch    string
+	BranchNamePrefix string
+	UserId           uuid.UUID
+	Columns          []domain.ProjectColumn
 }
 
 func (ps *ProjectService) Create(ctx context.Context, request CreateProjectRequest) (*domain.Project, error) {
@@ -82,10 +87,15 @@ func (ps *ProjectService) Create(ctx context.Context, request CreateProjectReque
 	}
 
 	project := domain.Project{
-		Name:        request.Name,
-		Description: request.Description,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		Name:             request.Name,
+		Description:      request.Description,
+		RepositoryURL:    request.RepositoryURL,
+		RepositoryOwner:  request.RepositoryOwner,
+		RepositoryName:   request.RepositoryName,
+		DefaultBranch:    request.DefaultBranch,
+		BranchNamePrefix: request.BranchNamePrefix,
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
 		Members: []domain.ProjectMember{
 			{
 				UserId: request.UserId,
@@ -173,12 +183,17 @@ func (ps *ProjectService) ListByUserId(ctx context.Context, request ListProjects
 }
 
 type UpdateProjectRequest struct {
-	Id             uuid.UUID
-	Name           string
-	Description    string
-	UserId         uuid.UUID
-	Columns        []domain.ProjectColumn
-	DeletedColumns []DeletedProjectColumnRequest
+	Id               uuid.UUID
+	Name             string
+	Description      string
+	RepositoryURL    string
+	RepositoryOwner  string
+	RepositoryName   string
+	DefaultBranch    string
+	BranchNamePrefix string
+	UserId           uuid.UUID
+	Columns          []domain.ProjectColumn
+	DeletedColumns   []DeletedProjectColumnRequest
 }
 
 type DeletedProjectColumnRequest struct {
@@ -220,7 +235,13 @@ func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectReque
 
 	project.Name = request.Name
 	project.Description = request.Description
+	project.RepositoryURL = request.RepositoryURL
+	project.RepositoryOwner = request.RepositoryOwner
+	project.RepositoryName = request.RepositoryName
+	project.DefaultBranch = request.DefaultBranch
+	project.BranchNamePrefix = request.BranchNamePrefix
 	project.UpdatedAt = time.Now()
+	request.Columns = restoreMissingProjectColumnIDs(request.Columns, project.Columns, request.DeletedColumns)
 
 	err = ps.projectRepository.Update(ctx, project)
 	if err != nil {
@@ -471,6 +492,39 @@ func validateProjectColumns(columns []domain.ProjectColumn) error {
 	}
 
 	return nil
+}
+
+func restoreMissingProjectColumnIDs(
+	columns []domain.ProjectColumn,
+	existingColumns []domain.ProjectColumn,
+	deletedColumns []DeletedProjectColumnRequest,
+) []domain.ProjectColumn {
+	if len(columns) != len(existingColumns) || len(deletedColumns) > 0 {
+		return columns
+	}
+
+	missingIDs := 0
+	for _, column := range columns {
+		if column.Id == uuid.Nil {
+			missingIDs++
+			continue
+		}
+
+		return columns
+	}
+
+	if missingIDs == 0 {
+		return columns
+	}
+
+	restored := make([]domain.ProjectColumn, len(columns))
+	copy(restored, columns)
+
+	for i := range restored {
+		restored[i].Id = existingColumns[i].Id
+	}
+
+	return restored
 }
 
 func validateSingleProjectColumn(column domain.ProjectColumn) error {

@@ -7,12 +7,17 @@ import (
 )
 
 type Project struct {
-	Id          uuid.UUID `json:"id"`
-	UserId      uuid.UUID `json:"user_id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Id               uuid.UUID `json:"id"`
+	UserId           uuid.UUID `json:"user_id"`
+	Name             string    `json:"name"`
+	Description      string    `json:"description"`
+	RepositoryURL    string    `json:"repository_url"`
+	RepositoryOwner  string    `json:"repository_owner"`
+	RepositoryName   string    `json:"repository_name"`
+	DefaultBranch    string    `json:"default_branch"`
+	BranchNamePrefix string    `json:"branch_name_prefix"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 
 	Members []ProjectMember `json:"members,omitempty"`
 	Columns []ProjectColumn `json:"columns,omitempty"`

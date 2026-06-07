@@ -147,6 +147,20 @@ func (q *Queries) ListUsers(ctx context.Context, userID uuid.UUID) ([]ListUsersR
 	return items, nil
 }
 
+const updateRefreshToken = `-- name: UpdateRefreshToken :exec
+UPDATE refresh_tokens SET active = $1 WHERE token = $2
+`
+
+type UpdateRefreshTokenParams struct {
+	Active bool
+	Token  string
+}
+
+func (q *Queries) UpdateRefreshToken(ctx context.Context, arg UpdateRefreshTokenParams) error {
+	_, err := q.db.Exec(ctx, updateRefreshToken, arg.Active, arg.Token)
+	return err
+}
+
 const updateUserPassword = `-- name: UpdateUserPassword :execrows
 UPDATE users
 SET password = $2, updated_at = CURRENT_TIMESTAMP
@@ -164,18 +178,4 @@ func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPassword
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const updateRefreshToken = `-- name: UpdateRefreshToken :exec
-UPDATE refresh_tokens SET active = $1 WHERE token = $2
-`
-
-type UpdateRefreshTokenParams struct {
-	Active bool
-	Token  string
-}
-
-func (q *Queries) UpdateRefreshToken(ctx context.Context, arg UpdateRefreshTokenParams) error {
-	_, err := q.db.Exec(ctx, updateRefreshToken, arg.Active, arg.Token)
-	return err
 }
