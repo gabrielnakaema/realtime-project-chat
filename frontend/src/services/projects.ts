@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { Member, Project } from '@/types/project';
+import type { Member, Project, ProjectColumn } from '@/types/project';
 import type { IProjectForm } from '@/schemas/project-schema';
 
 export const listProjects = async (searchQuery?: string) => {
@@ -54,6 +54,32 @@ export const updateProject = async (request: UpdateProjectRequest) => {
   });
 
   const json = await response.json<Project>();
+
+  return json;
+};
+
+interface UpdateProjectColumnRequest {
+  projectId: string;
+  columnId: string;
+  name: string;
+  description: string;
+  color: string;
+  is_done_column: boolean;
+}
+
+export const updateProjectColumn = async (request: UpdateProjectColumnRequest) => {
+  const payload = {
+    name: request.name,
+    description: request.description,
+    color: request.color,
+    is_done_column: request.is_done_column,
+  };
+
+  const response = await api.patch(`projects/${request.projectId}/columns/${request.columnId}`, {
+    json: payload,
+  });
+
+  const json = await response.json<ProjectColumn>();
 
   return json;
 };

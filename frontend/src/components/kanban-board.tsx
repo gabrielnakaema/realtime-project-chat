@@ -35,6 +35,7 @@ export const KanbanBoard = ({ project }: KanbanBoardProps) => {
       id: column.id,
       color: column.color || getDefaultProjectColumnColor(index),
       title: column.name,
+      description: column.description,
       columnId: column.id,
       isDoneColumn: column.is_done_column,
       project_id: project.id,
@@ -53,7 +54,7 @@ export const KanbanBoard = ({ project }: KanbanBoardProps) => {
           <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Task Board</h2>
           {isOwner && <ArchivedTasksModal project={project} />}
         </div>
-        <CreateTask projectId={projectId} projectColumns={project.columns} />
+        <CreateTask projectId={projectId} initialProjectColumnId={project.columns[0]?.id} />
       </div>
 
       <div
@@ -61,7 +62,7 @@ export const KanbanBoard = ({ project }: KanbanBoardProps) => {
         style={{ gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(0, 1fr))` }}
       >
         {columns.map((column) => (
-          <BoardColumn column={column} key={column.id} />
+          <BoardColumn canEditColumns={isOwner} column={column} key={column.id} />
         ))}
       </div>
     </div>

@@ -10,6 +10,7 @@ import { getProjectFormValues } from './project-form-utils';
 import { useProjectForm } from './use-project-form';
 import type { SubmitHandler } from 'react-hook-form';
 import type { IProjectForm } from '@/schemas/project-schema';
+import { invalidateProjectBoardData } from '@/services/project-board-invalidation';
 import { projectQueryKeys } from '@/services/query-keys';
 import { getProject, updateProject } from '@/services/projects';
 import { handleSuccess } from '@/utils/handle-success';
@@ -31,8 +32,8 @@ export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
 
   const { mutate, isPending } = useMutation({
     mutationFn: updateProject,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.all });
+    onSuccess: async () => {
+      await invalidateProjectBoardData(queryClient);
       handleSuccess('Project saved successfully');
       setOpen(false);
       resetForm();

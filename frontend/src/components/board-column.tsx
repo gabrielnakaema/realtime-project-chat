@@ -1,7 +1,7 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import { MoreHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
+import { ProjectColumnActions } from './project-column-actions';
 import { TaskCard } from './task-card';
 import type {
   BaseEventPayload,
@@ -18,9 +18,10 @@ import { DEFAULT_TASK_LIMIT } from '@/constants/tasks';
 
 interface BoardColumnProps {
   column: Column;
+  canEditColumns: boolean;
 }
 
-export const BoardColumn = ({ column }: BoardColumnProps) => {
+export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
   const columnRef = useRef<HTMLDivElement>(null);
   const scrollableRef = useRef<HTMLDivElement | null>(null);
 
@@ -129,12 +130,7 @@ export const BoardColumn = ({ column }: BoardColumnProps) => {
             {column.total}
           </span>
         </div>
-        <button
-          className="rounded p-1 text-slate-500 transition-colors hover:text-slate-700 dark:hover:text-slate-300"
-          style={{ color: surface.accentColor }}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
+        <ProjectColumnActions canEditColumn={canEditColumns} column={column} surfaceAccentColor={surface.accentColor} />
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto" ref={scrollableRef}>
