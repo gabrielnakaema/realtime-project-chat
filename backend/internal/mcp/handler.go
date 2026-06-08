@@ -438,7 +438,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		if err != nil {
 			return nil, err
 		}
-		code, err := optionalTrimmedStringArg(params.Arguments, "code")
+		code, err := optionalTrimmedStringArgPointer(params.Arguments, "code")
 		if err != nil {
 			return nil, err
 		}
@@ -818,6 +818,21 @@ func optionalTrimmedStringArg(args map[string]any, key string) (string, error) {
 	}
 
 	return strings.TrimSpace(value), nil
+}
+
+func optionalTrimmedStringArgPointer(args map[string]any, key string) (*string, error) {
+	raw, ok := args[key]
+	if !ok || raw == nil {
+		return nil, nil
+	}
+
+	value, ok := raw.(string)
+	if !ok {
+		return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be a string", key))
+	}
+
+	trimmed := strings.TrimSpace(value)
+	return &trimmed, nil
 }
 
 func writeHTTPError(w http.ResponseWriter, status int, message string) {

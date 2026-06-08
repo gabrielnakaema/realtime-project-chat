@@ -220,7 +220,8 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	assert.Equal(t, domain.ActionOriginMCPAgent, taskSvc.updateOrigin)
 	require.NotNil(t, taskSvc.updateRequest)
 	assert.Equal(t, taskID, taskSvc.updateRequest.TaskId)
-	assert.Equal(t, "TASK-456", taskSvc.updateRequest.Code)
+	require.NotNil(t, taskSvc.updateRequest.Code)
+	assert.Equal(t, "TASK-456", *taskSvc.updateRequest.Code)
 	assert.Equal(t, []uuid.UUID{taskID}, taskSvc.updateRequest.DependsOnTaskIds)
 
 	_, err = handler.callTool(context.Background(), principal, toolCallParams{
@@ -265,6 +266,99 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	assert.Equal(t, domain.ActionOriginMCPAgent, taskSvc.assignSelfOrigin)
 	require.NotNil(t, taskSvc.assignSelfRequest)
 	assert.Equal(t, taskID, taskSvc.assignSelfRequest.TaskId)
+}
+
+func TestUpdateTaskCodeArgHandling(t *testing.T) {
+	projectID := uuid.New()
+	columnID := uuid.New()
+	taskID := uuid.New()
+
+	task := &domain.Task{
+		Id:              taskID,
+		ProjectId:       projectID,
+		ProjectColumnId: columnID,
+		Title:           "Task",
+		Description:     "Desc",
+		Code:            "EXISTING-1",
+		Priority:        domain.TaskPriorityMedium,
+		Tags:            []string{},
+	}
+	project := &domain.Project{
+		Id:      projectID,
+		Columns: []domain.ProjectColumn{{Id: columnID, Name: "Doing"}},
+	}
+
+	baseArgs := func() map[string]any {
+		return map[string]any{
+			"task_id":           taskID.String(),
+			"project_column_id": columnID.String(),
+			"title":             "Task",
+			"description":       "Desc",
+			"priority":          "medium",
+		}
+	}
+
+	newHandler := func() (*Handler, *stubTaskService) {
+		svc := &stubTaskService{
+			task: task,
+			grouped: map[string]utils.CursorPaginated[domain.Task]{
+				columnID.String(): {Data: []domain.Task{*task}},
+			},
+		}
+		projectSvc := &stubProjectService{project: project}
+		return NewHandler(nil, projectSvc, svc, &stubTaskCommentService{}), svc
+	}
+
+	principal := principal{
+		APIKeyID: uuid.New(),
+		UserID:   uuid.New(),
+		Scopes:   domain.AllowedMCPAPIScopes,
+	}
+
+	t.Run("code absent: Code field is nil (let service preserve existing)", func(t *testing.T) {
+		h, svc := newHandler()
+		args := baseArgs()
+
+		_, err := h.callTool(context.Background(), principal, toolCallParams{Name: "update_task", Arguments: args})
+		require.NoError(t, err)
+		require.NotNil(t, svc.updateRequest)
+		assert.Nil(t, svc.updateRequest.Code, "absent code key should produce nil, signalling service to keep existing value")
+	})
+
+	t.Run("code null: Code field is nil (treated same as absent)", func(t *testing.T) {
+		h, svc := newHandler()
+		args := baseArgs()
+		args["code"] = nil
+
+		_, err := h.callTool(context.Background(), principal, toolCallParams{Name: "update_task", Arguments: args})
+		require.NoError(t, err)
+		require.NotNil(t, svc.updateRequest)
+		assert.Nil(t, svc.updateRequest.Code, "null code key should produce nil, signalling service to keep existing value")
+	})
+
+	t.Run("code empty string: Code field is pointer to empty string (clear it)", func(t *testing.T) {
+		h, svc := newHandler()
+		args := baseArgs()
+		args["code"] = ""
+
+		_, err := h.callTool(context.Background(), principal, toolCallParams{Name: "update_task", Arguments: args})
+		require.NoError(t, err)
+		require.NotNil(t, svc.updateRequest)
+		require.NotNil(t, svc.updateRequest.Code, "explicit empty string should produce a non-nil pointer so the service clears the code")
+		assert.Equal(t, "", *svc.updateRequest.Code)
+	})
+
+	t.Run("code with value: Code field is pointer to trimmed string", func(t *testing.T) {
+		h, svc := newHandler()
+		args := baseArgs()
+		args["code"] = "  NEW-99  "
+
+		_, err := h.callTool(context.Background(), principal, toolCallParams{Name: "update_task", Arguments: args})
+		require.NoError(t, err)
+		require.NotNil(t, svc.updateRequest)
+		require.NotNil(t, svc.updateRequest.Code)
+		assert.Equal(t, "NEW-99", *svc.updateRequest.Code, "value should be trimmed")
+	})
 }
 
 func TestCallToolMissingScope(t *testing.T) {

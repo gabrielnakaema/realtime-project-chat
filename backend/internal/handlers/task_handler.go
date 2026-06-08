@@ -315,7 +315,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		TaskId:          parsedId,
 		Title:           request.Title,
 		Description:     request.Description,
-		Code:            request.Code,
+		Code:            &request.Code,
 		ProjectColumnId: request.ProjectColumnId,
 		RequestUserId:   userId,
 		Priority:        domain.TaskPriority(request.Priority),

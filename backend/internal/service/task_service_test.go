@@ -473,7 +473,7 @@ func TestTaskService_Update(t *testing.T) {
 				TaskId:          validTaskId,
 				Title:           "Updated Task",
 				Description:     "Updated Deascription",
-				Code:            "  TASK-202  ",
+				Code:            func() *string { s := "  TASK-202  "; return &s }(),
 				ProjectColumnId: doneStatusID,
 				RequestUserId:   validUserId,
 				Priority:        domain.TaskPriorityHigh,
@@ -623,6 +623,88 @@ func TestTaskService_Update(t *testing.T) {
 			mockUserRepo.AssertExpectations(t)
 		})
 	}
+
+	taskWithCode := domain.Task{
+		Id:              validTaskId,
+		ProjectId:       validProjectId,
+		AuthorId:        validUserId,
+		Author:          &validUser,
+		Title:           "Test Task",
+		Description:     "Test Description",
+		Code:            "EXISTING-42",
+		Status:          domain.TaskStatusPending,
+		ProjectColumnId: pendingStatusID,
+		ProjectColumn:   &domain.ProjectColumn{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+		Updates:         []domain.TaskUpdate{},
+		Tags:            []string{},
+	}
+
+	baseUpdateRequest := func() service.UpdateTaskRequest {
+		return service.UpdateTaskRequest{
+			TaskId:          validTaskId,
+			Title:           "Test Task",
+			Description:     "Test Description",
+			ProjectColumnId: pendingStatusID,
+			RequestUserId:   validUserId,
+			Priority:        domain.TaskPriorityLow,
+			Tags:            []string{},
+		}
+	}
+
+	t.Run("nil Code preserves existing task code", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&taskWithCode, nil)
+		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		req := baseUpdateRequest()
+		req.Code = nil // not provided — keep existing
+
+		task, err := svc.Update(context.Background(), req)
+		require.NoError(t, err)
+		assert.Equal(t, "EXISTING-42", task.Code, "existing code must be preserved when Code is nil")
+	})
+
+	t.Run("pointer to empty string clears existing task code", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&taskWithCode, nil)
+		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		req := baseUpdateRequest()
+		empty := ""
+		req.Code = &empty
+
+		task, err := svc.Update(context.Background(), req)
+		require.NoError(t, err)
+		assert.Equal(t, "", task.Code, "code must be cleared when Code points to an empty string")
+	})
+
+	t.Run("pointer to new value replaces existing task code", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&taskWithCode, nil)
+		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		req := baseUpdateRequest()
+		newCode := "  NEW-99  "
+		req.Code = &newCode
+
+		task, err := svc.Update(context.Background(), req)
+		require.NoError(t, err)
+		assert.Equal(t, "NEW-99", task.Code, "new code must be trimmed and applied")
+	})
 }
 
 func TestTaskService_Archive(t *testing.T) {

@@ -60,15 +60,15 @@ func NewTaskService(taskRepository taskRepository, projectRepository taskService
 }
 
 type CreateTaskRequest struct {
-	ProjectId       uuid.UUID
-	ProjectColumnId uuid.UUID
-	Title           string
-	Description     string
-	Code            string
-	RequestUserId   uuid.UUID
-	Priority        string
-	DueDate         *time.Time
-	ResponsibleId   *uuid.UUID
+	ProjectId        uuid.UUID
+	ProjectColumnId  uuid.UUID
+	Title            string
+	Description      string
+	Code             string
+	RequestUserId    uuid.UUID
+	Priority         string
+	DueDate          *time.Time
+	ResponsibleId    *uuid.UUID
 	Tags             []string
 	DependsOnTaskIds []uuid.UUID
 }
@@ -202,16 +202,16 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 }
 
 type UpdateTaskRequest struct {
-	TaskId          uuid.UUID
-	Title           string
-	Description     string
-	Code            string
-	ProjectColumnId uuid.UUID
-	RequestUserId   uuid.UUID
-	Priority        domain.TaskPriority
-	DueDate         *time.Time
-	ResponsibleId   *uuid.UUID
-	Tags            []string
+	TaskId           uuid.UUID
+	Title            string
+	Description      string
+	Code             *string
+	ProjectColumnId  uuid.UUID
+	RequestUserId    uuid.UUID
+	Priority         domain.TaskPriority
+	DueDate          *time.Time
+	ResponsibleId    *uuid.UUID
+	Tags             []string
 	DependsOnTaskIds []uuid.UUID
 }
 
@@ -579,15 +579,16 @@ func (ts *TaskService) AssignTaskToSelf(ctx context.Context, request AssignTaskT
 	}
 
 	return ts.updateLoadedTask(ctx, task, project, UpdateTaskRequest{
-		TaskId:          task.Id,
-		Title:           task.Title,
-		Description:     task.Description,
-		ProjectColumnId: task.ProjectColumnId,
-		RequestUserId:   request.RequestUserId,
-		Priority:        task.Priority,
-		DueDate:         task.DueDate,
-		ResponsibleId:   &request.RequestUserId,
-		Tags:            task.Tags,
+		TaskId:           task.Id,
+		Title:            task.Title,
+		Description:      task.Description,
+		Code:             &task.Code,
+		ProjectColumnId:  task.ProjectColumnId,
+		RequestUserId:    request.RequestUserId,
+		Priority:         task.Priority,
+		DueDate:          task.DueDate,
+		ResponsibleId:    &request.RequestUserId,
+		Tags:             task.Tags,
 		DependsOnTaskIds: task.DependsOnTaskIds,
 	})
 }
@@ -695,6 +696,11 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 		return nil, err
 	}
 
+	code := task.Code
+	if request.Code != nil {
+		code = strings.TrimSpace(*request.Code)
+	}
+
 	updatedTask := domain.Task{
 		Id:               task.Id,
 		ProjectId:        task.ProjectId,
@@ -705,7 +711,7 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 		Order:            task.Order,
 		Title:            request.Title,
 		Description:      request.Description,
-		Code:             strings.TrimSpace(request.Code),
+		Code:             code,
 		Status:           domain.TaskStatus(strings.ToLower(projectColumn.Name)),
 		Priority:         request.Priority,
 		ResponsibleId:    request.ResponsibleId,
