@@ -1,6 +1,6 @@
 import { parse } from 'date-fns';
 import { api } from './api';
-import type { ListTasksRequest, ListUserDueTasksRequest, Task, TaskComment } from '@/types/task';
+import type { ListTasksRequest, ListUserDueTasksRequest, Task, TaskComment, TaskDependencyRef } from '@/types/task';
 import type { ITaskForm } from '@/schemas/task-schema';
 import type { CursorPaginated, Paginated } from '@/types/paginated';
 
@@ -104,6 +104,7 @@ export const createTask = async (request: CreateTaskRequest) => {
     responsible_id: request.form.responsible_id,
     due_date: formattedDueDate,
     tags: uniqueTags,
+    depends_on_task_ids: request.form.depends_on_task_ids.length > 0 ? request.form.depends_on_task_ids : null,
   };
 
   const response = await api.post('tasks', {
@@ -125,6 +126,7 @@ interface UpdateTaskRequest {
   due_date: string | null;
   responsible_id: string | null;
   tags: string[];
+  depends_on_task_ids: string[];
 }
 
 export const updateTask = async (request: UpdateTaskRequest) => {
@@ -140,6 +142,7 @@ export const updateTask = async (request: UpdateTaskRequest) => {
     due_date: formattedDueDate,
     responsible_id: request.responsible_id || null,
     tags: request.tags,
+    depends_on_task_ids: request.depends_on_task_ids,
   };
 
   const response = await api.put(`tasks/${request.id}`, {
@@ -277,6 +280,34 @@ export interface SearchTasksForUserRequest {
   limit: number;
   searchQuery: string;
 }
+
+export interface SearchProjectTasksForDependenciesRequest {
+  projectId: string;
+  query: string;
+  excludeTaskId?: string;
+  limit?: number;
+}
+
+export const searchProjectTasksForDependencies = async (request: SearchProjectTasksForDependenciesRequest) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('project_id', request.projectId);
+  searchParams.set('query', request.query);
+
+  if (request.excludeTaskId) {
+    searchParams.set('exclude_task_id', request.excludeTaskId);
+  }
+
+  if (request.limit) {
+    searchParams.set('limit', request.limit.toString());
+  }
+
+  const response = await api.get('tasks/project-search', {
+    searchParams,
+  });
+
+  const json = await response.json<{ data: TaskDependencyRef[] }>();
+  return json.data;
+};
 
 export const searchTasksForUser = async (request: SearchTasksForUserRequest) => {
   const searchParams = new URLSearchParams();

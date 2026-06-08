@@ -1,9 +1,10 @@
-import { Calendar, CircleCheck, ClockArrowUp, Hash, Tag, User } from 'lucide-react';
+import { Calendar, CircleCheck, ClockArrowUp, GitBranch, Hash, Tag, User } from 'lucide-react';
 import { TaskCodeBadge } from '../task-code-badge';
 import { TaskPriorityBadge } from '../task-priority-badge';
 import { TaskStatusBadge } from '../task-status-badge';
 import type { Task } from '@/types/task';
 import { formatDateString, formatTaskDueDate } from '@/utils/date';
+import { useTaskDetailsRouting } from '@/hooks/use-task-details-routing';
 import { cn } from '@/lib/utils';
 
 interface TaskDataGridProps {
@@ -16,7 +17,9 @@ const infoValueClassNames = 'text-sm text-slate-500 dark:text-slate-400 col-star
 const infoIconClassNames = 'h-4 w-4 text-slate-500 dark:text-slate-400';
 
 export const TaskDataGrid = ({ task }: TaskDataGridProps) => {
+  const { openTask } = useTaskDetailsRouting();
   const tags = task.tags ?? [];
+  const dependencies = task.depends_on_tasks ?? [];
 
   return (
     <div className="grid gap-4 rounded-2xl border border-slate-200 p-5 md:grid-cols-2 dark:border-slate-700">
@@ -73,22 +76,43 @@ export const TaskDataGrid = ({ task }: TaskDataGridProps) => {
       </div>
 
       <div className={cn(infoFieldClassNames, 'md:col-span-2')}>
+        <GitBranch className={infoIconClassNames} />
+        <p className={infoTitleClassNames}>Dependencies</p>
+        <div className="col-span-2 flex w-full flex-wrap gap-2">
+          {dependencies.length > 0 ? (
+            dependencies.map((dependency) => (
+              <button
+                key={dependency.id}
+                type="button"
+                onClick={() => openTask(dependency.id)}
+                className="inline-flex max-w-full min-w-0 items-center gap-2 rounded-full border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-900 dark:hover:text-slate-100"
+              >
+                {dependency.code ? <TaskCodeBadge code={dependency.code} /> : null}
+                <span className="truncate">{dependency.title}</span>
+              </button>
+            ))
+          ) : (
+            <p className={infoValueClassNames}>No dependencies added.</p>
+          )}
+        </div>
+      </div>
+
+      <div className={cn(infoFieldClassNames, 'md:col-span-2')}>
         <Tag className={infoIconClassNames} />
         <p className={infoTitleClassNames}>Tags</p>
         <div className="col-span-2 flex w-full flex-wrap gap-2">
-          {tags.length > 0 && (
-            <>
-              {tags.map((tag) => (
-                <div
-                  key={tag}
-                  className="rounded-full border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300"
-                >
-                  {tag}
-                </div>
-              ))}
-            </>
+          {tags.length > 0 ? (
+            tags.map((tag) => (
+              <div
+                key={tag}
+                className="rounded-full border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300"
+              >
+                {tag}
+              </div>
+            ))
+          ) : (
+            <p className={infoValueClassNames}>No tags added.</p>
           )}
-          {tags.length === 0 && <p className={infoValueClassNames}>No tags added.</p>}
         </div>
       </div>
     </div>

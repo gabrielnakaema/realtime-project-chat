@@ -1,13 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format, parseISO } from 'date-fns';
 import { useEffect } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 import { Button } from '../button';
 import { LoadingSpinner } from '../loading';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { TaskFormFields } from './task-form-fields';
-import { getTaskMemberOptions, parseUniqueTags } from './task-form-utils';
+import { getTaskFormValues, getTaskMemberOptions, parseUniqueTags } from './task-form-utils';
 import type { SubmitHandler } from 'react-hook-form';
 import type { ITaskForm } from '@/schemas/task-schema';
 import { useProjectMembers } from '@/hooks/use-project-members';
@@ -35,7 +34,7 @@ function useEditTaskForm(taskId: string, open: boolean, onOpenChange: (open: boo
   const memberOptions = getTaskMemberOptions(projectMembers ?? []);
 
   const form = useForm<ITaskForm>({
-    resolver: zodResolver(taskSchema),
+    resolver: zodResolver(taskSchema as any) as any,
   });
   const { reset } = form;
 
@@ -54,15 +53,7 @@ function useEditTaskForm(taskId: string, open: boolean, onOpenChange: (open: boo
       return;
     }
 
-    reset({
-      code: task.code || undefined,
-      title: task.title,
-      description: task.description,
-      due_date: task.due_date ? format(parseISO(task.due_date), 'yyyy-MM-dd') : undefined,
-      priority: task.priority,
-      responsible_id: task.responsible_id,
-      tags: task.tags?.join(',') || undefined,
-    });
+    reset(getTaskFormValues(task));
   }, [task, reset]);
 
   const onSubmit: SubmitHandler<ITaskForm> = (data) => {
@@ -75,6 +66,7 @@ function useEditTaskForm(taskId: string, open: boolean, onOpenChange: (open: boo
       due_date: data.due_date ?? null,
       responsible_id: data.responsible_id ?? null,
       tags: parseUniqueTags(data.tags),
+      depends_on_task_ids: data.depends_on_task_ids.length ? data.depends_on_task_ids : [],
       project_column_id: task?.project_column_id ?? '',
     });
   };
@@ -133,6 +125,9 @@ export const EditTask = ({ taskId, open, onOpenChange }: EditTaskProps) => {
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto px-6 py-5">
               <TaskFormFields
+                projectId={task.project_id}
+                excludeTaskId={task.id}
+                initialDependencyTasks={task.depends_on_tasks ?? []}
                 memberOptions={memberOptions}
                 descriptionInitialValue={task.description}
                 descriptionEditorKey={task.id}

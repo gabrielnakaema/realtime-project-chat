@@ -1,5 +1,5 @@
 import type { ListTasksRequest } from '@/types/task';
-import type { SearchTasksForUserRequest } from './tasks';
+import type { SearchProjectTasksForDependenciesRequest, SearchTasksForUserRequest } from './tasks';
 
 export interface TaskCommentsQueryKeyState {
   taskId: string;
@@ -49,6 +49,11 @@ export const taskQueryKeys = {
   countByColumn: (projectId: string, projectColumnIds: string[]) => ['tasks', 'count', { projectId, projectColumnIds }],
   listUserDueTasks: ['tasks', 'list', 'user'],
   search: (request: SearchTasksForUserRequest) => ['tasks', 'search', request],
+  searchProjectDependencies: (request: SearchProjectTasksForDependenciesRequest) => [
+    'tasks',
+    'project-search',
+    request,
+  ],
 
   _allGrouped: () => ['tasks', 'list', 'grouped'] as const,
   _allCounts: () => ['tasks', 'count'] as const,

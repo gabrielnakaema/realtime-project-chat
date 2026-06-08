@@ -6,12 +6,18 @@ export type TaskStatus = string;
 
 export type TaskPriority = 'low' | 'medium' | 'high';
 
+export interface TaskDependencyRef {
+  id: string;
+  title: string;
+  code: string;
+}
+
 export interface Task {
   id: string;
   project_id: string;
   title: string;
   description: string;
-  code: string;
+  code: string | null;
   status: TaskStatus;
   project_column_id: string;
   project_column: ProjectColumn | null;
@@ -24,6 +30,8 @@ export interface Task {
   done_at: string | null;
   archived_at: string | null;
   tags: string[] | null;
+  depends_on_task_ids?: string[];
+  depends_on_tasks?: TaskDependencyRef[];
   author_id: string;
   author: User;
   responsible: User | null;

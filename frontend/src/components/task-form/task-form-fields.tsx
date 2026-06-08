@@ -3,17 +3,25 @@ import { Input } from '../input';
 import { Select } from '../select';
 import { TextEditor } from '../text-editor';
 import { TagPreviewList } from './tag-preview-list';
+import { TaskDependencyPicker } from './task-dependency-picker';
 import { parseUniqueTags, priorityOptions } from './task-form-utils';
 import type { ITaskForm } from '@/schemas/task-schema';
 import type { TaskMemberOption } from './task-form-utils';
+import type { TaskDependencyRef } from '@/types/task';
 
 interface TaskFormFieldsProps {
+  projectId: string;
+  excludeTaskId?: string;
+  initialDependencyTasks?: TaskDependencyRef[];
   memberOptions: TaskMemberOption[];
   descriptionInitialValue: string;
   descriptionEditorKey?: string;
 }
 
 export const TaskFormFields = ({
+  projectId,
+  excludeTaskId,
+  initialDependencyTasks = [],
   memberOptions,
   descriptionInitialValue,
   descriptionEditorKey,
@@ -98,6 +106,19 @@ export const TaskFormFields = ({
             );
           }}
         />
+        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Dependencies</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Link tasks that should be finished before this one moves forward.
+            </p>
+          </div>
+          <TaskDependencyPicker
+            projectId={projectId}
+            excludeTaskId={excludeTaskId}
+            initialSelectedTasks={initialDependencyTasks}
+          />
+        </div>
       </div>
       <div className="min-w-0 lg:pl-2">
         <TextEditor

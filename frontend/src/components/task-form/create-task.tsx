@@ -43,7 +43,6 @@ export const CreateTask = ({
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const queryClient = useQueryClient();
   const open = controlledOpen ?? uncontrolledOpen;
-  const defaultProjectColumnId = initialProjectColumnId;
   const setOpen = (nextOpen: boolean) => {
     if (controlledOpen === undefined) {
       setUncontrolledOpen(nextOpen);
@@ -55,9 +54,10 @@ export const CreateTask = ({
   const memberOptions = getTaskMemberOptions(projectMembers ?? []);
 
   const form = useForm<ITaskForm>({
-    resolver: zodResolver(taskSchema),
+    resolver: zodResolver(taskSchema as any) as any,
     defaultValues: {
-      project_column_id: defaultProjectColumnId,
+      project_column_id: initialProjectColumnId,
+      depends_on_task_ids: [],
     },
   });
   const { reset } = form;
@@ -68,9 +68,10 @@ export const CreateTask = ({
     }
 
     reset({
-      project_column_id: defaultProjectColumnId,
+      project_column_id: initialProjectColumnId,
+      depends_on_task_ids: [],
     });
-  }, [defaultProjectColumnId, open, reset]);
+  }, [initialProjectColumnId, open, reset]);
 
   const { mutate, isPending } = useMutation({
     mutationFn: createTask,
@@ -79,7 +80,8 @@ export const CreateTask = ({
       queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
       setOpen(false);
       reset({
-        project_column_id: defaultProjectColumnId,
+        project_column_id: initialProjectColumnId,
+        depends_on_task_ids: [],
       });
     },
   });
@@ -117,7 +119,11 @@ export const CreateTask = ({
                   <LoadingSpinner size="3rem" />
                 </div>
               ) : (
-                <TaskFormFields memberOptions={memberOptions} descriptionInitialValue="" />
+                <TaskFormFields
+                  projectId={projectId}
+                  memberOptions={memberOptions}
+                  descriptionInitialValue=""
+                />
               )}
             </div>
             <div className="flex w-full shrink-0 items-center justify-end gap-4 border-t border-slate-200 px-6 py-4 dark:border-slate-700">
