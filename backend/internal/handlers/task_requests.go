@@ -18,7 +18,8 @@ type CreateTaskRequest struct {
 	Priority        string     `json:"priority"`
 	ResponsibleId   *uuid.UUID `json:"responsible_id"`
 	DueDate         *time.Time `json:"due_date"`
-	Tags            []string   `json:"tags"`
+	Tags              []string    `json:"tags"`
+	DependsOnTaskIds  []uuid.UUID `json:"depends_on_task_ids"`
 }
 
 func (r *CreateTaskRequest) Validate(v *validator.Validator) {
@@ -30,9 +31,6 @@ func (r *CreateTaskRequest) Validate(v *validator.Validator) {
 	v.Check("priority", "priority is required", validator.NotBlank(r.Priority))
 	v.Check("priority", "priority is invalid", slices.Contains(domain.AllowedTaskPriorities, domain.TaskPriority(r.Priority)))
 
-	if r.ResponsibleId != nil && *r.ResponsibleId != uuid.Nil {
-		v.Check("responsible_id", "responsible_id is invalid", *r.ResponsibleId != uuid.Nil)
-	}
 }
 
 type UpdateTaskRequest struct {
@@ -43,7 +41,8 @@ type UpdateTaskRequest struct {
 	Priority        string     `json:"priority"`
 	ResponsibleId   *uuid.UUID `json:"responsible_id"`
 	DueDate         *time.Time `json:"due_date"`
-	Tags            []string   `json:"tags"`
+	Tags              []string    `json:"tags"`
+	DependsOnTaskIds  []uuid.UUID `json:"depends_on_task_ids"`
 }
 
 func (r *UpdateTaskRequest) Validate(v *validator.Validator) {
@@ -54,14 +53,6 @@ func (r *UpdateTaskRequest) Validate(v *validator.Validator) {
 
 	v.Check("priority", "priority is required", validator.NotBlank(r.Priority))
 	v.Check("priority", "priority is invalid", slices.Contains(domain.AllowedTaskPriorities, domain.TaskPriority(r.Priority)))
-
-	if r.ResponsibleId != nil && *r.ResponsibleId != uuid.Nil {
-		v.Check("responsible_id", "responsible_id is invalid", *r.ResponsibleId != uuid.Nil)
-	}
-
-	if r.DueDate != nil {
-		v.Check("due_date", "due_date is required", r.DueDate != nil)
-	}
 
 }
 

@@ -161,13 +161,14 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	_, err = handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "create_task",
 		Arguments: map[string]any{
-			"project_id":        projectID.String(),
-			"project_column_id": columnID.String(),
-			"title":             "New Task",
-			"description":       "Created via MCP",
-			"code":              "  TASK-123  ",
-			"priority":          "medium",
-			"tags":              []any{"backend", "mcp"},
+			"project_id":          projectID.String(),
+			"project_column_id":   columnID.String(),
+			"title":               "New Task",
+			"description":         "Created via MCP",
+			"code":                "  TASK-123  ",
+			"priority":            "medium",
+			"tags":                []any{"backend", "mcp"},
+			"depends_on_task_ids": []any{taskID.String()},
 		},
 	})
 	require.NoError(t, err)
@@ -175,6 +176,7 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	require.NotNil(t, taskSvc.createRequest)
 	assert.Equal(t, projectID, taskSvc.createRequest.ProjectId)
 	assert.Equal(t, "TASK-123", taskSvc.createRequest.Code)
+	assert.Equal(t, []uuid.UUID{taskID}, taskSvc.createRequest.DependsOnTaskIds)
 
 	taskResult, err := handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "get_task",
@@ -204,13 +206,14 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	_, err = handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "update_task",
 		Arguments: map[string]any{
-			"task_id":           taskID.String(),
-			"project_column_id": columnID.String(),
-			"title":             "Task Updated",
-			"description":       "Updated via MCP",
-			"code":              "TASK-456",
-			"priority":          "high",
-			"tags":              []any{"backend", "updated"},
+			"task_id":             taskID.String(),
+			"project_column_id":   columnID.String(),
+			"title":               "Task Updated",
+			"description":         "Updated via MCP",
+			"code":                "TASK-456",
+			"priority":            "high",
+			"tags":                []any{"backend", "updated"},
+			"depends_on_task_ids": []any{taskID.String()},
 		},
 	})
 	require.NoError(t, err)
@@ -218,6 +221,7 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	require.NotNil(t, taskSvc.updateRequest)
 	assert.Equal(t, taskID, taskSvc.updateRequest.TaskId)
 	assert.Equal(t, "TASK-456", taskSvc.updateRequest.Code)
+	assert.Equal(t, []uuid.UUID{taskID}, taskSvc.updateRequest.DependsOnTaskIds)
 
 	_, err = handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "move_task",

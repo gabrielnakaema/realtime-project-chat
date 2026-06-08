@@ -418,13 +418,14 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 		"params": map[string]any{
 			"name": "create_task",
 			"arguments": map[string]any{
-				"project_id":        projectID,
-				"project_column_id": pendingColumnID,
-				"title":             "MCP Created Task",
-				"description":       "Created through MCP",
-				"code":              "MCP-2",
-				"priority":          "high",
-				"tags":              []string{"mcp", "created"},
+				"project_id":          projectID,
+				"project_column_id":   pendingColumnID,
+				"title":               "MCP Created Task",
+				"description":         "Created through MCP",
+				"code":                "MCP-2",
+				"priority":            "high",
+				"tags":                []string{"mcp", "created"},
+				"depends_on_task_ids": []string{task["id"].(string)},
 			},
 		},
 	})
@@ -432,6 +433,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	createdTaskID := createdTask["id"].(string)
 	assert.Equal(t, "MCP Created Task", createdTask["title"])
 	assert.Equal(t, "MCP-2", createdTask["code"])
+	assert.Equal(t, []any{task["id"].(string)}, createdTask["depends_on_task_ids"])
 	assert.Contains(t, createTaskResp["result"].(map[string]any)["content"].([]any)[0].(map[string]any)["text"], "MCP Created Task")
 
 	updateTaskResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
@@ -441,19 +443,21 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 		"params": map[string]any{
 			"name": "update_task",
 			"arguments": map[string]any{
-				"task_id":           createdTaskID,
-				"project_column_id": pendingColumnID,
-				"title":             "MCP Updated Task",
-				"description":       "Updated through MCP",
-				"code":              "MCP-3",
-				"priority":          "medium",
-				"tags":              []string{"mcp", "updated"},
+				"task_id":             createdTaskID,
+				"project_column_id":   pendingColumnID,
+				"title":               "MCP Updated Task",
+				"description":         "Updated through MCP",
+				"code":                "MCP-3",
+				"priority":            "medium",
+				"tags":                []string{"mcp", "updated"},
+				"depends_on_task_ids": []string{},
 			},
 		},
 	})
 	updatedTask := updateTaskResp["result"].(map[string]any)["structuredContent"].(map[string]any)["task"].(map[string]any)
 	assert.Equal(t, "MCP Updated Task", updatedTask["title"])
 	assert.Equal(t, "MCP-3", updatedTask["code"])
+	assert.Equal(t, []any{}, updatedTask["depends_on_task_ids"])
 	assert.Contains(t, updateTaskResp["result"].(map[string]any)["content"].([]any)[0].(map[string]any)["text"], "MCP Updated Task")
 
 	addCommentResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{

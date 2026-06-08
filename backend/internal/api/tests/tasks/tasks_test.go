@@ -235,3 +235,254 @@ func TestTaskCodeFieldFlowsThroughTaskEndpoints(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "", updatedTask["code"])
 }
+
+func TestTaskDependenciesEndpoints(t *testing.T) {
+	testAPI, cleanup := shared.SetupTestAPI(t)
+	defer cleanup()
+
+	testAPI.TruncateTables(t)
+
+	client := shared.NewHTTPClient(testAPI.GetBaseURL())
+	_, err := client.CreateUserAndLogin("task-deps@example.com", "password123")
+	require.NoError(t, err)
+
+	projectResp, err := client.POST("/projects", taskProjectPayload())
+	require.NoError(t, err)
+	defer projectResp.Body.Close()
+	require.Equal(t, http.StatusCreated, projectResp.StatusCode)
+
+	var project map[string]any
+	err = json.NewDecoder(projectResp.Body).Decode(&project)
+	require.NoError(t, err)
+
+	projectID := project["id"].(string)
+	columns := project["columns"].([]any)
+	pendingColumnID := columns[0].(map[string]any)["id"].(string)
+
+	createTask := func(title string, dependsOn []string) map[string]any {
+		payload := map[string]any{
+			"project_id":        projectID,
+			"project_column_id": pendingColumnID,
+			"title":             title,
+			"description":       fmt.Sprintf("%s description", title),
+			"priority":          "medium",
+			"tags":              []string{},
+		}
+		if dependsOn != nil {
+			payload["depends_on_task_ids"] = dependsOn
+		}
+
+		resp, postErr := client.POST("/tasks", payload)
+		require.NoError(t, postErr)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var created map[string]any
+		decodeErr := json.NewDecoder(resp.Body).Decode(&created)
+		require.NoError(t, decodeErr)
+
+		return created
+	}
+
+	blocker := createTask("Blocker", nil)
+	blockerID := blocker["id"].(string)
+
+	blocked := createTask("Blocked", []string{blockerID})
+	blockedID := blocked["id"].(string)
+	assert.Equal(t, []any{blockerID}, blocked["depends_on_task_ids"])
+
+	getResp, err := client.GET(fmt.Sprintf("/tasks/%s", blockedID))
+	require.NoError(t, err)
+	defer getResp.Body.Close()
+	require.Equal(t, http.StatusOK, getResp.StatusCode)
+
+	var fetchedTask map[string]any
+	err = json.NewDecoder(getResp.Body).Decode(&fetchedTask)
+	require.NoError(t, err)
+	assert.Equal(t, []any{blockerID}, fetchedTask["depends_on_task_ids"])
+
+	dependsOnTasks := fetchedTask["depends_on_tasks"].([]any)
+	require.Len(t, dependsOnTasks, 1)
+	dependsOnTask := dependsOnTasks[0].(map[string]any)
+	assert.Equal(t, blockerID, dependsOnTask["id"])
+	assert.Equal(t, "Blocker", dependsOnTask["title"])
+
+	cycleResp, err := client.PUT(fmt.Sprintf("/tasks/%s", blockerID), map[string]any{
+		"title":               "Blocker",
+		"description":         "Cycle attempt",
+		"project_column_id":   pendingColumnID,
+		"priority":            "medium",
+		"tags":                []string{},
+		"depends_on_task_ids": []string{blockedID},
+	})
+	require.NoError(t, err)
+	defer cycleResp.Body.Close()
+	assert.Equal(t, http.StatusUnprocessableEntity, cycleResp.StatusCode)
+
+	clearResp, err := client.PUT(fmt.Sprintf("/tasks/%s", blockedID), map[string]any{
+		"title":               "Blocked",
+		"description":         "No dependencies",
+		"project_column_id":   pendingColumnID,
+		"priority":            "medium",
+		"tags":                []string{},
+		"depends_on_task_ids": []string{},
+	})
+	require.NoError(t, err)
+	defer clearResp.Body.Close()
+	require.Equal(t, http.StatusOK, clearResp.StatusCode)
+
+	var clearedTask map[string]any
+	err = json.NewDecoder(clearResp.Body).Decode(&clearedTask)
+	require.NoError(t, err)
+	assert.Equal(t, []any{}, clearedTask["depends_on_task_ids"])
+}
+
+func TestCreateTaskResponsibleIdValidation(t *testing.T) {
+	testAPI, cleanup := shared.SetupTestAPI(t)
+	defer cleanup()
+
+	testAPI.TruncateTables(t)
+
+	client := shared.NewHTTPClient(testAPI.GetBaseURL())
+	_, err := client.CreateUserAndLogin("responsible-id@example.com", "password123")
+	require.NoError(t, err)
+
+	projectResp, err := client.POST("/projects", taskProjectPayload())
+	require.NoError(t, err)
+	defer projectResp.Body.Close()
+	require.Equal(t, http.StatusCreated, projectResp.StatusCode)
+
+	var project map[string]any
+	err = json.NewDecoder(projectResp.Body).Decode(&project)
+	require.NoError(t, err)
+
+	projectID := project["id"].(string)
+	pendingColumnID := project["columns"].([]any)[0].(map[string]any)["id"].(string)
+
+	basePayload := map[string]any{
+		"project_id":        projectID,
+		"project_column_id": pendingColumnID,
+		"title":             "Task",
+		"description":       "Description",
+		"priority":          "medium",
+	}
+
+	t.Run("invalid uuid string is rejected", func(t *testing.T) {
+		payload := map[string]any{}
+		for k, v := range basePayload {
+			payload[k] = v
+		}
+		payload["responsible_id"] = "not-a-uuid"
+
+		resp, postErr := client.POST("/tasks", payload)
+		require.NoError(t, postErr)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("null responsible_id is accepted", func(t *testing.T) {
+		payload := map[string]any{}
+		for k, v := range basePayload {
+			payload[k] = v
+		}
+		payload["responsible_id"] = nil
+
+		resp, postErr := client.POST("/tasks", payload)
+		require.NoError(t, postErr)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var created map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
+		assert.Nil(t, created["responsible_id"])
+	})
+
+	t.Run("omitted responsible_id is accepted", func(t *testing.T) {
+		resp, postErr := client.POST("/tasks", basePayload)
+		require.NoError(t, postErr)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var created map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
+		assert.Nil(t, created["responsible_id"])
+	})
+}
+
+func TestTaskProjectSearchForDependenciesEndpoint(t *testing.T) {
+	testAPI, cleanup := shared.SetupTestAPI(t)
+	defer cleanup()
+
+	testAPI.TruncateTables(t)
+
+	client := shared.NewHTTPClient(testAPI.GetBaseURL())
+	_, err := client.CreateUserAndLogin("project-search@example.com", "password123")
+	require.NoError(t, err)
+
+	projectResp, err := client.POST("/projects", taskProjectPayload())
+	require.NoError(t, err)
+	defer projectResp.Body.Close()
+	require.Equal(t, http.StatusCreated, projectResp.StatusCode)
+
+	var project map[string]any
+	err = json.NewDecoder(projectResp.Body).Decode(&project)
+	require.NoError(t, err)
+
+	projectID := project["id"].(string)
+	columns := project["columns"].([]any)
+	pendingColumnID := columns[0].(map[string]any)["id"].(string)
+
+	createResp, err := client.POST("/tasks", map[string]any{
+		"project_id":        projectID,
+		"project_column_id": pendingColumnID,
+		"title":             "Auth middleware",
+		"description":       "<p>Implement JWT validation middleware</p>",
+		"code":              "BACKEND-9",
+		"priority":          "medium",
+		"tags":              []string{},
+	})
+	require.NoError(t, err)
+	defer createResp.Body.Close()
+	require.Equal(t, http.StatusCreated, createResp.StatusCode)
+
+	var createdTask map[string]any
+	err = json.NewDecoder(createResp.Body).Decode(&createdTask)
+	require.NoError(t, err)
+	taskID := createdTask["id"].(string)
+
+	searchByCodeResp, err := client.GET(fmt.Sprintf("/tasks/project-search?project_id=%s&query=backend-9", projectID))
+	require.NoError(t, err)
+	defer searchByCodeResp.Body.Close()
+	require.Equal(t, http.StatusOK, searchByCodeResp.StatusCode)
+
+	var searchByCodeResult map[string]any
+	err = json.NewDecoder(searchByCodeResp.Body).Decode(&searchByCodeResult)
+	require.NoError(t, err)
+	searchByCodeData := searchByCodeResult["data"].([]any)
+	require.Len(t, searchByCodeData, 1)
+	searchByCodeTask := searchByCodeData[0].(map[string]any)
+	assert.Equal(t, taskID, searchByCodeTask["id"])
+	assert.Equal(t, "Auth middleware", searchByCodeTask["title"])
+	assert.Equal(t, "BACKEND-9", searchByCodeTask["code"])
+
+	searchByDescriptionResp, err := client.GET("/tasks/project-search?project_id=" + projectID + "&query=jwt+validation")
+	require.NoError(t, err)
+	defer searchByDescriptionResp.Body.Close()
+	require.Equal(t, http.StatusOK, searchByDescriptionResp.StatusCode)
+
+	var searchByDescriptionResult map[string]any
+	err = json.NewDecoder(searchByDescriptionResp.Body).Decode(&searchByDescriptionResult)
+	require.NoError(t, err)
+	searchByDescriptionData := searchByDescriptionResult["data"].([]any)
+	require.Len(t, searchByDescriptionData, 1)
+
+	excludeResp, err := client.GET(fmt.Sprintf("/tasks/project-search?project_id=%s&query=auth&exclude_task_id=%s", projectID, taskID))
+	require.NoError(t, err)
+	defer excludeResp.Body.Close()
+	require.Equal(t, http.StatusOK, excludeResp.StatusCode)
+
+	var excludeResult map[string]any
+	err = json.NewDecoder(excludeResp.Body).Decode(&excludeResult)
+	require.NoError(t, err)
+	assert.Empty(t, excludeResult["data"].([]any))
+}

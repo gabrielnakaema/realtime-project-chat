@@ -1,10 +1,23 @@
 package domain
 
 import (
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+type TaskDependencyRef struct {
+	Id    uuid.UUID `json:"id"`
+	Title string    `json:"title"`
+	Code  string    `json:"code"`
+}
+
+type TaskDependencyEdge struct {
+	TaskId          uuid.UUID
+	DependsOnTaskId uuid.UUID
+}
 
 type TaskStatus string
 
@@ -40,9 +53,11 @@ type Task struct {
 	DueDate         *time.Time   `json:"due_date"`
 	DoneAt          *time.Time   `json:"done_at"`
 	ArchivedAt      *time.Time   `json:"archived_at"`
-	Tags            []string     `json:"tags"`
-	CreatedAt       time.Time    `json:"created_at"`
-	UpdatedAt       time.Time    `json:"updated_at"`
+	Tags             []string            `json:"tags"`
+	DependsOnTaskIds []uuid.UUID         `json:"depends_on_task_ids"`
+	DependsOnTasks   []TaskDependencyRef `json:"depends_on_tasks,omitempty"`
+	CreatedAt        time.Time           `json:"created_at"`
+	UpdatedAt        time.Time           `json:"updated_at"`
 
 	Responsible   *User          `json:"responsible,omitempty"`
 	Author        *User          `json:"author,omitempty"`
@@ -227,6 +242,26 @@ var taskChangeDefinitions = []taskChangeDefinition{
 			}
 		},
 	},
+	{
+		field: "depends_on_task_ids",
+		build: func(old *Task, new *Task) *TaskChange {
+			oldValue := joinSortedUUIDs(old.DependsOnTaskIds)
+			newValue := joinSortedUUIDs(new.DependsOnTaskIds)
+			if oldValue == newValue {
+				return nil
+			}
+
+			oldDisplay := formatSortedRefs(old.DependsOnTasks)
+			newDisplay := formatSortedRefs(new.DependsOnTasks)
+			return &TaskChange{
+				Field:           "depends_on_task_ids",
+				OldValue:        oldValue,
+				NewValue:        newValue,
+				OldDisplayValue: optionalString(oldDisplay),
+				NewDisplayValue: optionalString(newDisplay),
+			}
+		},
+	},
 }
 
 func NewTaskUpdate(old *Task, new *Task, author *User) TaskUpdate {
@@ -323,6 +358,49 @@ func formatTaskTime(value *time.Time) string {
 	}
 
 	return value.UTC().Format(time.RFC3339)
+}
+
+func TaskDependencyRefsToIDs(refs []TaskDependencyRef) []uuid.UUID {
+	ids := make([]uuid.UUID, len(refs))
+	for i, ref := range refs {
+		ids[i] = ref.Id
+	}
+	return ids
+}
+
+func joinSortedUUIDs(ids []uuid.UUID) string {
+	strs := make([]string, len(ids))
+	for i, id := range ids {
+		strs[i] = id.String()
+	}
+	sort.Strings(strs)
+	return strings.Join(strs, ",")
+}
+
+func formatSortedRefs(refs []TaskDependencyRef) string {
+	if len(refs) == 0 {
+		return ""
+	}
+
+	type sortable struct {
+		id    string
+		label string
+	}
+	items := make([]sortable, len(refs))
+	for i, ref := range refs {
+		label := ref.Title
+		if ref.Code != "" {
+			label = ref.Code + " — " + ref.Title
+		}
+		items[i] = sortable{id: ref.Id.String(), label: label}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].id < items[j].id })
+
+	labels := make([]string, len(items))
+	for i, item := range items {
+		labels[i] = item.label
+	}
+	return strings.Join(labels, ", ")
 }
 
 func stringPointer(value string) *string {

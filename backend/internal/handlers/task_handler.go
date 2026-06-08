@@ -27,6 +27,7 @@ type taskService interface {
 	Restore(ctx context.Context, request service.RestoreTaskRequest) (*domain.Task, error)
 	ListUserDueTasks(ctx context.Context, request service.ListUserDueTasksRequest) (*utils.CursorPaginated[domain.Task], error)
 	SearchTasksForUser(ctx context.Context, request service.SearchTasksForUserRequest) (*utils.CursorPaginated[domain.Task], error)
+	SearchProjectTasksForDependencies(ctx context.Context, request service.SearchProjectTasksForDependenciesRequest) ([]domain.TaskDependencyRef, error)
 }
 
 type TaskHandler struct {
@@ -65,9 +66,10 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Code:            request.Code,
 		RequestUserId:   userId,
 		Priority:        request.Priority,
-		ResponsibleId:   request.ResponsibleId,
-		DueDate:         request.DueDate,
-		Tags:            request.Tags,
+		ResponsibleId:    request.ResponsibleId,
+		DueDate:          request.DueDate,
+		Tags:             request.Tags,
+		DependsOnTaskIds: request.DependsOnTaskIds,
 	}
 
 	task, err := h.taskService.Create(r.Context(), serviceRequest)
@@ -317,9 +319,10 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		ProjectColumnId: request.ProjectColumnId,
 		RequestUserId:   userId,
 		Priority:        domain.TaskPriority(request.Priority),
-		ResponsibleId:   request.ResponsibleId,
-		DueDate:         request.DueDate,
-		Tags:            request.Tags,
+		ResponsibleId:    request.ResponsibleId,
+		DueDate:          request.DueDate,
+		Tags:             request.Tags,
+		DependsOnTaskIds: request.DependsOnTaskIds,
 	}
 
 	task, err := h.taskService.Update(r.Context(), serviceRequest)
@@ -519,6 +522,68 @@ func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, result, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *TaskHandler) SearchProjectTasksForDependencies(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+
+	projectId := utils.GetQueryString(r, "project_id", "")
+	if projectId == "" {
+		BadRequestResponse(w, errors.New("project_id is required"))
+		return
+	}
+
+	parsedProjectId, err := uuid.Parse(projectId)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	searchQuery := strings.TrimSpace(utils.GetQueryString(r, "query", ""))
+	if searchQuery == "" {
+		BadRequestResponse(w, errors.New("query is required"))
+		return
+	}
+
+	limit := utils.GetQueryInt(r, "limit", 20)
+	if limit <= 0 {
+		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		return
+	}
+
+	if limit > 100 {
+		BadRequestResponse(w, errors.New("limit must be less than 100"))
+		return
+	}
+
+	var excludeTaskId *uuid.UUID
+	excludeTaskIdParam := utils.GetQueryString(r, "exclude_task_id", "")
+	if excludeTaskIdParam != "" {
+		parsedExcludeTaskId, parseErr := uuid.Parse(excludeTaskIdParam)
+		if parseErr != nil {
+			BadRequestResponse(w, parseErr)
+			return
+		}
+		excludeTaskId = &parsedExcludeTaskId
+	}
+
+	result, err := h.taskService.SearchProjectTasksForDependencies(r.Context(), service.SearchProjectTasksForDependenciesRequest{
+		ProjectId:     parsedProjectId,
+		UserId:        userId,
+		Query:         searchQuery,
+		ExcludeTaskId: excludeTaskId,
+		Limit:         int(limit),
+	})
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, map[string]any{"data": result}, nil)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

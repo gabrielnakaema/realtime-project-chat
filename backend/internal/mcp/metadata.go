@@ -352,6 +352,14 @@ func toolCatalog() []toolSpec {
 							"type": "string",
 						},
 					},
+					"depends_on_task_ids": map[string]any{
+						"type":        "array",
+						"description": "Optional task ids that must be completed before this task.",
+						"items": map[string]any{
+							"type":   "string",
+							"format": "uuid",
+						},
+					},
 				},
 				"required":             []string{"project_id", "project_column_id", "title", "description", "priority"},
 				"additionalProperties": false,
@@ -484,6 +492,14 @@ func toolCatalog() []toolSpec {
 						"description": "Updated task tags.",
 						"items": map[string]any{
 							"type": "string",
+						},
+					},
+					"depends_on_task_ids": map[string]any{
+						"type":        "array",
+						"description": "Updated task ids that must be completed before this task.",
+						"items": map[string]any{
+							"type":   "string",
+							"format": "uuid",
 						},
 					},
 				},

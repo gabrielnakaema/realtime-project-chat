@@ -216,11 +216,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"owner_user_id", principal.UserID,
 	)
 
-	if resp.Error != nil {
-		_ = utils.WriteJSON(w, http.StatusOK, resp, nil)
-		return
-	}
-
 	_ = utils.WriteJSON(w, http.StatusOK, resp, nil)
 }
 
@@ -330,22 +325,27 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		if err != nil {
 			return nil, err
 		}
+		dependsOnTaskIDs, err := optionalUUIDSliceArg(params.Arguments, "depends_on_task_ids")
+		if err != nil {
+			return nil, err
+		}
 		code, err := optionalTrimmedStringArg(params.Arguments, "code")
 		if err != nil {
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
 		task, err := h.taskService.Create(ctx, service.CreateTaskRequest{
-			ProjectId:       projectID,
-			ProjectColumnId: projectColumnID,
-			Title:           title,
-			Description:     description,
-			Code:            code,
-			RequestUserId:   principal.UserID,
-			Priority:        string(priority),
-			ResponsibleId:   responsibleID,
-			DueDate:         dueDate,
-			Tags:            tags,
+			ProjectId:        projectID,
+			ProjectColumnId:  projectColumnID,
+			Title:            title,
+			Description:      description,
+			Code:             code,
+			RequestUserId:    principal.UserID,
+			Priority:         string(priority),
+			ResponsibleId:    responsibleID,
+			DueDate:          dueDate,
+			Tags:             tags,
+			DependsOnTaskIds: dependsOnTaskIDs,
 		})
 		if err != nil {
 			return nil, err
@@ -434,22 +434,27 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		if err != nil {
 			return nil, err
 		}
+		dependsOnTaskIDs, err := optionalUUIDSliceArg(params.Arguments, "depends_on_task_ids")
+		if err != nil {
+			return nil, err
+		}
 		code, err := optionalTrimmedStringArg(params.Arguments, "code")
 		if err != nil {
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
 		task, err := h.taskService.Update(ctx, service.UpdateTaskRequest{
-			TaskId:          taskID,
-			Title:           title,
-			Description:     description,
-			Code:            code,
-			ProjectColumnId: projectColumnID,
-			RequestUserId:   principal.UserID,
-			Priority:        priority,
-			ResponsibleId:   responsibleID,
-			DueDate:         dueDate,
-			Tags:            tags,
+			TaskId:           taskID,
+			Title:            title,
+			Description:      description,
+			Code:             code,
+			ProjectColumnId:  projectColumnID,
+			RequestUserId:    principal.UserID,
+			Priority:         priority,
+			ResponsibleId:    responsibleID,
+			DueDate:          dueDate,
+			Tags:             tags,
+			DependsOnTaskIds: dependsOnTaskIDs,
 		})
 		if err != nil {
 			return nil, err

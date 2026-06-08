@@ -11,12 +11,37 @@ DELETE FROM task_tags WHERE task_id = $1 AND name = $2;
 -- name: DeleteAllTaskTags :exec
 DELETE FROM task_tags WHERE task_id = $1;
 
+-- name: CreateTaskDependency :exec
+INSERT INTO task_dependencies (task_id, depends_on_task_id) VALUES ($1, $2);
+
+-- name: DeleteAllTaskDependencies :exec
+DELETE FROM task_dependencies WHERE task_id = $1;
+
+-- name: CountTasksInProjectByIds :one
+SELECT COUNT(*)::int AS count
+FROM tasks
+WHERE project_id = $1 AND id = ANY($2::uuid[]);
+
+-- name: ListTaskDependenciesByProjectId :many
+SELECT td.task_id, td.depends_on_task_id
+FROM task_dependencies td
+JOIN tasks t ON t.id = td.task_id
+WHERE t.project_id = $1;
+
 -- name: GetTaskById :one
 WITH task_tags_cte AS (
   SELECT
     tt.name as task_tag_name
   from task_tags tt
   WHERE tt.task_id = $1
+), task_dependencies_cte AS (
+  SELECT
+    td.depends_on_task_id,
+    dep.title as depends_on_title,
+    dep.code as depends_on_code
+  FROM task_dependencies td
+  JOIN tasks dep ON dep.id = td.depends_on_task_id
+  WHERE td.task_id = $1
 ), task_changes_cte AS (
   SELECT
     tc.id as task_change_id,
@@ -122,6 +147,14 @@ SELECT
   (select coalesce(jsonb_agg(tt.task_tag_name) filter (where tt.task_tag_name is not null), '[]') from task_tags_cte tt) as tags,
   (select coalesce(jsonb_agg(
     jsonb_build_object(
+      'id', tdc.depends_on_task_id,
+      'title', tdc.depends_on_title,
+      'code', coalesce(tdc.depends_on_code, '')
+    )
+    ORDER BY tdc.depends_on_title, tdc.depends_on_task_id
+  ) filter (where tdc.depends_on_task_id is not null), '[]') from task_dependencies_cte tdc) as depends_on_tasks,
+  (select coalesce(jsonb_agg(
+    jsonb_build_object(
       'id', tu.task_update_id,
       'task_id', tu.task_update_task_id,
       'user_id', tu.task_update_user_id,
@@ -159,12 +192,14 @@ SELECT
   a.name as author_name,
   r.id as responsible_responsible_id,
   r.name as responsible_name,
-  coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
+  coalesce(jsonb_agg(DISTINCT tt.name) filter (where tt.name is not null), '[]') as tags,
+  coalesce(jsonb_agg(DISTINCT td.depends_on_task_id) filter (where td.depends_on_task_id is not null), '[]') as depends_on_task_ids
 FROM tasks t
 JOIN project_columns ps ON ps.id = t.project_column_id
 LEFT JOIN users a ON a.id = t.author_id
 LEFT JOIN users r ON r.id = t.responsible_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
+LEFT JOIN task_dependencies td ON td.task_id = t.id
 WHERE t.project_id = $1
 AND (
   cardinality(sqlc.slice('project_column_ids')::uuid[]) = 0
@@ -202,11 +237,13 @@ SELECT
   p.user_id as project_user_id,
   r.id as responsible_responsible_id,
   r.name as responsible_name,
-  coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
+  coalesce(jsonb_agg(DISTINCT tt.name) filter (where tt.name is not null), '[]') as tags,
+  coalesce(jsonb_agg(DISTINCT td.depends_on_task_id) filter (where td.depends_on_task_id is not null), '[]') as depends_on_task_ids
 FROM tasks t
 JOIN project_columns ps ON ps.id = t.project_column_id
 LEFT JOIN users r ON r.id = t.responsible_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
+LEFT JOIN task_dependencies td ON td.task_id = t.id
 JOIN projects p ON p.id = t.project_id
 WHERE t.responsible_id = $1
 AND t.due_date IS NOT NULL
@@ -305,7 +342,8 @@ SELECT t.*,
   a.name as author_name,
   a.email as author_email,
   a.created_at as author_created_at,
-  coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
+  coalesce(jsonb_agg(DISTINCT tt.name) filter (where tt.name is not null), '[]') as tags,
+  coalesce(jsonb_agg(DISTINCT td.depends_on_task_id) filter (where td.depends_on_task_id is not null), '[]') as depends_on_task_ids
 FROM tasks t
 JOIN project_columns ps ON ps.id = t.project_column_id
 LEFT JOIN users r ON r.id = t.responsible_id
@@ -313,6 +351,7 @@ LEFT JOIN users a ON a.id = t.author_id
 JOIN projects p ON p.id = t.project_id
 JOIN project_ids_cte pi ON pi.project_id = t.project_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
+LEFT JOIN task_dependencies td ON td.task_id = t.id
 WHERE (sqlc.narg('query')::text IS NULL OR (t.title ILIKE '%' || sqlc.narg('query')::text || '%' OR t.description ILIKE '%' || sqlc.narg('query')::text || '%' OR t.code ILIKE '%' || sqlc.narg('query')::text || '%'))
 AND t.archived_at IS NULL
 AND ps.is_done_column = false
@@ -325,3 +364,24 @@ AND (
 GROUP BY t.id, ps.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id, r.id, r.name, r.email, r.created_at, a.id, a.name, a.email, a.created_at
 ORDER BY t.due_date ASC, t.updated_at DESC
 LIMIT $2;
+
+-- name: SearchProjectTasksForDependencies :many
+SELECT
+  t.id,
+  t.title,
+  coalesce(t.code, '') as code
+FROM tasks t
+WHERE t.project_id = sqlc.arg('project_id')
+  AND t.archived_at IS NULL
+  AND (
+    sqlc.narg('exclude_task_id')::uuid IS NULL
+    OR t.id <> sqlc.narg('exclude_task_id')::uuid
+  )
+  AND (
+    t.title ILIKE '%' || sqlc.arg('query')::text || '%'
+    OR coalesce(t.code, '') ILIKE '%' || sqlc.arg('query')::text || '%'
+    OR t.id::text ILIKE '%' || sqlc.arg('query')::text || '%'
+    OR lower(regexp_replace(regexp_replace(t.description, '<[^>]+>', ' ', 'g'), '\s+', ' ', 'g')) LIKE '%' || lower(sqlc.arg('query')::text) || '%'
+  )
+ORDER BY t.title ASC, t.id ASC
+LIMIT sqlc.arg('limit');

@@ -133,6 +133,18 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 		}
 	}
 
+	if len(task.DependsOnTaskIds) > 0 {
+		for _, dependsOnTaskID := range task.DependsOnTaskIds {
+			err = qtx.CreateTaskDependency(ctx, queries.CreateTaskDependencyParams{
+				TaskID:          task.Id,
+				DependsOnTaskID: dependsOnTaskID,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return tx.Commit(ctx)
 }
 
@@ -214,6 +226,10 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if err := mapDependsOnTasksFromResult(result.DependsOnTasks, &task); err != nil {
+		return nil, err
 	}
 
 	if result.Updates != nil {
@@ -317,6 +333,10 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 			}
 		}
 
+		if err := mapDependsOnTaskIdsFromResult(result.DependsOnTaskIds, &task); err != nil {
+			return nil, err
+		}
+
 		if result.DueDate.Valid {
 			task.DueDate = &result.DueDate.Time
 		}
@@ -414,6 +434,23 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 			err = qtx.CreateTaskTag(ctx, queries.CreateTaskTagParams{
 				TaskID: task.Id,
 				Name:   tag,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	err = qtx.DeleteAllTaskDependencies(ctx, task.Id)
+	if err != nil {
+		return err
+	}
+
+	if len(task.DependsOnTaskIds) > 0 {
+		for _, dependsOnTaskID := range task.DependsOnTaskIds {
+			err = qtx.CreateTaskDependency(ctx, queries.CreateTaskDependencyParams{
+				TaskID:          task.Id,
+				DependsOnTaskID: dependsOnTaskID,
 			})
 			if err != nil {
 				return err
@@ -744,6 +781,10 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 			}
 		}
 
+		if err := mapDependsOnTaskIdsFromResult(result.DependsOnTaskIds, &task); err != nil {
+			return nil, err
+		}
+
 		if result.DueDate.Valid {
 			task.DueDate = &result.DueDate.Time
 		}
@@ -848,6 +889,10 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 			}
 		}
 
+		if err := mapDependsOnTaskIdsFromResult(result.DependsOnTaskIds, &task); err != nil {
+			return nil, err
+		}
+
 		if result.DueDate.Valid {
 			task.DueDate = &result.DueDate.Time
 		}
@@ -906,4 +951,148 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 	}
 
 	return &paginated, nil
+}
+
+func (tr *TaskRepository) CountTasksInProjectByIds(ctx context.Context, projectId uuid.UUID, taskIds []uuid.UUID) (int, error) {
+	if len(taskIds) == 0 {
+		return 0, nil
+	}
+
+	q := queries.New(tr.pool)
+	count, err := q.CountTasksInProjectByIds(ctx, queries.CountTasksInProjectByIdsParams{
+		ProjectID: projectId,
+		Column2:   taskIds,
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}
+
+func (tr *TaskRepository) ListTaskDependenciesByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.TaskDependencyEdge, error) {
+	q := queries.New(tr.pool)
+	rows, err := q.ListTaskDependenciesByProjectId(ctx, projectId)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]domain.TaskDependencyEdge, 0, len(rows))
+	for _, row := range rows {
+		edges = append(edges, domain.TaskDependencyEdge{
+			TaskId:          row.TaskID,
+			DependsOnTaskId: row.DependsOnTaskID,
+		})
+	}
+
+	return edges, nil
+}
+
+func mapDependsOnTasksFromResult(raw interface{}, task *domain.Task) error {
+	if raw == nil {
+		task.DependsOnTasks = []domain.TaskDependencyRef{}
+		task.DependsOnTaskIds = []uuid.UUID{}
+		return nil
+	}
+
+	bytes, err := json.Marshal(raw)
+	if err != nil {
+		return err
+	}
+
+	var refs []domain.TaskDependencyRef
+	if err := json.Unmarshal(bytes, &refs); err != nil {
+		return err
+	}
+
+	task.DependsOnTasks = refs
+	task.DependsOnTaskIds = make([]uuid.UUID, 0, len(refs))
+	for _, ref := range refs {
+		task.DependsOnTaskIds = append(task.DependsOnTaskIds, ref.Id)
+	}
+
+	return nil
+}
+
+func mapDependsOnTaskIdsFromResult(raw interface{}, task *domain.Task) error {
+	if raw == nil {
+		task.DependsOnTaskIds = []uuid.UUID{}
+		return nil
+	}
+
+	bytes, err := json.Marshal(raw)
+	if err != nil {
+		return err
+	}
+
+	var ids []uuid.UUID
+	if err := json.Unmarshal(bytes, &ids); err != nil {
+		return err
+	}
+
+	task.DependsOnTaskIds = ids
+	return nil
+}
+
+func (tr *TaskRepository) GetTaskDependencyRefsByProjectAndIds(ctx context.Context, projectId uuid.UUID, ids []uuid.UUID) ([]domain.TaskDependencyRef, error) {
+	const q = `
+		SELECT id, title, coalesce(code, '') AS code
+		FROM tasks
+		WHERE project_id = $1 AND id = ANY($2::uuid[])
+	`
+	rows, err := tr.pool.Query(ctx, q, projectId, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	refs := make([]domain.TaskDependencyRef, 0, len(ids))
+	for rows.Next() {
+		var ref domain.TaskDependencyRef
+		if err := rows.Scan(&ref.Id, &ref.Title, &ref.Code); err != nil {
+			return nil, err
+		}
+		refs = append(refs, ref)
+	}
+
+	return refs, rows.Err()
+}
+
+func (tr *TaskRepository) SearchProjectTasksForDependencies(
+	ctx context.Context,
+	projectId uuid.UUID,
+	query string,
+	excludeTaskId *uuid.UUID,
+	limit int,
+) ([]domain.TaskDependencyRef, error) {
+	q := queries.New(tr.pool)
+
+	params := queries.SearchProjectTasksForDependenciesParams{
+		ProjectID: projectId,
+		Query:     query,
+		Limit:     int32(limit),
+	}
+
+	if excludeTaskId != nil {
+		params.ExcludeTaskID = pgtype.UUID{
+			Bytes: *excludeTaskId,
+			Valid: true,
+		}
+	}
+
+	results, err := q.SearchProjectTasksForDependencies(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	tasks := make([]domain.TaskDependencyRef, 0, len(results))
+	for _, result := range results {
+		tasks = append(tasks, domain.TaskDependencyRef{
+			Id:    result.ID,
+			Title: result.Title,
+			Code:  result.Code,
+		})
+	}
+
+	return tasks, nil
 }

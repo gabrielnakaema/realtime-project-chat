@@ -51,6 +51,24 @@ func (q *Queries) CountTasksByProjectIdAndColumn(ctx context.Context, arg CountT
 	return items, nil
 }
 
+const countTasksInProjectByIds = `-- name: CountTasksInProjectByIds :one
+SELECT COUNT(*)::int AS count
+FROM tasks
+WHERE project_id = $1 AND id = ANY($2::uuid[])
+`
+
+type CountTasksInProjectByIdsParams struct {
+	ProjectID uuid.UUID
+	Column2   []uuid.UUID
+}
+
+func (q *Queries) CountTasksInProjectByIds(ctx context.Context, arg CountTasksInProjectByIdsParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countTasksInProjectByIds, arg.ProjectID, arg.Column2)
+	var count int32
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (project_id, title, description, code, project_column_id, author_id, responsible_id, priority, due_date, done_at, task_order)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id
@@ -122,6 +140,20 @@ func (q *Queries) CreateTaskChange(ctx context.Context, arg CreateTaskChangePara
 	return id, err
 }
 
+const createTaskDependency = `-- name: CreateTaskDependency :exec
+INSERT INTO task_dependencies (task_id, depends_on_task_id) VALUES ($1, $2)
+`
+
+type CreateTaskDependencyParams struct {
+	TaskID          uuid.UUID
+	DependsOnTaskID uuid.UUID
+}
+
+func (q *Queries) CreateTaskDependency(ctx context.Context, arg CreateTaskDependencyParams) error {
+	_, err := q.db.Exec(ctx, createTaskDependency, arg.TaskID, arg.DependsOnTaskID)
+	return err
+}
+
 const createTaskTag = `-- name: CreateTaskTag :exec
 INSERT INTO task_tags (task_id, name) VALUES ($1, $2)
 `
@@ -157,6 +189,15 @@ func (q *Queries) CreateTaskUpdate(ctx context.Context, arg CreateTaskUpdatePara
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const deleteAllTaskDependencies = `-- name: DeleteAllTaskDependencies :exec
+DELETE FROM task_dependencies WHERE task_id = $1
+`
+
+func (q *Queries) DeleteAllTaskDependencies(ctx context.Context, taskID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteAllTaskDependencies, taskID)
+	return err
 }
 
 const deleteAllTaskTags = `-- name: DeleteAllTaskTags :exec
@@ -289,6 +330,14 @@ WITH task_tags_cte AS (
     tt.name as task_tag_name
   from task_tags tt
   WHERE tt.task_id = $1
+), task_dependencies_cte AS (
+  SELECT
+    td.depends_on_task_id,
+    dep.title as depends_on_title,
+    dep.code as depends_on_code
+  FROM task_dependencies td
+  JOIN tasks dep ON dep.id = td.depends_on_task_id
+  WHERE td.task_id = $1
 ), task_changes_cte AS (
   SELECT
     tc.id as task_change_id,
@@ -394,6 +443,14 @@ SELECT
   (select coalesce(jsonb_agg(tt.task_tag_name) filter (where tt.task_tag_name is not null), '[]') from task_tags_cte tt) as tags,
   (select coalesce(jsonb_agg(
     jsonb_build_object(
+      'id', tdc.depends_on_task_id,
+      'title', tdc.depends_on_title,
+      'code', coalesce(tdc.depends_on_code, '')
+    )
+    ORDER BY tdc.depends_on_title, tdc.depends_on_task_id
+  ) filter (where tdc.depends_on_task_id is not null), '[]') from task_dependencies_cte tdc) as depends_on_tasks,
+  (select coalesce(jsonb_agg(
+    jsonb_build_object(
       'id', tu.task_update_id,
       'task_id', tu.task_update_task_id,
       'user_id', tu.task_update_user_id,
@@ -441,6 +498,7 @@ type GetTaskByIdRow struct {
 	TaskResponsibleCreatedAt pgtype.Timestamptz
 	ProjectColumn            []byte
 	Tags                     interface{}
+	DependsOnTasks           interface{}
 	Updates                  interface{}
 }
 
@@ -471,9 +529,42 @@ func (q *Queries) GetTaskById(ctx context.Context, id uuid.UUID) (GetTaskByIdRow
 		&i.TaskResponsibleCreatedAt,
 		&i.ProjectColumn,
 		&i.Tags,
+		&i.DependsOnTasks,
 		&i.Updates,
 	)
 	return i, err
+}
+
+const listTaskDependenciesByProjectId = `-- name: ListTaskDependenciesByProjectId :many
+SELECT td.task_id, td.depends_on_task_id
+FROM task_dependencies td
+JOIN tasks t ON t.id = td.task_id
+WHERE t.project_id = $1
+`
+
+type ListTaskDependenciesByProjectIdRow struct {
+	TaskID          uuid.UUID
+	DependsOnTaskID uuid.UUID
+}
+
+func (q *Queries) ListTaskDependenciesByProjectId(ctx context.Context, projectID uuid.UUID) ([]ListTaskDependenciesByProjectIdRow, error) {
+	rows, err := q.db.Query(ctx, listTaskDependenciesByProjectId, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTaskDependenciesByProjectIdRow
+	for rows.Next() {
+		var i ListTaskDependenciesByProjectIdRow
+		if err := rows.Scan(&i.TaskID, &i.DependsOnTaskID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listTasksByProjectId = `-- name: ListTasksByProjectId :many
@@ -491,12 +582,14 @@ SELECT
   a.name as author_name,
   r.id as responsible_responsible_id,
   r.name as responsible_name,
-  coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
+  coalesce(jsonb_agg(DISTINCT tt.name) filter (where tt.name is not null), '[]') as tags,
+  coalesce(jsonb_agg(DISTINCT td.depends_on_task_id) filter (where td.depends_on_task_id is not null), '[]') as depends_on_task_ids
 FROM tasks t
 JOIN project_columns ps ON ps.id = t.project_column_id
 LEFT JOIN users a ON a.id = t.author_id
 LEFT JOIN users r ON r.id = t.responsible_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
+LEFT JOIN task_dependencies td ON td.task_id = t.id
 WHERE t.project_id = $1
 AND (
   cardinality($3::uuid[]) = 0
@@ -554,6 +647,7 @@ type ListTasksByProjectIdRow struct {
 	ResponsibleResponsibleID  pgtype.UUID
 	ResponsibleName           pgtype.Text
 	Tags                      interface{}
+	DependsOnTaskIds          interface{}
 }
 
 func (q *Queries) ListTasksByProjectId(ctx context.Context, arg ListTasksByProjectIdParams) ([]ListTasksByProjectIdRow, error) {
@@ -601,6 +695,7 @@ func (q *Queries) ListTasksByProjectId(ctx context.Context, arg ListTasksByProje
 			&i.ResponsibleResponsibleID,
 			&i.ResponsibleName,
 			&i.Tags,
+			&i.DependsOnTaskIds,
 		); err != nil {
 			return nil, err
 		}
@@ -631,11 +726,13 @@ SELECT
   p.user_id as project_user_id,
   r.id as responsible_responsible_id,
   r.name as responsible_name,
-  coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
+  coalesce(jsonb_agg(DISTINCT tt.name) filter (where tt.name is not null), '[]') as tags,
+  coalesce(jsonb_agg(DISTINCT td.depends_on_task_id) filter (where td.depends_on_task_id is not null), '[]') as depends_on_task_ids
 FROM tasks t
 JOIN project_columns ps ON ps.id = t.project_column_id
 LEFT JOIN users r ON r.id = t.responsible_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
+LEFT JOIN task_dependencies td ON td.task_id = t.id
 JOIN projects p ON p.id = t.project_id
 WHERE t.responsible_id = $1
 AND t.due_date IS NOT NULL
@@ -692,6 +789,7 @@ type ListUserDueTasksRow struct {
 	ResponsibleResponsibleID  pgtype.UUID
 	ResponsibleName           pgtype.Text
 	Tags                      interface{}
+	DependsOnTaskIds          interface{}
 }
 
 func (q *Queries) ListUserDueTasks(ctx context.Context, arg ListUserDueTasksParams) ([]ListUserDueTasksRow, error) {
@@ -741,6 +839,7 @@ func (q *Queries) ListUserDueTasks(ctx context.Context, arg ListUserDueTasksPara
 			&i.ResponsibleResponsibleID,
 			&i.ResponsibleName,
 			&i.Tags,
+			&i.DependsOnTaskIds,
 		); err != nil {
 			return nil, err
 		}
@@ -792,6 +891,66 @@ func (q *Queries) MoveTask(ctx context.Context, arg MoveTaskParams) (MoveTaskRow
 	return i, err
 }
 
+const searchProjectTasksForDependencies = `-- name: SearchProjectTasksForDependencies :many
+SELECT
+  t.id,
+  t.title,
+  coalesce(t.code, '') as code
+FROM tasks t
+WHERE t.project_id = $1
+  AND t.archived_at IS NULL
+  AND (
+    $2::uuid IS NULL
+    OR t.id <> $2::uuid
+  )
+  AND (
+    t.title ILIKE '%' || $3::text || '%'
+    OR coalesce(t.code, '') ILIKE '%' || $3::text || '%'
+    OR t.id::text ILIKE '%' || $3::text || '%'
+    OR lower(regexp_replace(regexp_replace(t.description, '<[^>]+>', ' ', 'g'), '\s+', ' ', 'g')) LIKE '%' || lower($3::text) || '%'
+  )
+ORDER BY t.title ASC, t.id ASC
+LIMIT $4
+`
+
+type SearchProjectTasksForDependenciesParams struct {
+	ProjectID     uuid.UUID
+	ExcludeTaskID pgtype.UUID
+	Query         string
+	Limit         int32
+}
+
+type SearchProjectTasksForDependenciesRow struct {
+	ID    uuid.UUID
+	Title string
+	Code  string
+}
+
+func (q *Queries) SearchProjectTasksForDependencies(ctx context.Context, arg SearchProjectTasksForDependenciesParams) ([]SearchProjectTasksForDependenciesRow, error) {
+	rows, err := q.db.Query(ctx, searchProjectTasksForDependencies,
+		arg.ProjectID,
+		arg.ExcludeTaskID,
+		arg.Query,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchProjectTasksForDependenciesRow
+	for rows.Next() {
+		var i SearchProjectTasksForDependenciesRow
+		if err := rows.Scan(&i.ID, &i.Title, &i.Code); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchTasksForUser = `-- name: SearchTasksForUser :many
 WITH project_ids_cte AS (
   SELECT DISTINCT pm.project_id
@@ -821,7 +980,8 @@ SELECT t.id, t.project_id, t.title, t.description, t.created_at, t.updated_at, t
   a.name as author_name,
   a.email as author_email,
   a.created_at as author_created_at,
-  coalesce(jsonb_agg(tt.name) filter (where tt.name is not null), '[]') as tags
+  coalesce(jsonb_agg(DISTINCT tt.name) filter (where tt.name is not null), '[]') as tags,
+  coalesce(jsonb_agg(DISTINCT td.depends_on_task_id) filter (where td.depends_on_task_id is not null), '[]') as depends_on_task_ids
 FROM tasks t
 JOIN project_columns ps ON ps.id = t.project_column_id
 LEFT JOIN users r ON r.id = t.responsible_id
@@ -829,6 +989,7 @@ LEFT JOIN users a ON a.id = t.author_id
 JOIN projects p ON p.id = t.project_id
 JOIN project_ids_cte pi ON pi.project_id = t.project_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
+LEFT JOIN task_dependencies td ON td.task_id = t.id
 WHERE ($3::text IS NULL OR (t.title ILIKE '%' || $3::text || '%' OR t.description ILIKE '%' || $3::text || '%' OR t.code ILIKE '%' || $3::text || '%'))
 AND t.archived_at IS NULL
 AND ps.is_done_column = false
@@ -890,6 +1051,7 @@ type SearchTasksForUserRow struct {
 	AuthorEmail               pgtype.Text
 	AuthorCreatedAt           pgtype.Timestamptz
 	Tags                      interface{}
+	DependsOnTaskIds          interface{}
 }
 
 func (q *Queries) SearchTasksForUser(ctx context.Context, arg SearchTasksForUserParams) ([]SearchTasksForUserRow, error) {
@@ -946,6 +1108,7 @@ func (q *Queries) SearchTasksForUser(ctx context.Context, arg SearchTasksForUser
 			&i.AuthorEmail,
 			&i.AuthorCreatedAt,
 			&i.Tags,
+			&i.DependsOnTaskIds,
 		); err != nil {
 			return nil, err
 		}

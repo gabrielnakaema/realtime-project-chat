@@ -25,6 +25,9 @@ type taskRepository interface {
 	CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error)
 	ListUserDueTasks(ctx context.Context, userId uuid.UUID, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 	SearchTasksForUser(ctx context.Context, userId uuid.UUID, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
+	SearchProjectTasksForDependencies(ctx context.Context, projectId uuid.UUID, query string, excludeTaskId *uuid.UUID, limit int) ([]domain.TaskDependencyRef, error)
+	GetTaskDependencyRefsByProjectAndIds(ctx context.Context, projectId uuid.UUID, taskIds []uuid.UUID) ([]domain.TaskDependencyRef, error)
+	ListTaskDependenciesByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.TaskDependencyEdge, error)
 }
 
 type taskServiceProjectRepository interface {
@@ -66,7 +69,8 @@ type CreateTaskRequest struct {
 	Priority        string
 	DueDate         *time.Time
 	ResponsibleId   *uuid.UUID
-	Tags            []string
+	Tags             []string
+	DependsOnTaskIds []uuid.UUID
 }
 
 func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*domain.Task, error) {
@@ -145,25 +149,32 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		formattedTags = append(formattedTags, tag)
 	}
 
+	dependsOnRefs, err := ts.validateDependsOnTaskIds(ctx, request.ProjectId, uuid.Nil, request.DependsOnTaskIds)
+	if err != nil {
+		return nil, err
+	}
+
 	task := domain.Task{
-		ProjectId:       request.ProjectId,
-		Title:           request.Title,
-		Description:     request.Description,
-		Code:            normalizeTaskCode(request.Code),
-		Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
-		AuthorId:        request.RequestUserId,
-		ProjectColumnId: request.ProjectColumnId,
-		CreatedAt:       time.Now(),
-		UpdatedAt:       time.Now(),
-		Author:          user,
-		Priority:        domain.TaskPriority(request.Priority),
-		Order:           order,
-		ResponsibleId:   request.ResponsibleId,
-		Responsible:     responsible,
-		DueDate:         request.DueDate,
-		Tags:            formattedTags,
-		Updates:         []domain.TaskUpdate{},
-		ProjectColumn:   projectColumn,
+		ProjectId:        request.ProjectId,
+		Title:            request.Title,
+		Description:      request.Description,
+		Code:             strings.TrimSpace(request.Code),
+		Status:           domain.TaskStatus(strings.ToLower(projectColumn.Name)),
+		AuthorId:         request.RequestUserId,
+		ProjectColumnId:  request.ProjectColumnId,
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
+		Author:           user,
+		Priority:         domain.TaskPriority(request.Priority),
+		Order:            order,
+		ResponsibleId:    request.ResponsibleId,
+		Responsible:      responsible,
+		DueDate:          request.DueDate,
+		Tags:             formattedTags,
+		DependsOnTaskIds: domain.TaskDependencyRefsToIDs(dependsOnRefs),
+		DependsOnTasks:   dependsOnRefs,
+		Updates:          []domain.TaskUpdate{},
+		ProjectColumn:    projectColumn,
 	}
 
 	if projectColumn.IsDoneColumn {
@@ -201,6 +212,7 @@ type UpdateTaskRequest struct {
 	DueDate         *time.Time
 	ResponsibleId   *uuid.UUID
 	Tags            []string
+	DependsOnTaskIds []uuid.UUID
 }
 
 func (ts *TaskService) Update(ctx context.Context, request UpdateTaskRequest) (*domain.Task, error) {
@@ -576,6 +588,7 @@ func (ts *TaskService) AssignTaskToSelf(ctx context.Context, request AssignTaskT
 		DueDate:         task.DueDate,
 		ResponsibleId:   &request.RequestUserId,
 		Tags:            task.Tags,
+		DependsOnTaskIds: task.DependsOnTaskIds,
 	})
 }
 
@@ -677,27 +690,34 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 		formattedTags = append(formattedTags, tag)
 	}
 
+	dependsOnRefs, err := ts.validateDependsOnTaskIds(ctx, task.ProjectId, task.Id, request.DependsOnTaskIds)
+	if err != nil {
+		return nil, err
+	}
+
 	updatedTask := domain.Task{
-		Id:              task.Id,
-		ProjectId:       task.ProjectId,
-		ProjectColumnId: request.ProjectColumnId,
-		AuthorId:        task.AuthorId,
-		CreatedAt:       task.CreatedAt,
-		Author:          task.Author,
-		Order:           task.Order,
-		Title:           request.Title,
-		Description:     request.Description,
-		Code:            normalizeTaskCode(request.Code),
-		Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
-		Priority:        request.Priority,
-		ResponsibleId:   request.ResponsibleId,
-		Responsible:     responsible,
-		DueDate:         request.DueDate,
-		Tags:            formattedTags,
-		UpdatedAt:       time.Now(),
-		Updates:         []domain.TaskUpdate{},
-		ProjectColumn:   projectColumn,
-		ArchivedAt:      task.ArchivedAt,
+		Id:               task.Id,
+		ProjectId:        task.ProjectId,
+		ProjectColumnId:  request.ProjectColumnId,
+		AuthorId:         task.AuthorId,
+		CreatedAt:        task.CreatedAt,
+		Author:           task.Author,
+		Order:            task.Order,
+		Title:            request.Title,
+		Description:      request.Description,
+		Code:             strings.TrimSpace(request.Code),
+		Status:           domain.TaskStatus(strings.ToLower(projectColumn.Name)),
+		Priority:         request.Priority,
+		ResponsibleId:    request.ResponsibleId,
+		Responsible:      responsible,
+		DueDate:          request.DueDate,
+		Tags:             formattedTags,
+		DependsOnTaskIds: domain.TaskDependencyRefsToIDs(dependsOnRefs),
+		DependsOnTasks:   dependsOnRefs,
+		UpdatedAt:        time.Now(),
+		Updates:          []domain.TaskUpdate{},
+		ProjectColumn:    projectColumn,
+		ArchivedAt:       task.ArchivedAt,
 	}
 
 	if projectColumn.IsDoneColumn {
@@ -729,10 +749,6 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 	}
 
 	return &updatedTask, nil
-}
-
-func normalizeTaskCode(value string) string {
-	return strings.TrimSpace(value)
 }
 
 func (ts *TaskService) getTaskAndProjectForUser(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (*domain.Task, *domain.Project, error) {
@@ -859,6 +875,45 @@ func (ts *TaskService) SearchTasksForUser(ctx context.Context, request SearchTas
 	return result, nil
 }
 
+type SearchProjectTasksForDependenciesRequest struct {
+	ProjectId     uuid.UUID
+	UserId        uuid.UUID
+	Query         string
+	ExcludeTaskId *uuid.UUID
+	Limit         int
+}
+
+func (ts *TaskService) SearchProjectTasksForDependencies(ctx context.Context, request SearchProjectTasksForDependenciesRequest) ([]domain.TaskDependencyRef, error) {
+	if request.UserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	if request.ProjectId == uuid.Nil {
+		return nil, domain.BusinessValidationError("project_id is required")
+	}
+
+	query := strings.TrimSpace(request.Query)
+	if query == "" {
+		return nil, domain.BusinessValidationError("query is required")
+	}
+
+	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
+	if err != nil {
+		return nil, domain.ServerError("failed to get project", err)
+	}
+
+	if !project.IsMember(request.UserId) {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	results, err := ts.taskRepository.SearchProjectTasksForDependencies(ctx, request.ProjectId, query, request.ExcludeTaskId, request.Limit)
+	if err != nil {
+		return nil, domain.ServerError("failed to search project tasks for dependencies", err)
+	}
+
+	return results, nil
+}
+
 func findProjectColumn(project *domain.Project, statusID uuid.UUID) (*domain.ProjectColumn, error) {
 	for _, status := range project.Columns {
 		if status.Id == statusID {
@@ -887,6 +942,111 @@ func validateProjectColumnIDs(project *domain.Project, statusIDs []uuid.UUID) er
 	}
 
 	return nil
+}
+
+func (ts *TaskService) validateDependsOnTaskIds(ctx context.Context, projectId uuid.UUID, taskId uuid.UUID, dependsOnTaskIds []uuid.UUID) ([]domain.TaskDependencyRef, error) {
+	uniqueIDs := dedupeDependsOnTaskIds(dependsOnTaskIds)
+	if len(uniqueIDs) == 0 {
+		return []domain.TaskDependencyRef{}, nil
+	}
+
+	for _, dependsOnTaskID := range uniqueIDs {
+		if dependsOnTaskID == uuid.Nil {
+			return nil, domain.BusinessValidationError("depends_on_task_ids contains an invalid task id")
+		}
+		if taskId != uuid.Nil && dependsOnTaskID == taskId {
+			return nil, domain.BusinessValidationError("task cannot depend on itself")
+		}
+	}
+
+	refs, err := ts.taskRepository.GetTaskDependencyRefsByProjectAndIds(ctx, projectId, uniqueIDs)
+	if err != nil {
+		return nil, domain.ServerError("failed to validate task dependencies", err)
+	}
+
+	refByID := make(map[uuid.UUID]domain.TaskDependencyRef, len(refs))
+	for _, ref := range refs {
+		refByID[ref.Id] = ref
+	}
+
+	orderedRefs := make([]domain.TaskDependencyRef, 0, len(uniqueIDs))
+	for _, id := range uniqueIDs {
+		ref, ok := refByID[id]
+		if !ok {
+			return nil, domain.BusinessValidationError("depends_on_task_ids contains unknown tasks")
+		}
+		orderedRefs = append(orderedRefs, ref)
+	}
+
+	if taskId == uuid.Nil {
+		return orderedRefs, nil
+	}
+
+	edges, err := ts.taskRepository.ListTaskDependenciesByProjectId(ctx, projectId)
+	if err != nil {
+		return nil, domain.ServerError("failed to validate task dependencies", err)
+	}
+
+	if hasDependencyCycle(taskId, uniqueIDs, edges) {
+		return nil, domain.BusinessValidationError("depends_on_task_ids would create a dependency cycle")
+	}
+
+	return orderedRefs, nil
+}
+
+func dedupeDependsOnTaskIds(ids []uuid.UUID) []uuid.UUID {
+	if len(ids) == 0 {
+		return []uuid.UUID{}
+	}
+
+	seen := make(map[uuid.UUID]struct{}, len(ids))
+	unique := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+
+	return unique
+}
+
+func hasDependencyCycle(taskId uuid.UUID, dependsOnTaskIds []uuid.UUID, edges []domain.TaskDependencyEdge) bool {
+	adjacency := make(map[uuid.UUID][]uuid.UUID)
+	for _, edge := range edges {
+		if edge.TaskId == taskId {
+			continue
+		}
+		adjacency[edge.TaskId] = append(adjacency[edge.TaskId], edge.DependsOnTaskId)
+	}
+	adjacency[taskId] = dependsOnTaskIds
+
+	for _, dependsOnTaskID := range dependsOnTaskIds {
+		if dependencyPathReachesTask(dependsOnTaskID, taskId, adjacency, map[uuid.UUID]bool{}) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func dependencyPathReachesTask(current, target uuid.UUID, adjacency map[uuid.UUID][]uuid.UUID, visited map[uuid.UUID]bool) bool {
+	if current == target {
+		return true
+	}
+	if visited[current] {
+		return false
+	}
+
+	visited[current] = true
+	for _, next := range adjacency[current] {
+		if dependencyPathReachesTask(next, target, adjacency, visited) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func resolveDoneColumn(project *domain.Project) (*domain.ProjectColumn, error) {

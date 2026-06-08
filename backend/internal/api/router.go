@@ -98,6 +98,7 @@ func (a *Api) Router() http.Handler {
 			r.Get("/", a.handlers.Task.List)
 			r.Post("/", a.handlers.Task.Create)
 			r.Get("/user", a.handlers.Task.ListUserDueTasks)
+			r.Get("/project-search", a.handlers.Task.SearchProjectTasksForDependencies)
 			r.Get("/{id}", a.handlers.Task.Get)
 			r.Get("/{id}/comments", a.handlers.TaskComment.ListByTaskID)
 			r.Post("/{id}/comments", a.handlers.TaskComment.Create)

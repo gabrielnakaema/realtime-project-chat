@@ -168,6 +168,12 @@ type TaskComment struct {
 	ActionOrigin    string
 }
 
+type TaskDependency struct {
+	TaskID          uuid.UUID
+	DependsOnTaskID uuid.UUID
+	CreatedAt       pgtype.Timestamptz
+}
+
 type TaskTag struct {
 	TaskID    uuid.UUID
 	Name      string

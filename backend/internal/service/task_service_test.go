@@ -106,12 +106,36 @@ func (m *mockTaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.U
 	return args.Get(0).(*utils.CursorPaginated[domain.Task]), args.Error(1)
 }
 
+func (m *mockTaskRepository) SearchProjectTasksForDependencies(ctx context.Context, projectId uuid.UUID, query string, excludeTaskId *uuid.UUID, limit int) ([]domain.TaskDependencyRef, error) {
+	args := m.Called(ctx, projectId, query, excludeTaskId, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.TaskDependencyRef), args.Error(1)
+}
+
 func (m *mockTaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UUID, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
 	args := m.Called(ctx, userId, searchQuery, cursorDueDate, cursorUpdatedAt, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*utils.CursorPaginated[domain.Task]), args.Error(1)
+}
+
+func (m *mockTaskRepository) GetTaskDependencyRefsByProjectAndIds(ctx context.Context, projectId uuid.UUID, taskIds []uuid.UUID) ([]domain.TaskDependencyRef, error) {
+	args := m.Called(ctx, projectId, taskIds)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.TaskDependencyRef), args.Error(1)
+}
+
+func (m *mockTaskRepository) ListTaskDependenciesByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.TaskDependencyEdge, error) {
+	args := m.Called(ctx, projectId)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.TaskDependencyEdge), args.Error(1)
 }
 
 func TestTaskService_Create(t *testing.T) {
@@ -1464,5 +1488,199 @@ func TestTaskService_AssignTaskToSelf(t *testing.T) {
 		mockRepo.AssertExpectations(t)
 		mockProjectRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
+	})
+}
+
+func TestTaskService_Dependencies(t *testing.T) {
+	validUserId := uuid.New()
+	validProjectId := uuid.New()
+	validTaskId := uuid.New()
+	dependencyTaskId := uuid.New()
+	otherDependencyTaskId := uuid.New()
+	pendingStatusID := uuid.New()
+	doingStatusID := uuid.New()
+	doneStatusID := uuid.New()
+
+	validProject := domain.Project{
+		Id:      validProjectId,
+		UserId:  validUserId,
+		Members: []domain.ProjectMember{{UserId: validUserId, Role: domain.ProjectMemberRoleCreator}},
+		Columns: []domain.ProjectColumn{
+			{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+			{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 1},
+			{Id: doneStatusID, ProjectId: validProjectId, Name: "Done", Color: "#059669", Position: 2, IsDoneColumn: true},
+		},
+	}
+
+	validUser := domain.User{Id: validUserId, Name: "Test User", Email: "user@example.com"}
+	validTask := domain.Task{
+		Id:              validTaskId,
+		ProjectId:       validProjectId,
+		AuthorId:        validUserId,
+		Title:           "Task",
+		Description:     "Description",
+		ProjectColumnId: pendingStatusID,
+		ProjectColumn:   &domain.ProjectColumn{Id: pendingStatusID, ProjectId: validProjectId, Name: "Pending", Color: "#64748B", Position: 0},
+		Priority:        domain.TaskPriorityMedium,
+	}
+
+	t.Run("create clears empty dependencies to empty slice", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+
+		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+		mockUserRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
+		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
+		mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		task, err := svc.Create(context.Background(), service.CreateTaskRequest{
+			ProjectId:       validProjectId,
+			ProjectColumnId: pendingStatusID,
+			Title:           "Independent task",
+			Description:     "No dependencies",
+			RequestUserId:   validUserId,
+			Priority:        string(domain.TaskPriorityMedium),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, task)
+		assert.Equal(t, []uuid.UUID{}, task.DependsOnTaskIds)
+	})
+
+	t.Run("create with dependencies", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+
+		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+		mockUserRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
+		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
+		mockRepo.On("GetTaskDependencyRefsByProjectAndIds", mock.Anything, validProjectId, []uuid.UUID{dependencyTaskId}).Return([]domain.TaskDependencyRef{{Id: dependencyTaskId, Title: "Dependency Task", Code: "DEP-1"}}, nil)
+		mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		task, err := svc.Create(context.Background(), service.CreateTaskRequest{
+			ProjectId:        validProjectId,
+			ProjectColumnId:  pendingStatusID,
+			Title:            "Blocked task",
+			Description:      "Depends on another task",
+			RequestUserId:    validUserId,
+			Priority:         string(domain.TaskPriorityMedium),
+			DependsOnTaskIds: []uuid.UUID{dependencyTaskId, dependencyTaskId},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, task)
+		assert.Equal(t, []uuid.UUID{dependencyTaskId}, task.DependsOnTaskIds)
+	})
+
+	t.Run("create rejects unknown dependencies", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+
+		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+		mockUserRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
+		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
+		mockRepo.On("GetTaskDependencyRefsByProjectAndIds", mock.Anything, validProjectId, []uuid.UUID{dependencyTaskId}).Return([]domain.TaskDependencyRef{}, nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		_, err := svc.Create(context.Background(), service.CreateTaskRequest{
+			ProjectId:        validProjectId,
+			ProjectColumnId:  pendingStatusID,
+			Title:            "Blocked task",
+			Description:      "Depends on another task",
+			RequestUserId:    validUserId,
+			Priority:         string(domain.TaskPriorityMedium),
+			DependsOnTaskIds: []uuid.UUID{dependencyTaskId},
+		})
+
+		require.Error(t, err)
+		var domainErr domain.DomainError
+		require.ErrorAs(t, err, &domainErr)
+		assert.Equal(t, domain.BusinessValidationErrorCode, domainErr.Code)
+	})
+
+	t.Run("update rejects self dependency", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+
+		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
+		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		_, err := svc.Update(context.Background(), service.UpdateTaskRequest{
+			TaskId:           validTaskId,
+			Title:            validTask.Title,
+			Description:      validTask.Description,
+			ProjectColumnId:  pendingStatusID,
+			RequestUserId:    validUserId,
+			Priority:         validTask.Priority,
+			DependsOnTaskIds: []uuid.UUID{validTaskId},
+		})
+
+		require.Error(t, err)
+		var domainErr domain.DomainError
+		require.ErrorAs(t, err, &domainErr)
+		assert.Equal(t, domain.BusinessValidationErrorCode, domainErr.Code)
+	})
+
+	t.Run("update rejects dependency cycle", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+
+		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
+		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+		mockRepo.On("GetTaskDependencyRefsByProjectAndIds", mock.Anything, validProjectId, []uuid.UUID{dependencyTaskId}).Return([]domain.TaskDependencyRef{{Id: dependencyTaskId, Title: "Dependency Task", Code: "DEP-1"}}, nil)
+		mockRepo.On("ListTaskDependenciesByProjectId", mock.Anything, validProjectId).Return([]domain.TaskDependencyEdge{
+			{TaskId: dependencyTaskId, DependsOnTaskId: validTaskId},
+		}, nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		_, err := svc.Update(context.Background(), service.UpdateTaskRequest{
+			TaskId:           validTaskId,
+			Title:            validTask.Title,
+			Description:      validTask.Description,
+			ProjectColumnId:  pendingStatusID,
+			RequestUserId:    validUserId,
+			Priority:         validTask.Priority,
+			DependsOnTaskIds: []uuid.UUID{dependencyTaskId},
+		})
+
+		require.Error(t, err)
+		var domainErr domain.DomainError
+		require.ErrorAs(t, err, &domainErr)
+		assert.Equal(t, domain.BusinessValidationErrorCode, domainErr.Code)
+	})
+
+	t.Run("update accepts valid dependencies", func(t *testing.T) {
+		mockRepo := &mockTaskRepository{}
+		mockProjectRepo := &mockProjectRepository{}
+		mockUserRepo := &mockUserRepository{}
+
+		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
+		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+		mockRepo.On("GetTaskDependencyRefsByProjectAndIds", mock.Anything, validProjectId, []uuid.UUID{dependencyTaskId, otherDependencyTaskId}).Return([]domain.TaskDependencyRef{{Id: dependencyTaskId, Title: "Dependency Task", Code: "DEP-1"}, {Id: otherDependencyTaskId, Title: "Other Dependency Task", Code: "DEP-2"}}, nil)
+		mockRepo.On("ListTaskDependenciesByProjectId", mock.Anything, validProjectId).Return([]domain.TaskDependencyEdge{}, nil)
+		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
+
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		task, err := svc.Update(context.Background(), service.UpdateTaskRequest{
+			TaskId:           validTaskId,
+			Title:            validTask.Title,
+			Description:      validTask.Description,
+			ProjectColumnId:  pendingStatusID,
+			RequestUserId:    validUserId,
+			Priority:         validTask.Priority,
+			DependsOnTaskIds: []uuid.UUID{dependencyTaskId, otherDependencyTaskId},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, task)
+		assert.Equal(t, []uuid.UUID{dependencyTaskId, otherDependencyTaskId}, task.DependsOnTaskIds)
 	})
 }
