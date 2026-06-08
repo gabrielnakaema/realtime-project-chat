@@ -57,10 +57,7 @@ export const KanbanBoard = ({ project }: KanbanBoardProps) => {
         <CreateTask projectId={projectId} initialProjectColumnId={project.columns[0]?.id} />
       </div>
 
-      <div
-        className="grid h-[calc(100vh-200px)] grid-cols-1 gap-6"
-        style={{ gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(0, 1fr))` }}
-      >
+      <div className="flex h-[calc(100vh-200px)] w-full max-w-full gap-6 overflow-x-auto pb-3">
         {columns.map((column) => (
           <BoardColumn canEditColumns={isOwner} column={column} key={column.id} />
         ))}

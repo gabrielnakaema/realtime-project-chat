@@ -112,7 +112,7 @@ export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
   return (
     <div
       key={column.id}
-      className={cn('flex flex-col overflow-auto rounded-2xl border p-4 shadow-sm')}
+      className={cn('flex min-w-84 flex-1 shrink-0 flex-col overflow-hidden rounded-2xl border p-4 shadow-sm')}
       style={{ backgroundColor: surface.backgroundColor, borderColor: surface.borderColor }}
       ref={columnRef}
     >
