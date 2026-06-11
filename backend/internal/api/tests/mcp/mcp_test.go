@@ -295,6 +295,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	guideText := guideContents[0].(map[string]any)["text"].(string)
 	assert.Contains(t, guideText, "Recommended workflow")
 	assert.Contains(t, guideText, "list_projects")
+	assert.Contains(t, guideText, "find_task_by_code")
 	assert.NotContains(t, guideText, "create_task")
 
 	toolsResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
@@ -312,6 +313,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 		assert.NotNil(t, tool["outputSchema"])
 	}
 	assert.Contains(t, toolNames, "list_projects")
+	assert.Contains(t, toolNames, "find_task_by_code")
 	assert.Contains(t, toolNames, "get_task")
 	assert.NotContains(t, toolNames, "create_task")
 	assert.NotContains(t, toolNames, "list_task_comments")
@@ -397,6 +399,22 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	missingCommentsStructured := missingCommentsResult["structuredContent"].(map[string]any)
 	assert.Equal(t, "missing_scope", missingCommentsStructured["error"].(map[string]any)["type"])
 
+	findTaskResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.6",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "find_task_by_code",
+			"arguments": map[string]any{
+				"project_id": projectID,
+				"code":       "  MCP-1  ",
+			},
+		},
+	})
+	foundTask := findTaskResp["result"].(map[string]any)["structuredContent"].(map[string]any)["task"].(map[string]any)
+	assert.Equal(t, task["id"].(string), foundTask["id"])
+	assert.Equal(t, "MCP-1", foundTask["code"])
+
 	boardResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
 		"jsonrpc": "2.0",
 		"id":      "3.75",
@@ -459,6 +477,59 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	assert.Equal(t, "MCP-3", updatedTask["code"])
 	assert.Equal(t, []any{}, updatedTask["depends_on_task_ids"])
 	assert.Contains(t, updateTaskResp["result"].(map[string]any)["content"].([]any)[0].(map[string]any)["text"], "MCP Updated Task")
+
+	duplicateOneResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.95",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "create_task",
+			"arguments": map[string]any{
+				"project_id":        projectID,
+				"project_column_id": pendingColumnID,
+				"title":             "Duplicate One",
+				"description":       "First duplicate",
+				"code":              "MCP-DUPE",
+				"priority":          "medium",
+			},
+		},
+	})
+	assert.False(t, duplicateOneResp["result"].(map[string]any)["isError"] == true)
+
+	duplicateTwoResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.96",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "create_task",
+			"arguments": map[string]any{
+				"project_id":        projectID,
+				"project_column_id": pendingColumnID,
+				"title":             "Duplicate Two",
+				"description":       "Second duplicate",
+				"code":              "MCP-DUPE",
+				"priority":          "medium",
+			},
+		},
+	})
+	assert.False(t, duplicateTwoResp["result"].(map[string]any)["isError"] == true)
+
+	ambiguousFindResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.97",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "find_task_by_code",
+			"arguments": map[string]any{
+				"project_id": projectID,
+				"code":       "MCP-DUPE",
+			},
+		},
+	})
+	ambiguousFindResult := ambiguousFindResp["result"].(map[string]any)
+	assert.Equal(t, true, ambiguousFindResult["isError"])
+	ambiguousFindStructured := ambiguousFindResult["structuredContent"].(map[string]any)
+	assert.Equal(t, "business_validation", ambiguousFindStructured["error"].(map[string]any)["type"])
 
 	addCommentResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
 		"jsonrpc": "2.0",

@@ -223,6 +223,49 @@ func (q *Queries) DeleteTaskTag(ctx context.Context, arg DeleteTaskTagParams) er
 	return err
 }
 
+const findTaskRefsByProjectAndCode = `-- name: FindTaskRefsByProjectAndCode :many
+SELECT
+  t.id,
+  t.title,
+  coalesce(t.code, '') as code
+FROM tasks t
+WHERE t.project_id = $1
+  AND t.archived_at IS NULL
+  AND lower(btrim(coalesce(t.code, ''))) = lower(btrim($2::text))
+ORDER BY t.updated_at DESC, t.created_at DESC, t.id DESC
+`
+
+type FindTaskRefsByProjectAndCodeParams struct {
+	ProjectID uuid.UUID
+	Code      string
+}
+
+type FindTaskRefsByProjectAndCodeRow struct {
+	ID    uuid.UUID
+	Title string
+	Code  string
+}
+
+func (q *Queries) FindTaskRefsByProjectAndCode(ctx context.Context, arg FindTaskRefsByProjectAndCodeParams) ([]FindTaskRefsByProjectAndCodeRow, error) {
+	rows, err := q.db.Query(ctx, findTaskRefsByProjectAndCode, arg.ProjectID, arg.Code)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FindTaskRefsByProjectAndCodeRow
+	for rows.Next() {
+		var i FindTaskRefsByProjectAndCodeRow
+		if err := rows.Scan(&i.ID, &i.Title, &i.Code); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getFirstTaskInColumn = `-- name: GetFirstTaskInColumn :one
 SELECT id, project_id, title, description, code, project_column_id, created_at, updated_at, author_id, priority, due_date, done_at, archived_at, responsible_id, task_order
 FROM tasks

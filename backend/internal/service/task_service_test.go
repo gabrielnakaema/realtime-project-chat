@@ -42,6 +42,14 @@ func (m *mockTaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain
 	return args.Get(0).(*domain.Task), args.Error(1)
 }
 
+func (m *mockTaskRepository) FindTaskRefsByProjectAndCode(ctx context.Context, projectId uuid.UUID, code string) ([]domain.TaskDependencyRef, error) {
+	args := m.Called(ctx, projectId, code)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.TaskDependencyRef), args.Error(1)
+}
+
 func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, archived bool, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
 	args := m.Called(ctx, projectId, projectColumnIDs, archived, taskOrder, cursorUpdatedAt, limit)
 	if args.Get(0) == nil {
@@ -356,6 +364,98 @@ func TestTaskService_Create(t *testing.T) {
 			mockUserRepo.AssertExpectations(t)
 		})
 	}
+}
+
+func TestTaskService_FindTaskByCode(t *testing.T) {
+	validUserID := uuid.New()
+	validProjectID := uuid.New()
+	validTaskID := uuid.New()
+	validColumnID := uuid.New()
+
+	validProject := &domain.Project{
+		Id: validProjectID,
+		Members: []domain.ProjectMember{
+			{UserId: validUserID, Role: domain.ProjectMemberRoleCreator},
+		},
+		Columns: []domain.ProjectColumn{
+			{Id: validColumnID, ProjectId: validProjectID, Name: "Pending"},
+		},
+	}
+	validTask := &domain.Task{
+		Id:              validTaskID,
+		ProjectId:       validProjectID,
+		ProjectColumnId: validColumnID,
+		Title:           "Resolve MCP lookup",
+		Code:            "BACKEND-5",
+	}
+
+	t.Run("returns matching task", func(t *testing.T) {
+		taskRepo := &mockTaskRepository{}
+		projectRepo := &mockProjectRepository{}
+		userRepo := &mockUserRepository{}
+
+		projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
+		taskRepo.On("FindTaskRefsByProjectAndCode", mock.Anything, validProjectID, "BACKEND-5").Return([]domain.TaskDependencyRef{
+			{Id: validTaskID, Title: validTask.Title, Code: validTask.Code},
+		}, nil)
+		taskRepo.On("GetById", mock.Anything, validTaskID).Return(validTask, nil)
+
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		task, err := svc.FindTaskByCode(context.Background(), service.FindTaskByCodeRequest{
+			ProjectId: validProjectID,
+			UserId:    validUserID,
+			Code:      "  BACKEND-5  ",
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, task)
+		assert.Equal(t, validTaskID, task.Id)
+	})
+
+	t.Run("returns not found when no active task matches", func(t *testing.T) {
+		taskRepo := &mockTaskRepository{}
+		projectRepo := &mockProjectRepository{}
+		userRepo := &mockUserRepository{}
+
+		projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
+		taskRepo.On("FindTaskRefsByProjectAndCode", mock.Anything, validProjectID, "BACKEND-5").Return([]domain.TaskDependencyRef{}, nil)
+
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		task, err := svc.FindTaskByCode(context.Background(), service.FindTaskByCodeRequest{
+			ProjectId: validProjectID,
+			UserId:    validUserID,
+			Code:      "BACKEND-5",
+		})
+
+		require.Error(t, err)
+		assert.Nil(t, task)
+		assert.Equal(t, domain.NotFoundErrorCode, err.(domain.DomainError).Code)
+	})
+
+	t.Run("returns ambiguity error when duplicates exist", func(t *testing.T) {
+		taskRepo := &mockTaskRepository{}
+		projectRepo := &mockProjectRepository{}
+		userRepo := &mockUserRepository{}
+
+		projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
+		taskRepo.On("FindTaskRefsByProjectAndCode", mock.Anything, validProjectID, "BACKEND-5").Return([]domain.TaskDependencyRef{
+			{Id: validTaskID, Title: "Resolve MCP lookup", Code: "BACKEND-5"},
+			{Id: uuid.New(), Title: "Duplicate task", Code: "BACKEND-5"},
+		}, nil)
+
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		task, err := svc.FindTaskByCode(context.Background(), service.FindTaskByCodeRequest{
+			ProjectId: validProjectID,
+			UserId:    validUserID,
+			Code:      "BACKEND-5",
+		})
+
+		require.Error(t, err)
+		assert.Nil(t, task)
+		domainErr := err.(domain.DomainError)
+		assert.Equal(t, domain.BusinessValidationErrorCode, domainErr.Code)
+		assert.Equal(t, "task code matches multiple tasks in this project", domainErr.Message)
+	})
 }
 
 func TestTaskService_GroupByColumn_DefaultStatuses(t *testing.T) {
