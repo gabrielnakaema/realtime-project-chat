@@ -31,6 +31,7 @@ type taskService interface {
 	Create(ctx context.Context, request service.CreateTaskRequest) (*domain.Task, error)
 	GroupByColumn(ctx context.Context, request service.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error)
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error)
+	FindTaskByCode(ctx context.Context, request service.FindTaskByCodeRequest) (*domain.Task, error)
 	Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error)
 	Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error)
 	MarkTaskDone(ctx context.Context, request service.MarkTaskDoneRequest) (*domain.Task, error)
@@ -371,6 +372,43 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			commentsLimit := optionalIntArg(params.Arguments, "comments_limit", 10)
 			comments, err := h.taskCommentService.ListByTaskID(ctx, service.ListTaskCommentsRequest{
 				TaskID:        taskID,
+				RequestUserID: principal.UserID,
+				Limit:         commentsLimit,
+			})
+			if err != nil {
+				return nil, err
+			}
+			task.Comments = comments.Data
+		}
+		return map[string]any{"task": task}, nil
+	case "find_task_by_code":
+		if err := requireScope(principal, domain.MCPAPIScopeTasksRead); err != nil {
+			return nil, err
+		}
+		projectID, err := requiredUUIDArg(params.Arguments, "project_id")
+		if err != nil {
+			return nil, err
+		}
+		code, err := requiredStringArg(params.Arguments, "code")
+		if err != nil {
+			return nil, err
+		}
+		task, err := h.taskService.FindTaskByCode(ctx, service.FindTaskByCodeRequest{
+			ProjectId: projectID,
+			UserId:    principal.UserID,
+			Code:      code,
+		})
+		if err != nil {
+			return nil, err
+		}
+		includeComments := optionalBoolArg(params.Arguments, "include_comments", false)
+		if includeComments {
+			if err := requireScope(principal, domain.MCPAPIScopeTasksCommentsRead); err != nil {
+				return nil, err
+			}
+			commentsLimit := optionalIntArg(params.Arguments, "comments_limit", 10)
+			comments, err := h.taskCommentService.ListByTaskID(ctx, service.ListTaskCommentsRequest{
+				TaskID:        task.Id,
 				RequestUserID: principal.UserID,
 				Limit:         commentsLimit,
 			})

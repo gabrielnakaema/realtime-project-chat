@@ -16,6 +16,7 @@ import (
 type taskRepository interface {
 	Create(ctx context.Context, task *domain.Task) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
+	FindTaskRefsByProjectAndCode(ctx context.Context, projectId uuid.UUID, code string) ([]domain.TaskDependencyRef, error)
 	ListByProjectId(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, archived bool, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 	Update(ctx context.Context, task *domain.Task) error
 	CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error
@@ -879,6 +880,58 @@ func (ts *TaskService) SearchTasksForUser(ctx context.Context, request SearchTas
 	}
 
 	return result, nil
+}
+
+type FindTaskByCodeRequest struct {
+	ProjectId uuid.UUID
+	UserId    uuid.UUID
+	Code      string
+}
+
+func (ts *TaskService) FindTaskByCode(ctx context.Context, request FindTaskByCodeRequest) (*domain.Task, error) {
+	if request.UserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	if request.ProjectId == uuid.Nil {
+		return nil, domain.BusinessValidationError("project_id is required")
+	}
+
+	code := strings.TrimSpace(request.Code)
+	if code == "" {
+		return nil, domain.BusinessValidationError("code is required")
+	}
+
+	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
+	if err != nil {
+		return nil, domain.ServerError("failed to get project", err)
+	}
+
+	if !project.IsMember(request.UserId) {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	matches, err := ts.taskRepository.FindTaskRefsByProjectAndCode(ctx, request.ProjectId, code)
+	if err != nil {
+		return nil, domain.ServerError("failed to find task by code", err)
+	}
+
+	switch len(matches) {
+	case 0:
+		return nil, domain.NotFoundError("task not found")
+	case 1:
+		task, err := ts.taskRepository.GetById(ctx, matches[0].Id)
+		if err != nil {
+			var domainErr domain.DomainError
+			if errors.As(err, &domainErr) {
+				return nil, domainErr
+			}
+			return nil, domain.ServerError("failed to get task", err)
+		}
+		return task, nil
+	default:
+		return nil, domain.BusinessValidationError("task code matches multiple tasks in this project")
+	}
 }
 
 type SearchProjectTasksForDependenciesRequest struct {

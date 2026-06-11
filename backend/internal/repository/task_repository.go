@@ -1058,6 +1058,29 @@ func (tr *TaskRepository) GetTaskDependencyRefsByProjectAndIds(ctx context.Conte
 	return refs, rows.Err()
 }
 
+func (tr *TaskRepository) FindTaskRefsByProjectAndCode(ctx context.Context, projectId uuid.UUID, code string) ([]domain.TaskDependencyRef, error) {
+	q := queries.New(tr.pool)
+
+	results, err := q.FindTaskRefsByProjectAndCode(ctx, queries.FindTaskRefsByProjectAndCodeParams{
+		ProjectID: projectId,
+		Code:      code,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	refs := make([]domain.TaskDependencyRef, 0, len(results))
+	for _, result := range results {
+		refs = append(refs, domain.TaskDependencyRef{
+			Id:    result.ID,
+			Title: result.Title,
+			Code:  result.Code,
+		})
+	}
+
+	return refs, nil
+}
+
 func (tr *TaskRepository) SearchProjectTasksForDependencies(
 	ctx context.Context,
 	projectId uuid.UUID,

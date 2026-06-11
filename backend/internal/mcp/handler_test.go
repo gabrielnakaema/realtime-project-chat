@@ -31,6 +31,7 @@ type stubTaskService struct {
 	createRequest     *service.CreateTaskRequest
 	task              *domain.Task
 	grouped           map[string]utils.CursorPaginated[domain.Task]
+	findByCodeRequest *service.FindTaskByCodeRequest
 	updateRequest     *service.UpdateTaskRequest
 	moveRequest       *service.MoveTaskRequest
 	markDoneRequest   *service.MarkTaskDoneRequest
@@ -53,6 +54,11 @@ func (s *stubTaskService) GroupByColumn(ctx context.Context, request service.Gro
 }
 
 func (s *stubTaskService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error) {
+	return s.task, nil
+}
+
+func (s *stubTaskService) FindTaskByCode(ctx context.Context, request service.FindTaskByCodeRequest) (*domain.Task, error) {
+	s.findByCodeRequest = &request
 	return s.task, nil
 }
 
@@ -190,6 +196,23 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	assert.Len(t, taskResult["task"].(*domain.Task).Comments, 1)
 	require.NotNil(t, commentSvc.listRequest)
 	assert.Equal(t, 5, commentSvc.listRequest.Limit)
+
+	findTaskResult, err := handler.callTool(context.Background(), principal, toolCallParams{
+		Name: "find_task_by_code",
+		Arguments: map[string]any{
+			"project_id":       projectID.String(),
+			"code":             "  TASK-1  ",
+			"include_comments": true,
+			"comments_limit":   float64(4),
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, taskID.String(), findTaskResult["task"].(*domain.Task).Id.String())
+	require.NotNil(t, taskSvc.findByCodeRequest)
+	assert.Equal(t, projectID, taskSvc.findByCodeRequest.ProjectId)
+	assert.Equal(t, "TASK-1", taskSvc.findByCodeRequest.Code)
+	require.NotNil(t, commentSvc.listRequest)
+	assert.Equal(t, 4, commentSvc.listRequest.Limit)
 
 	listCommentsResult, err := handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "list_task_comments",
@@ -440,6 +463,7 @@ func TestToolDefinitionsForPrincipalFiltersScopes(t *testing.T) {
 	}
 
 	assert.Contains(t, toolNames, "list_projects")
+	assert.Contains(t, toolNames, "find_task_by_code")
 	assert.Contains(t, toolNames, "get_task")
 	assert.NotContains(t, toolNames, "create_task")
 	assert.NotContains(t, toolNames, "list_task_comments")
@@ -462,5 +486,6 @@ func TestReadResourceBuildsScopeAwareGuide(t *testing.T) {
 
 	assert.Contains(t, text, "Recommended workflow")
 	assert.Contains(t, text, "list_projects")
+	assert.Contains(t, text, "find_task_by_code")
 	assert.NotContains(t, text, "create_task")
 }

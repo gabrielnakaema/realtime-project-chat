@@ -385,3 +385,14 @@ WHERE t.project_id = sqlc.arg('project_id')
   )
 ORDER BY t.title ASC, t.id ASC
 LIMIT sqlc.arg('limit');
+
+-- name: FindTaskRefsByProjectAndCode :many
+SELECT
+  t.id,
+  t.title,
+  coalesce(t.code, '') as code
+FROM tasks t
+WHERE t.project_id = sqlc.arg('project_id')
+  AND t.archived_at IS NULL
+  AND lower(btrim(coalesce(t.code, ''))) = lower(btrim(sqlc.arg('code')::text))
+ORDER BY t.updated_at DESC, t.created_at DESC, t.id DESC;

@@ -97,9 +97,10 @@ func buildServerGuide(principal principal) string {
 	builder.WriteString("This server exposes Project Chat workspace data over MCP. It is designed for board and task workflows rather than general code browsing.\n\n")
 	builder.WriteString("## Recommended workflow\n")
 	builder.WriteString("1. Call `list_projects` to discover which projects this API key can access.\n")
-	builder.WriteString("2. Call `list_project_board` to inspect project columns and the tasks grouped inside them.\n")
-	builder.WriteString("3. Call `get_task` when you need the full task record. Set `include_comments=true` only when you also have the `tasks:comments:read` scope.\n")
-	builder.WriteString("4. Use any write action returned by `tools/list` only when the capability is visible for this API key.\n\n")
+	builder.WriteString("2. Call `find_task_by_code` when you know a project-scoped task code and need the matching task id quickly.\n")
+	builder.WriteString("3. Call `list_project_board` to inspect project columns and the tasks grouped inside them.\n")
+	builder.WriteString("4. Call `get_task` when you need the full task record. Set `include_comments=true` only when you also have the `tasks:comments:read` scope.\n")
+	builder.WriteString("5. Use any write action returned by `tools/list` only when the capability is visible for this API key.\n\n")
 	builder.WriteString("## Important notes\n")
 	builder.WriteString("- `tools/list` is scope-aware. If a capability is missing from the list, this API key cannot use it.\n")
 	builder.WriteString("- `list_project_board` is the best way to understand the board layout without scraping the web UI or repository.\n")
@@ -149,6 +150,10 @@ func toolSuccessText(name string, result map[string]any) string {
 	case "get_task":
 		if task, ok := result["task"].(*domain.Task); ok {
 			return fmt.Sprintf("Loaded task %q.", task.Title)
+		}
+	case "find_task_by_code":
+		if task, ok := result["task"].(*domain.Task); ok {
+			return fmt.Sprintf("Found task %q by code.", task.Title)
 		}
 	case "list_task_comments":
 		if comments, ok := result["comments"].([]domain.TaskComment); ok {
@@ -362,6 +367,45 @@ func toolCatalog() []toolSpec {
 					},
 				},
 				"required":             []string{"project_id", "project_column_id", "title", "description", "priority"},
+				"additionalProperties": false,
+			},
+			OutputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"task": taskSchema,
+				},
+				"required": []string{"task"},
+			},
+		},
+		{
+			Name:          "find_task_by_code",
+			Title:         "Find Task By Code",
+			Description:   "Find a single active task in a project by its exact code. If the same code is used by multiple active tasks in that project, the tool returns an ambiguity error instead of guessing.",
+			RequiredScope: domain.MCPAPIScopeTasksRead,
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"project_id": map[string]any{
+						"type":        "string",
+						"format":      "uuid",
+						"description": "Project id that owns the task.",
+					},
+					"code": map[string]any{
+						"type":        "string",
+						"description": "Exact task code to match within the project, for example BACKEND-5.",
+					},
+					"include_comments": map[string]any{
+						"type":        "boolean",
+						"description": "When true, recent comments are attached to the task result and require the tasks:comments:read scope.",
+					},
+					"comments_limit": map[string]any{
+						"type":        "integer",
+						"minimum":     1,
+						"maximum":     100,
+						"description": "Maximum number of comments to attach when include_comments is true. Defaults to 10.",
+					},
+				},
+				"required":             []string{"project_id", "code"},
 				"additionalProperties": false,
 			},
 			OutputSchema: map[string]any{
