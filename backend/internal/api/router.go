@@ -40,6 +40,11 @@ func (a *Api) Router() http.Handler {
 
 	r.Handle("/mcp", a.handlers.MCP)
 
+	r.Handle("/health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	}))
+
 	r.Group(func(r chi.Router) {
 		r.Use(a.handlers.AuthMiddleware.IdentifyUser)
 
