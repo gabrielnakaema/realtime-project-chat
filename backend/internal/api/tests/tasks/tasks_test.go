@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/gabrielnakaema/project-chat/internal/api/tests/shared"
@@ -234,6 +235,170 @@ func TestTaskCodeFieldFlowsThroughTaskEndpoints(t *testing.T) {
 	err = json.NewDecoder(updateResp.Body).Decode(&updatedTask)
 	require.NoError(t, err)
 	assert.Equal(t, "", updatedTask["code"])
+}
+
+func TestTaskCodeSuggestionsEndpoint(t *testing.T) {
+	testAPI, cleanup := shared.SetupTestAPI(t)
+	defer cleanup()
+
+	testAPI.TruncateTables(t)
+
+	client := shared.NewHTTPClient(testAPI.GetBaseURL())
+	_, err := client.CreateUserAndLogin("task-code-suggestions@example.com", "password123")
+	require.NoError(t, err)
+
+	projectResp, err := client.POST("/projects", taskProjectPayload())
+	require.NoError(t, err)
+	defer projectResp.Body.Close()
+	require.Equal(t, http.StatusCreated, projectResp.StatusCode)
+
+	var project map[string]any
+	err = json.NewDecoder(projectResp.Body).Decode(&project)
+	require.NoError(t, err)
+
+	projectID := project["id"].(string)
+	pendingColumnID := project["columns"].([]any)[0].(map[string]any)["id"].(string)
+
+	createTask := func(title string, code string) string {
+		resp, postErr := client.POST("/tasks", map[string]any{
+			"project_id":        projectID,
+			"project_column_id": pendingColumnID,
+			"title":             title,
+			"description":       fmt.Sprintf("%s description", title),
+			"code":              code,
+			"priority":          "medium",
+			"tags":              []string{},
+		})
+		require.NoError(t, postErr)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var task map[string]any
+		decodeErr := json.NewDecoder(resp.Body).Decode(&task)
+		require.NoError(t, decodeErr)
+
+		return task["id"].(string)
+	}
+
+	createTask("Backend one", "BACKEND-001")
+	archivedTaskID := createTask("Backend nine", "BACKEND-009")
+	createTask("Frontend one", "FRONTEND-001")
+	createTask("API one", "API-1")
+
+	archiveResp, err := client.DELETE(fmt.Sprintf("/tasks/%s", archivedTaskID))
+	require.NoError(t, err)
+	defer archiveResp.Body.Close()
+	require.Equal(t, http.StatusOK, archiveResp.StatusCode)
+
+	resp, err := client.GET(fmt.Sprintf("/tasks/code-suggestions?project_id=%s&prefix=BACKEND-&limit=4", projectID))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var result map[string]any
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+
+	data := result["data"].([]any)
+	require.NotEmpty(t, data)
+
+	next := data[0].(map[string]any)
+	assert.Equal(t, "BACKEND-010", next["code"])
+	assert.Equal(t, "next", next["kind"])
+
+	codes := []string{}
+	for _, item := range data {
+		codes = append(codes, item.(map[string]any)["code"].(string))
+	}
+	assert.Contains(t, codes, "BACKEND-009")
+	assert.Contains(t, codes, "BACKEND-001")
+	assert.NotContains(t, codes, "FRONTEND-001")
+
+	typedNumberResp, err := client.GET(fmt.Sprintf("/tasks/code-suggestions?project_id=%s&prefix=BACKEND-009&limit=4", projectID))
+	require.NoError(t, err)
+	defer typedNumberResp.Body.Close()
+	require.Equal(t, http.StatusOK, typedNumberResp.StatusCode)
+
+	var typedNumberResult map[string]any
+	err = json.NewDecoder(typedNumberResp.Body).Decode(&typedNumberResult)
+	require.NoError(t, err)
+
+	typedNumberData := typedNumberResult["data"].([]any)
+	require.NotEmpty(t, typedNumberData)
+	typedNumberNext := typedNumberData[0].(map[string]any)
+	assert.Equal(t, "BACKEND-010", typedNumberNext["code"])
+	assert.Equal(t, "next", typedNumberNext["kind"])
+
+	singleDigitResp, err := client.GET(fmt.Sprintf("/tasks/code-suggestions?project_id=%s&prefix=API-1&limit=4", projectID))
+	require.NoError(t, err)
+	defer singleDigitResp.Body.Close()
+	require.Equal(t, http.StatusOK, singleDigitResp.StatusCode)
+
+	var singleDigitResult map[string]any
+	err = json.NewDecoder(singleDigitResp.Body).Decode(&singleDigitResult)
+	require.NoError(t, err)
+
+	singleDigitData := singleDigitResult["data"].([]any)
+	require.NotEmpty(t, singleDigitData)
+	singleDigitNext := singleDigitData[0].(map[string]any)
+	assert.Equal(t, "API-2", singleDigitNext["code"])
+	assert.Equal(t, "next", singleDigitNext["kind"])
+
+	lowerCaseResp, err := client.GET(fmt.Sprintf("/tasks/code-suggestions?project_id=%s&prefix=backend-&limit=4", projectID))
+	require.NoError(t, err)
+	defer lowerCaseResp.Body.Close()
+	require.Equal(t, http.StatusOK, lowerCaseResp.StatusCode)
+
+	var lowerCaseResult map[string]any
+	err = json.NewDecoder(lowerCaseResp.Body).Decode(&lowerCaseResult)
+	require.NoError(t, err)
+
+	lowerCaseData := lowerCaseResult["data"].([]any)
+	require.NotEmpty(t, lowerCaseData)
+	lowerCaseNext := lowerCaseData[0].(map[string]any)
+	assert.Equal(t, "BACKEND-010", lowerCaseNext["code"], "next suggestion should follow the casing of existing codes, not the typed prefix")
+	assert.Equal(t, "next", lowerCaseNext["kind"])
+
+	createTask("Underscore literal", "AB_1")
+	createTask("Underscore lookalike", "ABX1")
+
+	wildcardResp, err := client.GET(fmt.Sprintf("/tasks/code-suggestions?project_id=%s&prefix=AB_&limit=10", projectID))
+	require.NoError(t, err)
+	defer wildcardResp.Body.Close()
+	require.Equal(t, http.StatusOK, wildcardResp.StatusCode)
+
+	var wildcardResult map[string]any
+	err = json.NewDecoder(wildcardResp.Body).Decode(&wildcardResult)
+	require.NoError(t, err)
+
+	wildcardCodes := []string{}
+	for _, item := range wildcardResult["data"].([]any) {
+		wildcardCodes = append(wildcardCodes, item.(map[string]any)["code"].(string))
+	}
+	assert.Contains(t, wildcardCodes, "AB_1")
+	assert.NotContains(t, wildcardCodes, "ABX1", "'_' in the prefix must be matched literally, not as a LIKE wildcard")
+
+	createTask("Server two", "SRV-2")
+	createTask("Server ten", "SRV-10")
+
+	orderingResp, err := client.GET(fmt.Sprintf("/tasks/code-suggestions?project_id=%s&prefix=SRV-&limit=10", projectID))
+	require.NoError(t, err)
+	defer orderingResp.Body.Close()
+	require.Equal(t, http.StatusOK, orderingResp.StatusCode)
+
+	var orderingResult map[string]any
+	err = json.NewDecoder(orderingResp.Body).Decode(&orderingResult)
+	require.NoError(t, err)
+
+	orderingCodes := []string{}
+	for _, item := range orderingResult["data"].([]any) {
+		orderingCodes = append(orderingCodes, item.(map[string]any)["code"].(string))
+	}
+	srv2Index := slices.Index(orderingCodes, "SRV-2")
+	srv10Index := slices.Index(orderingCodes, "SRV-10")
+	require.NotEqual(t, -1, srv2Index)
+	require.NotEqual(t, -1, srv10Index)
+	assert.Less(t, srv10Index, srv2Index, "existing codes should be ordered numerically so SRV-10 ranks above SRV-2")
 }
 
 func TestTaskDependenciesEndpoints(t *testing.T) {

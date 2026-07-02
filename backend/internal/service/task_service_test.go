@@ -50,6 +50,14 @@ func (m *mockTaskRepository) FindTaskRefsByProjectAndCode(ctx context.Context, p
 	return args.Get(0).([]domain.TaskDependencyRef), args.Error(1)
 }
 
+func (m *mockTaskRepository) SuggestTaskCodesByProjectPrefix(ctx context.Context, projectId uuid.UUID, prefix string, limit int) ([]domain.TaskCodeSuggestion, error) {
+	args := m.Called(ctx, projectId, prefix, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.TaskCodeSuggestion), args.Error(1)
+}
+
 func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, archived bool, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
 	args := m.Called(ctx, projectId, projectColumnIDs, archived, taskOrder, cursorUpdatedAt, limit)
 	if args.Get(0) == nil {
@@ -455,6 +463,80 @@ func TestTaskService_FindTaskByCode(t *testing.T) {
 		domainErr := err.(domain.DomainError)
 		assert.Equal(t, domain.BusinessValidationErrorCode, domainErr.Code)
 		assert.Equal(t, "task code matches multiple tasks in this project", domainErr.Message)
+	})
+}
+
+func TestTaskService_SuggestTaskCodes(t *testing.T) {
+	validUserID := uuid.New()
+	validProjectID := uuid.New()
+	validProject := &domain.Project{
+		Id:      validProjectID,
+		Members: []domain.ProjectMember{{UserId: validUserID, Role: domain.ProjectMemberRoleCreator}},
+	}
+
+	t.Run("returns suggestions for project member", func(t *testing.T) {
+		taskRepo := &mockTaskRepository{}
+		projectRepo := &mockProjectRepository{}
+		userRepo := &mockUserRepository{}
+		expected := []domain.TaskCodeSuggestion{
+			{Code: "BACKEND-3", Kind: "next"},
+			{Code: "BACKEND-2", Kind: "existing"},
+		}
+
+		projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
+		taskRepo.On("SuggestTaskCodesByProjectPrefix", mock.Anything, validProjectID, "BACKEND-", 8).Return(expected, nil)
+
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		result, err := svc.SuggestTaskCodes(context.Background(), service.SuggestTaskCodesRequest{
+			ProjectId: validProjectID,
+			UserId:    validUserID,
+			Prefix:    "  BACKEND-  ",
+			Limit:     8,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, expected, result)
+		taskRepo.AssertExpectations(t)
+		projectRepo.AssertExpectations(t)
+	})
+
+	t.Run("rejects short prefix", func(t *testing.T) {
+		taskRepo := &mockTaskRepository{}
+		projectRepo := &mockProjectRepository{}
+		userRepo := &mockUserRepository{}
+
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		result, err := svc.SuggestTaskCodes(context.Background(), service.SuggestTaskCodesRequest{
+			ProjectId: validProjectID,
+			UserId:    validUserID,
+			Prefix:    "B",
+			Limit:     8,
+		})
+
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Equal(t, domain.BusinessValidationErrorCode, err.(domain.DomainError).Code)
+	})
+
+	t.Run("rejects non-member", func(t *testing.T) {
+		taskRepo := &mockTaskRepository{}
+		projectRepo := &mockProjectRepository{}
+		userRepo := &mockUserRepository{}
+
+		projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
+
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		result, err := svc.SuggestTaskCodes(context.Background(), service.SuggestTaskCodesRequest{
+			ProjectId: validProjectID,
+			UserId:    uuid.New(),
+			Prefix:    "BACKEND-",
+			Limit:     8,
+		})
+
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Equal(t, domain.ForbiddenErrorCode, err.(domain.DomainError).Code)
+		projectRepo.AssertExpectations(t)
 	})
 }
 

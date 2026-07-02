@@ -1163,6 +1163,132 @@ func (q *Queries) SearchTasksForUser(ctx context.Context, arg SearchTasksForUser
 	return items, nil
 }
 
+const suggestTaskCodesByProjectPrefix = `-- name: SuggestTaskCodesByProjectPrefix :many
+WITH matches AS (
+  SELECT
+    btrim(t.code) AS code,
+    substring(btrim(t.code) from length($2::text) + 1) AS suffix,
+    substring(btrim(t.code) from 1 for length($2::text)) AS matched_base
+  FROM tasks t
+  WHERE t.project_id = $3
+    AND t.code IS NOT NULL
+    AND btrim(t.code) <> ''
+    AND lower(btrim(t.code)) LIKE $4::text ESCAPE '\'
+),
+existing_matches AS (
+  SELECT
+    btrim(t.code) AS code
+  FROM tasks t
+  WHERE t.project_id = $3
+    AND t.code IS NOT NULL
+    AND btrim(t.code) <> ''
+    AND lower(btrim(t.code)) LIKE $5::text ESCAPE '\'
+),
+numeric_matches AS (
+  SELECT
+    code,
+    matched_base,
+    suffix::bigint AS number,
+    length(suffix) AS suffix_width
+  FROM matches
+  -- cap at 18 digits so the cast to bigint (max ~9.2e18) can never overflow
+  WHERE suffix ~ '^[0-9]{1,18}$'
+),
+next_number AS (
+  -- an ungrouped aggregate always returns exactly one row, even when
+  -- numeric_matches is empty, so "next" always has a default of 1
+  SELECT
+    coalesce(max(number), 0) + 1 AS number,
+    coalesce(max(suffix_width), 1) AS suffix_width,
+    -- follow the casing of the highest-numbered existing match so the
+    -- suggestion matches the project's established code convention instead
+    -- of whatever case the user happened to type
+    coalesce((array_agg(matched_base ORDER BY number DESC, code DESC))[1], $2::text) AS base
+  FROM numeric_matches
+),
+next_code AS (
+  SELECT
+    base || lpad(number::text, greatest(length(number::text), suffix_width), '0') AS code,
+    'next'::text AS kind,
+    0 AS sort_rank,
+    NULL::bigint AS sort_number
+  FROM next_number
+),
+existing_codes AS (
+  SELECT
+    code,
+    kind,
+    sort_rank,
+    sort_number
+  FROM (
+    SELECT DISTINCT
+      em.code,
+      'existing'::text AS kind,
+      1 AS sort_rank,
+      nm.number AS sort_number
+    FROM existing_matches em
+    LEFT JOIN numeric_matches nm ON nm.code = em.code
+  ) deduped
+  -- order numerically by suffix so e.g. "API-10" ranks above "API-2";
+  -- non-numeric codes fall back to lexicographic order.
+  -- reserve one slot for the "next" suggestion so the final UNION ALL
+  -- (1 next + up to limit-1 existing) fits within the outer LIMIT below
+  -- without silently dropping the lowest-ranked existing row.
+  ORDER BY sort_number DESC NULLS LAST, code DESC
+  LIMIT greatest($1::int - 1, 0)
+)
+SELECT code::text AS code, kind::text AS kind
+FROM (
+  SELECT code, kind, sort_rank, sort_number FROM next_code
+  UNION ALL
+  SELECT code, kind, sort_rank, sort_number FROM existing_codes
+) suggestions
+ORDER BY sort_rank ASC, sort_number DESC NULLS LAST, code DESC
+LIMIT $1
+`
+
+type SuggestTaskCodesByProjectPrefixParams struct {
+	Limit               int32
+	SequenceBase        string
+	ProjectID           uuid.UUID
+	SequenceBasePattern string
+	PrefixPattern       string
+}
+
+type SuggestTaskCodesByProjectPrefixRow struct {
+	Code string
+	Kind string
+}
+
+// sequence_base, sequence_base_pattern and prefix_pattern are precomputed in
+// Go (trimming, lowercasing, stripping trailing digits, LIKE-escaping) so
+// this query only has to do set matching and aggregation.
+func (q *Queries) SuggestTaskCodesByProjectPrefix(ctx context.Context, arg SuggestTaskCodesByProjectPrefixParams) ([]SuggestTaskCodesByProjectPrefixRow, error) {
+	rows, err := q.db.Query(ctx, suggestTaskCodesByProjectPrefix,
+		arg.Limit,
+		arg.SequenceBase,
+		arg.ProjectID,
+		arg.SequenceBasePattern,
+		arg.PrefixPattern,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SuggestTaskCodesByProjectPrefixRow
+	for rows.Next() {
+		var i SuggestTaskCodesByProjectPrefixRow
+		if err := rows.Scan(&i.Code, &i.Kind); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateTask = `-- name: UpdateTask :exec
 UPDATE tasks SET title = $1, description = $2, code = $3, project_column_id = $4, task_order = $5, priority = $6, due_date = $7, responsible_id = $8, done_at = $9, archived_at = $10, updated_at = CURRENT_TIMESTAMP WHERE id = $11
 `

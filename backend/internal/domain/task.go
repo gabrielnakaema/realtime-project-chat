@@ -14,6 +14,11 @@ type TaskDependencyRef struct {
 	Code  string    `json:"code"`
 }
 
+type TaskCodeSuggestion struct {
+	Code string `json:"code"`
+	Kind string `json:"kind"`
+}
+
 type TaskDependencyEdge struct {
 	TaskId          uuid.UUID
 	DependsOnTaskId uuid.UUID
@@ -39,20 +44,20 @@ var (
 var AllowedTaskPriorities = []TaskPriority{TaskPriorityLow, TaskPriorityMedium, TaskPriorityHigh}
 
 type Task struct {
-	Id              uuid.UUID    `json:"id"`
-	ProjectId       uuid.UUID    `json:"project_id"`
-	AuthorId        uuid.UUID    `json:"author_id"`
-	Title           string       `json:"title"`
-	Description     string       `json:"description"`
-	Code            string       `json:"code"`
-	Status          TaskStatus   `json:"status"`
-	ProjectColumnId uuid.UUID    `json:"project_column_id"`
-	Priority        TaskPriority `json:"priority"`
-	Order           string       `json:"order"`
-	ResponsibleId   *uuid.UUID   `json:"responsible_id"`
-	DueDate         *time.Time   `json:"due_date"`
-	DoneAt          *time.Time   `json:"done_at"`
-	ArchivedAt      *time.Time   `json:"archived_at"`
+	Id               uuid.UUID           `json:"id"`
+	ProjectId        uuid.UUID           `json:"project_id"`
+	AuthorId         uuid.UUID           `json:"author_id"`
+	Title            string              `json:"title"`
+	Description      string              `json:"description"`
+	Code             string              `json:"code"`
+	Status           TaskStatus          `json:"status"`
+	ProjectColumnId  uuid.UUID           `json:"project_column_id"`
+	Priority         TaskPriority        `json:"priority"`
+	Order            string              `json:"order"`
+	ResponsibleId    *uuid.UUID          `json:"responsible_id"`
+	DueDate          *time.Time          `json:"due_date"`
+	DoneAt           *time.Time          `json:"done_at"`
+	ArchivedAt       *time.Time          `json:"archived_at"`
 	Tags             []string            `json:"tags"`
 	DependsOnTaskIds []uuid.UUID         `json:"depends_on_task_ids"`
 	DependsOnTasks   []TaskDependencyRef `json:"depends_on_tasks,omitempty"`

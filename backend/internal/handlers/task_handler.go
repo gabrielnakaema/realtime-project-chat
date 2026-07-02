@@ -27,6 +27,7 @@ type taskService interface {
 	Restore(ctx context.Context, request service.RestoreTaskRequest) (*domain.Task, error)
 	ListUserDueTasks(ctx context.Context, request service.ListUserDueTasksRequest) (*utils.CursorPaginated[domain.Task], error)
 	SearchTasksForUser(ctx context.Context, request service.SearchTasksForUserRequest) (*utils.CursorPaginated[domain.Task], error)
+	SuggestTaskCodes(ctx context.Context, request service.SuggestTaskCodesRequest) ([]domain.TaskCodeSuggestion, error)
 	SearchProjectTasksForDependencies(ctx context.Context, request service.SearchProjectTasksForDependenciesRequest) ([]domain.TaskDependencyRef, error)
 }
 
@@ -59,13 +60,13 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userId := UserIdFromContext(r.Context())
 
 	serviceRequest := service.CreateTaskRequest{
-		ProjectId:       request.ProjectId,
-		ProjectColumnId: request.ProjectColumnId,
-		Title:           request.Title,
-		Description:     request.Description,
-		Code:            request.Code,
-		RequestUserId:   userId,
-		Priority:        request.Priority,
+		ProjectId:        request.ProjectId,
+		ProjectColumnId:  request.ProjectColumnId,
+		Title:            request.Title,
+		Description:      request.Description,
+		Code:             request.Code,
+		RequestUserId:    userId,
+		Priority:         request.Priority,
 		ResponsibleId:    request.ResponsibleId,
 		DueDate:          request.DueDate,
 		Tags:             request.Tags,
@@ -312,13 +313,13 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userId := UserIdFromContext(r.Context())
 
 	serviceRequest := service.UpdateTaskRequest{
-		TaskId:          parsedId,
-		Title:           request.Title,
-		Description:     request.Description,
-		Code:            &request.Code,
-		ProjectColumnId: request.ProjectColumnId,
-		RequestUserId:   userId,
-		Priority:        domain.TaskPriority(request.Priority),
+		TaskId:           parsedId,
+		Title:            request.Title,
+		Description:      request.Description,
+		Code:             &request.Code,
+		ProjectColumnId:  request.ProjectColumnId,
+		RequestUserId:    userId,
+		Priority:         domain.TaskPriority(request.Priority),
 		ResponsibleId:    request.ResponsibleId,
 		DueDate:          request.DueDate,
 		Tags:             request.Tags,
@@ -522,6 +523,56 @@ func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, result, nil)
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *TaskHandler) SuggestTaskCodes(w http.ResponseWriter, r *http.Request) {
+	userId := UserIdFromContext(r.Context())
+
+	projectId := utils.GetQueryString(r, "project_id", "")
+	if projectId == "" {
+		BadRequestResponse(w, errors.New("project_id is required"))
+		return
+	}
+
+	parsedProjectId, err := uuid.Parse(projectId)
+	if err != nil {
+		BadRequestResponse(w, err)
+		return
+	}
+
+	prefix := strings.TrimSpace(utils.GetQueryString(r, "prefix", ""))
+	if len(prefix) < 2 {
+		BadRequestResponse(w, errors.New("prefix must be at least 2 characters"))
+		return
+	}
+
+	limit := utils.GetQueryInt(r, "limit", 8)
+	if limit <= 0 {
+		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		return
+	}
+
+	if limit > 20 {
+		BadRequestResponse(w, errors.New("limit must be at most 20"))
+		return
+	}
+
+	result, err := h.taskService.SuggestTaskCodes(r.Context(), service.SuggestTaskCodesRequest{
+		ProjectId: parsedProjectId,
+		UserId:    userId,
+		Prefix:    prefix,
+		Limit:     int(limit),
+	})
+	if err != nil {
+		ErrorResponse(w, r, err)
+		return
+	}
+
+	err = utils.WriteJSON(w, http.StatusOK, map[string]any{"data": result}, nil)
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return

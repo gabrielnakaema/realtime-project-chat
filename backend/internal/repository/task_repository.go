@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 
@@ -1079,6 +1080,57 @@ func (tr *TaskRepository) FindTaskRefsByProjectAndCode(ctx context.Context, proj
 	}
 
 	return refs, nil
+}
+
+// trailingDigitsPattern matches a run of digits at the end of a task code
+// prefix, e.g. the "9" in "BACKEND-9".
+var trailingDigitsPattern = regexp.MustCompile(`\d+$`)
+
+// taskCodeSequenceBase strips a trailing run of digits from prefix so that
+// e.g. "BACKEND-9" and "BACKEND-" both group under the same numbering
+// sequence. Falls back to the full prefix when it's entirely digits.
+func taskCodeSequenceBase(prefix string) string {
+	base := trailingDigitsPattern.ReplaceAllString(prefix, "")
+	if base == "" {
+		return prefix
+	}
+	return base
+}
+
+// taskCodeLikePattern escapes Postgres LIKE metacharacters so value is
+// matched literally (e.g. a prefix of "AB_1" won't match "ABX1"), then
+// appends a trailing wildcard for prefix matching.
+func taskCodeLikePattern(value string) string {
+	replacer := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return replacer.Replace(value) + "%"
+}
+
+func (tr *TaskRepository) SuggestTaskCodesByProjectPrefix(ctx context.Context, projectId uuid.UUID, prefix string, limit int) ([]domain.TaskCodeSuggestion, error) {
+	q := queries.New(tr.pool)
+
+	prefixLower := strings.ToLower(prefix)
+	sequenceBase := taskCodeSequenceBase(prefix)
+
+	results, err := q.SuggestTaskCodesByProjectPrefix(ctx, queries.SuggestTaskCodesByProjectPrefixParams{
+		ProjectID:           projectId,
+		SequenceBase:        sequenceBase,
+		SequenceBasePattern: taskCodeLikePattern(strings.ToLower(sequenceBase)),
+		PrefixPattern:       taskCodeLikePattern(prefixLower),
+		Limit:               int32(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	suggestions := make([]domain.TaskCodeSuggestion, 0, len(results))
+	for _, result := range results {
+		suggestions = append(suggestions, domain.TaskCodeSuggestion{
+			Code: result.Code,
+			Kind: result.Kind,
+		})
+	}
+
+	return suggestions, nil
 }
 
 func (tr *TaskRepository) SearchProjectTasksForDependencies(

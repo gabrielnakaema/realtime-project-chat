@@ -17,6 +17,7 @@ type taskRepository interface {
 	Create(ctx context.Context, task *domain.Task) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
 	FindTaskRefsByProjectAndCode(ctx context.Context, projectId uuid.UUID, code string) ([]domain.TaskDependencyRef, error)
+	SuggestTaskCodesByProjectPrefix(ctx context.Context, projectId uuid.UUID, prefix string, limit int) ([]domain.TaskCodeSuggestion, error)
 	ListByProjectId(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, archived bool, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 	Update(ctx context.Context, task *domain.Task) error
 	CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error
@@ -940,6 +941,44 @@ type SearchProjectTasksForDependenciesRequest struct {
 	Query         string
 	ExcludeTaskId *uuid.UUID
 	Limit         int
+}
+
+type SuggestTaskCodesRequest struct {
+	ProjectId uuid.UUID
+	UserId    uuid.UUID
+	Prefix    string
+	Limit     int
+}
+
+func (ts *TaskService) SuggestTaskCodes(ctx context.Context, request SuggestTaskCodesRequest) ([]domain.TaskCodeSuggestion, error) {
+	if request.UserId == uuid.Nil {
+		return nil, domain.UnauthorizedError("unauthorized")
+	}
+
+	if request.ProjectId == uuid.Nil {
+		return nil, domain.BusinessValidationError("project_id is required")
+	}
+
+	prefix := strings.TrimSpace(request.Prefix)
+	if len(prefix) < 2 {
+		return nil, domain.BusinessValidationError("prefix must be at least 2 characters")
+	}
+
+	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
+	if err != nil {
+		return nil, domain.ServerError("failed to get project", err)
+	}
+
+	if !project.IsMember(request.UserId) {
+		return nil, domain.ForbiddenError("forbidden")
+	}
+
+	results, err := ts.taskRepository.SuggestTaskCodesByProjectPrefix(ctx, request.ProjectId, prefix, request.Limit)
+	if err != nil {
+		return nil, domain.ServerError("failed to suggest task codes", err)
+	}
+
+	return results, nil
 }
 
 func (ts *TaskService) SearchProjectTasksForDependencies(ctx context.Context, request SearchProjectTasksForDependenciesRequest) ([]domain.TaskDependencyRef, error) {

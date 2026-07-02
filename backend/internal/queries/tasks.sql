@@ -386,6 +386,78 @@ WHERE t.project_id = sqlc.arg('project_id')
 ORDER BY t.title ASC, t.id ASC
 LIMIT sqlc.arg('limit');
 
+-- name: SuggestTaskCodesByProjectPrefix :many
+WITH matches AS (
+  SELECT
+    btrim(t.code) AS code,
+    substring(btrim(t.code) from length(sqlc.arg('sequence_base')::text) + 1) AS suffix,
+    substring(btrim(t.code) from 1 for length(sqlc.arg('sequence_base')::text)) AS matched_base
+  FROM tasks t
+  WHERE t.project_id = sqlc.arg('project_id')
+    AND t.code IS NOT NULL
+    AND btrim(t.code) <> ''
+    AND lower(btrim(t.code)) LIKE sqlc.arg('sequence_base_pattern')::text ESCAPE '\'
+),
+existing_matches AS (
+  SELECT
+    btrim(t.code) AS code
+  FROM tasks t
+  WHERE t.project_id = sqlc.arg('project_id')
+    AND t.code IS NOT NULL
+    AND btrim(t.code) <> ''
+    AND lower(btrim(t.code)) LIKE sqlc.arg('prefix_pattern')::text ESCAPE '\'
+),
+numeric_matches AS (
+  SELECT
+    code,
+    matched_base,
+    suffix::bigint AS number,
+    length(suffix) AS suffix_width
+  FROM matches
+  WHERE suffix ~ '^[0-9]{1,18}$'
+),
+next_number AS (
+  SELECT
+    coalesce(max(number), 0) + 1 AS number,
+    coalesce(max(suffix_width), 1) AS suffix_width,
+    coalesce((array_agg(matched_base ORDER BY number DESC, code DESC))[1], sqlc.arg('sequence_base')::text) AS base
+  FROM numeric_matches
+),
+next_code AS (
+  SELECT
+    base || lpad(number::text, greatest(length(number::text), suffix_width), '0') AS code,
+    'next'::text AS kind,
+    0 AS sort_rank,
+    NULL::bigint AS sort_number
+  FROM next_number
+),
+existing_codes AS (
+  SELECT
+    code,
+    kind,
+    sort_rank,
+    sort_number
+  FROM (
+    SELECT DISTINCT
+      em.code,
+      'existing'::text AS kind,
+      1 AS sort_rank,
+      nm.number AS sort_number
+    FROM existing_matches em
+    LEFT JOIN numeric_matches nm ON nm.code = em.code
+  ) deduped
+  ORDER BY sort_number DESC NULLS LAST, code DESC
+  LIMIT greatest(sqlc.arg('limit')::int - 1, 0)
+)
+SELECT code::text AS code, kind::text AS kind
+FROM (
+  SELECT code, kind, sort_rank, sort_number FROM next_code
+  UNION ALL
+  SELECT code, kind, sort_rank, sort_number FROM existing_codes
+) suggestions
+ORDER BY sort_rank ASC, sort_number DESC NULLS LAST, code DESC
+LIMIT sqlc.arg('limit');
+
 -- name: FindTaskRefsByProjectAndCode :many
 SELECT
   t.id,
