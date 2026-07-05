@@ -2,6 +2,7 @@ import { Controller, useFormContext } from 'react-hook-form';
 import { Input } from '../input';
 import { Select } from '../select';
 import { TextEditor } from '../text-editor';
+import { TaskCodeAutocomplete } from './task-code-autocomplete';
 import { TagPreviewList } from './tag-preview-list';
 import { TaskDependencyPicker } from './task-dependency-picker';
 import { parseUniqueTags, priorityOptions } from './task-form-utils';
@@ -43,7 +44,7 @@ export const TaskFormFields = ({
           {...register('title')}
           error={errors.title?.message}
         />
-        <Input label="Code" id="code" placeholder="TASK-101" {...register('code')} error={errors.code?.message} />
+        <TaskCodeAutocomplete projectId={projectId} />
         <Controller
           control={control}
           name="responsible_id"

@@ -12,6 +12,11 @@ export interface TaskDependencyRef {
   code: string;
 }
 
+export interface TaskCodeSuggestion {
+  code: string;
+  kind: 'next' | 'existing';
+}
+
 export interface Task {
   id: string;
   project_id: string;

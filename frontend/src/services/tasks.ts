@@ -1,6 +1,13 @@
 import { parse } from 'date-fns';
 import { api } from './api';
-import type { ListTasksRequest, ListUserDueTasksRequest, Task, TaskComment, TaskDependencyRef } from '@/types/task';
+import type {
+  ListTasksRequest,
+  ListUserDueTasksRequest,
+  Task,
+  TaskCodeSuggestion,
+  TaskComment,
+  TaskDependencyRef,
+} from '@/types/task';
 import type { ITaskForm } from '@/schemas/task-schema';
 import type { CursorPaginated, Paginated } from '@/types/paginated';
 
@@ -287,6 +294,29 @@ export interface SearchProjectTasksForDependenciesRequest {
   excludeTaskId?: string;
   limit?: number;
 }
+
+export interface SuggestTaskCodesRequest {
+  projectId: string;
+  prefix: string;
+  limit?: number;
+}
+
+export const suggestTaskCodes = async (request: SuggestTaskCodesRequest) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('project_id', request.projectId);
+  searchParams.set('prefix', request.prefix);
+
+  if (request.limit) {
+    searchParams.set('limit', request.limit.toString());
+  }
+
+  const response = await api.get('tasks/code-suggestions', {
+    searchParams,
+  });
+
+  const json = await response.json<{ data: TaskCodeSuggestion[] }>();
+  return json.data;
+};
 
 export const searchProjectTasksForDependencies = async (request: SearchProjectTasksForDependenciesRequest) => {
   const searchParams = new URLSearchParams();
