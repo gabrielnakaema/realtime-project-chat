@@ -288,6 +288,23 @@ func (pr *ProjectRepository) UpdateWithColumns(ctx context.Context, params Updat
 		}
 	}
 
+	for _, del := range params.Deletions {
+		if err := qtx.ReassignTasksToProjectColumn(ctx, queries.ReassignTasksToProjectColumnParams{
+			ProjectColumnID:   del.TargetColumn.Id,
+			Column2:           del.TargetColumn.IsDoneColumn,
+			ProjectColumnID_2: del.ColumnID,
+		}); err != nil {
+			return err
+		}
+
+		if err := qtx.DeleteProjectColumn(ctx, queries.DeleteProjectColumnParams{
+			ID:        del.ColumnID,
+			ProjectID: project.Id,
+		}); err != nil {
+			return err
+		}
+	}
+
 	for i := range params.Columns {
 		params.Columns[i].Position = i
 		params.Columns[i].ProjectId = project.Id
@@ -317,23 +334,6 @@ func (pr *ProjectRepository) UpdateWithColumns(ctx context.Context, params Updat
 			IsDoneColumn: params.Columns[i].IsDoneColumn,
 			ID:           params.Columns[i].Id,
 			ProjectID:    project.Id,
-		}); err != nil {
-			return err
-		}
-	}
-
-	for _, del := range params.Deletions {
-		if err := qtx.ReassignTasksToProjectColumn(ctx, queries.ReassignTasksToProjectColumnParams{
-			ProjectColumnID:   del.TargetColumn.Id,
-			Column2:           del.TargetColumn.IsDoneColumn,
-			ProjectColumnID_2: del.ColumnID,
-		}); err != nil {
-			return err
-		}
-
-		if err := qtx.DeleteProjectColumn(ctx, queries.DeleteProjectColumnParams{
-			ID:        del.ColumnID,
-			ProjectID: project.Id,
 		}); err != nil {
 			return err
 		}

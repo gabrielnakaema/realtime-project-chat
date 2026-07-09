@@ -451,6 +451,48 @@ func TestProjectsEndpoints(t *testing.T) {
 		assertProjectColumnsContract(t, updateResponse["columns"], updateResponse["id"].(string))
 	})
 
+	t.Run("PUT /projects/{id} - deletes a column and closes the resulting position gap", func(t *testing.T) {
+		testAPI.TruncateTables(t)
+
+		client := shared.NewHTTPClient(testAPI.GetBaseURL())
+		client.CreateUserAndLogin("test@example.com", "password123")
+
+		resp, err := client.POST("/projects", validProjectPayload("Test Project", "Test Description"))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var createResponse map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&createResponse))
+
+		columns := createResponse["columns"].([]any)
+		pending := columns[0].(map[string]any)
+		doing := columns[1].(map[string]any)
+		done := columns[2].(map[string]any)
+		payload := map[string]any{
+			"name":        "Test Project",
+			"description": "Test Description",
+			"columns":     projectColumnsPayloadFromResponse(t, []any{pending, done}),
+			"deleted_columns": []map[string]any{
+				{"id": doing["id"], "move_tasks_to_column_id": done["id"]},
+			},
+		}
+
+		resp, err = client.PUT("/projects/"+createResponse["id"].(string), payload)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var updateResponse map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&updateResponse))
+		updatedColumns := updateResponse["columns"].([]any)
+		require.Len(t, updatedColumns, 2)
+		assert.Equal(t, "Pending", updatedColumns[0].(map[string]any)["name"])
+		assert.Equal(t, float64(0), updatedColumns[0].(map[string]any)["position"])
+		assert.Equal(t, "Done", updatedColumns[1].(map[string]any)["name"])
+		assert.Equal(t, float64(1), updatedColumns[1].(map[string]any)["position"])
+	})
+
 	t.Run("PUT /projects/{id} - invalid column deletion target leaves the project unchanged", func(t *testing.T) {
 		testAPI.TruncateTables(t)
 
