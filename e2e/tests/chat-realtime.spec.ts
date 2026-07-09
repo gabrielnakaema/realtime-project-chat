@@ -1,7 +1,11 @@
 import crypto from "node:crypto";
 import { test, expect } from "@playwright/test";
 import { registerUser } from "../src/fixtures/test-user.js";
-import { backendURL, loginAsUser } from "../src/fixtures/authenticated-page.js";
+import {
+  backendURL,
+  expectToast,
+  loginAsUser,
+} from "../src/fixtures/authenticated-page.js";
 
 test("a chat message sent by one member appears for another member in real time", async ({
   browser,
@@ -28,7 +32,7 @@ test("a chat message sent by one member appears for another member in real time"
     .getByRole("dialog")
     .getByRole("button", { name: "Create project" })
     .click();
-  await expect(pageA.getByText("Project created successfully")).toBeVisible();
+  await expectToast(pageA, "Project created successfully");
 
   await pageA.getByRole("link", { name: projectName }).click();
   await expect(pageA).toHaveURL(/\/projects\/[^/]+$/);
@@ -37,7 +41,7 @@ test("a chat message sent by one member appears for another member in real time"
   await pageA.getByTitle("Add project member").click();
   await pageA.locator("#email").fill(userB.email);
   await pageA.getByRole("button", { name: "Add member" }).click();
-  await expect(pageA.getByText("Member added successfully")).toBeVisible();
+  await expectToast(pageA, "Member added successfully");
 
   await pageA.getByRole("link", { name: "Chat" }).click();
   await pageB.goto(`/projects/${projectId}/chat`);

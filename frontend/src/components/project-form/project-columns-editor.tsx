@@ -169,6 +169,7 @@ export const ProjectColumnsEditor = ({
         {columns.map((column, index) => {
           const canDelete = columns.length > 1 && (!column.id || existingColumns.length > 1);
           const surface = buildProjectColumnSurface(column.color);
+          const columnLabel = column.name || `Column ${index + 1}`;
 
           return (
             <div
@@ -275,6 +276,7 @@ export const ProjectColumnsEditor = ({
                     type="button"
                     variant="secondary"
                     className="px-3 py-2"
+                    aria-label={`Move ${columnLabel} up`}
                     onClick={() => moveColumn(index, -1)}
                     disabled={index === 0}
                   >
@@ -284,6 +286,7 @@ export const ProjectColumnsEditor = ({
                     type="button"
                     variant="secondary"
                     className="px-3 py-2"
+                    aria-label={`Move ${columnLabel} down`}
                     onClick={() => moveColumn(index, 1)}
                     disabled={index === columns.length - 1}
                   >
@@ -293,6 +296,7 @@ export const ProjectColumnsEditor = ({
                     type="button"
                     variant="secondary"
                     className="px-3 py-2"
+                    aria-label={`Delete ${columnLabel}`}
                     onClick={() => removeColumn(index)}
                     disabled={!canDelete}
                     title={!canDelete ? 'Keep at least one saved column available for task reassignment.' : undefined}
