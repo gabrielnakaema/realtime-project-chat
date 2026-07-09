@@ -1,0 +1,19 @@
+{
+  "name": "e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@testcontainers/kafka": "^11.0.3",
+    "@testcontainers/postgresql": "^11.0.3",
+    "@types/node": "^24.5.1",
+    "dotenv": "^17.0.0",
+    "execa": "^9.5.2",
+    "testcontainers": "^11.0.3",
+    "typescript": "^5.7.2"
+  }
+}
