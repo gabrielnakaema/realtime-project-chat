@@ -1191,18 +1191,12 @@ numeric_matches AS (
     suffix::bigint AS number,
     length(suffix) AS suffix_width
   FROM matches
-  -- cap at 18 digits so the cast to bigint (max ~9.2e18) can never overflow
   WHERE suffix ~ '^[0-9]{1,18}$'
 ),
 next_number AS (
-  -- an ungrouped aggregate always returns exactly one row, even when
-  -- numeric_matches is empty, so "next" always has a default of 1
   SELECT
     coalesce(max(number), 0) + 1 AS number,
     coalesce(max(suffix_width), 1) AS suffix_width,
-    -- follow the casing of the highest-numbered existing match so the
-    -- suggestion matches the project's established code convention instead
-    -- of whatever case the user happened to type
     coalesce((array_agg(matched_base ORDER BY number DESC, code DESC))[1], $2::text) AS base
   FROM numeric_matches
 ),
@@ -1229,11 +1223,6 @@ existing_codes AS (
     FROM existing_matches em
     LEFT JOIN numeric_matches nm ON nm.code = em.code
   ) deduped
-  -- order numerically by suffix so e.g. "API-10" ranks above "API-2";
-  -- non-numeric codes fall back to lexicographic order.
-  -- reserve one slot for the "next" suggestion so the final UNION ALL
-  -- (1 next + up to limit-1 existing) fits within the outer LIMIT below
-  -- without silently dropping the lowest-ranked existing row.
   ORDER BY sort_number DESC NULLS LAST, code DESC
   LIMIT greatest($1::int - 1, 0)
 )
@@ -1260,9 +1249,6 @@ type SuggestTaskCodesByProjectPrefixRow struct {
 	Kind string
 }
 
-// sequence_base, sequence_base_pattern and prefix_pattern are precomputed in
-// Go (trimming, lowercasing, stripping trailing digits, LIKE-escaping) so
-// this query only has to do set matching and aggregation.
 func (q *Queries) SuggestTaskCodesByProjectPrefix(ctx context.Context, arg SuggestTaskCodesByProjectPrefixParams) ([]SuggestTaskCodesByProjectPrefixRow, error) {
 	rows, err := q.db.Query(ctx, suggestTaskCodesByProjectPrefix,
 		arg.Limit,

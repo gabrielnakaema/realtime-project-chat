@@ -230,6 +230,118 @@ func (pr *ProjectRepository) Update(ctx context.Context, project *domain.Project
 	return nil
 }
 
+type ProjectColumnDeletion struct {
+	ColumnID     uuid.UUID
+	TargetColumn domain.ProjectColumn
+}
+
+type UpdateProjectWithColumnsParams struct {
+	Project   *domain.Project
+	Columns   []domain.ProjectColumn
+	Deletions []ProjectColumnDeletion
+}
+
+func (pr *ProjectRepository) UpdateWithColumns(ctx context.Context, params UpdateProjectWithColumnsParams) error {
+	tx, err := pr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	q := queries.New(pr.pool)
+	qtx := q.WithTx(tx)
+
+	project := params.Project
+
+	err = qtx.UpdateProject(ctx, queries.UpdateProjectParams{
+		Name:             project.Name,
+		Description:      project.Description,
+		RepositoryUrl:    optionalText(project.RepositoryURL),
+		RepositoryOwner:  optionalText(project.RepositoryOwner),
+		RepositoryName:   optionalText(project.RepositoryName),
+		DefaultBranch:    optionalText(project.DefaultBranch),
+		BranchNamePrefix: optionalText(project.BranchNamePrefix),
+		ID:               project.Id,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.NotFoundError("project not found")
+		}
+		return err
+	}
+
+	for i, column := range params.Columns {
+		if column.Id == uuid.Nil {
+			continue
+		}
+
+		if err := qtx.UpdateProjectColumn(ctx, queries.UpdateProjectColumnParams{
+			Name:         column.Name,
+			Description:  column.Description,
+			Color:        column.Color,
+			Position:     int32(i + 1000),
+			IsDoneColumn: false,
+			ID:           column.Id,
+			ProjectID:    project.Id,
+		}); err != nil {
+			return err
+		}
+	}
+
+	for i := range params.Columns {
+		params.Columns[i].Position = i
+		params.Columns[i].ProjectId = project.Id
+
+		if params.Columns[i].Id == uuid.Nil {
+			id, err := qtx.CreateProjectColumn(ctx, queries.CreateProjectColumnParams{
+				ProjectID:    project.Id,
+				Name:         params.Columns[i].Name,
+				Description:  params.Columns[i].Description,
+				Color:        params.Columns[i].Color,
+				Position:     int32(params.Columns[i].Position),
+				IsDoneColumn: params.Columns[i].IsDoneColumn,
+			})
+			if err != nil {
+				return err
+			}
+
+			params.Columns[i].Id = id
+			continue
+		}
+
+		if err := qtx.UpdateProjectColumn(ctx, queries.UpdateProjectColumnParams{
+			Name:         params.Columns[i].Name,
+			Description:  params.Columns[i].Description,
+			Color:        params.Columns[i].Color,
+			Position:     int32(params.Columns[i].Position),
+			IsDoneColumn: params.Columns[i].IsDoneColumn,
+			ID:           params.Columns[i].Id,
+			ProjectID:    project.Id,
+		}); err != nil {
+			return err
+		}
+	}
+
+	for _, del := range params.Deletions {
+		if err := qtx.ReassignTasksToProjectColumn(ctx, queries.ReassignTasksToProjectColumnParams{
+			ProjectColumnID:   del.TargetColumn.Id,
+			Column2:           del.TargetColumn.IsDoneColumn,
+			ProjectColumnID_2: del.ColumnID,
+		}); err != nil {
+			return err
+		}
+
+		if err := qtx.DeleteProjectColumn(ctx, queries.DeleteProjectColumnParams{
+			ID:        del.ColumnID,
+			ProjectID: project.Id,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (pr *ProjectRepository) CreateMember(ctx context.Context, member *domain.ProjectMember) error {
 	q := queries.New(pr.pool)
 

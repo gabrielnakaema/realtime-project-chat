@@ -69,11 +69,8 @@ func (m *mockProjectRepository) ListByUserId(ctx context.Context, userId uuid.UU
 	return args.Get(0).([]domain.Project), args.Error(1)
 }
 
-func (m *mockProjectRepository) Update(ctx context.Context, project *domain.Project) error {
-	args := m.Called(ctx, project)
-	if args.Get(0) == nil {
-		return args.Error(0)
-	}
+func (m *mockProjectRepository) UpdateWithColumns(ctx context.Context, params repository.UpdateProjectWithColumnsParams) error {
+	args := m.Called(ctx, params)
 	return args.Error(0)
 }
 
@@ -85,32 +82,8 @@ func (m *mockProjectRepository) MarkUpdatedAt(ctx context.Context, projectId uui
 	return args.Error(0)
 }
 
-func (m *mockProjectRepository) CreateColumn(ctx context.Context, status *domain.ProjectColumn) error {
-	args := m.Called(ctx, status)
-	if args.Get(0) == nil {
-		return args.Error(0)
-	}
-	return args.Error(0)
-}
-
 func (m *mockProjectRepository) UpdateColumn(ctx context.Context, status *domain.ProjectColumn) error {
 	args := m.Called(ctx, status)
-	if args.Get(0) == nil {
-		return args.Error(0)
-	}
-	return args.Error(0)
-}
-
-func (m *mockProjectRepository) DeleteColumn(ctx context.Context, projectId uuid.UUID, statusId uuid.UUID) error {
-	args := m.Called(ctx, projectId, statusId)
-	if args.Get(0) == nil {
-		return args.Error(0)
-	}
-	return args.Error(0)
-}
-
-func (m *mockProjectRepository) ReassignTasksToColumn(ctx context.Context, fromStatusId uuid.UUID, toStatus *domain.ProjectColumn) error {
-	args := m.Called(ctx, fromStatusId, toStatus)
 	if args.Get(0) == nil {
 		return args.Error(0)
 	}
@@ -529,8 +502,7 @@ func TestProjectService_Update(t *testing.T) {
 			},
 			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("Update", mock.Anything, &validProject).Return(nil)
-				repo.On("UpdateColumn", mock.Anything, mock.AnythingOfType("*domain.ProjectColumn")).Return(nil).Times(6)
+				repo.On("UpdateWithColumns", mock.Anything, mock.AnythingOfType("repository.UpdateProjectWithColumnsParams")).Return(nil)
 			},
 			expectedProject: &validProject,
 			shouldSucceed:   true,
@@ -556,10 +528,7 @@ func TestProjectService_Update(t *testing.T) {
 			},
 			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("Update", mock.Anything, &validProject).Return(nil)
-				repo.On("UpdateColumn", mock.Anything, mock.MatchedBy(func(column *domain.ProjectColumn) bool {
-					return column.Id != uuid.Nil
-				})).Return(nil).Times(6)
+				repo.On("UpdateWithColumns", mock.Anything, mock.AnythingOfType("repository.UpdateProjectWithColumnsParams")).Return(nil)
 			},
 			expectedProject: &validProject,
 			shouldSucceed:   true,
@@ -576,11 +545,72 @@ func TestProjectService_Update(t *testing.T) {
 			},
 			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("Update", mock.Anything, &validProject).Return(errors.New("server error"))
+				repo.On("UpdateWithColumns", mock.Anything, mock.AnythingOfType("repository.UpdateProjectWithColumnsParams")).Return(errors.New("server error"))
 			},
 			shouldSucceed:     false,
 			expectedErrorCode: string(domain.ServerErrorCode),
 			expectedError:     domain.ServerError("failed to update project", errors.New("server error")),
+		},
+		{
+			name: "throws validation error without writing anything when a column is invalid",
+			request: service.UpdateProjectRequest{
+				Id:          validProjectId,
+				Name:        "Updated Project",
+				Description: "Updated Description",
+				UserId:      validUserId,
+				Columns: []domain.ProjectColumn{
+					{Id: uuid.New(), ProjectId: validProjectId, Name: "Unknown", Color: "#64748B", Position: 0},
+					{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 1},
+					{Id: doneStatusID, ProjectId: validProjectId, Name: "Done", Color: "#059669", Position: 2, IsDoneColumn: true},
+				},
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.BusinessValidationErrorCode),
+			expectedError:     domain.BusinessValidationError("invalid project column"),
+		},
+		{
+			name: "throws validation error without writing anything when a deleted column has no reassignment",
+			request: service.UpdateProjectRequest{
+				Id:          validProjectId,
+				Name:        "Updated Project",
+				Description: "Updated Description",
+				UserId:      validUserId,
+				Columns: []domain.ProjectColumn{
+					{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 0},
+					{Id: doneStatusID, ProjectId: validProjectId, Name: "Done", Color: "#059669", Position: 1, IsDoneColumn: true},
+				},
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.BusinessValidationErrorCode),
+			expectedError:     domain.BusinessValidationError("deleted column reassignment is required"),
+		},
+		{
+			name: "throws validation error without writing anything when a deleted column target is invalid",
+			request: service.UpdateProjectRequest{
+				Id:          validProjectId,
+				Name:        "Updated Project",
+				Description: "Updated Description",
+				UserId:      validUserId,
+				Columns: []domain.ProjectColumn{
+					{Id: doingStatusID, ProjectId: validProjectId, Name: "Doing", Color: "#2563EB", Position: 0},
+					{Id: doneStatusID, ProjectId: validProjectId, Name: "Done", Color: "#059669", Position: 1, IsDoneColumn: true},
+				},
+				DeletedColumns: []service.DeletedProjectColumnRequest{
+					{Id: pendingStatusID, MoveTasksToColumnId: uuid.New()},
+				},
+			},
+			mockSetup: func(repo *mockProjectRepository, userRepo *mockUserRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(domain.BusinessValidationErrorCode),
+			expectedError:     domain.BusinessValidationError("deleted column target is invalid"),
 		},
 		{
 			name: "throws forbidden error",
@@ -648,6 +678,10 @@ func TestProjectService_Update(t *testing.T) {
 				var domainErr domain.DomainError
 				if assert.ErrorAs(t, err, &domainErr) {
 					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
+				}
+
+				if tt.expectedErrorCode == string(domain.BusinessValidationErrorCode) {
+					mockRepo.AssertNotCalled(t, "UpdateWithColumns", mock.Anything, mock.Anything)
 				}
 			}
 

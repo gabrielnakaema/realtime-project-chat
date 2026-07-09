@@ -28,12 +28,9 @@ type projectRepository interface {
 	Create(ctx context.Context, project *domain.Project) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Project, error)
 	ListByUserId(ctx context.Context, userId uuid.UUID, memberRole string, searchQuery string) ([]domain.Project, error)
-	Update(ctx context.Context, project *domain.Project) error
+	UpdateWithColumns(ctx context.Context, params repository.UpdateProjectWithColumnsParams) error
 	MarkUpdatedAt(ctx context.Context, projectId uuid.UUID) error
-	CreateColumn(ctx context.Context, status *domain.ProjectColumn) error
 	UpdateColumn(ctx context.Context, status *domain.ProjectColumn) error
-	DeleteColumn(ctx context.Context, projectId uuid.UUID, statusId uuid.UUID) error
-	ReassignTasksToColumn(ctx context.Context, fromStatusId uuid.UUID, toStatus *domain.ProjectColumn) error
 	GetColumnById(ctx context.Context, id uuid.UUID) (*domain.ProjectColumn, error)
 	CreateMember(ctx context.Context, member *domain.ProjectMember) error
 	RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) error
@@ -243,11 +240,6 @@ func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectReque
 	project.UpdatedAt = time.Now()
 	request.Columns = restoreMissingProjectColumnIDs(request.Columns, project.Columns, request.DeletedColumns)
 
-	err = ps.projectRepository.Update(ctx, project)
-	if err != nil {
-		return nil, domain.ServerError("failed to update project", err)
-	}
-
 	if err := validateProjectColumns(request.Columns); err != nil {
 		return nil, err
 	}
@@ -262,10 +254,7 @@ func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectReque
 		deletedColumns[deleted.Id] = deleted
 	}
 
-	for i, column := range request.Columns {
-		column.Position = i
-		column.ProjectId = project.Id
-
+	for _, column := range request.Columns {
 		if column.Id == uuid.Nil {
 			continue
 		}
@@ -273,36 +262,16 @@ func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectReque
 		if _, ok := existingColumns[column.Id]; !ok {
 			return nil, domain.BusinessValidationError("invalid project column")
 		}
-
-		column.IsDoneColumn = false
-		column.Position = i + 1000
-		if err := ps.projectRepository.UpdateColumn(ctx, &column); err != nil {
-			return nil, domain.ServerError("failed to prepare project columns", err)
-		}
-
-	}
-
-	for i := range request.Columns {
-		request.Columns[i].Position = i
-		request.Columns[i].ProjectId = project.Id
-
-		if request.Columns[i].Id == uuid.Nil {
-			if err := ps.projectRepository.CreateColumn(ctx, &request.Columns[i]); err != nil {
-				return nil, domain.ServerError("failed to create project column", err)
-			}
-			continue
-		}
-
-		if err := ps.projectRepository.UpdateColumn(ctx, &request.Columns[i]); err != nil {
-			return nil, domain.ServerError("failed to update project column", err)
-		}
 	}
 
 	finalColumnsByID := map[uuid.UUID]domain.ProjectColumn{}
-	for _, column := range request.Columns {
+	for i, column := range request.Columns {
+		column.Position = i
+		column.ProjectId = project.Id
 		finalColumnsByID[column.Id] = column
 	}
 
+	deletions := []repository.ProjectColumnDeletion{}
 	for existingID := range existingColumns {
 		if _, ok := finalColumnsByID[existingID]; ok {
 			continue
@@ -318,13 +287,19 @@ func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectReque
 			return nil, domain.BusinessValidationError("deleted column target is invalid")
 		}
 
-		if err := ps.projectRepository.ReassignTasksToColumn(ctx, existingID, &targetColumn); err != nil {
-			return nil, domain.ServerError("failed to move tasks from deleted column", err)
-		}
+		deletions = append(deletions, repository.ProjectColumnDeletion{
+			ColumnID:     existingID,
+			TargetColumn: targetColumn,
+		})
+	}
 
-		if err := ps.projectRepository.DeleteColumn(ctx, project.Id, existingID); err != nil {
-			return nil, domain.ServerError("failed to delete project column", err)
-		}
+	err = ps.projectRepository.UpdateWithColumns(ctx, repository.UpdateProjectWithColumnsParams{
+		Project:   project,
+		Columns:   request.Columns,
+		Deletions: deletions,
+	})
+	if err != nil {
+		return nil, domain.ServerError("failed to update project", err)
 	}
 
 	project.Columns = request.Columns

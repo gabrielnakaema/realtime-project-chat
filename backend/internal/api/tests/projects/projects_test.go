@@ -451,6 +451,63 @@ func TestProjectsEndpoints(t *testing.T) {
 		assertProjectColumnsContract(t, updateResponse["columns"], updateResponse["id"].(string))
 	})
 
+	t.Run("PUT /projects/{id} - invalid column deletion target leaves the project unchanged", func(t *testing.T) {
+		testAPI.TruncateTables(t)
+
+		client := shared.NewHTTPClient(testAPI.GetBaseURL())
+		client.CreateUserAndLogin("test@example.com", "password123")
+
+		resp, err := client.POST("/projects", validProjectPayload("Test Project", "Test Description"))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var createResponse map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&createResponse)
+		require.NoError(t, err)
+
+		columns := createResponse["columns"].([]interface{})
+		remainingColumns := projectColumnsPayloadFromResponse(t, []interface{}{columns[0], columns[2]})
+		removedColumnID := columns[1].(map[string]interface{})["id"]
+
+		payload := map[string]any{
+			"name":        "Should Not Persist",
+			"description": "Should Not Persist",
+			"columns":     remainingColumns,
+			"deleted_columns": []map[string]any{
+				{"id": removedColumnID, "move_tasks_to_column_id": uuid.New().String()},
+			},
+		}
+		for key, value := range validProjectRepositoryPayload() {
+			payload[key] = value
+		}
+
+		resp, err = client.PUT("/projects/"+createResponse["id"].(string), payload)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
+
+		resp, err = client.GET("/projects/" + createResponse["id"].(string))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var getResponse map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&getResponse)
+		require.NoError(t, err)
+
+		assert.Equal(t, "Test Project", getResponse["name"])
+		assert.Equal(t, "Test Description", getResponse["description"])
+		assertProjectRepositoryFields(t, getResponse, map[string]any{
+			"repository_url":     "",
+			"repository_owner":   "",
+			"repository_name":    "",
+			"default_branch":     "",
+			"branch_name_prefix": "",
+		})
+		assertProjectColumnsContract(t, getResponse["columns"], getResponse["id"].(string))
+	})
+
 	t.Run("PATCH /projects/{id}/columns/{column_id} - update single column", func(t *testing.T) {
 		testAPI.TruncateTables(t)
 
