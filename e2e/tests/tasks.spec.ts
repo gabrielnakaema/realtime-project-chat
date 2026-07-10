@@ -48,9 +48,46 @@ function taskCard(page: Page, title: string) {
   return page.getByText(title, { exact: true });
 }
 
+function boardColumn(page: Page, columnName: string) {
+  return page
+    .getByRole("button", { name: `Open actions for ${columnName}` })
+    .locator("xpath=ancestor::div[contains(@class, 'min-w-84')][1]");
+}
+
+function taskCardInColumn(page: Page, columnName: string, title: string) {
+  return boardColumn(page, columnName).getByText(title, { exact: true });
+}
+
 async function openTaskDetails(page: Page, title: string) {
   await taskCard(page, title).click();
   return page.getByRole("dialog", { name: title });
+}
+
+async function dragTaskToColumn(
+  page: Page,
+  taskTitle: string,
+  columnName: string
+) {
+  const draggableTask = taskCard(page, taskTitle).locator(
+    "xpath=ancestor::div[contains(@class, 'cursor-pointer')][1]"
+  );
+  const targetColumn = boardColumn(page, columnName);
+
+  const moveResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+
+    return (
+      response.request().method() === "PATCH" &&
+      /\/tasks\/[^/]+\/move$/.test(url.pathname)
+    );
+  });
+
+  await draggableTask.dragTo(targetColumn, {
+    targetPosition: { x: 50, y: 200 },
+  });
+
+  const moveResponse = await moveResponsePromise;
+  expect(moveResponse.ok()).toBe(true);
 }
 
 test.describe("tasks", () => {
@@ -97,6 +134,59 @@ test.describe("tasks", () => {
         .getByText("Priority", { exact: true })
         .locator("..")
         .getByText("High", { exact: true })
+    ).toBeVisible();
+  });
+
+  test("project owner can move a task across board columns and the move persists", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Task Move Project ${crypto.randomUUID()}`;
+    const taskTitle = `E2E Moving Task ${crypto.randomUUID()}`;
+
+    await createProject(page, projectName);
+
+    await page.getByRole("button", { name: "Open actions for Doing" }).click();
+    await page.getByRole("menuitem", { name: "Add task" }).click();
+
+    const createDialog = page.getByRole("dialog", { name: "Create task" });
+    await createDialog.locator("#title").fill(taskTitle);
+    await fillRichText(
+      createDialog.locator("#description"),
+      page,
+      "A task moved through the board workflow."
+    );
+    await selectOption(createDialog, page, "priority", "Medium");
+    await createDialog.getByRole("button", { name: "Create task" }).click();
+
+    await expectToast(page, "Task created successfully");
+    await expect(taskCard(page, taskTitle)).toBeVisible();
+
+    await dragTaskToColumn(page, taskTitle, "Done");
+
+    await expect(taskCardInColumn(page, "Doing", taskTitle)).toHaveCount(0);
+    await expect(taskCardInColumn(page, "Done", taskTitle)).toBeVisible();
+    await taskCardInColumn(page, "Done", taskTitle).click();
+
+    let taskDetails = page.getByRole("dialog", { name: taskTitle });
+    await expect(
+      taskDetails
+        .getByText("Status", { exact: true })
+        .locator("..")
+        .getByText("Done", { exact: true })
+    ).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(taskDetails).toHaveCount(0);
+    await page.reload();
+
+    await expect(taskCardInColumn(page, "Done", taskTitle)).toBeVisible();
+    await taskCardInColumn(page, "Done", taskTitle).click();
+    taskDetails = page.getByRole("dialog", { name: taskTitle });
+    await expect(
+      taskDetails
+        .getByText("Status", { exact: true })
+        .locator("..")
+        .getByText("Done", { exact: true })
     ).toBeVisible();
   });
 
@@ -368,5 +458,57 @@ test.describe("tasks", () => {
       name: upstreamTaskTitle,
     });
     await expect(upstreamDetails).toBeVisible();
+  });
+
+  test("user can find a task through global search and open its details", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Task Search Project ${crypto.randomUUID()}`;
+    const taskTitle = `E2E Searchable Task ${crypto.randomUUID()}`;
+
+    await createProject(page, projectName);
+
+    await page.getByRole("button", { name: "Open actions for Doing" }).click();
+    await page.getByRole("menuitem", { name: "Add task" }).click();
+
+    const createDialog = page.getByRole("dialog", { name: "Create task" });
+    await createDialog.locator("#title").fill(taskTitle);
+    await fillRichText(
+      createDialog.locator("#description"),
+      page,
+      "A task created to test global task search."
+    );
+    await selectOption(createDialog, page, "priority", "Low");
+    await createDialog.getByRole("button", { name: "Create task" }).click();
+    await expectToast(page, "Task created successfully");
+
+    await page.goto("/projects");
+    const searchInput = page.getByRole("searchbox", {
+      name: "Search projects and tasks",
+    });
+    await searchInput.fill(taskTitle);
+    await searchInput.press("Enter");
+
+    await expect(page).toHaveURL(/\/search\?query=/);
+    const taskResults = page
+      .getByRole("heading", {
+        name: "Tasks",
+        exact: true,
+      })
+      .locator("..");
+    await expect(
+      taskResults.getByText(taskTitle, { exact: true })
+    ).toBeVisible();
+    await taskResults
+      .getByRole("button", { name: `Open task ${taskTitle}`, exact: true })
+      .click();
+
+    const taskDetails = page.getByRole("dialog", { name: taskTitle });
+    await expect(taskDetails).toBeVisible();
+    await expect(
+      taskDetails.getByText("A task created to test global task search.", {
+        exact: true,
+      })
+    ).toBeVisible();
   });
 });

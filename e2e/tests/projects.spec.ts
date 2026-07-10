@@ -3,7 +3,9 @@ import {
   test,
   expect,
   expectToast,
+  loginAsUser,
 } from "../src/fixtures/authenticated-page.js";
+import { registerUser } from "../src/fixtures/test-user.js";
 import type { Locator, Page } from "@playwright/test";
 
 async function fillRichText(editor: Locator, page: Page, value: string) {
@@ -17,9 +19,7 @@ async function fillRichText(editor: Locator, page: Page, value: string) {
 function columnEditor(container: Locator, index: number) {
   return container
     .locator(`#column-${index}`)
-    .locator(
-      `xpath=ancestor::*[.//*[@id="column-description-${index}"]][1]`
-    );
+    .locator(`xpath=ancestor::*[.//*[@id="column-description-${index}"]][1]`);
 }
 
 async function markColumnAsDone(container: Locator, index: number) {
@@ -37,9 +37,7 @@ async function createProject(page: Page, name: string, description: string) {
   const createDialog = page.getByRole("dialog", { name: "Create project" });
   await createDialog.locator("#name").fill(name);
   await fillRichText(createDialog.locator("#description"), page, description);
-  await createDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await createDialog.getByRole("button", { name: "Create project" }).click();
 
   await expectToast(page, "Project created successfully");
 }
@@ -50,7 +48,93 @@ function boardColumnHeadings(page: Page, names: string[]) {
     .filter({ hasText: new RegExp(`^(${names.join("|")})$`) });
 }
 
+function projectListLink(page: Page, name: string) {
+  return page
+    .getByRole("heading", { name: "Your Projects" })
+    .locator("..")
+    .getByRole("link", { name: new RegExp(name) });
+}
+
 test.describe("projects", () => {
+  test("project owner can add and remove a member, granting and revoking project access", async ({
+    authenticatedPage: ownerPage,
+    backendURL,
+    browser,
+    request,
+  }) => {
+    const member = await registerUser(request, backendURL, {
+      name: "E2E Project Member",
+    });
+    const memberPage = await loginAsUser(browser, member);
+    const projectName = `E2E Membership ${crypto.randomUUID()}`;
+
+    await createProject(
+      ownerPage,
+      projectName,
+      "Created by the project membership e2e test"
+    );
+    await expect(projectListLink(memberPage, projectName)).toHaveCount(0);
+
+    await projectListLink(ownerPage, projectName).click();
+    await expect(
+      ownerPage.getByRole("heading", { name: projectName })
+    ).toBeVisible();
+
+    await ownerPage.getByTitle("Add project member").click();
+    const addMemberDialog = ownerPage.getByRole("dialog", {
+      name: "Add project member",
+    });
+    await addMemberDialog.getByLabel("Email").fill(member.email);
+    await addMemberDialog.getByRole("button", { name: "Add member" }).click();
+    await expectToast(ownerPage, "Member added successfully");
+    await expect(addMemberDialog).toHaveCount(0);
+
+    await memberPage.reload();
+    await projectListLink(memberPage, projectName).click();
+    await expect(
+      memberPage.getByRole("heading", { name: projectName })
+    ).toBeVisible();
+    await expect(
+      boardColumnHeadings(memberPage, ["Pending", "Doing", "Done"])
+    ).toHaveText(["Pending", "Doing", "Done"]);
+
+    await ownerPage.getByTitle("View project members").click();
+    let membersDialog = ownerPage.getByRole("dialog", {
+      name: "Project members",
+    });
+    await expect(membersDialog.getByText("2 members")).toBeVisible();
+    const memberRow = membersDialog.locator("article").filter({
+      hasText: member.email,
+    });
+    await expect(memberRow.getByText("Member", { exact: true })).toBeVisible();
+    await memberRow.hover();
+    await memberRow
+      .getByRole("button", { name: "Remove member from project" })
+      .click();
+
+    const removeMemberDialog = ownerPage.getByRole("dialog", {
+      name: "Remove member from project",
+    });
+    await expect(
+      removeMemberDialog.getByText(
+        `Are you sure you want to remove ${member.name} from the project?`
+      )
+    ).toBeVisible();
+    await removeMemberDialog.getByRole("button", { name: "Remove" }).click();
+    await expect(removeMemberDialog).toHaveCount(0);
+
+    membersDialog = ownerPage.getByRole("dialog", {
+      name: "Project members",
+    });
+    await expect(membersDialog.getByText("1 member")).toBeVisible();
+    await expect(membersDialog.getByText(member.email)).toHaveCount(0);
+
+    await memberPage.goto("/projects");
+    await expect(projectListLink(memberPage, projectName)).toHaveCount(0);
+
+    await memberPage.context().close();
+  });
+
   test("project creation shows validation errors for a missing name", async ({
     authenticatedPage: page,
   }) => {
@@ -60,12 +144,45 @@ test.describe("projects", () => {
       .click();
 
     const createDialog = page.getByRole("dialog", { name: "Create project" });
-    await createDialog
-      .getByRole("button", { name: "Create project" })
-      .click();
+    await createDialog.getByRole("button", { name: "Create project" }).click();
 
     await expect(createDialog.getByText("Name is required")).toBeVisible();
     await expect(createDialog).toBeVisible();
+  });
+
+  test("user can find a project through global search and open it", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Project Search ${crypto.randomUUID()}`;
+
+    await createProject(
+      page,
+      projectName,
+      "Created by the project search e2e test"
+    );
+
+    const searchInput = page.getByRole("searchbox", {
+      name: "Search projects and tasks",
+    });
+    await searchInput.fill(projectName);
+    await searchInput.press("Enter");
+
+    await expect(page).toHaveURL(/\/search\?query=/);
+    const projectResults = page
+      .getByRole("heading", {
+        name: "Projects",
+        exact: true,
+      })
+      .locator("..");
+    const projectResult = projectResults.getByRole("link", {
+      name: new RegExp(projectName),
+    });
+    await expect(projectResult).toBeVisible();
+
+    await projectResult.click();
+    await expect(
+      page.getByRole("heading", { name: projectName, exact: true })
+    ).toBeVisible();
   });
 
   test("user can create a project with repository details and a custom workflow", async ({
@@ -108,8 +225,9 @@ test.describe("projects", () => {
       .fill(customColumnDescription);
     await markColumnAsDone(createDialog, 3);
 
-    await expect(createDialog.getByRole("button", { name: "Done column" }))
-      .toHaveCount(1);
+    await expect(
+      createDialog.getByRole("button", { name: "Done column" })
+    ).toHaveCount(1);
     await expect(
       columnEditor(createDialog, 3).getByRole("button", {
         name: "Done column",
@@ -121,14 +239,14 @@ test.describe("projects", () => {
       })
     ).toBeVisible();
 
-    await createDialog
-      .getByRole("button", { name: "Create project" })
-      .click();
+    await createDialog.getByRole("button", { name: "Create project" }).click();
 
     await expectToast(page, "Project created successfully");
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
 
-    await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: projectName })
+    ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Pending" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Doing" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Done" })).toBeVisible();
@@ -176,8 +294,9 @@ test.describe("projects", () => {
 
     const createDialog = page.getByRole("dialog", { name: "Create project" });
 
-    await expect(createDialog.getByRole("button", { name: "Done column" }))
-      .toHaveCount(1);
+    await expect(
+      createDialog.getByRole("button", { name: "Done column" })
+    ).toHaveCount(1);
     await expect(
       columnEditor(createDialog, 2).getByRole("button", {
         name: "Done column",
@@ -186,8 +305,9 @@ test.describe("projects", () => {
 
     await markColumnAsDone(createDialog, 0);
 
-    await expect(createDialog.getByRole("button", { name: "Done column" }))
-      .toHaveCount(1);
+    await expect(
+      createDialog.getByRole("button", { name: "Done column" })
+    ).toHaveCount(1);
     await expect(
       columnEditor(createDialog, 0).getByRole("button", {
         name: "Done column",
@@ -223,13 +343,13 @@ test.describe("projects", () => {
       page,
       projectDescription
     );
-    await createDialog
-      .getByRole("button", { name: "Create project" })
-      .click();
+    await createDialog.getByRole("button", { name: "Create project" }).click();
 
     await expectToast(page, "Project created successfully");
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
-    await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: projectName })
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "Settings" }).click();
 
@@ -247,8 +367,9 @@ test.describe("projects", () => {
       .fill(addedColumnDescription);
     await markColumnAsDone(settingsDialog, 3);
 
-    await expect(settingsDialog.getByRole("button", { name: "Done column" }))
-      .toHaveCount(1);
+    await expect(
+      settingsDialog.getByRole("button", { name: "Done column" })
+    ).toHaveCount(1);
     await expect(
       columnEditor(settingsDialog, 3).getByRole("button", {
         name: "Done column",
@@ -294,6 +415,87 @@ test.describe("projects", () => {
     ).toBeVisible();
   });
 
+  test("project owner can edit a column from the board and the changes persist", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Direct Column Edit ${crypto.randomUUID()}`;
+    const updatedColumnName = "Ready";
+    const updatedColumnDescription =
+      "Work that is ready to count as completed.";
+    const updatedColumnColor = "#7c3aed";
+
+    await createProject(
+      page,
+      projectName,
+      "Created by the direct column editing e2e test"
+    );
+    await projectListLink(page, projectName).click();
+    await expect(
+      page.getByRole("heading", { name: projectName })
+    ).toBeVisible();
+
+    await page
+      .getByRole("button", { name: "Open actions for Pending" })
+      .click();
+    await page.getByRole("menuitem", { name: "Edit column" }).click();
+
+    let editDialog = page.getByRole("dialog", { name: "Edit column" });
+    await expect(editDialog.getByLabel("Column name")).toHaveValue("Pending");
+    await editDialog.getByLabel("Column name").fill(updatedColumnName);
+    await editDialog
+      .getByLabel("Column description")
+      .fill(updatedColumnDescription);
+    await editDialog.getByLabel("Color").fill(updatedColumnColor);
+    await editDialog.getByRole("checkbox").check();
+    await editDialog.getByRole("button", { name: "Save changes" }).click();
+
+    await expectToast(page, "Column updated successfully");
+    await expect(editDialog).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: updatedColumnName })
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Pending" })).toHaveCount(0);
+
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: updatedColumnName })
+    ).toBeVisible();
+    await page
+      .getByRole("button", {
+        name: `Open actions for ${updatedColumnName}`,
+      })
+      .click();
+    await page.getByRole("menuitem", { name: "Edit column" }).click();
+
+    editDialog = page.getByRole("dialog", { name: "Edit column" });
+    await expect(editDialog.getByLabel("Column name")).toHaveValue(
+      updatedColumnName
+    );
+    await expect(editDialog.getByLabel("Column description")).toHaveValue(
+      updatedColumnDescription
+    );
+    await expect(editDialog.getByLabel("Color")).toHaveValue(
+      updatedColumnColor
+    );
+    await expect(editDialog.getByRole("checkbox")).toBeChecked();
+    await editDialog.getByRole("button", { name: "Cancel" }).click();
+
+    await page.getByRole("button", { name: "Settings" }).click();
+    const settingsDialog = page.getByRole("dialog", {
+      name: "Project settings",
+    });
+    await expect(
+      columnEditor(settingsDialog, 0).getByRole("button", {
+        name: "Done column",
+      })
+    ).toBeVisible();
+    await expect(
+      columnEditor(settingsDialog, 2).getByRole("button", {
+        name: "Mark as done",
+      })
+    ).toBeVisible();
+  });
+
   test("user can reorder project columns from settings", async ({
     authenticatedPage: page,
   }) => {
@@ -306,9 +508,12 @@ test.describe("projects", () => {
     );
 
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
-    await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
-    await expect(boardColumnHeadings(page, ["Pending", "Doing", "Done"]))
-      .toHaveText(["Pending", "Doing", "Done"]);
+    await expect(
+      page.getByRole("heading", { name: projectName })
+    ).toBeVisible();
+    await expect(
+      boardColumnHeadings(page, ["Pending", "Doing", "Done"])
+    ).toHaveText(["Pending", "Doing", "Done"]);
 
     await page.getByRole("button", { name: "Settings" }).click();
 
@@ -322,8 +527,9 @@ test.describe("projects", () => {
     await settingsDialog.getByRole("button", { name: "Save changes" }).click();
 
     await expectToast(page, "Project saved successfully");
-    await expect(boardColumnHeadings(page, ["Pending", "Done", "Doing"]))
-      .toHaveText(["Pending", "Done", "Doing"]);
+    await expect(
+      boardColumnHeadings(page, ["Pending", "Done", "Doing"])
+    ).toHaveText(["Pending", "Done", "Doing"]);
 
     await page.getByRole("button", { name: "Settings" }).click();
 
@@ -353,16 +559,16 @@ test.describe("projects", () => {
     );
 
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
-    await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: projectName })
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "Settings" }).click();
 
     const settingsDialog = page.getByRole("dialog", {
       name: "Project settings",
     });
-    await settingsDialog
-      .getByRole("button", { name: "Delete Doing" })
-      .click();
+    await settingsDialog.getByRole("button", { name: "Delete Doing" }).click();
 
     await expect(settingsDialog.getByText("Pending removals")).toBeVisible();
     await expect(settingsDialog.getByText("Doing")).toBeVisible();
@@ -394,6 +600,66 @@ test.describe("projects", () => {
     ).toHaveCount(0);
   });
 
+  test("project owner can delete a populated column and reassign its tasks", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Column Reassignment ${crypto.randomUUID()}`;
+    const taskTitle = `E2E Reassigned Task ${crypto.randomUUID()}`;
+
+    await createProject(
+      page,
+      projectName,
+      "Created by the populated column deletion e2e test"
+    );
+
+    await page.getByRole("link", { name: new RegExp(projectName) }).click();
+    await expect(
+      page.getByRole("heading", { name: projectName })
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Open actions for Doing" }).click();
+    await page.getByRole("menuitem", { name: "Add task" }).click();
+
+    const createTaskDialog = page.getByRole("dialog", { name: "Create task" });
+    await createTaskDialog.locator("#title").fill(taskTitle);
+    await fillRichText(
+      createTaskDialog.locator("#description"),
+      page,
+      "This task must survive removal of its workflow column."
+    );
+    await createTaskDialog.locator("#priority").click();
+    await page.getByRole("option", { name: "Medium", exact: true }).click();
+    await createTaskDialog.getByRole("button", { name: "Create task" }).click();
+
+    await expectToast(page, "Task created successfully");
+    await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Settings" }).click();
+
+    const settingsDialog = page.getByRole("dialog", {
+      name: "Project settings",
+    });
+    await settingsDialog.getByRole("button", { name: "Delete Doing" }).click();
+    await expect(settingsDialog.getByText("Pending removals")).toBeVisible();
+
+    await settingsDialog.getByRole("combobox").click();
+    await page.getByRole("option", { name: "Done", exact: true }).click();
+    await settingsDialog.getByRole("button", { name: "Save changes" }).click();
+
+    await expectToast(page, "Project saved successfully");
+    await expect(page.getByRole("heading", { name: "Doing" })).toHaveCount(0);
+    await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
+
+    await page.getByText(taskTitle, { exact: true }).click();
+    const taskDetails = page.getByRole("dialog", { name: taskTitle });
+    await expect(
+      taskDetails
+        .getByText("Status", { exact: true })
+        .locator("..")
+        .getByText("Done", { exact: true })
+    ).toBeVisible();
+  });
+
   test("user can create and update a project through the UI", async ({
     authenticatedPage: page,
   }) => {
@@ -415,9 +681,7 @@ test.describe("projects", () => {
       page,
       projectDescription
     );
-    await createDialog
-      .getByRole("button", { name: "Create project" })
-      .click();
+    await createDialog.getByRole("button", { name: "Create project" }).click();
 
     await expectToast(page, "Project created successfully");
     await expect(
@@ -426,7 +690,9 @@ test.describe("projects", () => {
 
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+$/);
-    await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: projectName })
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "Settings" }).click();
 

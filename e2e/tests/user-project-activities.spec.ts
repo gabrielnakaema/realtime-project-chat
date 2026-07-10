@@ -1,0 +1,73 @@
+import crypto from "node:crypto";
+import {
+  expect,
+  expectToast,
+  test,
+} from "../src/fixtures/authenticated-page.js";
+
+test("project owner sees task creation in recent activity and can return to the project", async ({
+  authenticatedPage: page,
+  testUser,
+}) => {
+  const projectName = `E2E Activity Project ${crypto.randomUUID()}`;
+  const taskTitle = `E2E Activity Task ${crypto.randomUUID()}`;
+
+  await page
+    .getByRole("banner")
+    .getByRole("button", { name: "Create project" })
+    .click();
+
+  const createProjectDialog = page.getByRole("dialog", {
+    name: "Create project",
+  });
+  await createProjectDialog.locator("#name").fill(projectName);
+  await createProjectDialog
+    .locator("#description")
+    .pressSequentially("Created by the project activity e2e test");
+  await createProjectDialog
+    .getByRole("button", { name: "Create project" })
+    .click();
+  await expectToast(page, "Project created successfully");
+
+  await page.getByRole("link", { name: projectName }).click();
+  await page.getByRole("button", { name: "Open actions for Doing" }).click();
+  await page.getByRole("menuitem", { name: "Add task" }).click();
+
+  const createTaskDialog = page.getByRole("dialog", {
+    name: "Create task",
+  });
+  await createTaskDialog.locator("#title").fill(taskTitle);
+  await createTaskDialog
+    .locator("#description")
+    .pressSequentially("A task created to verify the activity feed.");
+  await createTaskDialog.locator("#priority").click();
+  await page.getByRole("option", { name: "Medium", exact: true }).click();
+  await createTaskDialog.getByRole("button", { name: "Create task" }).click();
+  await expectToast(page, "Task created successfully");
+
+  await page.goto("/projects");
+  const activityFeed = page
+    .getByRole("heading", {
+      name: "Recent activity",
+      exact: true,
+    })
+    .locator("xpath=ancestor::section[1]");
+  await expect(activityFeed.getByText(taskTitle, { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(
+    activityFeed.getByText(`${testUser.name} created task`, { exact: false })
+  ).toBeVisible();
+
+  const taskActivity = activityFeed
+    .getByText(taskTitle, { exact: true })
+    .locator(
+      "xpath=ancestor::div[contains(@class, 'flex items-center gap-4')][1]"
+    );
+  await taskActivity
+    .getByRole("link", { name: projectName, exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: projectName, exact: true })
+  ).toBeVisible();
+});
