@@ -39,6 +39,7 @@ export const TaskDetailsHeaderActions = ({ status, isArchiving, onEdit, onArchiv
     <>
       <button
         type="button"
+        aria-label="Edit task"
         className="w-fit rounded-md p-2 font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
         onClick={onEdit}
       >
@@ -47,6 +48,7 @@ export const TaskDetailsHeaderActions = ({ status, isArchiving, onEdit, onArchiv
       {status !== 'archived' && (
         <button
           type="button"
+          aria-label="Archive task"
           className="w-fit rounded-md p-2 font-medium transition-colors hover:bg-red-50 dark:hover:bg-red-950"
           onClick={() => setIsConfirmingArchive(true)}
         >

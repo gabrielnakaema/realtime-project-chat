@@ -28,17 +28,26 @@ test.describe("auth", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
-  test("sign-up redirects to the login page", async ({ page }) => {
+  test("newly signed-up user can log in via the UI", async ({ page }) => {
     const email = `e2e-signup-${crypto.randomUUID()}@example.com`;
+    const name = "New E2E User";
+    const password = "Password123!";
 
     await page.goto("/sign-up");
 
-    await page.locator("#name").fill("New E2E User");
+    await page.locator("#name").fill(name);
     await page.locator("#email").fill(email);
-    await page.locator("#password").fill("Password123!");
-    await page.locator("#confirmPassword").fill("Password123!");
+    await page.locator("#password").fill(password);
+    await page.locator("#confirmPassword").fill(password);
     await page.getByRole("button", { name: "Sign up" }).click();
 
     await expect(page).toHaveURL(/\/login$/);
+
+    await page.locator("#email").fill(email);
+    await page.locator("#password").fill(password);
+    await page.getByRole("button", { name: "Sign In" }).click();
+
+    await expect(page.getByText(`Welcome back, ${name}`)).toBeVisible();
+    await expect(page).toHaveURL(/\/projects$/);
   });
 });

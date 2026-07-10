@@ -39,8 +39,7 @@ export const ProjectColumnActions = ({ column, canEditColumn, surfaceAccentColor
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem
-            onSelect={(event) => {
-              event.preventDefault();
+            onSelect={() => {
               setIsCreateTaskOpen(true);
             }}
           >
@@ -49,8 +48,7 @@ export const ProjectColumnActions = ({ column, canEditColumn, surfaceAccentColor
           </DropdownMenuItem>
           {canEditColumn && (
             <DropdownMenuItem
-              onSelect={(event) => {
-                event.preventDefault();
+              onSelect={() => {
                 setIsEditColumnOpen(true);
               }}
             >
