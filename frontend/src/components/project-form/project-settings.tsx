@@ -36,7 +36,6 @@ export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
       await invalidateProjectBoardData(queryClient);
       handleSuccess('Project saved successfully');
       setOpen(false);
-      resetForm();
     },
   });
 

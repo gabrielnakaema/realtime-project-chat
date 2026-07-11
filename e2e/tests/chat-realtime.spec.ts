@@ -149,11 +149,30 @@ test("project collaborators can start a direct message and receive it in real ti
   expect(createMessageResponse.ok()).toBe(true);
 
   await pageB.getByRole("button", { name: "Messages" }).click();
-  await pageB.getByRole("button", { name: new RegExp(userA.name) }).click();
+  const directChatRow = pageB.getByRole("button", {
+    name: new RegExp(userA.name),
+  });
+  await expect(directChatRow.getByText("1", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const readResponsePromise = pageB.waitForResponse((response) => {
+    const url = new URL(response.url());
+
+    return (
+      response.request().method() === "POST" &&
+      /\/chats\/[^/]+\/read$/.test(url.pathname)
+    );
+  });
+  await directChatRow.click();
 
   await expect(pageB.getByText(messageContent)).toBeVisible({
     timeout: 15_000,
   });
+  expect((await readResponsePromise).ok()).toBe(true);
+
+  await pageB.locator("aside").getByRole("button").first().click();
+  await expect(directChatRow.getByText("1", { exact: true })).toHaveCount(0);
 
   await pageA.context().close();
   await pageB.context().close();

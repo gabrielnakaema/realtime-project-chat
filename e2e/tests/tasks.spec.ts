@@ -90,6 +90,37 @@ async function dragTaskToColumn(
   expect(moveResponse.ok()).toBe(true);
 }
 
+async function dragTaskBeforeTask(
+  page: Page,
+  taskTitle: string,
+  targetTaskTitle: string
+) {
+  const draggableTask = taskCard(page, taskTitle).locator(
+    "xpath=ancestor::div[contains(@class, 'cursor-pointer')][1]"
+  );
+  const targetTask = taskCard(page, targetTaskTitle).locator(
+    "xpath=ancestor::div[contains(@class, 'cursor-pointer')][1]"
+  );
+
+  const moveResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+
+    return (
+      response.request().method() === "PATCH" &&
+      /\/tasks\/[^/]+\/move$/.test(url.pathname)
+    );
+  });
+
+  await draggableTask.dragTo(targetTask, {
+    targetPosition: { x: 40, y: 1 },
+  });
+
+  const moveResponse = await moveResponsePromise;
+  expect(moveResponse.ok()).toBe(true);
+
+  return moveResponse;
+}
+
 test.describe("tasks", () => {
   test("project owner can create a task in a board column and view its details", async ({
     authenticatedPage: page,
@@ -135,6 +166,60 @@ test.describe("tasks", () => {
         .locator("..")
         .getByText("High", { exact: true })
     ).toBeVisible();
+  });
+
+  test("project owner can select a suggested task code when creating a task", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Task Code Project ${crypto.randomUUID()}`;
+    const codePrefix = `E2E-${crypto.randomUUID().slice(0, 8).toUpperCase()}-`;
+    const existingTaskTitle = `E2E Existing Code Task ${crypto.randomUUID()}`;
+    const taskTitle = `E2E Suggested Code Task ${crypto.randomUUID()}`;
+    const existingCode = `${codePrefix}001`;
+    const suggestedCode = `${codePrefix}002`;
+
+    await createProject(page, projectName);
+
+    await page.getByRole("button", { name: "Create task" }).click();
+    let createDialog = page.getByRole("dialog", { name: "Create task" });
+    await createDialog.locator("#title").fill(existingTaskTitle);
+    await fillRichText(
+      createDialog.locator("#description"),
+      page,
+      "Creates the first task code in the sequence."
+    );
+    await createDialog.getByPlaceholder("TASK-101").fill(existingCode);
+    await selectOption(createDialog, page, "priority", "Medium");
+    await createDialog.getByRole("button", { name: "Create task" }).click();
+    await expectToast(page, "Task created successfully");
+
+    await page.getByRole("button", { name: "Create task" }).click();
+    createDialog = page.getByRole("dialog", { name: "Create task" });
+    await createDialog.locator("#title").fill(taskTitle);
+    await fillRichText(
+      createDialog.locator("#description"),
+      page,
+      "Uses the next task code suggested by the project."
+    );
+
+    const codeInput = createDialog.getByPlaceholder("TASK-101");
+    await codeInput.fill(codePrefix);
+    await page
+      .getByRole("option", { name: new RegExp(`^${suggestedCode}`) })
+      .click();
+    await expect(codeInput).toHaveValue(suggestedCode);
+
+    await selectOption(createDialog, page, "priority", "High");
+    await createDialog.getByRole("button", { name: "Create task" }).click();
+    await expectToast(page, "Task created successfully");
+
+    let taskDetails = await openTaskDetails(page, taskTitle);
+    await expect(taskDetails.getByTitle(suggestedCode).first()).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await page.reload();
+    taskDetails = await openTaskDetails(page, taskTitle);
+    await expect(taskDetails.getByTitle(suggestedCode).first()).toBeVisible();
   });
 
   test("project owner can move a task across board columns and the move persists", async ({
@@ -188,6 +273,58 @@ test.describe("tasks", () => {
         .locator("..")
         .getByText("Done", { exact: true })
     ).toBeVisible();
+  });
+
+  test("project owner can reorder tasks within a board column and the order persists", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Task Order Project ${crypto.randomUUID()}`;
+    const firstTaskTitle = `E2E First Task ${crypto.randomUUID()}`;
+    const secondTaskTitle = `E2E Second Task ${crypto.randomUUID()}`;
+    const thirdTaskTitle = `E2E Third Task ${crypto.randomUUID()}`;
+
+    await createProject(page, projectName);
+
+    const createTask = async (title: string) => {
+      await page.getByRole("button", { name: "Create task" }).click();
+      const createDialog = page.getByRole("dialog", { name: "Create task" });
+      await createDialog.locator("#title").fill(title);
+      await fillRichText(
+        createDialog.locator("#description"),
+        page,
+        "A task used to verify the board order."
+      );
+      await selectOption(createDialog, page, "priority", "Medium");
+      await createDialog.getByRole("button", { name: "Create task" }).click();
+      await expect(createDialog).toHaveCount(0);
+      await expect(taskCardInColumn(page, "Pending", title)).toBeVisible();
+    };
+
+    await createTask(firstTaskTitle);
+    await createTask(secondTaskTitle);
+    await createTask(thirdTaskTitle);
+
+    const pendingTaskHeadings = boardColumn(page, "Pending").getByRole(
+      "heading",
+      { level: 4 }
+    );
+    await expect(pendingTaskHeadings).toHaveText([
+      thirdTaskTitle,
+      secondTaskTitle,
+      firstTaskTitle,
+    ]);
+
+    await dragTaskBeforeTask(page, firstTaskTitle, thirdTaskTitle);
+    await expect(pendingTaskHeadings).toHaveText([
+      firstTaskTitle,
+      thirdTaskTitle,
+      secondTaskTitle,
+    ]);
+
+    await page.reload();
+    await expect(
+      boardColumn(page, "Pending").getByRole("heading", { level: 4 })
+    ).toHaveText([firstTaskTitle, thirdTaskTitle, secondTaskTitle]);
   });
 
   test("task creation form shows validation errors for missing required fields", async ({

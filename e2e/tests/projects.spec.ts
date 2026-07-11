@@ -660,7 +660,7 @@ test.describe("projects", () => {
     ).toBeVisible();
   });
 
-  test("user can create and update a project through the UI", async ({
+  test("user can create and update project details through the UI", async ({
     authenticatedPage: page,
   }) => {
     const projectName = `E2E Project ${crypto.randomUUID()}`;
@@ -668,6 +668,12 @@ test.describe("projects", () => {
     const updatedProjectName = `${projectName} updated`;
     const updatedProjectDescription =
       "Updated from project settings by the projects e2e test";
+    const repositoryURL =
+      "https://github.com/example/project-chat-e2e-settings";
+    const repositoryOwner = "example";
+    const repositoryName = "project-chat-e2e-settings";
+    const defaultBranch = "release";
+    const branchNamePrefix = "e2e/settings/";
 
     await page
       .getByRole("banner")
@@ -706,9 +712,15 @@ test.describe("projects", () => {
       page,
       updatedProjectDescription
     );
+    await settingsDialog.locator("#repository_url").fill(repositoryURL);
+    await settingsDialog.locator("#repository_owner").fill(repositoryOwner);
+    await settingsDialog.locator("#repository_name").fill(repositoryName);
+    await settingsDialog.locator("#default_branch").fill(defaultBranch);
+    await settingsDialog.locator("#branch_name_prefix").fill(branchNamePrefix);
     await settingsDialog.getByRole("button", { name: "Save changes" }).click();
 
     await expectToast(page, "Project saved successfully");
+    await expect(settingsDialog).toHaveCount(0);
     await expect(
       page.getByRole("heading", { name: updatedProjectName })
     ).toBeVisible();
@@ -719,5 +731,37 @@ test.describe("projects", () => {
     await expect(
       detailsSheet.getByText(updatedProjectDescription)
     ).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: updatedProjectName, exact: true })
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Settings" }).click();
+
+    const reopenedSettingsDialog = page.getByRole("dialog", {
+      name: "Project settings",
+    });
+    await expect(reopenedSettingsDialog.locator("#name")).toHaveValue(
+      updatedProjectName
+    );
+    await expect(reopenedSettingsDialog.locator("#description")).toHaveText(
+      updatedProjectDescription
+    );
+    await expect(reopenedSettingsDialog.locator("#repository_url")).toHaveValue(
+      repositoryURL
+    );
+    await expect(
+      reopenedSettingsDialog.locator("#repository_owner")
+    ).toHaveValue(repositoryOwner);
+    await expect(
+      reopenedSettingsDialog.locator("#repository_name")
+    ).toHaveValue(repositoryName);
+    await expect(reopenedSettingsDialog.locator("#default_branch")).toHaveValue(
+      defaultBranch
+    );
+    await expect(
+      reopenedSettingsDialog.locator("#branch_name_prefix")
+    ).toHaveValue(branchNamePrefix);
   });
 });

@@ -71,3 +71,85 @@ test("project owner sees task creation in recent activity and can return to the 
     page.getByRole("heading", { name: projectName, exact: true })
   ).toBeVisible();
 });
+
+test("project owner sees a task move in recent activity and can return to the project", async ({
+  authenticatedPage: page,
+  testUser,
+}) => {
+  const projectName = `E2E Updated Activity Project ${crypto.randomUUID()}`;
+  const taskTitle = `E2E Updated Activity Task ${crypto.randomUUID()}`;
+
+  await page
+    .getByRole("banner")
+    .getByRole("button", { name: "Create project" })
+    .click();
+  const createProjectDialog = page.getByRole("dialog", {
+    name: "Create project",
+  });
+  await createProjectDialog.locator("#name").fill(projectName);
+  await createProjectDialog
+    .locator("#description")
+    .pressSequentially("Created by the task update activity e2e test.");
+  await createProjectDialog
+    .getByRole("button", { name: "Create project" })
+    .click();
+  await expectToast(page, "Project created successfully");
+
+  await page.getByRole("link", { name: projectName }).click();
+  await page.getByRole("button", { name: "Open actions for Doing" }).click();
+  await page.getByRole("menuitem", { name: "Add task" }).click();
+  const createTaskDialog = page.getByRole("dialog", {
+    name: "Create task",
+  });
+  await createTaskDialog.locator("#title").fill(taskTitle);
+  await createTaskDialog
+    .locator("#description")
+    .pressSequentially("A task moved to verify the updated activity feed.");
+  await createTaskDialog.locator("#priority").click();
+  await page.getByRole("option", { name: "High", exact: true }).click();
+  await createTaskDialog.getByRole("button", { name: "Create task" }).click();
+  await expectToast(page, "Task created successfully");
+
+  const draggableTask = page
+    .getByText(taskTitle, { exact: true })
+    .locator("xpath=ancestor::div[contains(@class, 'cursor-pointer')][1]");
+  const doneColumn = page
+    .getByRole("button", { name: "Open actions for Done" })
+    .locator("xpath=ancestor::div[contains(@class, 'min-w-84')][1]");
+  const moveResponsePromise = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+
+    return (
+      response.request().method() === "PATCH" &&
+      /\/tasks\/[^/]+\/move$/.test(url.pathname)
+    );
+  });
+  await draggableTask.dragTo(doneColumn, {
+    targetPosition: { x: 50, y: 200 },
+  });
+  expect((await moveResponsePromise).ok()).toBe(true);
+
+  await page.goto("/projects");
+  const activityFeed = page
+    .getByRole("heading", {
+      name: "Recent activity",
+      exact: true,
+    })
+    .locator("xpath=ancestor::section[1]");
+  const updatedTaskActivity = activityFeed
+    .getByText(`${testUser.name} updated task`, { exact: false })
+    .locator(
+      "xpath=ancestor::div[contains(@class, 'flex items-center gap-4')][1]"
+    );
+  await expect(updatedTaskActivity).toBeVisible({ timeout: 15_000 });
+  await expect(
+    updatedTaskActivity.getByText(taskTitle, { exact: true })
+  ).toBeVisible();
+
+  await updatedTaskActivity
+    .getByRole("link", { name: projectName, exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: projectName, exact: true })
+  ).toBeVisible();
+});
