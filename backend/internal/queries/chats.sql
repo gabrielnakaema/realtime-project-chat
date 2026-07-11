@@ -4,6 +4,9 @@ INSERT INTO chats (project_id) VALUES ($1) returning id;
 -- name: CreateChatMember :exec
 INSERT INTO chat_members (user_id, chat_id, last_seen_at, joined_at) VALUES ($1, $2, $3, $4);
 
+-- name: DeleteChatMember :exec
+DELETE FROM chat_members WHERE user_id = $1 AND chat_id = $2;
+
 -- name: UpdateChatMemberLastSeenAt :exec
 UPDATE chat_members
 SET last_seen_at = GREATEST(last_seen_at, $1)

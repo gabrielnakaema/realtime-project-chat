@@ -27,6 +27,8 @@ const (
 	WebsocketMessageTypeTaskCreated            WebsocketMessageType = "task_created"
 	WebsocketMessageTypeTaskUpdated            WebsocketMessageType = "task_updated"
 	WebsocketMessageTypeProjectUpdated         WebsocketMessageType = "project_updated"
+	WebsocketMessageTypeProjectMemberCreated   WebsocketMessageType = "project_member_created"
+	WebsocketMessageTypeProjectMemberRemoved   WebsocketMessageType = "project_member_removed"
 	WebsocketMessageTypeTaskCommentCreated     WebsocketMessageType = "task_comment_created"
 	WebsocketMessageTypeUsersOnline            WebsocketMessageType = "users_online"
 	WebsocketMessageTypeMessageRead            WebsocketMessageType = "message_read"
@@ -128,6 +130,22 @@ func MapProjectUpdated(project *domain.Project) WebsocketMessage {
 		Type:   WebsocketMessageTypeProjectUpdated,
 		RoomId: project.Id,
 		Data:   project,
+	}
+}
+
+func MapProjectMemberCreated(member *domain.ProjectMember, roomID uuid.UUID) WebsocketMessage {
+	return WebsocketMessage{
+		Type:   WebsocketMessageTypeProjectMemberCreated,
+		RoomId: roomID,
+		Data:   member,
+	}
+}
+
+func MapProjectMemberRemoved(member *domain.ProjectMember, roomID uuid.UUID) WebsocketMessage {
+	return WebsocketMessage{
+		Type:   WebsocketMessageTypeProjectMemberRemoved,
+		RoomId: roomID,
+		Data:   member,
 	}
 }
 

@@ -35,6 +35,10 @@ func (m *mockChatRepository) CreateMember(ctx context.Context, member *domain.Ch
 	return m.Called(ctx, member).Error(0)
 }
 
+func (m *mockChatRepository) DeleteMember(ctx context.Context, member *domain.ChatMember) error {
+	return m.Called(ctx, member).Error(0)
+}
+
 func (m *mockChatRepository) CreateMessage(ctx context.Context, message *domain.ChatMessage) error {
 	return m.Called(ctx, message).Error(0)
 }

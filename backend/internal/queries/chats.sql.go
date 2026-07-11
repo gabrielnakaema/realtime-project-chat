@@ -82,6 +82,20 @@ func (q *Queries) CreateGeneralChat(ctx context.Context) (uuid.UUID, error) {
 	return id, err
 }
 
+const deleteChatMember = `-- name: DeleteChatMember :exec
+DELETE FROM chat_members WHERE user_id = $1 AND chat_id = $2
+`
+
+type DeleteChatMemberParams struct {
+	UserID uuid.UUID
+	ChatID uuid.UUID
+}
+
+func (q *Queries) DeleteChatMember(ctx context.Context, arg DeleteChatMemberParams) error {
+	_, err := q.db.Exec(ctx, deleteChatMember, arg.UserID, arg.ChatID)
+	return err
+}
+
 const findGeneralChatByExactMembers = `-- name: FindGeneralChatByExactMembers :one
 SELECT c.id FROM chats c
 WHERE c.chat_type = 'general'

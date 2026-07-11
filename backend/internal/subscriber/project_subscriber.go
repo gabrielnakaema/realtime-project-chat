@@ -12,6 +12,8 @@ import (
 
 type ProjectNotifier interface {
 	SendUpdatedProject(context.Context, *domain.Project) error
+	SendProjectMemberCreated(context.Context, *domain.ProjectMember) error
+	SendProjectMemberRemoved(context.Context, *domain.ProjectMember) error
 }
 
 type ProjectSubscriber struct {
@@ -32,7 +34,7 @@ func NewProjectSubscriber(ctx context.Context, config *config.Config, logger *sl
 		notifier:   notifier,
 	}
 
-	topics := []events.Topic{events.ProjectUpdated}
+	topics := []events.Topic{events.ProjectUpdated, events.ProjectMemberCreated, events.ProjectMemberRemoved}
 
 	err = subscriber.Subscribe(ctx, topics, projectSubscriber.handleProjectEvents, projectSubscriber.logger)
 	if err != nil {
@@ -50,9 +52,39 @@ func (ps *ProjectSubscriber) handleProjectEvents(ctx context.Context, message Me
 	switch message.Topic {
 	case events.ProjectUpdated:
 		return ps.handleProjectUpdated(ctx, message)
+	case events.ProjectMemberCreated:
+		return ps.handleProjectMemberCreated(ctx, message)
+	case events.ProjectMemberRemoved:
+		return ps.handleProjectMemberRemoved(ctx, message)
 	default:
 		return nil
 	}
+}
+
+func (ps *ProjectSubscriber) handleProjectMemberCreated(ctx context.Context, message Message) error {
+	var payload events.ProjectMemberCreatedPayload
+	if err := json.Unmarshal(message.Value, &payload); err != nil {
+		return domain.ServerError("failed to unmarshal project member created payload", err)
+	}
+
+	if err := ps.notifier.SendProjectMemberCreated(ctx, &payload.ProjectMember); err != nil {
+		return domain.ServerError("failed to send created project member to ws server", err)
+	}
+
+	return nil
+}
+
+func (ps *ProjectSubscriber) handleProjectMemberRemoved(ctx context.Context, message Message) error {
+	var payload events.ProjectMemberRemovedPayload
+	if err := json.Unmarshal(message.Value, &payload); err != nil {
+		return domain.ServerError("failed to unmarshal project member removed payload", err)
+	}
+
+	if err := ps.notifier.SendProjectMemberRemoved(ctx, &payload.ProjectMember); err != nil {
+		return domain.ServerError("failed to send removed project member to ws server", err)
+	}
+
+	return nil
 }
 
 func (ps *ProjectSubscriber) handleProjectUpdated(ctx context.Context, message Message) error {

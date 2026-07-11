@@ -134,6 +134,39 @@ func (ws *Server) SendUpdatedProject(ctx context.Context, project *domain.Projec
 	return ws.SendEvent(ctx, MapProjectUpdated(project))
 }
 
+func (ws *Server) SendProjectMemberCreated(ctx context.Context, member *domain.ProjectMember) error {
+	if err := ws.SendEvent(ctx, MapProjectMemberCreated(member, member.UserId)); err != nil {
+		return err
+	}
+
+	return ws.SendEvent(ctx, MapProjectMemberCreated(member, member.ProjectId))
+}
+
+func (ws *Server) SendProjectMemberRemoved(ctx context.Context, member *domain.ProjectMember) error {
+	if err := ws.SendEvent(ctx, MapProjectMemberRemoved(member, member.UserId)); err != nil {
+		return err
+	}
+	if err := ws.SendEvent(ctx, MapProjectMemberRemoved(member, member.ProjectId)); err != nil {
+		return err
+	}
+
+	ws.disconnectUserFromRoom(member.UserId, member.ProjectId)
+	return nil
+}
+
+func (ws *Server) SendChatProjectMemberCreated(ctx context.Context, member *domain.ProjectMember, chatID uuid.UUID) error {
+	return ws.SendEvent(ctx, MapProjectMemberCreated(member, chatID))
+}
+
+func (ws *Server) SendChatProjectMemberRemoved(ctx context.Context, member *domain.ProjectMember, chatID uuid.UUID) error {
+	if err := ws.SendEvent(ctx, MapProjectMemberRemoved(member, chatID)); err != nil {
+		return err
+	}
+
+	ws.disconnectUserFromRoom(member.UserId, chatID)
+	return nil
+}
+
 func (ws *Server) SendCreatedTask(ctx context.Context, task *domain.Task) error {
 	return ws.SendEvent(ctx, MapTaskCreated(task))
 }

@@ -71,6 +71,14 @@ func (cr *ChatRepository) CreateMember(ctx context.Context, member *domain.ChatM
 	})
 }
 
+func (cr *ChatRepository) DeleteMember(ctx context.Context, member *domain.ChatMember) error {
+	q := queries.New(cr.pool)
+	return q.DeleteChatMember(ctx, queries.DeleteChatMemberParams{
+		UserID: member.UserId,
+		ChatID: member.ChatId,
+	})
+}
+
 func (cr *ChatRepository) UpdateMemberLastSeenAt(ctx context.Context, member *domain.ChatMember) error {
 	q := queries.New(cr.pool)
 	return q.UpdateChatMemberLastSeenAt(ctx, queries.UpdateChatMemberLastSeenAtParams{

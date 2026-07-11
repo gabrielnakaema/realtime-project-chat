@@ -17,6 +17,7 @@ type chatRepository interface {
 	Create(ctx context.Context, chat *domain.Chat) error
 	GetByProjectId(ctx context.Context, projectId uuid.UUID) (*domain.Chat, error)
 	CreateMember(ctx context.Context, member *domain.ChatMember) error
+	DeleteMember(ctx context.Context, member *domain.ChatMember) error
 	CreateMessage(ctx context.Context, message *domain.ChatMessage) error
 	UpdateMemberLastSeenAt(ctx context.Context, member *domain.ChatMember) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Chat, error)
@@ -111,6 +112,23 @@ func (cs *ChatService) CreateMemberFromProjectMember(ctx context.Context, projec
 	}
 
 	return nil
+}
+
+func (cs *ChatService) RemoveMemberFromProjectMember(ctx context.Context, projectMember *domain.ProjectMember) (*domain.ChatMember, error) {
+	chat, err := cs.chatRepository.GetByProjectId(ctx, projectMember.ProjectId)
+	if err != nil {
+		return nil, domain.ServerError("failed to get project chat", err)
+	}
+
+	member := &domain.ChatMember{
+		UserId: projectMember.UserId,
+		ChatId: chat.Id,
+	}
+	if err := cs.chatRepository.DeleteMember(ctx, member); err != nil {
+		return nil, domain.ServerError("failed to remove project chat member", err)
+	}
+
+	return member, nil
 }
 
 func (cs *ChatService) CreateJoinedMessage(ctx context.Context, chatMember *domain.ChatMember) error {

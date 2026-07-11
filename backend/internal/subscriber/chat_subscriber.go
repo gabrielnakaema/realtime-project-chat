@@ -16,6 +16,8 @@ import (
 type MessageNotifier interface {
 	SendMessages(ctx context.Context, message *domain.ChatMessage) error
 	SendReadUpdate(ctx context.Context, chatId uuid.UUID, read *domain.ChatMessageRead) error
+	SendChatProjectMemberCreated(ctx context.Context, member *domain.ProjectMember, chatID uuid.UUID) error
+	SendChatProjectMemberRemoved(ctx context.Context, member *domain.ProjectMember, chatID uuid.UUID) error
 }
 
 type ChatSubscriber struct {
@@ -38,7 +40,7 @@ func NewChatSubscriber(ctx context.Context, config *config.Config, logger *slog.
 		notifier:    notifier,
 	}
 
-	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ChatMemberCreated, events.ChatMessageCreated, events.ChatMemberViewed, events.ChatMessageRead}
+	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ProjectMemberRemoved, events.ChatMemberCreated, events.ChatMessageCreated, events.ChatMemberViewed, events.ChatMessageRead}
 
 	err = subscriber.Subscribe(ctx, topics, chatSubscriber.handleChatEvents, chatSubscriber.logger)
 	if err != nil {
@@ -58,6 +60,8 @@ func (cs *ChatSubscriber) handleChatEvents(ctx context.Context, message Message)
 		return cs.handleProjectCreated(ctx, message)
 	case events.ProjectMemberCreated:
 		return cs.handleProjectMemberCreated(ctx, message)
+	case events.ProjectMemberRemoved:
+		return cs.handleProjectMemberRemoved(ctx, message)
 	case events.ChatMemberCreated:
 		return cs.handleChatMemberCreated(ctx, message)
 	case events.ChatMessageCreated:
@@ -130,6 +134,31 @@ func (cs *ChatSubscriber) handleProjectMemberCreated(ctx context.Context, messag
 
 		cs.logger.Error("failed to create member from project member", "error", err)
 		return domain.ServerError("failed to create member from project member", err)
+	}
+
+	chat, err := cs.chatService.GetByProjectId(ctx, payload.ProjectMember.ProjectId, payload.ProjectMember.UserId)
+	if err != nil {
+		return err
+	}
+	if err := cs.notifier.SendChatProjectMemberCreated(ctx, &payload.ProjectMember, chat.Id); err != nil {
+		return domain.ServerError("failed to send created project member to chat room", err)
+	}
+
+	return nil
+}
+
+func (cs *ChatSubscriber) handleProjectMemberRemoved(ctx context.Context, message Message) error {
+	var payload events.ProjectMemberRemovedPayload
+	if err := json.Unmarshal(message.Value, &payload); err != nil {
+		return domain.ServerError("failed to unmarshal project member removed payload", err)
+	}
+
+	chatMember, err := cs.chatService.RemoveMemberFromProjectMember(ctx, &payload.ProjectMember)
+	if err != nil {
+		return err
+	}
+	if err := cs.notifier.SendChatProjectMemberRemoved(ctx, &payload.ProjectMember, chatMember.ChatId); err != nil {
+		return domain.ServerError("failed to send removed project member to chat room", err)
 	}
 
 	return nil
