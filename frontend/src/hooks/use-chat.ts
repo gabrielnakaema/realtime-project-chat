@@ -1,7 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useEffectEvent } from 'react';
 import { useChatMessageFeed } from './use-chat-message-feed';
 import { useChatMessageListBehavior } from './use-chat-message-list-behavior';
 import { useOnlineUsers } from './use-online-users';
+import { useSocket } from './use-socket';
+import type { SocketEvent } from '@/types/websocket';
+import { isProjectMembershipEvent } from '@/types/websocket';
 import { getChatByProjectId, listMessagesByProjectId } from '@/services/chat';
 import { getProject } from '@/services/projects';
 import { chatMessageQueryKeys, projectChatQueryKeys, projectQueryKeys } from '@/services/query-keys';
@@ -20,6 +24,23 @@ export const useProjectChatView = (projectId: string) => {
   });
 
   const { onlineUserIds } = useOnlineUsers(chat?.id, 'chat');
+  const { status, subscribe } = useSocket();
+  const handleMembershipEvent = useEffectEvent((event: SocketEvent) => {
+    if (!isProjectMembershipEvent(event)) {
+      return;
+    }
+
+    queryClient.invalidateQueries({ queryKey: projectQueryKeys.details(projectId) });
+    queryClient.invalidateQueries({ queryKey: projectChatQueryKeys.detailsByProjectId(projectId) });
+  });
+
+  useEffect(() => {
+    if (!chat?.id || status !== 'connected') {
+      return;
+    }
+
+    return subscribe(chat.id, 'chat', handleMembershipEvent);
+  }, [chat?.id, status, subscribe]);
   const messagesQueryKey = projectChatQueryKeys.infiniteMessages(projectId);
   const { messages, fetchNextPage } = useChatMessageFeed({
     chatId: chat?.id,

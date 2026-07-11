@@ -14,7 +14,7 @@ import {
 } from './ui/dialog';
 import type { Member, Project } from '@/types/project';
 import { ProjectMemberRole } from '@/types/project';
-import { projectQueryKeys, taskQueryKeys } from '@/services/query-keys';
+import { invalidateProjectBoardData } from '@/services/project-board-invalidation';
 import { removeProjectMember } from '@/services/projects';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
@@ -47,8 +47,7 @@ export const ProjectMembersModal = ({ project }: ProjectMembersModalProps) => {
     mutationFn: removeProjectMember,
     onSuccess: () => {
       setRemovingMember(null);
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.all });
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+      void invalidateProjectBoardData(queryClient);
     },
   });
 

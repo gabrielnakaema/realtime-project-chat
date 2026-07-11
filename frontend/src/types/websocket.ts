@@ -1,6 +1,6 @@
 import type { ChatMessage, ChatMessageRead } from './chat';
 import type { Notification } from './notification';
-import type { Project } from './project';
+import type { Member, Project } from './project';
 import type { Task, TaskComment } from './task';
 
 export type MessageEvent = {
@@ -50,6 +50,18 @@ export type ProjectUpdatedEvent = {
   data: Project;
 };
 
+export type ProjectMemberCreatedEvent = {
+  type: 'project_member_created';
+  room_id: string;
+  data: Member;
+};
+
+export type ProjectMemberRemovedEvent = {
+  type: 'project_member_removed';
+  room_id: string;
+  data: Member;
+};
+
 export type UsersOnlineEvent = {
   type: 'users_online';
   room_id: string;
@@ -94,8 +106,15 @@ export type SocketEvent =
   | TaskUpdatedEvent
   | TaskCommentCreatedEvent
   | ProjectUpdatedEvent
+  | ProjectMemberCreatedEvent
+  | ProjectMemberRemovedEvent
   | UsersOnlineEvent
   | MessageReadEvent
   | NotificationCreatedEvent
   | UserConnectedEvent
   | UserDisconnectedEvent;
+
+export type ProjectMembershipEvent = ProjectMemberCreatedEvent | ProjectMemberRemovedEvent;
+
+export const isProjectMembershipEvent = (event: SocketEvent): event is ProjectMembershipEvent =>
+  event.type === 'project_member_created' || event.type === 'project_member_removed';
