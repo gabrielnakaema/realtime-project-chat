@@ -1,4 +1,4 @@
-package handlers_test
+package auth_test
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gabrielnakaema/project-chat/internal/handlers"
+	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -113,7 +113,7 @@ func TestAuthMiddleware(t *testing.T) {
 			mockTokenProvider := &mockTokenProvider{}
 			tt.mockSetup(mockTokenProvider)
 
-			authMiddleware := handlers.NewAuthMiddleware(mockTokenProvider)
+			authMiddleware := auth.NewMiddleware(mockTokenProvider)
 
 			req := httptest.NewRequest("GET", "/test", nil)
 			if tt.authHeader != "" {
@@ -124,7 +124,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 			var userId uuid.UUID
 			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				userId = handlers.UserIdFromContext(r.Context())
+				userId = auth.UserIdFromContext(r.Context())
 				w.WriteHeader(http.StatusOK)
 			})
 

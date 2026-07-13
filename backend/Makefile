@@ -3,6 +3,9 @@ ifneq (,$(wildcard ./.env))
 	export
 endif
 
+dev:
+	goreman start
+
 goose-up:
 	goose up
 

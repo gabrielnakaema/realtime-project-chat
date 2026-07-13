@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
@@ -52,7 +53,7 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	serviceRequest := service.CreateProjectRequest{
 		Name:             request.Name,
@@ -80,7 +81,7 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	memberRole := utils.GetQueryString(r, "member_role", "")
 
@@ -120,7 +121,7 @@ func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	id := chi.URLParam(r, "id")
 	parsed, err := uuid.Parse(id)
@@ -143,7 +144,7 @@ func (h *ProjectHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	id := chi.URLParam(r, "id")
 	parsed, err := uuid.Parse(id)
@@ -194,7 +195,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectHandler) UpdateColumn(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	projectID := chi.URLParam(r, "id")
 	parsedProjectID, err := uuid.Parse(projectID)
@@ -274,7 +275,7 @@ func mapDeletedProjectColumnsRequest(columns []DeletedProjectColumnRequest) []se
 }
 
 func (h *ProjectHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	id := chi.URLParam(r, "id")
 	parsed, err := uuid.Parse(id)
@@ -317,7 +318,7 @@ func (h *ProjectHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	id := chi.URLParam(r, "id")
 	parsed, err := uuid.Parse(id)
@@ -353,7 +354,7 @@ func (h *ProjectHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProjectHandler) ListActivitiesByProject(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	id := chi.URLParam(r, "id")
 	parsed, err := uuid.Parse(id)
@@ -418,7 +419,7 @@ func (h *ProjectHandler) ListActivitiesByProject(w http.ResponseWriter, r *http.
 }
 
 func (h *ProjectHandler) ListUsersProjectActivities(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	limit := utils.GetQueryInt(r, "limit", 10)
 	before := utils.GetQueryString(r, "before", "")
@@ -475,7 +476,7 @@ func (h *ProjectHandler) ListUsersProjectActivities(w http.ResponseWriter, r *ht
 }
 
 func (h *ProjectHandler) ListMembersByProjectId(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	id := chi.URLParam(r, "id")
 	parsed, err := uuid.Parse(id)

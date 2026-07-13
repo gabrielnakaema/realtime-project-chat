@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/handlers"
 	"github.com/gabrielnakaema/project-chat/internal/service"
@@ -92,7 +93,7 @@ func (m *mockChatService) ListMessageReads(ctx context.Context, request service.
 }
 
 func withUserId(req *http.Request, userId uuid.UUID) *http.Request {
-	ctx := context.WithValue(req.Context(), handlers.UserIdContextKey, userId)
+	ctx := context.WithValue(req.Context(), auth.UserIdContextKey, userId)
 	return req.WithContext(ctx)
 }
 

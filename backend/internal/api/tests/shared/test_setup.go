@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/api"
+	"github.com/gabrielnakaema/project-chat/internal/notificationapi"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -99,6 +100,113 @@ func SetupTestAPI(t *testing.T) (*TestAPI, func()) {
 	}
 
 	return testAPI, cleanup
+}
+
+// TestSplitAPI boots both the monolith and the notification-service against the same
+// Postgres testcontainer, mirroring the real deployment: user/auth endpoints only exist
+// on the monolith, notification endpoints only exist on notification-service, and both
+// read/write the same database.
+type TestSplitAPI struct {
+	MonolithBaseURL     string
+	NotificationBaseURL string
+	DB                  *pgxpool.Pool
+	PostgresContainer   *postgres.PostgresContainer
+}
+
+func SetupTestSplitAPI(t *testing.T) (*TestSplitAPI, func()) {
+	ctx := context.Background()
+
+	postgresContainer, err := postgres.Run(ctx,
+		"postgres:17-alpine",
+		postgres.WithDatabase("testdb"),
+		postgres.WithUsername("testuser"),
+		postgres.WithPassword("testpass"),
+		postgres.WithSQLDriver("pgx"),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog("database system is ready to accept connections").
+				WithOccurrence(2).
+				WithStartupTimeout(30*time.Second),
+		),
+	)
+	require.NoError(t, err, "Failed to start postgres container")
+
+	host, err := postgresContainer.Host(ctx)
+	require.NoError(t, err)
+
+	port, err := postgresContainer.MappedPort(ctx, "5432")
+	require.NoError(t, err)
+
+	dsn := fmt.Sprintf("postgres://testuser:testpass@%s:%s/testdb?sslmode=disable", host, port.Port())
+
+	os.Setenv("DB_DSN", dsn)
+	os.Setenv("JWT_SECRET", "test-jwt-secret-key-for-testing")
+	os.Setenv("ENV", "test")
+	os.Setenv("PUBSUB_BROKERS", "localhost:9092")
+	os.Setenv("NOTIFICATION_SERVICE_PORT", "0")
+
+	projectRoot := findProjectRoot(t)
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+
+	os.Chdir(projectRoot)
+
+	pool, err := pgxpool.New(ctx, dsn)
+	require.NoError(t, err, "Failed to create database connection pool")
+
+	err = goose.SetDialect("postgres")
+	require.NoError(t, err)
+
+	config, err := pgxpool.ParseConfig(dsn)
+	require.NoError(t, err)
+
+	sqlDB := stdlib.OpenDB(*config.ConnConfig)
+	defer sqlDB.Close()
+
+	migrationsPath := filepath.Join(projectRoot, "migrations")
+	err = goose.Up(sqlDB, migrationsPath)
+	require.NoError(t, err, "Failed to run migrations")
+
+	apiInstance, err := api.NewApi()
+	require.NoError(t, err, "Failed to create API instance")
+	monolithServer := httptest.NewServer(apiInstance.Router())
+
+	notificationAPIInstance, err := notificationapi.New()
+	require.NoError(t, err, "Failed to create notification API instance")
+	notificationServer := httptest.NewServer(notificationAPIInstance.Router())
+
+	testAPI := &TestSplitAPI{
+		MonolithBaseURL:     monolithServer.URL,
+		NotificationBaseURL: notificationServer.URL,
+		DB:                  pool,
+		PostgresContainer:   postgresContainer,
+	}
+
+	cleanup := func() {
+		monolithServer.Close()
+		notificationServer.Close()
+		pool.Close()
+		if err := postgresContainer.Terminate(ctx); err != nil {
+			t.Errorf("Failed to terminate postgres container: %v", err)
+		}
+	}
+
+	return testAPI, cleanup
+}
+
+func (ta *TestSplitAPI) TruncateTables(t *testing.T) {
+	ta.DB.Exec(context.Background(), `DO
+$$
+DECLARE
+    tables text;
+BEGIN
+    SELECT string_agg(format('%I.%I', schemaname, tablename), ', ')
+    INTO tables
+    FROM pg_tables
+    WHERE schemaname = 'public';
+
+    EXECUTE 'TRUNCATE TABLE ' || tables || ' RESTART IDENTITY CASCADE';
+END;
+$$;`)
 }
 
 func (ta *TestAPI) GetBaseURL() string {

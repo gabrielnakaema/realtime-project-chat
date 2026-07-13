@@ -1,4 +1,4 @@
-package handlers
+package auth
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -14,12 +15,12 @@ type tokenProvider interface {
 	Verify(token string) (*jwt.Token, error)
 }
 
-type AuthMiddleware struct {
+type Middleware struct {
 	tokenProvider tokenProvider
 }
 
-func NewAuthMiddleware(tokenProvider tokenProvider) *AuthMiddleware {
-	return &AuthMiddleware{
+func NewMiddleware(tokenProvider tokenProvider) *Middleware {
+	return &Middleware{
 		tokenProvider: tokenProvider,
 	}
 }
@@ -40,7 +41,7 @@ func WithAnonymousUser(ctx context.Context) context.Context {
 	return context.WithValue(ctx, UserIdContextKey, uuid.Nil)
 }
 
-func (am *AuthMiddleware) IdentifyUser(next http.Handler) http.Handler {
+func (m *Middleware) IdentifyUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		const INVALID_TOKEN_ERROR_MESSAGE = "invalid token"
 
@@ -52,20 +53,20 @@ func (am *AuthMiddleware) IdentifyUser(next http.Handler) http.Handler {
 		}
 
 		if !strings.HasPrefix(authHeader, "Bearer ") {
-			UnauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
+			unauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
 			return
 		}
 
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
 		if strings.TrimSpace(token) == "" {
-			UnauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
+			unauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
 			return
 		}
 
-		jwt, err := am.tokenProvider.Verify(token)
+		jwt, err := m.tokenProvider.Verify(token)
 		if err != nil {
-			UnauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
+			unauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
 			return
 		}
 
@@ -73,24 +74,24 @@ func (am *AuthMiddleware) IdentifyUser(next http.Handler) http.Handler {
 
 		exp, err := claims.GetExpirationTime()
 		if err != nil {
-			UnauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
+			unauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
 			return
 		}
 
 		if exp.Time.Before(time.Now()) {
-			UnauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
+			unauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
 			return
 		}
 
 		userId, err := claims.GetSubject()
 		if err != nil {
-			UnauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
+			unauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
 			return
 		}
 
 		tokenUserId, err := uuid.Parse(userId)
 		if err != nil {
-			UnauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
+			unauthorizedResponse(w, INVALID_TOKEN_ERROR_MESSAGE)
 			return
 		}
 
@@ -100,13 +101,28 @@ func (am *AuthMiddleware) IdentifyUser(next http.Handler) http.Handler {
 	})
 }
 
-func (am *AuthMiddleware) ProtectRoutes(next http.Handler) http.Handler {
+func (m *Middleware) ProtectRoutes(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userId := UserIdFromContext(r.Context())
 		if userId == uuid.Nil {
-			UnauthorizedResponse(w, "unauthorized")
+			unauthorizedResponse(w, "unauthorized")
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+type apiError struct {
+	Status  int    `json:"status"`
+	Message string `json:"message"`
+}
+
+func unauthorizedResponse(w http.ResponseWriter, message string) {
+	err := utils.WriteJSON(w, http.StatusUnauthorized, apiError{
+		Status:  http.StatusUnauthorized,
+		Message: message,
+	}, nil)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }

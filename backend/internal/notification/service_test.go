@@ -1,4 +1,4 @@
-package service_test
+package notification_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/notification"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -41,9 +41,9 @@ func (s *notificationRepositoryStub) MarkAllRead(context.Context, uuid.UUID, tim
 }
 
 func TestNotificationService_ListUnauthorized(t *testing.T) {
-	svc := service.NewNotificationService(&notificationRepositoryStub{})
+	svc := notification.NewService(&notificationRepositoryStub{})
 
-	result, err := svc.List(context.Background(), service.ListNotificationsRequest{
+	result, err := svc.List(context.Background(), notification.ListRequest{
 		UserId: uuid.Nil,
 	})
 
@@ -55,7 +55,7 @@ func TestNotificationService_ListUnauthorized(t *testing.T) {
 }
 
 func TestNotificationService_CountUnreadSuccess(t *testing.T) {
-	svc := service.NewNotificationService(&notificationRepositoryStub{
+	svc := notification.NewService(&notificationRepositoryStub{
 		countUnreadResult: 3,
 	})
 
@@ -66,11 +66,11 @@ func TestNotificationService_CountUnreadSuccess(t *testing.T) {
 }
 
 func TestNotificationService_MarkReadReturnsNotFoundWhenMissing(t *testing.T) {
-	svc := service.NewNotificationService(&notificationRepositoryStub{
+	svc := notification.NewService(&notificationRepositoryStub{
 		markReadFound: false,
 	})
 
-	err := svc.MarkRead(context.Background(), service.MarkNotificationReadRequest{
+	err := svc.MarkRead(context.Background(), notification.MarkReadRequest{
 		NotificationId: uuid.New(),
 		UserId:         uuid.New(),
 	})
@@ -82,7 +82,7 @@ func TestNotificationService_MarkReadReturnsNotFoundWhenMissing(t *testing.T) {
 }
 
 func TestNotificationService_MarkAllReadWrapsRepositoryError(t *testing.T) {
-	svc := service.NewNotificationService(&notificationRepositoryStub{
+	svc := notification.NewService(&notificationRepositoryStub{
 		markAllReadErr: errors.New("db error"),
 	})
 

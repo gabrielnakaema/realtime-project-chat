@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
@@ -43,7 +44,7 @@ func (h *MCPAPIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.service.Create(r.Context(), service.CreateMCPAPIKeyRequest{
-		UserID: UserIdFromContext(r.Context()),
+		UserID: auth.UserIdFromContext(r.Context()),
 		Name:   request.Name,
 		Scopes: request.Scopes,
 	})
@@ -64,7 +65,7 @@ func (h *MCPAPIKeyHandler) ListAvailableScopes(w http.ResponseWriter, r *http.Re
 }
 
 func (h *MCPAPIKeyHandler) List(w http.ResponseWriter, r *http.Request) {
-	keys, err := h.service.ListByUserID(r.Context(), UserIdFromContext(r.Context()))
+	keys, err := h.service.ListByUserID(r.Context(), auth.UserIdFromContext(r.Context()))
 	if err != nil {
 		ErrorResponse(w, r, err)
 		return
@@ -97,7 +98,7 @@ func (h *MCPAPIKeyHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	key, err := h.service.Update(r.Context(), service.UpdateMCPAPIKeyRequest{
 		ID:     id,
-		UserID: UserIdFromContext(r.Context()),
+		UserID: auth.UserIdFromContext(r.Context()),
 		Name:   request.Name,
 		Scopes: request.Scopes,
 	})
@@ -118,7 +119,7 @@ func (h *MCPAPIKeyHandler) Revoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.Revoke(r.Context(), id, UserIdFromContext(r.Context())); err != nil {
+	if err := h.service.Revoke(r.Context(), id, auth.UserIdFromContext(r.Context())); err != nil {
 		ErrorResponse(w, r, err)
 		return
 	}

@@ -1,0 +1,20 @@
+http:
+  routers:
+    notification-service:
+      rule: "PathPrefix(`/notifications`)"
+      service: notification-service
+      priority: 10
+    api:
+      rule: "PathPrefix(`/`)"
+      service: api
+      priority: 1
+
+  services:
+    notification-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3335"
+    api:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:4333"

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/handlers"
@@ -451,7 +452,7 @@ func TestUserHandler_ChangePassword(t *testing.T) {
 			req := httptest.NewRequest("PUT", "/users/me/password", &body)
 			req.Header.Set("Content-Type", "application/json")
 			if tt.withUser {
-				req = req.WithContext(context.WithValue(req.Context(), handlers.UserIdContextKey, userID))
+				req = req.WithContext(context.WithValue(req.Context(), auth.UserIdContextKey, userID))
 			}
 
 			w := httptest.NewRecorder()

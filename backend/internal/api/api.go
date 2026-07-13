@@ -12,11 +12,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/db"
 	"github.com/gabrielnakaema/project-chat/internal/handlers"
 	"github.com/gabrielnakaema/project-chat/internal/logger"
 	"github.com/gabrielnakaema/project-chat/internal/mcp"
+	"github.com/gabrielnakaema/project-chat/internal/notification"
 	"github.com/gabrielnakaema/project-chat/internal/publisher"
 	"github.com/gabrielnakaema/project-chat/internal/repository"
 	"github.com/gabrielnakaema/project-chat/internal/service"
@@ -38,9 +40,8 @@ type Api struct {
 }
 
 type Handlers struct {
-	AuthMiddleware *handlers.AuthMiddleware
+	AuthMiddleware *auth.Middleware
 	Chat           *handlers.ChatHandler
-	Notification   *handlers.NotificationHandler
 	MCPAPIKey      *handlers.MCPAPIKeyHandler
 	MCP            *mcp.Handler
 	Project        *handlers.ProjectHandler
@@ -70,7 +71,7 @@ func NewApi() (*Api, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	jwtProvider := token.NewTokenProvider(config)
-	authMiddleware := handlers.NewAuthMiddleware(jwtProvider)
+	authMiddleware := auth.NewMiddleware(jwtProvider)
 
 	chatRepo := repository.NewChatRepository(pool)
 	projectRepo := repository.NewProjectRepository(pool)
@@ -78,7 +79,6 @@ func NewApi() (*Api, error) {
 	taskCommentRepo := repository.NewTaskCommentRepository(pool)
 	userRepo := repository.NewUserRepository(pool)
 	activityRepo := repository.NewProjectActivityRepository(pool)
-	notificationRepo := repository.NewNotificationRepository(pool)
 	mcpAPIKeyRepo := repository.NewMCPAPIKeyRepository(pool)
 
 	projectService := service.NewProjectService(projectRepo, userRepo, pub, activityRepo)
@@ -125,16 +125,14 @@ func NewApi() (*Api, error) {
 	}
 	subscribers = append(subscribers, taskUpdateSub)
 
-	notificationSub, err := subscriber.NewNotificationSubscriber(ctx, config, logger, notificationRepo, ws)
+	notificationForwardSub, err := notification.NewForwardSubscriber(ctx, config, logger, ws)
 	if err != nil {
 		cancel()
 		return nil, err
 	}
-	subscribers = append(subscribers, notificationSub)
+	subscribers = append(subscribers, notificationForwardSub)
 
 	chatHandler := handlers.NewChatHandler(chatService)
-	notificationService := service.NewNotificationService(notificationRepo)
-	notificationHandler := handlers.NewNotificationHandler(notificationService)
 
 	userService := service.NewUserService(jwtProvider, userRepo)
 	userHandler := handlers.NewUserHandler(userService, config)
@@ -152,7 +150,6 @@ func NewApi() (*Api, error) {
 		Chat:           chatHandler,
 		MCPAPIKey:      mcpAPIKeyHandler,
 		MCP:            mcpHandler,
-		Notification:   notificationHandler,
 		Project:        projectHandler,
 		Task:           taskHandler,
 		TaskComment:    taskCommentHandler,

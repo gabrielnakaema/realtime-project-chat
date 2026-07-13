@@ -1,4 +1,4 @@
-package service
+package notification
 
 import (
 	"context"
@@ -16,24 +16,24 @@ type notificationRepository interface {
 	MarkAllRead(ctx context.Context, userId uuid.UUID, updatedAt time.Time) error
 }
 
-type NotificationService struct {
+type Service struct {
 	repository notificationRepository
 }
 
-func NewNotificationService(repository notificationRepository) *NotificationService {
-	return &NotificationService{
+func NewService(repository notificationRepository) *Service {
+	return &Service{
 		repository: repository,
 	}
 }
 
-type ListNotificationsRequest struct {
+type ListRequest struct {
 	UserId          uuid.UUID
 	BeforeCreatedAt time.Time
 	BeforeId        uuid.UUID
 	Limit           int32
 }
 
-func (ns *NotificationService) List(ctx context.Context, request ListNotificationsRequest) (*utils.CursorPaginated[domain.Notification], error) {
+func (ns *Service) List(ctx context.Context, request ListRequest) (*utils.CursorPaginated[domain.Notification], error) {
 	if request.UserId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
@@ -46,7 +46,7 @@ func (ns *NotificationService) List(ctx context.Context, request ListNotificatio
 	return notifications, nil
 }
 
-func (ns *NotificationService) CountUnread(ctx context.Context, userId uuid.UUID) (int, error) {
+func (ns *Service) CountUnread(ctx context.Context, userId uuid.UUID) (int, error) {
 	if userId == uuid.Nil {
 		return 0, domain.UnauthorizedError("unauthorized")
 	}
@@ -59,12 +59,12 @@ func (ns *NotificationService) CountUnread(ctx context.Context, userId uuid.UUID
 	return count, nil
 }
 
-type MarkNotificationReadRequest struct {
+type MarkReadRequest struct {
 	NotificationId uuid.UUID
 	UserId         uuid.UUID
 }
 
-func (ns *NotificationService) MarkRead(ctx context.Context, request MarkNotificationReadRequest) error {
+func (ns *Service) MarkRead(ctx context.Context, request MarkReadRequest) error {
 	if request.UserId == uuid.Nil {
 		return domain.UnauthorizedError("unauthorized")
 	}
@@ -81,7 +81,7 @@ func (ns *NotificationService) MarkRead(ctx context.Context, request MarkNotific
 	return nil
 }
 
-func (ns *NotificationService) MarkAllRead(ctx context.Context, userId uuid.UUID) error {
+func (ns *Service) MarkAllRead(ctx context.Context, userId uuid.UUID) error {
 	if userId == uuid.Nil {
 		return domain.UnauthorizedError("unauthorized")
 	}

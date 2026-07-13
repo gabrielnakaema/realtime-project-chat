@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
@@ -51,7 +52,7 @@ func (h *TaskCommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := UserIdFromContext(r.Context())
+	userID := auth.UserIdFromContext(r.Context())
 
 	comment, err := h.taskCommentService.Create(r.Context(), service.CreateTaskCommentRequest{
 		TaskID:          parsedTaskID,
@@ -144,7 +145,7 @@ func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request
 		parsedAfterCommentID = &id
 	}
 
-	userID := UserIdFromContext(r.Context())
+	userID := auth.UserIdFromContext(r.Context())
 
 	comments, err := h.taskCommentService.ListByTaskID(r.Context(), service.ListTaskCommentsRequest{
 		TaskID:          parsedTaskID,

@@ -11,6 +11,14 @@ type Payload interface {
 	ToMessage() ([]byte, error)
 }
 
+type NotificationCreatedPayload struct {
+	Notification domain.Notification `json:"notification"`
+}
+
+func (n *NotificationCreatedPayload) ToMessage() ([]byte, error) {
+	return json.Marshal(n)
+}
+
 type TaskCreatedPayload struct {
 	Task         domain.Task         `json:"task"`
 	User         domain.User         `json:"user"`

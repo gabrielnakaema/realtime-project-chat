@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/logger"
@@ -153,7 +154,7 @@ func (uh *UserHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (uh *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		clearRefreshTokenCookie(w, uh.isProduction())
 		utils.WriteJSON(w, http.StatusOK, nil, nil)
@@ -209,7 +210,7 @@ func setRefreshTokenCookie(w http.ResponseWriter, refreshToken string, isProduct
 }
 
 func (uh *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return
@@ -225,7 +226,7 @@ func (uh *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (uh *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return
@@ -261,7 +262,7 @@ func (uh *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (uh *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return

@@ -1,4 +1,4 @@
-package subscriber
+package notification
 
 import (
 	"context"
@@ -9,68 +9,69 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/subscriber"
 	"github.com/google/uuid"
 )
 
-type NotificationRepository interface {
+type eventRepository interface {
 	CreateMany(ctx context.Context, notifications []domain.Notification) ([]uuid.UUID, error)
 	ListByIDs(ctx context.Context, ids []uuid.UUID) ([]domain.Notification, error)
 }
 
-type NotificationNotifier interface {
+type Notifier interface {
 	SendNotification(ctx context.Context, notification *domain.Notification) error
 }
 
-type NotificationSubscriber struct {
+type EventSubscriber struct {
 	logger     *slog.Logger
-	subscriber *Subscriber
-	repository NotificationRepository
-	notifier   NotificationNotifier
+	subscriber *subscriber.Subscriber
+	repository eventRepository
+	notifier   Notifier
 	now        func() time.Time
 }
 
-func NewNotificationSubscriber(ctx context.Context, config *config.Config, logger *slog.Logger, repository NotificationRepository, notifier NotificationNotifier) (*NotificationSubscriber, error) {
-	subscriber, err := NewSubscriber(config, "notification.subscriber")
+func NewEventSubscriber(ctx context.Context, cfg *config.Config, logger *slog.Logger, repository eventRepository, notifier Notifier) (*EventSubscriber, error) {
+	sub, err := subscriber.NewSubscriber(cfg, "notification.subscriber")
 	if err != nil {
 		return nil, err
 	}
 
-	notificationSubscriber := &NotificationSubscriber{
+	eventSubscriber := &EventSubscriber{
 		logger:     logger,
-		subscriber: subscriber,
+		subscriber: sub,
 		repository: repository,
 		notifier:   notifier,
 		now:        time.Now,
 	}
 
 	topics := []events.Topic{events.ProjectMemberCreated, events.TaskCreated, events.TaskUpdated, events.TaskCommentCreated}
-	if err := subscriber.Subscribe(ctx, topics, notificationSubscriber.handleNotificationEvents, notificationSubscriber.logger); err != nil {
+	if err := sub.Subscribe(ctx, topics, eventSubscriber.handleNotificationEvents, eventSubscriber.logger); err != nil {
 		return nil, err
 	}
 
-	return notificationSubscriber, nil
+	return eventSubscriber, nil
 }
 
-func (ns *NotificationSubscriber) Close() error {
-	return ns.subscriber.Close()
+func (es *EventSubscriber) Close() error {
+	return es.subscriber.Close()
 }
 
-func (ns *NotificationSubscriber) handleNotificationEvents(ctx context.Context, message Message) error {
+func (es *EventSubscriber) handleNotificationEvents(ctx context.Context, message subscriber.Message) error {
 	switch message.Topic {
 	case events.ProjectMemberCreated:
-		return ns.handleProjectMemberCreated(ctx, message)
+		return es.handleProjectMemberCreated(ctx, message)
 	case events.TaskCreated:
-		return ns.handleTaskCreated(ctx, message)
+		return es.handleTaskCreated(ctx, message)
 	case events.TaskUpdated:
-		return ns.handleTaskUpdated(ctx, message)
+		return es.handleTaskUpdated(ctx, message)
 	case events.TaskCommentCreated:
-		return ns.handleTaskCommentCreated(ctx, message)
+		return es.handleTaskCommentCreated(ctx, message)
 	default:
 		return nil
 	}
 }
 
-func (ns *NotificationSubscriber) handleProjectMemberCreated(ctx context.Context, message Message) error {
+func (es *EventSubscriber) handleProjectMemberCreated(ctx context.Context, message subscriber.Message) error {
 	var payload events.ProjectMemberCreatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
 		return domain.ServerError("failed to unmarshal project member created payload", err)
@@ -86,15 +87,15 @@ func (ns *NotificationSubscriber) handleProjectMemberCreated(ctx context.Context
 			ActorId:   payload.User.Id,
 			ProjectId: payload.ProjectMember.ProjectId,
 			Type:      domain.NotificationTypeProjectMemberCreated,
-			CreatedAt: ns.now(),
-			UpdatedAt: ns.now(),
+			CreatedAt: es.now(),
+			UpdatedAt: es.now(),
 		},
 	}
 
-	return ns.persistAndNotify(ctx, notifications)
+	return es.persistAndNotify(ctx, notifications)
 }
 
-func (ns *NotificationSubscriber) handleTaskCreated(ctx context.Context, message Message) error {
+func (es *EventSubscriber) handleTaskCreated(ctx context.Context, message subscriber.Message) error {
 	var payload events.TaskCreatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
 		return domain.ServerError("failed to unmarshal task created payload", err)
@@ -111,15 +112,15 @@ func (ns *NotificationSubscriber) handleTaskCreated(ctx context.Context, message
 			ProjectId: payload.Task.ProjectId,
 			TaskId:    pointerUUID(payload.Task.Id),
 			Type:      domain.NotificationTypeTaskAssigned,
-			CreatedAt: ns.now(),
-			UpdatedAt: ns.now(),
+			CreatedAt: es.now(),
+			UpdatedAt: es.now(),
 		},
 	}
 
-	return ns.persistAndNotify(ctx, notifications)
+	return es.persistAndNotify(ctx, notifications)
 }
 
-func (ns *NotificationSubscriber) handleTaskUpdated(ctx context.Context, message Message) error {
+func (es *EventSubscriber) handleTaskUpdated(ctx context.Context, message subscriber.Message) error {
 	var payload events.TaskUpdatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
 		return domain.ServerError("failed to unmarshal task updated payload", err)
@@ -144,15 +145,15 @@ func (ns *NotificationSubscriber) handleTaskUpdated(ctx context.Context, message
 			ProjectId: payload.Task.ProjectId,
 			TaskId:    pointerUUID(payload.Task.Id),
 			Type:      domain.NotificationTypeTaskAssigned,
-			CreatedAt: ns.now(),
-			UpdatedAt: ns.now(),
+			CreatedAt: es.now(),
+			UpdatedAt: es.now(),
 		},
 	}
 
-	return ns.persistAndNotify(ctx, notifications)
+	return es.persistAndNotify(ctx, notifications)
 }
 
-func (ns *NotificationSubscriber) handleTaskCommentCreated(ctx context.Context, message Message) error {
+func (es *EventSubscriber) handleTaskCommentCreated(ctx context.Context, message subscriber.Message) error {
 	var payload events.TaskCommentCreatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
 		return domain.ServerError("failed to unmarshal task comment created payload", err)
@@ -185,27 +186,27 @@ func (ns *NotificationSubscriber) handleTaskCommentCreated(ctx context.Context, 
 			TaskId:        pointerUUID(payload.TaskComment.Task.Id),
 			TaskCommentId: parseOptionalUUID(payload.TaskComment.ID),
 			Type:          domain.NotificationTypeTaskCommentCreated,
-			CreatedAt:     ns.now(),
-			UpdatedAt:     ns.now(),
+			CreatedAt:     es.now(),
+			UpdatedAt:     es.now(),
 		})
 	}
 
-	return ns.persistAndNotify(ctx, notifications)
+	return es.persistAndNotify(ctx, notifications)
 }
 
-func (ns *NotificationSubscriber) persistAndNotify(ctx context.Context, notifications []domain.Notification) error {
-	ids, err := ns.repository.CreateMany(ctx, notifications)
+func (es *EventSubscriber) persistAndNotify(ctx context.Context, notifications []domain.Notification) error {
+	ids, err := es.repository.CreateMany(ctx, notifications)
 	if err != nil {
 		return domain.ServerError("failed to create notifications", err)
 	}
 
-	createdNotifications, err := ns.repository.ListByIDs(ctx, ids)
+	createdNotifications, err := es.repository.ListByIDs(ctx, ids)
 	if err != nil {
 		return domain.ServerError("failed to list created notifications", err)
 	}
 
 	for _, notification := range createdNotifications {
-		if err := ns.notifier.SendNotification(ctx, &notification); err != nil {
+		if err := es.notifier.SendNotification(ctx, &notification); err != nil {
 			return domain.ServerError("failed to send notification", err)
 		}
 	}

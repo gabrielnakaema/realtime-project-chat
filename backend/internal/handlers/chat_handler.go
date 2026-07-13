@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
@@ -49,7 +50,7 @@ func (ch *ChatHandler) GetChatByProjectId(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return
@@ -81,7 +82,7 @@ func (ch *ChatHandler) GetChatById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return
@@ -115,7 +116,7 @@ func (ch *ChatHandler) CreateMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return
@@ -155,7 +156,7 @@ func (ch *ChatHandler) GetOrCreateGeneralChat(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return
@@ -175,7 +176,7 @@ func (ch *ChatHandler) GetOrCreateGeneralChat(w http.ResponseWriter, r *http.Req
 }
 
 func (ch *ChatHandler) ListGeneralChats(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return
@@ -240,7 +241,7 @@ func (ch *ChatHandler) ListChatMessages(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return
@@ -298,7 +299,7 @@ func (ch *ChatHandler) MarkChatRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return
@@ -337,7 +338,7 @@ func (ch *ChatHandler) ListMessageReads(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return
@@ -406,7 +407,7 @@ func (ch *ChatHandler) ListMessagesByProjectId(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
 		UnauthorizedResponse(w, "unauthorized")
 		return

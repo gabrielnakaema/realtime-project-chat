@@ -115,14 +115,6 @@ func (a *Api) Router() http.Handler {
 			r.Get("/search", a.handlers.Task.SearchTasksForUser)
 		})
 
-		r.Route("/notifications", func(r chi.Router) {
-			r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
-			r.Get("/", a.handlers.Notification.List)
-			r.Get("/unread-count", a.handlers.Notification.CountUnread)
-			r.Post("/read-all", a.handlers.Notification.MarkAllRead)
-			r.Post("/{id}/read", a.handlers.Notification.MarkRead)
-		})
-
 		r.Route("/ws", func(r chi.Router) {
 			r.Get("/", a.Ws.Handler)
 		})

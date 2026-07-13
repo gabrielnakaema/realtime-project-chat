@@ -14,13 +14,13 @@ import (
 )
 
 func TestNotificationEndpoints(t *testing.T) {
-	testAPI, cleanup := shared.SetupTestAPI(t)
+	testAPI, cleanup := shared.SetupTestSplitAPI(t)
 	defer cleanup()
 
 	t.Run("notifications endpoints are protected by auth", func(t *testing.T) {
 		testAPI.TruncateTables(t)
 
-		client := shared.NewHTTPClient(testAPI.GetBaseURL())
+		client := shared.NewHTTPClient(testAPI.NotificationBaseURL)
 
 		resp, err := client.GET("/notifications")
 		require.NoError(t, err)
@@ -36,12 +36,15 @@ func TestNotificationEndpoints(t *testing.T) {
 	t.Run("list, count and mark notifications as read", func(t *testing.T) {
 		testAPI.TruncateTables(t)
 
-		client := shared.NewHTTPClient(testAPI.GetBaseURL())
-		_, err := client.CreateUserAndLogin("notifications@example.com", "password123")
+		monolithClient := shared.NewHTTPClient(testAPI.MonolithBaseURL)
+		token, err := monolithClient.CreateUserAndLogin("notifications@example.com", "password123")
 		require.NoError(t, err)
 
+		client := shared.NewHTTPClient(testAPI.NotificationBaseURL)
+		client.SetAuthToken(token)
+
 		actorID := createUser(t, testAPI, "actor@example.com")
-		userID := getCurrentUserID(t, client)
+		userID := getCurrentUserID(t, monolithClient)
 		projectID := uuid.New()
 		projectColumnID := uuid.New()
 		taskID := uuid.New()
@@ -139,7 +142,7 @@ func TestNotificationEndpoints(t *testing.T) {
 	})
 }
 
-func createUser(t *testing.T, testAPI *shared.TestAPI, email string) uuid.UUID {
+func createUser(t *testing.T, testAPI *shared.TestSplitAPI, email string) uuid.UUID {
 	t.Helper()
 
 	id := uuid.New()

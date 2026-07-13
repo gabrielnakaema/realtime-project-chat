@@ -33,6 +33,20 @@ services:
       - KAFKA_LOG_RETENTION_HOURS=168
       - CLUSTER_ID=KafkaCluster
 
+  gateway:
+    image: traefik:v3.1
+    container_name: gateway_local
+    command:
+      - "--entrypoints.web.address=:80"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.watch=true"
+    ports:
+      - "3333:80"
+    volumes:
+      - ./traefik/dynamic-dev.yml:/etc/traefik/dynamic.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   postgres_data:
   kafka_data:

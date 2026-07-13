@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
@@ -57,7 +58,7 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	serviceRequest := service.CreateTaskRequest{
 		ProjectId:        request.ProjectId,
@@ -129,7 +130,7 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		updatedAt = &parsedTime
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	archived := utils.GetQueryString(r, "archived", "") == "true"
 
 	serviceRequest := service.ListTasksRequest{
@@ -199,7 +200,7 @@ func (h *TaskHandler) GroupByColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 	archived := utils.GetQueryString(r, "archived", "") == "true"
 
 	serviceRequest := service.GroupByColumnRequest{
@@ -238,7 +239,7 @@ func (h *TaskHandler) CountByColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	projectColumnIDs, err := parseUUIDQueryParam(utils.GetQueryString(r, "project_column_ids", ""))
 	if err != nil {
@@ -273,7 +274,7 @@ func (h *TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	task, err := h.taskService.GetById(r.Context(), parsedId, userId)
 	if err != nil {
@@ -310,7 +311,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	serviceRequest := service.UpdateTaskRequest{
 		TaskId:           parsedId,
@@ -347,7 +348,7 @@ func (h *TaskHandler) Archive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	serviceRequest := service.ArchiveTaskRequest{
 		TaskId:        parsedId,
@@ -389,7 +390,7 @@ func (h *TaskHandler) Restore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	serviceRequest := service.RestoreTaskRequest{
 		TaskId:          parsedId,
@@ -432,7 +433,7 @@ func (h *TaskHandler) Move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	serviceRequest := service.MoveTaskRequest{
 		TaskId:          parsedId,
@@ -474,7 +475,7 @@ func parseUUIDQueryParam(value string) ([]uuid.UUID, error) {
 }
 
 func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	limit := utils.GetQueryInt(r, "limit", 15)
 	if limit <= 0 {
@@ -530,7 +531,7 @@ func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) SuggestTaskCodes(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	projectId := utils.GetQueryString(r, "project_id", "")
 	if projectId == "" {
@@ -580,7 +581,7 @@ func (h *TaskHandler) SuggestTaskCodes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) SearchProjectTasksForDependencies(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	projectId := utils.GetQueryString(r, "project_id", "")
 	if projectId == "" {
@@ -642,7 +643,7 @@ func (h *TaskHandler) SearchProjectTasksForDependencies(w http.ResponseWriter, r
 }
 
 func (h *TaskHandler) SearchTasksForUser(w http.ResponseWriter, r *http.Request) {
-	userId := UserIdFromContext(r.Context())
+	userId := auth.UserIdFromContext(r.Context())
 
 	limit := utils.GetQueryInt(r, "limit", 15)
 	if limit <= 0 {

@@ -1,4 +1,4 @@
-package repository
+package notification
 
 import (
 	"context"
@@ -13,19 +13,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type NotificationRepository struct {
+type Repository struct {
 	pool *pgxpool.Pool
 }
 
 type notificationRow queries.ListNotificationsByUserIdRow
 
-func NewNotificationRepository(pool *pgxpool.Pool) *NotificationRepository {
-	return &NotificationRepository{
+func NewRepository(pool *pgxpool.Pool) *Repository {
+	return &Repository{
 		pool: pool,
 	}
 }
 
-func (nr *NotificationRepository) CreateMany(ctx context.Context, notifications []domain.Notification) ([]uuid.UUID, error) {
+func (nr *Repository) CreateMany(ctx context.Context, notifications []domain.Notification) ([]uuid.UUID, error) {
 	if len(notifications) == 0 {
 		return []uuid.UUID{}, nil
 	}
@@ -66,7 +66,7 @@ func (nr *NotificationRepository) CreateMany(ctx context.Context, notifications 
 	return ids, nil
 }
 
-func (nr *NotificationRepository) ListByUserID(ctx context.Context, userId uuid.UUID, beforeCreatedAt time.Time, beforeId uuid.UUID, limit int32) (*utils.CursorPaginated[domain.Notification], error) {
+func (nr *Repository) ListByUserID(ctx context.Context, userId uuid.UUID, beforeCreatedAt time.Time, beforeId uuid.UUID, limit int32) (*utils.CursorPaginated[domain.Notification], error) {
 	q := queries.New(nr.pool)
 
 	rows, err := q.ListNotificationsByUserId(ctx, queries.ListNotificationsByUserIdParams{
@@ -101,7 +101,7 @@ func (nr *NotificationRepository) ListByUserID(ctx context.Context, userId uuid.
 	}, nil
 }
 
-func (nr *NotificationRepository) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]domain.Notification, error) {
+func (nr *Repository) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]domain.Notification, error) {
 	if len(ids) == 0 {
 		return []domain.Notification{}, nil
 	}
@@ -125,7 +125,7 @@ func (nr *NotificationRepository) ListByIDs(ctx context.Context, ids []uuid.UUID
 	return notifications, nil
 }
 
-func (nr *NotificationRepository) CountUnreadByUserID(ctx context.Context, userId uuid.UUID) (int, error) {
+func (nr *Repository) CountUnreadByUserID(ctx context.Context, userId uuid.UUID) (int, error) {
 	q := queries.New(nr.pool)
 	count, err := q.CountUnreadNotificationsByUserId(ctx, userId)
 	if err != nil {
@@ -135,7 +135,7 @@ func (nr *NotificationRepository) CountUnreadByUserID(ctx context.Context, userI
 	return int(count), nil
 }
 
-func (nr *NotificationRepository) MarkRead(ctx context.Context, notificationId uuid.UUID, userId uuid.UUID, updatedAt time.Time) (bool, error) {
+func (nr *Repository) MarkRead(ctx context.Context, notificationId uuid.UUID, userId uuid.UUID, updatedAt time.Time) (bool, error) {
 	q := queries.New(nr.pool)
 	rowsAffected, err := q.MarkNotificationRead(ctx, queries.MarkNotificationReadParams{
 		ID:        notificationId,
@@ -149,7 +149,7 @@ func (nr *NotificationRepository) MarkRead(ctx context.Context, notificationId u
 	return rowsAffected > 0, nil
 }
 
-func (nr *NotificationRepository) MarkAllRead(ctx context.Context, userId uuid.UUID, updatedAt time.Time) error {
+func (nr *Repository) MarkAllRead(ctx context.Context, userId uuid.UUID, updatedAt time.Time) error {
 	q := queries.New(nr.pool)
 	return q.MarkAllNotificationsRead(ctx, queries.MarkAllNotificationsReadParams{
 		UserID:    userId,

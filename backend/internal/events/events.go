@@ -18,6 +18,8 @@ const (
 	TaskCreated        Topic = "task.created"
 	TaskUpdated        Topic = "task.updated"
 	TaskCommentCreated Topic = "task.comment.created"
+
+	NotificationCreated Topic = "notification.created"
 )
 
 func (t Topic) String() string {
@@ -37,6 +39,7 @@ func (t Topic) Valid() bool {
 		TaskCreated,
 		TaskUpdated,
 		TaskCommentCreated,
+		NotificationCreated,
 	}
 
 	return slices.Contains(allowedTopics, t)

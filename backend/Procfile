@@ -1,0 +1,2 @@
+api: air -c .air.toml
+notification: air -c .air.notification.toml
