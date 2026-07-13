@@ -6,6 +6,15 @@ endif
 dev:
 	goreman start
 
+dev-api:
+	air -c .air.toml
+
+dev-notification:
+	air -c .air.notification.toml
+
+dev-websocket:
+	air -c .air.websocket.toml
+
 goose-up:
 	goose up
 

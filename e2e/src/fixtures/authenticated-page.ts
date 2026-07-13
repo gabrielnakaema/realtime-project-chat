@@ -8,9 +8,15 @@ import {
 } from "@playwright/test";
 import { registerUser, type TestUser } from "./test-user.js";
 
-export const backendURL = `http://localhost:${
-  process.env.E2E_BACKEND_PORT ?? "4333"
-}`;
+const gatewayPort = process.env.E2E_RESOLVED_GATEWAY_PORT;
+
+if (!gatewayPort) {
+  throw new Error(
+    "E2E_RESOLVED_GATEWAY_PORT was not set by the global E2E setup"
+  );
+}
+
+export const backendURL = `http://localhost:${gatewayPort}`;
 
 interface AuthFixtures {
   backendURL: string;

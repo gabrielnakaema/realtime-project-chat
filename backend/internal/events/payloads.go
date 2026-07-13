@@ -110,11 +110,22 @@ func (c *ChatMessageReadPayload) ToMessage() ([]byte, error) {
 }
 
 type ChatMemberCreatedPayload struct {
-	ChatMember domain.ChatMember `json:"chat_member"`
-	User       domain.User       `json:"user"`
+	ChatMember    domain.ChatMember    `json:"chat_member"`
+	ProjectMember domain.ProjectMember `json:"project_member"`
+	User          domain.User          `json:"user"`
 }
 
 func (c *ChatMemberCreatedPayload) ToMessage() ([]byte, error) {
+	return json.Marshal(c)
+}
+
+type ChatMemberRemovedPayload struct {
+	ChatMember    domain.ChatMember    `json:"chat_member"`
+	ProjectMember domain.ProjectMember `json:"project_member"`
+	User          domain.User          `json:"user"`
+}
+
+func (c *ChatMemberRemovedPayload) ToMessage() ([]byte, error) {
 	return json.Marshal(c)
 }
 

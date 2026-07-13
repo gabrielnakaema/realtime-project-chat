@@ -62,5 +62,5 @@ jobs:
             export REGISTRY=${{ env.REGISTRY }}
             export IMAGE_NAME=${{ env.IMAGE_NAME }}
             export IMAGE_TAG=${{ env.IMAGE_TAG }}
-            docker compose -f docker-compose-prod.yml pull api notification-service
+            docker compose -f docker-compose-prod.yml pull api notification-service websocket-service
             docker compose -f docker-compose-prod.yml up -d

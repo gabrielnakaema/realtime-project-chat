@@ -102,7 +102,8 @@ func (cs *ChatService) CreateMemberFromProjectMember(ctx context.Context, projec
 	}
 
 	err = cs.publisher.Publish(ctx, events.ChatMemberCreated, &events.ChatMemberCreatedPayload{
-		ChatMember: member,
+		ChatMember:    member,
+		ProjectMember: *projectMember,
 		User: domain.User{
 			Id: projectMember.UserId,
 		},
@@ -126,6 +127,14 @@ func (cs *ChatService) RemoveMemberFromProjectMember(ctx context.Context, projec
 	}
 	if err := cs.chatRepository.DeleteMember(ctx, member); err != nil {
 		return nil, domain.ServerError("failed to remove project chat member", err)
+	}
+
+	if err := cs.publisher.Publish(ctx, events.ChatMemberRemoved, &events.ChatMemberRemovedPayload{
+		ChatMember:    *member,
+		ProjectMember: *projectMember,
+		User:          domain.User{Id: projectMember.UserId},
+	}); err != nil {
+		return nil, domain.ServerError("failed to publish chat member removed event", err)
 	}
 
 	return member, nil

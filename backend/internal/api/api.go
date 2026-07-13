@@ -1,42 +1,19 @@
 package api
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
+	"github.com/gabrielnakaema/project-chat/internal/apphost"
 	"github.com/gabrielnakaema/project-chat/internal/auth"
-	"github.com/gabrielnakaema/project-chat/internal/config"
-	"github.com/gabrielnakaema/project-chat/internal/db"
 	"github.com/gabrielnakaema/project-chat/internal/handlers"
-	"github.com/gabrielnakaema/project-chat/internal/logger"
 	"github.com/gabrielnakaema/project-chat/internal/mcp"
-	"github.com/gabrielnakaema/project-chat/internal/notification"
-	"github.com/gabrielnakaema/project-chat/internal/publisher"
 	"github.com/gabrielnakaema/project-chat/internal/repository"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/subscriber"
 	"github.com/gabrielnakaema/project-chat/internal/token"
-	"github.com/gabrielnakaema/project-chat/internal/ws"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Api struct {
-	config      *config.Config
-	pool        *pgxpool.Pool
-	handlers    *Handlers
-	logger      *slog.Logger
-	Publisher   *publisher.Publisher
-	Ws          *ws.Server
-	subscribers []io.Closer
-	cancel      context.CancelFunc
+	rt       *apphost.Runtime
+	handlers *Handlers
 }
 
 type Handlers struct {
@@ -51,184 +28,82 @@ type Handlers struct {
 }
 
 func NewApi() (*Api, error) {
-	config, err := config.New()
+	rt, err := apphost.New("api", "", "")
 	if err != nil {
 		return nil, err
 	}
 
-	logger := logger.Init(config)
-
-	pool, err := db.NewPool(config)
-	if err != nil {
-		return nil, err
-	}
-
-	pub, err := publisher.NewPublisher(config, logger)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	jwtProvider := token.NewTokenProvider(config)
+	jwtProvider := token.NewTokenProvider(rt.Config)
 	authMiddleware := auth.NewMiddleware(jwtProvider)
 
-	chatRepo := repository.NewChatRepository(pool)
-	projectRepo := repository.NewProjectRepository(pool)
-	taskRepo := repository.NewTaskRepository(pool)
-	taskCommentRepo := repository.NewTaskCommentRepository(pool)
-	userRepo := repository.NewUserRepository(pool)
-	activityRepo := repository.NewProjectActivityRepository(pool)
-	mcpAPIKeyRepo := repository.NewMCPAPIKeyRepository(pool)
+	chatRepo := repository.NewChatRepository(rt.Pool)
+	projectRepo := repository.NewProjectRepository(rt.Pool)
+	taskRepo := repository.NewTaskRepository(rt.Pool)
+	taskCommentRepo := repository.NewTaskCommentRepository(rt.Pool)
+	userRepo := repository.NewUserRepository(rt.Pool)
+	activityRepo := repository.NewProjectActivityRepository(rt.Pool)
+	mcpAPIKeyRepo := repository.NewMCPAPIKeyRepository(rt.Pool)
 
-	projectService := service.NewProjectService(projectRepo, userRepo, pub, activityRepo)
+	projectService := service.NewProjectService(projectRepo, userRepo, rt.Publisher, activityRepo)
 	projectHandler := handlers.NewProjectHandler(projectService)
 
-	chatService := service.NewChatService(chatRepo, userRepo, pub)
+	chatService := service.NewChatService(chatRepo, userRepo, rt.Publisher)
 
-	ws := ws.NewServer(ctx, jwtProvider, logger, chatService, projectService, pub)
-
-	var subscribers []io.Closer
-
-	chatSub, err := subscriber.NewChatSubscriber(ctx, config, logger, chatService, ws)
+	chatSub, err := subscriber.NewChatSubscriber(rt.Ctx, rt.Config, rt.Logger, chatService)
 	if err != nil {
-		cancel()
+		rt.Close()
 		return nil, err
 	}
-	subscribers = append(subscribers, chatSub)
+	rt.Track(chatSub)
 
-	taskSub, err := subscriber.NewTaskSubscriber(ctx, config, logger, ws)
+	activitySub, err := subscriber.NewProjectActivitySubscriber(rt.Ctx, rt.Config, rt.Logger, activityRepo, projectRepo)
 	if err != nil {
-		cancel()
+		rt.Close()
 		return nil, err
 	}
-	subscribers = append(subscribers, taskSub)
+	rt.Track(activitySub)
 
-	projectSub, err := subscriber.NewProjectSubscriber(ctx, config, logger, ws)
+	taskUpdateSub, err := subscriber.NewTaskUpdateSubscriber(rt.Ctx, rt.Config, rt.Logger, taskRepo)
 	if err != nil {
-		cancel()
+		rt.Close()
 		return nil, err
 	}
-	subscribers = append(subscribers, projectSub)
-
-	activitySub, err := subscriber.NewProjectActivitySubscriber(ctx, config, logger, activityRepo, projectRepo)
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-	subscribers = append(subscribers, activitySub)
-
-	taskUpdateSub, err := subscriber.NewTaskUpdateSubscriber(ctx, config, logger, taskRepo)
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-	subscribers = append(subscribers, taskUpdateSub)
-
-	notificationForwardSub, err := notification.NewForwardSubscriber(ctx, config, logger, ws)
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-	subscribers = append(subscribers, notificationForwardSub)
+	rt.Track(taskUpdateSub)
 
 	chatHandler := handlers.NewChatHandler(chatService)
 
 	userService := service.NewUserService(jwtProvider, userRepo)
-	userHandler := handlers.NewUserHandler(userService, config)
+	userHandler := handlers.NewUserHandler(userService, rt.Config)
 	mcpAPIKeyService := service.NewMCPAPIKeyService(mcpAPIKeyRepo)
 	mcpAPIKeyHandler := handlers.NewMCPAPIKeyHandler(mcpAPIKeyService)
 
-	taskService := service.NewTaskService(taskRepo, projectRepo, userRepo, pub)
+	taskService := service.NewTaskService(taskRepo, projectRepo, userRepo, rt.Publisher)
 	taskHandler := handlers.NewTaskHandler(taskService)
-	taskCommentService := service.NewTaskCommentService(taskCommentRepo, taskRepo, projectRepo, userRepo, pub)
+	taskCommentService := service.NewTaskCommentService(taskCommentRepo, taskRepo, projectRepo, userRepo, rt.Publisher)
 	taskCommentHandler := handlers.NewTaskCommentHandler(taskCommentService)
 	mcpHandler := mcp.NewHandler(mcpAPIKeyService, projectService, taskService, taskCommentService)
 
-	handlers := Handlers{
-		AuthMiddleware: authMiddleware,
-		Chat:           chatHandler,
-		MCPAPIKey:      mcpAPIKeyHandler,
-		MCP:            mcpHandler,
-		Project:        projectHandler,
-		Task:           taskHandler,
-		TaskComment:    taskCommentHandler,
-		User:           userHandler,
-	}
-
 	api := Api{
-		handlers:    &handlers,
-		config:      config,
-		pool:        pool,
-		logger:      logger,
-		Ws:          ws,
-		Publisher:   pub,
-		subscribers: subscribers,
-		cancel:      cancel,
+		rt: rt,
+		handlers: &Handlers{
+			AuthMiddleware: authMiddleware,
+			Chat:           chatHandler,
+			MCPAPIKey:      mcpAPIKeyHandler,
+			MCP:            mcpHandler,
+			Project:        projectHandler,
+			Task:           taskHandler,
+			TaskComment:    taskCommentHandler,
+			User:           userHandler,
+		},
 	}
 
 	return &api, nil
 }
 
 func (a *Api) Close() {
-	a.cancel()
-
-	for _, s := range a.subscribers {
-		if err := s.Close(); err != nil {
-			a.logger.Error("error closing subscriber", "error", err)
-		}
-	}
-
-	if err := a.Publisher.Close(); err != nil {
-		a.logger.Error("error closing publisher", "error", err)
-	}
-
-	a.pool.Close()
-
-	a.logger.Info("all resources closed")
+	a.rt.Close()
 }
 
 func (a *Api) Serve() error {
-	addr := fmt.Sprintf(":%s", a.config.Port)
-
-	server := &http.Server{
-		Addr:         addr,
-		IdleTimeout:  30 * time.Second,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		Handler:      a.Router(),
-		ErrorLog:     slog.NewLogLogger(a.logger.Handler(), slog.LevelError),
-	}
-
-	shutdownError := make(chan error)
-
-	go func() {
-		quit := make(chan os.Signal, 1)
-		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-		s := <-quit
-
-		a.logger.Info("shutting down server", "signal", s.String())
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		shutdownError <- server.Shutdown(ctx)
-	}()
-
-	a.logger.Info("starting server", "addr", addr, "environment", a.config.Environment)
-
-	err := server.ListenAndServe()
-	if !errors.Is(err, http.ErrServerClosed) {
-		return err
-	}
-
-	err = <-shutdownError
-	if err != nil {
-		return err
-	}
-
-	a.logger.Info("stopped server", "addr", addr, "environment", a.config.Environment)
-
-	return nil
+	return a.rt.Serve(a.Router())
 }

@@ -1,5 +1,9 @@
 http:
   routers:
+    websocket-service:
+      rule: "PathPrefix(`/ws`)"
+      service: websocket-service
+      priority: 20
     notification-service:
       rule: "PathPrefix(`/notifications`)"
       service: notification-service
@@ -10,6 +14,10 @@ http:
       priority: 1
 
   services:
+    websocket-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3336"
     notification-service:
       loadBalancer:
         servers:

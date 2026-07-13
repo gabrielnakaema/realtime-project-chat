@@ -91,6 +91,26 @@ services:
       - "traefik.http.routers.notification-service.priority=10"
       - "traefik.http.services.notification-service.loadbalancer.server.port=${NOTIFICATION_SERVICE_PORT}"
 
+  websocket-service:
+    container_name: websocket_service_projectmanagement_${ENV_NAME}
+    image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+    pull_policy: always
+    command: ["./websocket-service"]
+    env_file: .env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: always
+    networks:
+      - project_management_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.websocket-service.rule=PathPrefix(`/ws`)"
+      - "traefik.http.routers.websocket-service.priority=20"
+      - "traefik.http.services.websocket-service.loadbalancer.server.port=${WEBSOCKET_SERVICE_PORT:-3336}"
+
   gateway:
     image: traefik:v3.1
     container_name: gateway_projectmanagement_${ENV_NAME}
@@ -106,6 +126,7 @@ services:
     depends_on:
       - api
       - notification-service
+      - websocket-service
     restart: always
     networks:
       - project_management_network

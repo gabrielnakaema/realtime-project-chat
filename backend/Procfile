@@ -1,2 +1,3 @@
 api: air -c .air.toml
 notification: air -c .air.notification.toml
+websocket: air -c .air.websocket.toml

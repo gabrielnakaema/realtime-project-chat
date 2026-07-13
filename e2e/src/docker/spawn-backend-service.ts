@@ -3,23 +3,16 @@ import { spawn, ChildProcess } from "node:child_process";
 import path from "node:path";
 import { waitOnHttp } from "./wait-on-http.js";
 
-export interface BackendEnv {
-  API_PORT: string;
-  DB_DSN: string;
-  PUBSUB_BROKERS: string;
-  JWT_SECRET: string;
-  ENV: string;
-  CORS_ORIGINS: string;
-}
-
-export async function spawnBackend(
+export async function spawnBackendService(
   backendDir: string,
+  name: string,
+  command: string,
   port: string,
-  env: BackendEnv
+  env: NodeJS.ProcessEnv
 ): Promise<ChildProcess> {
-  const binaryPath = path.join(backendDir, ".bin", "api-e2e");
+  const binaryPath = path.join(backendDir, ".bin", `${name}-e2e`);
 
-  await execa("go", ["build", "-o", binaryPath, "./cmd/api"], {
+  await execa("go", ["build", "-o", binaryPath, command], {
     cwd: backendDir,
     stdio: "inherit",
   });
@@ -31,6 +24,5 @@ export async function spawnBackend(
   });
 
   await waitOnHttp(`http://localhost:${port}/health`, 60_000);
-
   return proc;
 }
