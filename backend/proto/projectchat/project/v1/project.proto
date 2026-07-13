@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package projectchat.project.v1;
+
+option go_package = "github.com/gabrielnakaema/project-chat/internal/project/v1;projectv1";
+
+// ProjectService exposes project business rules over gRPC so other services can
+// enforce them without instantiating the core application.
+service ProjectService {
+  // CheckAccess reports whether a user may access a project. A successful
+  // response means access is granted; denial is returned as a gRPC status error.
+  rpc CheckAccess(CheckAccessRequest) returns (CheckAccessResponse);
+}
+
+message CheckAccessRequest {
+  string user_id = 1;
+  string project_id = 2;
+}
+
+message CheckAccessResponse {}

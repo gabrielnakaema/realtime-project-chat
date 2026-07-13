@@ -22,16 +22,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type chatServiceStub struct{}
+type accessCheckerStub struct{}
 
-func (chatServiceStub) GetById(context.Context, uuid.UUID, uuid.UUID) (*domain.Chat, error) {
-	return &domain.Chat{}, nil
-}
-
-type projectServiceStub struct{}
-
-func (projectServiceStub) GetById(context.Context, uuid.UUID, uuid.UUID) (*domain.Project, error) {
-	return &domain.Project{}, nil
+func (accessCheckerStub) CheckAccess(context.Context, uuid.UUID, uuid.UUID) error {
+	return nil
 }
 
 type publisherStub struct{}
@@ -43,7 +37,7 @@ func newTestApp(t *testing.T) (*App, context.CancelFunc) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	rt := apphost.NewForTest(log)
 	cfg := &config.Config{JwtSecret: "websocket-test-secret"}
-	server := ws.NewServer(rt.Ctx, token.NewTokenProvider(cfg), log, chatServiceStub{}, projectServiceStub{}, publisherStub{})
+	server := ws.NewServer(rt.Ctx, token.NewTokenProvider(cfg), log, accessCheckerStub{}, accessCheckerStub{}, time.Second, publisherStub{})
 	return &App{rt: rt, Ws: server}, func() { rt.Close() }
 }
 

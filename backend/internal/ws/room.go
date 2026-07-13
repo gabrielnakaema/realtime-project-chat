@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
@@ -89,35 +90,24 @@ func (ws *Server) disconnectUser(userId uuid.UUID) {
 	delete(ws.users, userId)
 }
 
-func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType WsRoomType) error {
+var errWebsocketUserDisconnected = errors.New("websocket user disconnected")
+
+func (ws *Server) connectUserToRoom(ctx context.Context, userId uuid.UUID, roomId uuid.UUID, roomType WsRoomType) error {
 	if !isValidRoomType(roomType) {
-		return nil
+		return domain.ValidationFailedError(map[string][]string{"room_type": {"invalid room type"}})
 	}
 
-	if roomType == WsRoomTypeChat {
-		_, err := ws.chatService.GetById(context.Background(), roomId, userId)
-		if err != nil {
-			return err
+	if roomType == WsRoomTypeChat || roomType == WsRoomTypeProject {
+		authorizationCtx, cancel := context.WithTimeout(ctx, ws.authorizationTimeout)
+		defer cancel()
+
+		var err error
+		switch roomType {
+		case WsRoomTypeChat:
+			err = ws.chatAuthorizer.CheckAccess(authorizationCtx, userId, roomId)
+		case WsRoomTypeProject:
+			err = ws.projectAuthorizer.CheckAccess(authorizationCtx, userId, roomId)
 		}
-
-		chatMember := domain.ChatMember{
-			ChatId:     roomId,
-			UserId:     userId,
-			LastSeenAt: time.Now(),
-		}
-
-		go func() {
-			ws.publisher.Publish(context.Background(), events.ChatMemberViewed, &events.ChatMemberViewedPayload{
-				ChatMember: chatMember,
-				User: domain.User{
-					Id: userId,
-				},
-			})
-		}()
-	}
-
-	if roomType == WsRoomTypeProject {
-		_, err := ws.projectService.GetById(context.Background(), roomId, userId)
 		if err != nil {
 			return err
 		}
@@ -130,17 +120,19 @@ func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType
 	}
 
 	ws.mutex.Lock()
-	defer ws.mutex.Unlock()
 
 	user, ok := ws.users[userId]
 	if !ok {
-		return nil
+		ws.mutex.Unlock()
+		return errWebsocketUserDisconnected
 	}
 
 	room, ok := ws.rooms[roomId]
 	if ok {
 		room.users[userId] = true
 		user.rooms[roomId] = true
+		ws.mutex.Unlock()
+		ws.publishChatMemberViewed(ctx, userId, roomId, roomType)
 		return nil
 	}
 
@@ -152,6 +144,30 @@ func (ws *Server) connectUserToRoom(userId uuid.UUID, roomId uuid.UUID, roomType
 	ws.rooms[roomId] = room
 	room.users[userId] = true
 	user.rooms[roomId] = true
+	ws.mutex.Unlock()
+	ws.publishChatMemberViewed(ctx, userId, roomId, roomType)
 
 	return nil
+}
+
+func (ws *Server) publishChatMemberViewed(ctx context.Context, userID uuid.UUID, roomID uuid.UUID, roomType WsRoomType) {
+	if roomType != WsRoomTypeChat {
+		return
+	}
+
+	chatMember := domain.ChatMember{
+		ChatId:     roomID,
+		UserId:     userID,
+		LastSeenAt: time.Now(),
+	}
+	go func() {
+		publishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if err := ws.publisher.Publish(publishCtx, events.ChatMemberViewed, &events.ChatMemberViewedPayload{
+			ChatMember: chatMember,
+			User:       domain.User{Id: userID},
+		}); err != nil {
+			ws.logger.Error("failed to publish chat member viewed", "error", err.Error(), "user_id", userID, "room_id", roomID)
+		}
+	}()
 }

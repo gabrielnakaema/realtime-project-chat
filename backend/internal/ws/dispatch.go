@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc/status"
 )
 
 func (ws *Server) handleMessage(ctx context.Context, userId uuid.UUID, message WebsocketMessage, writerChannel chan interface{}) {
@@ -35,8 +36,9 @@ func (ws *Server) handleConnectUserToRoom(ctx context.Context, userId uuid.UUID,
 		return
 	}
 
-	err = ws.connectUserToRoom(userId, data.RoomId, WsRoomType(data.Type))
+	err = ws.connectUserToRoom(ctx, userId, data.RoomId, WsRoomType(data.Type))
 	if err != nil {
+		ws.logger.Warn("room connection authorization failed", "error", err.Error(), "code", status.Code(err).String(), "user_id", userId, "room_id", data.RoomId, "room_type", data.Type)
 		return
 	}
 

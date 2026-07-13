@@ -38,12 +38,12 @@ services:
     container_name: gateway_local
     command:
       - "--entrypoints.web.address=:80"
-      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.filename=/etc/traefik/dynamic-dev.yml"
       - "--providers.file.watch=true"
     ports:
       - "3333:80"
     volumes:
-      - ./traefik/dynamic-dev.yml:/etc/traefik/dynamic.yml:ro
+      - ./traefik:/etc/traefik:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

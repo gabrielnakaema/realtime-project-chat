@@ -2,12 +2,16 @@ package websocketapi
 
 import (
 	"github.com/gabrielnakaema/project-chat/internal/apphost"
+	"github.com/gabrielnakaema/project-chat/internal/chat"
+	chatv1 "github.com/gabrielnakaema/project-chat/internal/chat/v1"
 	"github.com/gabrielnakaema/project-chat/internal/notification"
-	"github.com/gabrielnakaema/project-chat/internal/repository"
-	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/project"
+	projectv1 "github.com/gabrielnakaema/project-chat/internal/project/v1"
 	"github.com/gabrielnakaema/project-chat/internal/subscriber"
 	"github.com/gabrielnakaema/project-chat/internal/token"
 	"github.com/gabrielnakaema/project-chat/internal/ws"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type App struct {
@@ -16,19 +20,24 @@ type App struct {
 }
 
 func New() (*App, error) {
-	rt, err := apphost.New("websocket-service", "WEBSOCKET_SERVICE_PORT", "3336")
+	rt, err := apphost.NewWithoutDB("websocket-service", "WEBSOCKET_SERVICE_PORT", "3336")
 	if err != nil {
 		return nil, err
 	}
 
 	jwtProvider := token.NewTokenProvider(rt.Config)
-	chatRepo := repository.NewChatRepository(rt.Pool)
-	projectRepo := repository.NewProjectRepository(rt.Pool)
-	userRepo := repository.NewUserRepository(rt.Pool)
-	activityRepo := repository.NewProjectActivityRepository(rt.Pool)
-	chatService := service.NewChatService(chatRepo, userRepo, rt.Publisher)
-	projectService := service.NewProjectService(projectRepo, userRepo, rt.Publisher, activityRepo)
-	server := ws.NewServer(rt.Ctx, jwtProvider, rt.Logger, chatService, projectService, rt.Publisher)
+	grpcConnection, err := grpc.NewClient(
+		rt.Config.AuthorizationGRPCTarget,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		rt.Close()
+		return nil, err
+	}
+	rt.Track(grpcConnection)
+	chatAuthorizer := chat.NewClient(chatv1.NewChatServiceClient(grpcConnection))
+	projectAuthorizer := project.NewClient(projectv1.NewProjectServiceClient(grpcConnection))
+	server := ws.NewServer(rt.Ctx, jwtProvider, rt.Logger, chatAuthorizer, projectAuthorizer, rt.Config.RoomAuthorizationTimeout, rt.Publisher)
 
 	realtimeSub, err := subscriber.NewRealtimeSubscriber(rt.Ctx, rt.Config, rt.Logger, server)
 	if err != nil {

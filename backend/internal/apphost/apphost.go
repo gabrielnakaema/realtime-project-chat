@@ -34,6 +34,14 @@ type Runtime struct {
 }
 
 func New(name, portEnvVar, defaultPort string) (*Runtime, error) {
+	return newRuntime(name, portEnvVar, defaultPort, true)
+}
+
+func NewWithoutDB(name, portEnvVar, defaultPort string) (*Runtime, error) {
+	return newRuntime(name, portEnvVar, defaultPort, false)
+}
+
+func newRuntime(name, portEnvVar, defaultPort string, withDB bool) (*Runtime, error) {
 	cfg, err := config.New()
 	if err != nil {
 		return nil, err
@@ -49,14 +57,19 @@ func New(name, portEnvVar, defaultPort string) (*Runtime, error) {
 
 	log := logger.Init(cfg)
 
-	pool, err := db.NewPool(cfg)
-	if err != nil {
-		return nil, err
+	var pool *pgxpool.Pool
+	if withDB {
+		pool, err = db.NewPool(cfg)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	pub, err := publisher.NewPublisher(cfg, log)
 	if err != nil {
-		pool.Close()
+		if pool != nil {
+			pool.Close()
+		}
 		return nil, err
 	}
 

@@ -57,6 +57,8 @@ services:
     image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
     pull_policy: always
     env_file: .env.prod
+    environment:
+      INTERNAL_GRPC_LISTEN_ADDRESS: 0.0.0.0:3334
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,9 +99,11 @@ services:
     pull_policy: always
     command: ["./websocket-service"]
     env_file: .env.prod
+    environment:
+      AUTHORIZATION_GRPC_TARGET: api:3334
     depends_on:
-      postgres:
-        condition: service_healthy
+      api:
+        condition: service_started
       kafka:
         condition: service_healthy
     restart: always

@@ -45,12 +45,8 @@ type tokenProvider interface {
 	Verify(token string) (*jwt.Token, error)
 }
 
-type chatService interface {
-	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Chat, error)
-}
-
-type projectService interface {
-	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Project, error)
+type accessChecker interface {
+	CheckAccess(ctx context.Context, userID uuid.UUID, resourceID uuid.UUID) error
 }
 
 type publisher interface {
@@ -58,26 +54,31 @@ type publisher interface {
 }
 
 type Server struct {
-	rooms          map[uuid.UUID]*WsRoom
-	users          map[uuid.UUID]*WsUser
-	logger         *slog.Logger
-	mutex          sync.Mutex
-	tokenProvider  tokenProvider
-	chatService    chatService
-	projectService projectService
-	publisher      publisher
+	rooms                map[uuid.UUID]*WsRoom
+	users                map[uuid.UUID]*WsUser
+	logger               *slog.Logger
+	mutex                sync.Mutex
+	tokenProvider        tokenProvider
+	chatAuthorizer       accessChecker
+	projectAuthorizer    accessChecker
+	authorizationTimeout time.Duration
+	publisher            publisher
 }
 
-func NewServer(ctx context.Context, tokenProvider tokenProvider, logger *slog.Logger, chatService chatService, projectService projectService, publisher publisher) *Server {
+func NewServer(ctx context.Context, tokenProvider tokenProvider, logger *slog.Logger, chatAuthorizer accessChecker, projectAuthorizer accessChecker, authorizationTimeout time.Duration, publisher publisher) *Server {
+	if authorizationTimeout <= 0 {
+		authorizationTimeout = 2 * time.Second
+	}
 	ws := &Server{
-		rooms:          make(map[uuid.UUID]*WsRoom),
-		logger:         logger,
-		mutex:          sync.Mutex{},
-		tokenProvider:  tokenProvider,
-		chatService:    chatService,
-		projectService: projectService,
-		publisher:      publisher,
-		users:          make(map[uuid.UUID]*WsUser),
+		rooms:                make(map[uuid.UUID]*WsRoom),
+		logger:               logger,
+		mutex:                sync.Mutex{},
+		tokenProvider:        tokenProvider,
+		chatAuthorizer:       chatAuthorizer,
+		projectAuthorizer:    projectAuthorizer,
+		authorizationTimeout: authorizationTimeout,
+		publisher:            publisher,
+		users:                make(map[uuid.UUID]*WsUser),
 	}
 
 	go func() {

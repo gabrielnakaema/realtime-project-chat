@@ -1,19 +1,30 @@
 package api
 
 import (
+	"errors"
+	"net"
+	"sync"
+
 	"github.com/gabrielnakaema/project-chat/internal/apphost"
 	"github.com/gabrielnakaema/project-chat/internal/auth"
+	"github.com/gabrielnakaema/project-chat/internal/chat"
+	chatv1 "github.com/gabrielnakaema/project-chat/internal/chat/v1"
 	"github.com/gabrielnakaema/project-chat/internal/handlers"
 	"github.com/gabrielnakaema/project-chat/internal/mcp"
+	"github.com/gabrielnakaema/project-chat/internal/project"
+	projectv1 "github.com/gabrielnakaema/project-chat/internal/project/v1"
 	"github.com/gabrielnakaema/project-chat/internal/repository"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/subscriber"
 	"github.com/gabrielnakaema/project-chat/internal/token"
+	"google.golang.org/grpc"
 )
 
 type Api struct {
-	rt       *apphost.Runtime
-	handlers *Handlers
+	rt           *apphost.Runtime
+	handlers     *Handlers
+	grpcServer   *grpc.Server
+	grpcStopOnce sync.Once
 }
 
 type Handlers struct {
@@ -48,6 +59,7 @@ func NewApi() (*Api, error) {
 	projectHandler := handlers.NewProjectHandler(projectService)
 
 	chatService := service.NewChatService(chatRepo, userRepo, rt.Publisher)
+	grpcServer := NewInternalGRPCServer(chat.NewServer(chatService), project.NewServer(projectService))
 
 	chatSub, err := subscriber.NewChatSubscriber(rt.Ctx, rt.Config, rt.Logger, chatService)
 	if err != nil {
@@ -84,7 +96,8 @@ func NewApi() (*Api, error) {
 	mcpHandler := mcp.NewHandler(mcpAPIKeyService, projectService, taskService, taskCommentService)
 
 	api := Api{
-		rt: rt,
+		rt:         rt,
+		grpcServer: grpcServer,
 		handlers: &Handlers{
 			AuthMiddleware: authMiddleware,
 			Chat:           chatHandler,
@@ -101,9 +114,41 @@ func NewApi() (*Api, error) {
 }
 
 func (a *Api) Close() {
+	a.stopGRPC()
 	a.rt.Close()
 }
 
+func NewInternalGRPCServer(chatServer chatv1.ChatServiceServer, projectServer projectv1.ProjectServiceServer) *grpc.Server {
+	server := grpc.NewServer()
+	chatv1.RegisterChatServiceServer(server, chatServer)
+	projectv1.RegisterProjectServiceServer(server, projectServer)
+	return server
+}
+
+func (a *Api) stopGRPC() {
+	a.grpcStopOnce.Do(a.grpcServer.GracefulStop)
+}
+
 func (a *Api) Serve() error {
-	return a.rt.Serve(a.Router())
+	listener, err := net.Listen("tcp", a.rt.Config.InternalGRPCListenAddress)
+	if err != nil {
+		return err
+	}
+
+	grpcError := make(chan error, 1)
+	go func() {
+		a.rt.Logger.Info("starting internal gRPC server", "service", a.rt.Name, "addr", listener.Addr().String())
+		grpcError <- a.grpcServer.Serve(listener)
+	}()
+
+	httpError := a.rt.Serve(a.Router())
+	a.stopGRPC()
+	serveError := <-grpcError
+	if httpError != nil {
+		return httpError
+	}
+	if serveError != nil && !errors.Is(serveError, grpc.ErrServerStopped) {
+		return serveError
+	}
+	return nil
 }

@@ -40,6 +40,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     api: "4333",
     notification: "3335",
     websocket: "3336",
+    grpc: "4334",
   } as const;
   const corsOrigin =
     process.env.E2E_CORS_ORIGIN ?? `http://localhost:${frontendPort}`;
@@ -70,7 +71,11 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     "api",
     "./cmd/api",
     servicePorts.api,
-    { ...sharedServiceEnv, API_PORT: servicePorts.api }
+    {
+      ...sharedServiceEnv,
+      API_PORT: servicePorts.api,
+      INTERNAL_GRPC_LISTEN_ADDRESS: `127.0.0.1:${servicePorts.grpc}`,
+    }
   );
 
   const notificationProc = await spawnBackendService(
@@ -92,6 +97,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     {
       ...sharedServiceEnv,
       WEBSOCKET_SERVICE_PORT: servicePorts.websocket,
+      AUTHORIZATION_GRPC_TARGET: `127.0.0.1:${servicePorts.grpc}`,
     }
   );
 

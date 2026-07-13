@@ -66,7 +66,7 @@ func (ws *Server) Handler(w http.ResponseWriter, r *http.Request) {
 	ws.users[userId] = roomUser
 	ws.mutex.Unlock()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(r.Context())
 
 	cleanUp := func() {
 		c.Close(websocket.StatusNormalClosure, "close")
