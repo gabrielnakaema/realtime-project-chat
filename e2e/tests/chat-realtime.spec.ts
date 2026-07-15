@@ -225,8 +225,14 @@ test("project collaborators can start a group message and all recipients receive
   await pageA.getByTitle("Add project member").click();
   addMemberDialog = pageA.getByRole("dialog", { name: "Add project member" });
   await addMemberDialog.getByLabel("Email").fill(userC.email);
+  const addUserCResponse = pageA.waitForResponse((response) => {
+    const url = new URL(response.url());
+
+    return response.request().method() === "POST" && /\/projects\/[^/]+\/members$/.test(url.pathname);
+  });
   await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-  await expectToast(pageA, "Member added successfully");
+  expect((await addUserCResponse).ok()).toBe(true);
+  await expect(pageA.getByText("Member added successfully").last()).toBeVisible();
 
   await pageA.goto("/projects");
   await pageA.getByRole("button", { name: "Messages" }).click();

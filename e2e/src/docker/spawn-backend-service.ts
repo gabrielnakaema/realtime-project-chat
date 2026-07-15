@@ -7,7 +7,7 @@ export async function spawnBackendService(
   backendDir: string,
   name: string,
   command: string,
-  port: string,
+  port: string | undefined,
   env: NodeJS.ProcessEnv
 ): Promise<ChildProcess> {
   const binaryPath = path.join(backendDir, ".bin", `${name}-e2e`);
@@ -23,6 +23,8 @@ export async function spawnBackendService(
     stdio: "inherit",
   });
 
-  await waitOnHttp(`http://localhost:${port}/health`, 60_000);
+  if (port) {
+    await waitOnHttp(`http://localhost:${port}/health`, 60_000);
+  }
   return proc;
 }

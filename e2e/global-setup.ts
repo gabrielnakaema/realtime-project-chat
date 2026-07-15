@@ -64,6 +64,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     JWT_SECRET: jwtSecret,
     ENV: "test",
     CORS_ORIGINS: corsOrigin,
+    OUTBOX_POLL_INTERVAL: "10ms",
   };
 
   const backendProc = await spawnBackendService(
@@ -101,6 +102,14 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     }
   );
 
+  const relayProc = await spawnBackendService(
+    backendDir,
+    "outbox-relay",
+    "./cmd/outbox-relay",
+    undefined,
+    sharedServiceEnv
+  );
+
   const gateway = await startGateway(backendDir, requestedGatewayPort);
   const gatewayPort = String(gateway.getMappedPort(80));
 
@@ -114,6 +123,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   return async () => {
     await killProcess(frontendProc);
     await gateway.stop();
+    await killProcess(relayProc);
     await killProcess(websocketProc);
     await killProcess(notificationProc);
     await killProcess(backendProc);
