@@ -125,6 +125,7 @@ SELECT
   t.done_at as task_done_at,
   t.archived_at as task_archived_at,
   t.task_order as task_order,
+  t.version as task_version,
   t.created_at as task_created_at,
   t.updated_at as task_updated_at,
   t.author_id as task_author_id,
@@ -259,8 +260,8 @@ GROUP BY t.id, ps.id, r.name, r.id, p.id, p.name, p.description, p.created_at, p
 ORDER BY t.due_date ASC, t.updated_at DESC
 LIMIT $2;
 
--- name: UpdateTask :exec
-UPDATE tasks SET title = $1, description = $2, code = $3, project_column_id = $4, task_order = $5, priority = $6, due_date = $7, responsible_id = $8, done_at = $9, archived_at = $10, updated_at = CURRENT_TIMESTAMP WHERE id = $11;
+-- name: UpdateTask :one
+UPDATE tasks SET title = $1, description = $2, code = $3, project_column_id = $4, task_order = $5, priority = $6, due_date = $7, responsible_id = $8, done_at = $9, archived_at = $10, version = version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = $11 RETURNING version, updated_at;
 
 -- name: CreateTaskUpdate :one
 INSERT INTO task_updates (task_id, user_id, update_type, action_origin) VALUES ($1, $2, $3, $4) returning id;
@@ -298,12 +299,13 @@ UPDATE tasks t
 SET task_order = $1,
     project_column_id = $2,
     done_at = $3,
+    version = t.version + 1,
     updated_at = CURRENT_TIMESTAMP
 FROM projects p
 JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $4
 WHERE t.id = $5
   AND p.id = t.project_id
-RETURNING t.id, t.task_order, t.project_column_id;
+RETURNING t.id, t.task_order, t.project_column_id, t.version;
 
 -- name: CountTasksByProjectIdAndColumn :many
 SELECT t.project_column_id, COUNT(*) AS count

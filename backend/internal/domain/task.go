@@ -54,6 +54,7 @@ type Task struct {
 	ProjectColumnId  uuid.UUID           `json:"project_column_id"`
 	Priority         TaskPriority        `json:"priority"`
 	Order            string              `json:"order"`
+	Version          int                 `json:"version"`
 	ResponsibleId    *uuid.UUID          `json:"responsible_id"`
 	DueDate          *time.Time          `json:"due_date"`
 	DoneAt           *time.Time          `json:"done_at"`

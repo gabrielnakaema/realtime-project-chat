@@ -150,6 +150,7 @@ type Task struct {
 	ProjectColumnID uuid.UUID
 	ArchivedAt      pgtype.Timestamptz
 	Code            pgtype.Text
+	Version         int32
 }
 
 type TaskChange struct {

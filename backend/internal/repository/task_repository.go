@@ -179,6 +179,7 @@ func (tr *TaskRepository) getByID(ctx context.Context, q *queries.Queries, id uu
 		ProjectColumnId: result.TaskProjectColumnID,
 		Priority:        domain.TaskPriority(result.TaskPriority),
 		Order:           result.TaskOrder,
+		Version:         int(result.TaskVersion),
 		CreatedAt:       result.TaskCreatedAt.Time,
 		UpdatedAt:       result.TaskUpdatedAt.Time,
 	}
@@ -301,6 +302,7 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 			ProjectColumnId: result.ProjectColumnID,
 			Priority:        domain.TaskPriority(result.Priority),
 			Order:           result.TaskOrder,
+			Version:         int(result.Version),
 			CreatedAt:       result.CreatedAt.Time,
 			UpdatedAt:       result.UpdatedAt.Time,
 			ProjectColumn: mapProjectColumn(
@@ -378,7 +380,7 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 	return &paginated, nil
 }
 
-func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task, msgs ...outbox.Message) error {
+func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task, buildEvents func(*domain.Task) []outbox.Message) error {
 	q := queries.New(tr.pool)
 
 	tx, err := tr.pool.Begin(ctx)
@@ -468,13 +470,18 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task, msgs ..
 		}
 	}
 
-	err = qtx.UpdateTask(ctx, params)
+	updated, err := qtx.UpdateTask(ctx, params)
 	if err != nil {
 		return err
 	}
 
-	if len(msgs) > 0 {
-		if err := outbox.Enqueue(ctx, tx, msgs...); err != nil {
+	// The version and updated_at are assigned by the database, so reflect the
+	// freshly-persisted values on the task before building the outbox event.
+	task.Version = int(updated.Version)
+	task.UpdatedAt = updated.UpdatedAt.Time
+
+	if buildEvents != nil {
+		if err := outbox.Enqueue(ctx, tx, buildEvents(task)...); err != nil {
 			return err
 		}
 	}
@@ -771,6 +778,7 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 			ProjectColumnId: result.ProjectColumnID,
 			Priority:        domain.TaskPriority(result.Priority),
 			Order:           result.TaskOrder,
+			Version:         int(result.Version),
 			CreatedAt:       result.CreatedAt.Time,
 			UpdatedAt:       result.UpdatedAt.Time,
 			ProjectColumn: mapProjectColumn(
@@ -885,6 +893,7 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 			ProjectColumnId: result.ProjectColumnID,
 			Priority:        domain.TaskPriority(result.Priority),
 			Order:           result.TaskOrder,
+			Version:         int(result.Version),
 			CreatedAt:       result.CreatedAt.Time,
 			UpdatedAt:       result.UpdatedAt.Time,
 			AuthorId:        result.AuthorID,

@@ -72,11 +72,11 @@ func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid
 	return args.Get(0).(*utils.CursorPaginated[domain.Task]), args.Error(1)
 }
 
-func (m *mockTaskRepository) Update(ctx context.Context, task *domain.Task, msgs ...outbox.Message) error {
+func (m *mockTaskRepository) Update(ctx context.Context, task *domain.Task, buildEvents func(*domain.Task) []outbox.Message) error {
 	args := m.Called(ctx, task)
 	err := args.Error(0)
-	if err == nil {
-		m.builtEvents = append(m.builtEvents, msgs...)
+	if err == nil && buildEvents != nil {
+		m.builtEvents = append(m.builtEvents, buildEvents(task)...)
 	}
 	return err
 }
