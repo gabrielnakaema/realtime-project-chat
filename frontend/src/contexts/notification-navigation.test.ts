@@ -52,6 +52,7 @@ describe('getNotificationNavigationTarget', () => {
           updated_at: '',
           priority: 'medium',
           order: 'a0',
+          version: 0,
           responsible_id: null,
           due_date: null,
           done_at: null,

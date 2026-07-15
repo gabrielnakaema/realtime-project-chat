@@ -21,6 +21,7 @@ const createTask = (id: string, order: string, updatedAt: string): Task => ({
   updated_at: updatedAt,
   priority: 'medium',
   order,
+  version: 0,
   responsible_id: null,
   due_date: null,
   done_at: null,

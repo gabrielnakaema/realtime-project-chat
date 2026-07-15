@@ -30,6 +30,7 @@ export interface Task {
   updated_at: string;
   priority: TaskPriority;
   order: string;
+  version: number;
   responsible_id: string | null;
   due_date: string | null;
   done_at: string | null;

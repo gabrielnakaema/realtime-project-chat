@@ -46,7 +46,6 @@ export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
           afterTaskId: tasksLength > 0 ? tasks[tasksLength - 1].id : null,
           projectId: column.project_id,
           projectColumnId: column.columnId,
-          projectColumnIds: [column.columnId],
           taskId: sourceTaskId,
         });
       }
@@ -78,7 +77,6 @@ export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
           afterTaskId: task.id,
           projectId: task.project_id,
           projectColumnId: task.project_column_id,
-          projectColumnIds: [task.project_column_id, column.columnId],
           taskId: droppedTaskId,
         });
       }
@@ -90,7 +88,6 @@ export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
             afterTaskId: task.id,
             projectId: task.project_id,
             projectColumnId: task.project_column_id,
-            projectColumnIds: [task.project_column_id, column.columnId],
             taskId: droppedTaskId,
           });
         } else {
@@ -98,7 +95,6 @@ export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
             afterTaskId: null,
             projectId: column.project_id,
             projectColumnId: column.columnId,
-            projectColumnIds: [column.columnId],
             taskId: droppedTaskId,
           });
         }

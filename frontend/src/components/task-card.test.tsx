@@ -46,6 +46,7 @@ const task: Task = {
   updated_at: '2026-06-05T10:00:00.000Z',
   priority: 'high',
   order: '1',
+  version: 0,
   responsible_id: null,
   due_date: null,
   done_at: null,

@@ -51,6 +51,7 @@ const createTaskActivity = (actionOrigin?: TaskProjectActivity['action_origin'])
     updated_at: '2026-06-03T10:00:00.000Z',
     priority: 'medium',
     order: 'a0',
+    version: 0,
     responsible_id: null,
     due_date: null,
     done_at: null,

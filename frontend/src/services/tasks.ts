@@ -242,7 +242,6 @@ interface MoveTaskRequest {
   taskId: string;
   projectId: string;
   projectColumnId: string;
-  projectColumnIds: string[];
   afterTaskId: string | null;
 }
 

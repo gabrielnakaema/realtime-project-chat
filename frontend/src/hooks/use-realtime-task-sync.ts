@@ -1,14 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import { useSocket } from './use-socket';
-import {
-  adjustCountCache,
-  buildColumnQueryKey,
-  findTaskInColumnCaches,
-  insertTaskAtCorrectPosition,
-  removeTaskFromColumn,
-  updateTaskInColumn,
-} from './task-cache-helpers';
+import { buildColumnQueryKey, reconcileTaskInBoard } from './task-cache-helpers';
 import type { SocketEvent } from '@/types/websocket';
 import { isProjectMembershipEvent } from '@/types/websocket';
 import { projectQueryKeys, taskQueryKeys } from '@/services/query-keys';
@@ -34,47 +27,13 @@ export const useRealtimeTaskSync = (projectId: string, projectColumnIds: string[
     }
 
     if (event.type === 'task_created') {
-      const task = event.data;
-      insertTaskAtCorrectPosition(queryClient, projectId, task.project_column_id, task);
-      adjustCountCache(queryClient, projectId, projectColumnIds, { [task.project_column_id]: 1 });
+      reconcileTaskInBoard(queryClient, projectId, event.data);
       return;
     }
 
     if (event.type === 'task_updated') {
       const { task, previous_project_column_id } = event.data;
-      const nextColumn = task.project_column_id;
-      const found = findTaskInColumnCaches(queryClient, projectId, projectColumnIds, task.id);
-
-      if (task.archived_at) {
-        const archivedColumn = previous_project_column_id ?? found?.columnId ?? nextColumn;
-
-        removeTaskFromColumn(queryClient, projectId, archivedColumn, task.id);
-        adjustCountCache(queryClient, projectId, projectColumnIds, { [archivedColumn]: -1 });
-        return;
-      }
-
-      if (!previous_project_column_id) {
-        if (!found) {
-          insertTaskAtCorrectPosition(queryClient, projectId, nextColumn, task);
-          adjustCountCache(queryClient, projectId, projectColumnIds, { [nextColumn]: 1 });
-          return;
-        }
-
-        if (found.columnId === nextColumn) {
-          updateTaskInColumn(queryClient, projectId, nextColumn, task);
-          return;
-        }
-
-        removeTaskFromColumn(queryClient, projectId, found.columnId, task.id);
-        insertTaskAtCorrectPosition(queryClient, projectId, nextColumn, task);
-        adjustCountCache(queryClient, projectId, projectColumnIds, { [found.columnId]: -1, [nextColumn]: 1 });
-        return;
-      }
-
-      const prevColumn = previous_project_column_id;
-      removeTaskFromColumn(queryClient, projectId, prevColumn, task.id);
-      insertTaskAtCorrectPosition(queryClient, projectId, nextColumn, task);
-      adjustCountCache(queryClient, projectId, projectColumnIds, { [prevColumn]: -1, [nextColumn]: 1 });
+      reconcileTaskInBoard(queryClient, projectId, task, { previousColumnId: previous_project_column_id });
     }
   });
 

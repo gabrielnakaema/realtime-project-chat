@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { findTaskInColumnCaches, insertTaskAtCorrectPosition, removeTaskFromColumn } from './task-cache-helpers';
+import { findTaskInBoardCaches, reconcileTaskInBoard } from './task-cache-helpers';
 import { taskQueryKeys } from '@/services/query-keys';
 import { moveTask } from '@/services/tasks';
 
@@ -9,30 +9,28 @@ export const useMoveTask = () => {
   return useMutation({
     mutationFn: moveTask,
     onMutate: async (variables) => {
-      const projectColumnIds = variables.projectColumnIds;
-      const found = findTaskInColumnCaches(queryClient, variables.projectId, projectColumnIds, variables.taskId);
-      if (!found || found.columnId === variables.projectColumnId) return;
+      const found = findTaskInBoardCaches(queryClient, variables.projectId, variables.taskId);
+      if (!found) return;
 
       const { task: taskSnapshot, columnId: sourceColumnId } = found;
 
       await queryClient.cancelQueries({ queryKey: taskQueryKeys._allGrouped() });
 
-      removeTaskFromColumn(queryClient, variables.projectId, sourceColumnId, variables.taskId);
-      insertTaskAtCorrectPosition(queryClient, variables.projectId, variables.projectColumnId, {
-        ...taskSnapshot,
-        project_column_id: variables.projectColumnId,
-      });
+      reconcileTaskInBoard(
+        queryClient,
+        variables.projectId,
+        { ...taskSnapshot, project_column_id: variables.projectColumnId },
+        { force: true },
+      );
 
       return { taskSnapshot, sourceColumnId };
     },
     onError: (_err, variables, context) => {
       if (!context) return;
-      const { taskSnapshot, sourceColumnId } = context;
-      removeTaskFromColumn(queryClient, variables.projectId, variables.projectColumnId, variables.taskId);
-      insertTaskAtCorrectPosition(queryClient, variables.projectId, sourceColumnId, taskSnapshot);
+      reconcileTaskInBoard(queryClient, variables.projectId, context.taskSnapshot, { force: true });
     },
     onSuccess: (updatedTask, variables) => {
-      insertTaskAtCorrectPosition(queryClient, variables.projectId, variables.projectColumnId, updatedTask);
+      reconcileTaskInBoard(queryClient, variables.projectId, updatedTask);
     },
   });
 };

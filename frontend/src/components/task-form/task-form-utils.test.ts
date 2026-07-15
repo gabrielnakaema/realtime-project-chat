@@ -15,6 +15,7 @@ const createTask = (overrides: Partial<Task> = {}): Task => ({
   updated_at: '2026-06-08T00:00:00Z',
   priority: 'medium',
   order: '001',
+  version: 0,
   responsible_id: null,
   due_date: '2026-06-15T12:00:00Z',
   done_at: null,
