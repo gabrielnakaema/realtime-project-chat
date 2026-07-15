@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -19,7 +20,7 @@ type mockTaskCommentRepository struct {
 	mock.Mock
 }
 
-func (m *mockTaskCommentRepository) Create(ctx context.Context, comment *domain.TaskComment, parentCommentID *uuid.UUID) error {
+func (m *mockTaskCommentRepository) Create(ctx context.Context, comment *domain.TaskComment, parentCommentID *uuid.UUID, buildEvents func(*domain.TaskComment) []outbox.Message) error {
 	args := m.Called(ctx, comment, parentCommentID)
 	return args.Error(0)
 }
@@ -223,8 +224,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 			tt.mockSetup(mockCommentRepo, mockTaskRepo, mockProjectRepo, mockUserRepo)
 
-			mockPublisher := &mockPublisher{}
-			svc := service.NewTaskCommentService(mockCommentRepo, mockTaskRepo, mockProjectRepo, mockUserRepo, mockPublisher)
+			svc := service.NewTaskCommentService(mockCommentRepo, mockTaskRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			comment, err := svc.Create(ctx, tt.request)
@@ -413,8 +413,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 			tt.mockSetup(mockCommentRepo, mockTaskRepo, mockProjectRepo)
 
-			mockPublisher := &mockPublisher{}
-			svc := service.NewTaskCommentService(mockCommentRepo, mockTaskRepo, mockProjectRepo, mockUserRepo, mockPublisher)
+			svc := service.NewTaskCommentService(mockCommentRepo, mockTaskRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			comments, err := svc.ListByTaskID(ctx, tt.request)

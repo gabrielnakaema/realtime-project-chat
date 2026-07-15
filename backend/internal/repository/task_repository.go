@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/queries"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -48,7 +49,7 @@ func compatibilityTaskStatus(projectColumnName string, archivedAt *time.Time) do
 	return domain.TaskStatus(strings.ToLower(projectColumnName))
 }
 
-func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
+func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task, buildEvents func(*domain.Task) []outbox.Message) error {
 	q := queries.New(tr.pool)
 	actionOrigin := domain.ActionOriginFromContext(ctx)
 
@@ -146,12 +147,20 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task) error {
 		}
 	}
 
+	if buildEvents != nil {
+		if err := outbox.Enqueue(ctx, tx, buildEvents(task)...); err != nil {
+			return err
+		}
+	}
+
 	return tx.Commit(ctx)
 }
 
 func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error) {
-	q := queries.New(tr.pool)
+	return tr.getByID(ctx, queries.New(tr.pool), id)
+}
 
+func (tr *TaskRepository) getByID(ctx context.Context, q *queries.Queries, id uuid.UUID) (*domain.Task, error) {
 	result, err := q.GetTaskById(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -369,7 +378,7 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 	return &paginated, nil
 }
 
-func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
+func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task, msgs ...outbox.Message) error {
 	q := queries.New(tr.pool)
 
 	tx, err := tr.pool.Begin(ctx)
@@ -462,6 +471,12 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task) error {
 	err = qtx.UpdateTask(ctx, params)
 	if err != nil {
 		return err
+	}
+
+	if len(msgs) > 0 {
+		if err := outbox.Enqueue(ctx, tx, msgs...); err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit(ctx)
@@ -627,7 +642,7 @@ func (tr *TaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.UUI
 	return &task, nil
 }
 
-func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID) (*domain.Task, error) {
+func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error) {
 	q := queries.New(tr.pool)
 	tx, err := tr.pool.Begin(ctx)
 	if err != nil {
@@ -659,12 +674,9 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 		return nil, err
 	}
 
-	err = tx.Commit(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	task, err = tr.GetById(ctx, result.ID)
+	// Reload within the same transaction so the outbox event carries the full,
+	// freshly-moved task and commits atomically with the move.
+	movedTask, err := tr.getByID(ctx, qtx, result.ID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.NotFoundError("task not found")
@@ -672,7 +684,17 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 		return nil, err
 	}
 
-	return task, nil
+	if buildEvents != nil {
+		if err := outbox.Enqueue(ctx, tx, buildEvents(movedTask)...); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return movedTask, nil
 }
 
 func (tr *TaskRepository) CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error) {

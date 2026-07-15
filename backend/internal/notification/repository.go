@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/queries"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -25,19 +27,18 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	}
 }
 
-func (nr *Repository) CreateMany(ctx context.Context, notifications []domain.Notification) ([]uuid.UUID, error) {
+func (nr *Repository) CreateManyAndEnqueue(ctx context.Context, notifications []domain.Notification) error {
 	if len(notifications) == 0 {
-		return []uuid.UUID{}, nil
+		return nil
 	}
 
 	tx, err := nr.pool.Begin(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer tx.Rollback(ctx)
 
-	q := queries.New(nr.pool)
-	qtx := q.WithTx(tx)
+	qtx := queries.New(tx)
 
 	ids := make([]uuid.UUID, 0, len(notifications))
 	for _, notification := range notifications {
@@ -53,17 +54,31 @@ func (nr *Repository) CreateMany(ctx context.Context, notifications []domain.Not
 			UpdatedAt:     pgtype.Timestamptz{Time: notification.UpdatedAt, Valid: true},
 		})
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		ids = append(ids, id)
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
+	created, err := nr.listByIDs(ctx, qtx, ids)
+	if err != nil {
+		return err
 	}
 
-	return ids, nil
+	messages := make([]outbox.Message, 0, len(created))
+	for i := range created {
+		messages = append(messages, outbox.Message{
+			Topic:       events.NotificationCreated,
+			AggregateID: created[i].UserId,
+			Payload:     &events.NotificationCreatedPayload{Notification: created[i]},
+		})
+	}
+
+	if err := outbox.Enqueue(ctx, tx, messages...); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (nr *Repository) ListByUserID(ctx context.Context, userId uuid.UUID, beforeCreatedAt time.Time, beforeId uuid.UUID, limit int32) (*utils.CursorPaginated[domain.Notification], error) {
@@ -102,11 +117,14 @@ func (nr *Repository) ListByUserID(ctx context.Context, userId uuid.UUID, before
 }
 
 func (nr *Repository) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]domain.Notification, error) {
+	return nr.listByIDs(ctx, queries.New(nr.pool), ids)
+}
+
+func (nr *Repository) listByIDs(ctx context.Context, q *queries.Queries, ids []uuid.UUID) ([]domain.Notification, error) {
 	if len(ids) == 0 {
 		return []domain.Notification{}, nil
 	}
 
-	q := queries.New(nr.pool)
 	rows, err := q.ListNotificationsByIds(ctx, ids)
 	if err != nil {
 		return nil, err

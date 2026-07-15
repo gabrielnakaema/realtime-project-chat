@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/repository"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
@@ -21,23 +21,11 @@ type mockProjectRepository struct {
 	mock.Mock
 }
 
-type mockPublisher struct {
-	mock.Mock
-}
-
 type mockActivityRepository struct {
 	mock.Mock
 }
 
-func (m *mockPublisher) Publish(ctx context.Context, topic events.Topic, payload events.Payload) error {
-	if len(m.ExpectedCalls) == 0 {
-		return nil
-	}
-
-	return m.Called(ctx, topic, payload).Error(0)
-}
-
-func (m *mockProjectRepository) Create(ctx context.Context, project *domain.Project) error {
+func (m *mockProjectRepository) Create(ctx context.Context, project *domain.Project, buildEvents func() []outbox.Message) error {
 	args := m.Called(ctx, project)
 	if args.Get(0) == nil {
 		return args.Error(0)
@@ -69,12 +57,12 @@ func (m *mockProjectRepository) ListByUserId(ctx context.Context, userId uuid.UU
 	return args.Get(0).([]domain.Project), args.Error(1)
 }
 
-func (m *mockProjectRepository) UpdateWithColumns(ctx context.Context, params repository.UpdateProjectWithColumnsParams) error {
+func (m *mockProjectRepository) UpdateWithColumns(ctx context.Context, params repository.UpdateProjectWithColumnsParams, buildEvents func() []outbox.Message) error {
 	args := m.Called(ctx, params)
 	return args.Error(0)
 }
 
-func (m *mockProjectRepository) MarkUpdatedAt(ctx context.Context, projectId uuid.UUID) error {
+func (m *mockProjectRepository) MarkUpdatedAt(ctx context.Context, projectId uuid.UUID, msgs ...outbox.Message) error {
 	args := m.Called(ctx, projectId)
 	if args.Get(0) == nil {
 		return args.Error(0)
@@ -98,7 +86,7 @@ func (m *mockProjectRepository) GetColumnById(ctx context.Context, id uuid.UUID)
 	return args.Get(0).(*domain.ProjectColumn), args.Error(1)
 }
 
-func (m *mockProjectRepository) CreateMember(ctx context.Context, member *domain.ProjectMember) error {
+func (m *mockProjectRepository) CreateMember(ctx context.Context, member *domain.ProjectMember, buildEvents func() []outbox.Message) error {
 	args := m.Called(ctx, member)
 	if args.Get(0) == nil {
 		return args.Error(0)
@@ -106,7 +94,7 @@ func (m *mockProjectRepository) CreateMember(ctx context.Context, member *domain
 	return args.Error(0)
 }
 
-func (m *mockProjectRepository) RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) error {
+func (m *mockProjectRepository) RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID, msgs ...outbox.Message) error {
 	args := m.Called(ctx, projectId, userId)
 	if args.Get(0) == nil {
 		return args.Error(0)
@@ -209,10 +197,9 @@ func TestProjectService_Create(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
-			mockPublisher := &mockPublisher{}
 			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo, mockUserRepo)
-			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockActivityRepo)
 			ctx := context.Background()
 
 			project, err := service.Create(ctx, tt.request)
@@ -325,10 +312,9 @@ func TestProjectService_GetById(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
-			mockPublisher := &mockPublisher{}
 			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo, mockUserRepo)
-			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockActivityRepo)
 			ctx := context.Background()
 
 			project, err := service.GetById(ctx, tt.id, tt.userId)
@@ -415,11 +401,10 @@ func TestProjectService_ListByUserId(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
-			mockPublisher := &mockPublisher{}
 			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo, mockUserRepo)
 
-			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockActivityRepo)
 			ctx := context.Background()
 
 			projects, err := service.ListByUserId(ctx, tt.request)
@@ -650,11 +635,10 @@ func TestProjectService_Update(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
-			mockPublisher := &mockPublisher{}
 			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo, mockUserRepo)
 
-			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockActivityRepo)
 			ctx := context.Background()
 
 			project, err := service.Update(ctx, tt.request)
@@ -818,11 +802,10 @@ func TestProjectService_UpdateColumn(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
-			mockPublisher := &mockPublisher{}
 			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo)
 
-			svc := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
+			svc := service.NewProjectService(mockRepo, mockUserRepo, mockActivityRepo)
 
 			column, err := svc.UpdateColumn(context.Background(), tt.request)
 
@@ -1028,11 +1011,10 @@ func TestProjectService_CreateMember(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
-			mockPublisher := &mockPublisher{}
 			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo, mockUserRepo)
 
-			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockActivityRepo)
 			ctx := context.Background()
 
 			member, err := service.CreateMember(ctx, tt.request)
@@ -1229,11 +1211,10 @@ func TestProjectService_RemoveMember(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
-			mockPublisher := &mockPublisher{}
 			mockActivityRepo := &mockActivityRepository{}
 			tt.mockSetup(mockRepo, mockUserRepo)
 
-			service := service.NewProjectService(mockRepo, mockUserRepo, mockPublisher, mockActivityRepo)
+			service := service.NewProjectService(mockRepo, mockUserRepo, mockActivityRepo)
 			ctx := context.Background()
 
 			err := service.RemoveMember(ctx, tt.request)

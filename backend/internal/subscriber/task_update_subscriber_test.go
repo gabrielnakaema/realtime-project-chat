@@ -2,6 +2,7 @@ package subscriber
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -63,7 +64,7 @@ func TestTaskUpdateSubscriberHandleTaskUpdateEvents_SkipsPoisonMessages(t *testi
 			User: domain.User{Id: userID},
 		}
 
-		bytes, err := payload.ToMessage()
+		bytes, err := json.Marshal(payload)
 		assert.NoError(t, err)
 
 		err = sub.handleTaskUpdateEvents(context.Background(), Message{
@@ -88,7 +89,7 @@ func TestTaskUpdateSubscriberHandleTaskUpdateEvents_SkipsPoisonMessages(t *testi
 			User:         domain.User{Id: userID},
 		}
 
-		bytes, err := payload.ToMessage()
+		bytes, err := json.Marshal(payload)
 		assert.NoError(t, err)
 
 		err = sub.handleTaskUpdateEvents(context.Background(), Message{

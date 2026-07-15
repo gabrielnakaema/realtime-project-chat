@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,8 @@ type Config struct {
 	InternalGRPCListenAddress string
 	AuthorizationGRPCTarget   string
 	RoomAuthorizationTimeout  time.Duration
+	OutboxPollInterval        time.Duration
+	OutboxBatchSize           int32
 }
 
 func New() (*Config, error) {
@@ -36,6 +39,22 @@ func New() (*Config, error) {
 		return nil, fmt.Errorf("ROOM_AUTHORIZATION_TIMEOUT must be greater than zero")
 	}
 
+	outboxPollInterval, err := time.ParseDuration(getEnv("OUTBOX_POLL_INTERVAL", "500ms"))
+	if err != nil {
+		return nil, fmt.Errorf("parse OUTBOX_POLL_INTERVAL: %w", err)
+	}
+	if outboxPollInterval <= 0 {
+		return nil, fmt.Errorf("OUTBOX_POLL_INTERVAL must be greater than zero")
+	}
+
+	outboxBatchSize, err := strconv.Atoi(getEnv("OUTBOX_BATCH_SIZE", "100"))
+	if err != nil {
+		return nil, fmt.Errorf("parse OUTBOX_BATCH_SIZE: %w", err)
+	}
+	if outboxBatchSize <= 0 {
+		return nil, fmt.Errorf("OUTBOX_BATCH_SIZE must be greater than zero")
+	}
+
 	config := Config{
 		Port:                      port,
 		DSN:                       getEnv("DB_DSN", ""),
@@ -46,6 +65,8 @@ func New() (*Config, error) {
 		InternalGRPCListenAddress: getEnv("INTERNAL_GRPC_LISTEN_ADDRESS", "127.0.0.1:3334"),
 		AuthorizationGRPCTarget:   getEnv("AUTHORIZATION_GRPC_TARGET", "127.0.0.1:3334"),
 		RoomAuthorizationTimeout:  authorizationTimeout,
+		OutboxPollInterval:        outboxPollInterval,
+		OutboxBatchSize:           int32(outboxBatchSize),
 	}
 
 	return &config, nil

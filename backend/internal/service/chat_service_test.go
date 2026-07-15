@@ -8,15 +8,18 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockChatRepository struct {
 	mock.Mock
+	builtEvents []outbox.Message
 }
 
 func (m *mockChatRepository) Create(ctx context.Context, chat *domain.Chat) error {
@@ -31,16 +34,28 @@ func (m *mockChatRepository) GetByProjectId(ctx context.Context, projectId uuid.
 	return args.Get(0).(*domain.Chat), args.Error(1)
 }
 
-func (m *mockChatRepository) CreateMember(ctx context.Context, member *domain.ChatMember) error {
-	return m.Called(ctx, member).Error(0)
+func (m *mockChatRepository) CreateMember(ctx context.Context, member *domain.ChatMember, buildEvents func() []outbox.Message) error {
+	err := m.Called(ctx, member).Error(0)
+	if err == nil && buildEvents != nil {
+		m.builtEvents = append(m.builtEvents, buildEvents()...)
+	}
+	return err
 }
 
-func (m *mockChatRepository) DeleteMember(ctx context.Context, member *domain.ChatMember) error {
-	return m.Called(ctx, member).Error(0)
+func (m *mockChatRepository) DeleteMember(ctx context.Context, member *domain.ChatMember, msgs ...outbox.Message) error {
+	err := m.Called(ctx, member).Error(0)
+	if err == nil {
+		m.builtEvents = append(m.builtEvents, msgs...)
+	}
+	return err
 }
 
-func (m *mockChatRepository) CreateMessage(ctx context.Context, message *domain.ChatMessage) error {
-	return m.Called(ctx, message).Error(0)
+func (m *mockChatRepository) CreateMessage(ctx context.Context, message *domain.ChatMessage, buildEvents func() []outbox.Message) error {
+	err := m.Called(ctx, message).Error(0)
+	if err == nil && buildEvents != nil {
+		m.builtEvents = append(m.builtEvents, buildEvents()...)
+	}
+	return err
 }
 
 func (m *mockChatRepository) UpdateMemberLastSeenAt(ctx context.Context, member *domain.ChatMember) error {
@@ -95,8 +110,12 @@ func (m *mockChatRepository) GetMessageById(ctx context.Context, id uuid.UUID) (
 	return args.Get(0).(*domain.ChatMessage), args.Error(1)
 }
 
-func (m *mockChatRepository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId uuid.UUID, readAt time.Time, message *domain.ChatMessage) error {
-	return m.Called(ctx, chatId, userId, readAt, message).Error(0)
+func (m *mockChatRepository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId uuid.UUID, readAt time.Time, message *domain.ChatMessage, msgs ...outbox.Message) error {
+	err := m.Called(ctx, chatId, userId, readAt, message).Error(0)
+	if err == nil {
+		m.builtEvents = append(m.builtEvents, msgs...)
+	}
+	return err
 }
 
 func (m *mockChatRepository) ListMessageReads(ctx context.Context, messageId uuid.UUID) ([]domain.ChatMessageRead, error) {
@@ -119,11 +138,11 @@ func (m *mockChatUserRepository) GetById(ctx context.Context, id uuid.UUID) (*do
 	return args.Get(0).(*domain.User), args.Error(1)
 }
 
-func newChatService(chatRepo *mockChatRepository, userRepo *mockChatUserRepository, pub *mockPublisher) *service.ChatService {
+func newChatService(chatRepo *mockChatRepository, userRepo *mockChatUserRepository) *service.ChatService {
 	chatRepo.On("GetUnreadSummary", mock.Anything, mock.Anything, mock.Anything).
 		Return(&domain.ChatUnreadSummary{UnreadCount: 0, HasMoreUnread: false}, nil).
 		Maybe()
-	return service.NewChatService(chatRepo, userRepo, pub)
+	return service.NewChatService(chatRepo, userRepo)
 }
 
 func TestChatService_GetOrCreateGeneralChat(t *testing.T) {
@@ -244,11 +263,10 @@ func TestChatService_GetOrCreateGeneralChat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			chatRepo := &mockChatRepository{}
 			userRepo := &mockChatUserRepository{}
-			pub := &mockPublisher{}
 			tt.chatRepoSetup(chatRepo)
 			tt.userRepoSetup(userRepo)
 
-			svc := newChatService(chatRepo, userRepo, pub)
+			svc := newChatService(chatRepo, userRepo)
 			chat, err := svc.GetOrCreateGeneralChat(context.Background(), tt.currentUserId, tt.targetUserIds)
 
 			if tt.shouldSucceed {
@@ -323,10 +341,9 @@ func TestChatService_ListGeneralChats(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			chatRepo := &mockChatRepository{}
 			userRepo := &mockChatUserRepository{}
-			pub := &mockPublisher{}
 			tt.chatRepoSetup(chatRepo)
 
-			svc := newChatService(chatRepo, userRepo, pub)
+			svc := newChatService(chatRepo, userRepo)
 			chats, err := svc.ListGeneralChats(context.Background(), tt.userId)
 
 			if tt.shouldSucceed {
@@ -422,10 +439,9 @@ func TestChatService_GetByProjectId(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			chatRepo := &mockChatRepository{}
 			userRepo := &mockChatUserRepository{}
-			pub := &mockPublisher{}
 			tt.chatRepoSetup(chatRepo)
 
-			svc := newChatService(chatRepo, userRepo, pub)
+			svc := newChatService(chatRepo, userRepo)
 			chat, err := svc.GetByProjectId(context.Background(), tt.projectId, tt.userId)
 
 			if tt.shouldSucceed {
@@ -525,10 +541,9 @@ func TestChatService_GetById(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			chatRepo := &mockChatRepository{}
 			userRepo := &mockChatUserRepository{}
-			pub := &mockPublisher{}
 			tt.chatRepoSetup(chatRepo)
 
-			svc := newChatService(chatRepo, userRepo, pub)
+			svc := newChatService(chatRepo, userRepo)
 			chat, err := svc.GetById(context.Background(), tt.chatId, tt.userId)
 
 			if tt.shouldSucceed {
@@ -669,10 +684,9 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			chatRepo := &mockChatRepository{}
 			userRepo := &mockChatUserRepository{}
-			pub := &mockPublisher{}
 			tt.chatRepoSetup(chatRepo)
 
-			svc := newChatService(chatRepo, userRepo, pub)
+			svc := newChatService(chatRepo, userRepo)
 			result, err := svc.ListMessagesByChatId(context.Background(), tt.request)
 
 			if tt.shouldSucceed {
@@ -801,7 +815,6 @@ func TestChatService_MarkChatRead(t *testing.T) {
 		name          string
 		request       service.MarkChatReadRequest
 		chatRepoSetup func(*mockChatRepository)
-		pubSetup      func(*mockPublisher)
 		shouldSucceed bool
 		expectedCode  domain.ErrorCode
 		expectPublish bool
@@ -864,11 +877,6 @@ func TestChatService_MarkChatRead(t *testing.T) {
 				r.On("GetMessageById", mock.Anything, messageId).Return(message, nil)
 				r.On("MarkReadUpTo", mock.Anything, chatId, userId, mock.AnythingOfType("time.Time"), message).Return(nil)
 			},
-			pubSetup: func(p *mockPublisher) {
-				p.On("Publish", mock.Anything, events.ChatMessageRead, mock.MatchedBy(func(payload *events.ChatMessageReadPayload) bool {
-					return payload.ChatID == chatId && payload.MessageID == messageId && payload.Read.UserId == userId
-				})).Return(nil).Once()
-			},
 			shouldSucceed: true,
 			expectPublish: true,
 		},
@@ -878,31 +886,34 @@ func TestChatService_MarkChatRead(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			chatRepo := &mockChatRepository{}
 			userRepo := &mockChatUserRepository{}
-			pub := &mockPublisher{}
 			tt.chatRepoSetup(chatRepo)
-			if tt.pubSetup != nil {
-				tt.pubSetup(pub)
-			}
 
-			svc := newChatService(chatRepo, userRepo, pub)
+			svc := newChatService(chatRepo, userRepo)
 			err := svc.MarkChatRead(context.Background(), tt.request)
 
 			if tt.shouldSucceed {
 				assert.NoError(t, err)
-				if !tt.expectPublish {
-					pub.AssertNotCalled(t, "Publish", mock.Anything, events.ChatMessageRead, mock.Anything)
-				}
 			} else {
 				assert.Error(t, err)
 				var domainErr domain.DomainError
 				if errors.As(err, &domainErr) {
 					assert.Equal(t, tt.expectedCode, domainErr.Code)
 				}
-				pub.AssertNotCalled(t, "Publish", mock.Anything, events.ChatMessageRead, mock.Anything)
+			}
+
+			if tt.expectPublish {
+				require.Len(t, chatRepo.builtEvents, 1)
+				assert.Equal(t, events.ChatMessageRead, chatRepo.builtEvents[0].Topic)
+				payload, ok := chatRepo.builtEvents[0].Payload.(*events.ChatMessageReadPayload)
+				require.True(t, ok)
+				assert.Equal(t, chatId, payload.ChatID)
+				assert.Equal(t, messageId, payload.MessageID)
+				assert.Equal(t, userId, payload.Read.UserId)
+			} else {
+				assert.Empty(t, chatRepo.builtEvents)
 			}
 
 			chatRepo.AssertExpectations(t)
-			pub.AssertExpectations(t)
 		})
 	}
 }
@@ -1000,10 +1011,9 @@ func TestChatService_ListMessageReads(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			chatRepo := &mockChatRepository{}
 			userRepo := &mockChatUserRepository{}
-			pub := &mockPublisher{}
 			tt.chatRepoSetup(chatRepo)
 
-			svc := newChatService(chatRepo, userRepo, pub)
+			svc := newChatService(chatRepo, userRepo)
 			result, err := svc.ListMessageReads(context.Background(), tt.request)
 
 			if tt.shouldSucceed {

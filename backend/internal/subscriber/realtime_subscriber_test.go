@@ -2,6 +2,7 @@ package subscriber
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"testing"
 
@@ -50,7 +51,7 @@ func TestRealtimeSubscriberDeliversEventsToWebsocketNotifier(t *testing.T) {
 	sub := &RealtimeSubscriber{logger: slog.Default(), notifier: notifier}
 
 	messagePayload := &events.ChatMessageCreatedPayload{ChatMessage: domain.ChatMessage{ChatId: chatID}}
-	messageValue, err := messagePayload.ToMessage()
+	messageValue, err := json.Marshal(messagePayload)
 	require.NoError(t, err)
 	require.NoError(t, sub.handleEvents(context.Background(), Message{Topic: events.ChatMessageCreated, Value: messageValue}))
 	require.Equal(t, chatID, notifier.message.ChatId)
@@ -59,14 +60,14 @@ func TestRealtimeSubscriberDeliversEventsToWebsocketNotifier(t *testing.T) {
 		ChatMember:    domain.ChatMember{ChatId: chatID, UserId: userID},
 		ProjectMember: domain.ProjectMember{ProjectId: projectID, UserId: userID},
 	}
-	memberValue, err := memberPayload.ToMessage()
+	memberValue, err := json.Marshal(memberPayload)
 	require.NoError(t, err)
 	require.NoError(t, sub.handleEvents(context.Background(), Message{Topic: events.ChatMemberCreated, Value: memberValue}))
 	require.Equal(t, chatID, notifier.roomID)
 	require.Equal(t, projectID, notifier.memberCreated.ProjectId)
 
 	readPayload := &events.ChatMessageReadPayload{ChatID: chatID, Read: domain.ChatMessageRead{UserId: userID}}
-	readValue, err := readPayload.ToMessage()
+	readValue, err := json.Marshal(readPayload)
 	require.NoError(t, err)
 	require.NoError(t, sub.handleEvents(context.Background(), Message{Topic: events.ChatMessageRead, Value: readValue}))
 	require.Equal(t, chatID, notifier.roomID)
@@ -76,7 +77,7 @@ func TestRealtimeSubscriberDeliversEventsToWebsocketNotifier(t *testing.T) {
 		ChatMember:    domain.ChatMember{ChatId: chatID, UserId: userID},
 		ProjectMember: domain.ProjectMember{ProjectId: projectID, UserId: userID},
 	}
-	removedValue, err := removedPayload.ToMessage()
+	removedValue, err := json.Marshal(removedPayload)
 	require.NoError(t, err)
 	require.NoError(t, sub.handleEvents(context.Background(), Message{Topic: events.ChatMemberRemoved, Value: removedValue}))
 	require.Equal(t, chatID, notifier.roomID)

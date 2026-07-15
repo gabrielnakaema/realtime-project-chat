@@ -7,6 +7,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/google/uuid"
 )
 
@@ -163,11 +164,16 @@ func (ws *Server) publishChatMemberViewed(ctx context.Context, userID uuid.UUID,
 	go func() {
 		publishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		if err := ws.publisher.Publish(publishCtx, events.ChatMemberViewed, &events.ChatMemberViewedPayload{
-			ChatMember: chatMember,
-			User:       domain.User{Id: userID},
+
+		if err := ws.enqueuer.Enqueue(publishCtx, outbox.Message{
+			Topic:       events.ChatMemberViewed,
+			AggregateID: roomID,
+			Payload: &events.ChatMemberViewedPayload{
+				ChatMember: chatMember,
+				User:       domain.User{Id: userID},
+			},
 		}); err != nil {
-			ws.logger.Error("failed to publish chat member viewed", "error", err.Error(), "user_id", userID, "room_id", roomID)
+			ws.logger.Error("failed to enqueue chat member viewed", "error", err.Error(), "user_id", userID, "room_id", roomID)
 		}
 	}()
 }

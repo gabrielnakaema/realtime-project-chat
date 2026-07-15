@@ -5,6 +5,7 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/chat"
 	chatv1 "github.com/gabrielnakaema/project-chat/internal/chat/v1"
 	"github.com/gabrielnakaema/project-chat/internal/notification"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/project"
 	projectv1 "github.com/gabrielnakaema/project-chat/internal/project/v1"
 	"github.com/gabrielnakaema/project-chat/internal/subscriber"
@@ -20,7 +21,7 @@ type App struct {
 }
 
 func New() (*App, error) {
-	rt, err := apphost.NewWithoutDB("websocket-service", "WEBSOCKET_SERVICE_PORT", "3336")
+	rt, err := apphost.New("websocket-service", "WEBSOCKET_SERVICE_PORT", "3336")
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +38,7 @@ func New() (*App, error) {
 	rt.Track(grpcConnection)
 	chatAuthorizer := chat.NewClient(chatv1.NewChatServiceClient(grpcConnection))
 	projectAuthorizer := project.NewClient(projectv1.NewProjectServiceClient(grpcConnection))
-	server := ws.NewServer(rt.Ctx, jwtProvider, rt.Logger, chatAuthorizer, projectAuthorizer, rt.Config.RoomAuthorizationTimeout, rt.Publisher)
+	server := ws.NewServer(rt.Ctx, jwtProvider, rt.Logger, chatAuthorizer, projectAuthorizer, rt.Config.RoomAuthorizationTimeout, outbox.NewPoolEnqueuer(rt.Pool))
 
 	realtimeSub, err := subscriber.NewRealtimeSubscriber(rt.Ctx, rt.Config, rt.Logger, server)
 	if err != nil {

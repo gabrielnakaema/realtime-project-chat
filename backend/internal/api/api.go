@@ -55,10 +55,10 @@ func NewApi() (*Api, error) {
 	activityRepo := repository.NewProjectActivityRepository(rt.Pool)
 	mcpAPIKeyRepo := repository.NewMCPAPIKeyRepository(rt.Pool)
 
-	projectService := service.NewProjectService(projectRepo, userRepo, rt.Publisher, activityRepo)
+	projectService := service.NewProjectService(projectRepo, userRepo, activityRepo)
 	projectHandler := handlers.NewProjectHandler(projectService)
 
-	chatService := service.NewChatService(chatRepo, userRepo, rt.Publisher)
+	chatService := service.NewChatService(chatRepo, userRepo)
 	grpcServer := NewInternalGRPCServer(chat.NewServer(chatService), project.NewServer(projectService))
 
 	chatSub, err := subscriber.NewChatSubscriber(rt.Ctx, rt.Config, rt.Logger, chatService)
@@ -89,9 +89,9 @@ func NewApi() (*Api, error) {
 	mcpAPIKeyService := service.NewMCPAPIKeyService(mcpAPIKeyRepo)
 	mcpAPIKeyHandler := handlers.NewMCPAPIKeyHandler(mcpAPIKeyService)
 
-	taskService := service.NewTaskService(taskRepo, projectRepo, userRepo, rt.Publisher)
+	taskService := service.NewTaskService(taskRepo, projectRepo, userRepo)
 	taskHandler := handlers.NewTaskHandler(taskService)
-	taskCommentService := service.NewTaskCommentService(taskCommentRepo, taskRepo, projectRepo, userRepo, rt.Publisher)
+	taskCommentService := service.NewTaskCommentService(taskCommentRepo, taskRepo, projectRepo, userRepo)
 	taskCommentHandler := handlers.NewTaskCommentHandler(taskCommentService)
 	mcpHandler := mcp.NewHandler(mcpAPIKeyService, projectService, taskService, taskCommentService)
 

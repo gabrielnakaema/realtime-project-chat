@@ -70,6 +70,15 @@ type Notification struct {
 	UpdatedAt     pgtype.Timestamptz
 }
 
+type OutboxMessage struct {
+	ID          uuid.UUID
+	Topic       string
+	AggregateID pgtype.UUID
+	Payload     []byte
+	CreatedAt   pgtype.Timestamptz
+	PublishedAt pgtype.Timestamptz
+}
+
 type Project struct {
 	ID               uuid.UUID
 	UserID           uuid.UUID

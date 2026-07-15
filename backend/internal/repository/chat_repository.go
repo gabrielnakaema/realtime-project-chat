@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/queries"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -61,22 +62,56 @@ func (cr *ChatRepository) Create(ctx context.Context, chat *domain.Chat) error {
 	return tx.Commit(ctx)
 }
 
-func (cr *ChatRepository) CreateMember(ctx context.Context, member *domain.ChatMember) error {
-	q := queries.New(cr.pool)
-	return q.CreateChatMember(ctx, queries.CreateChatMemberParams{
+func (cr *ChatRepository) CreateMember(ctx context.Context, member *domain.ChatMember, buildEvents func() []outbox.Message) error {
+	tx, err := cr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := queries.New(tx)
+
+	if err := qtx.CreateChatMember(ctx, queries.CreateChatMemberParams{
 		UserID:     member.UserId,
 		ChatID:     member.ChatId,
 		LastSeenAt: pgtype.Timestamptz{Time: member.LastSeenAt, Valid: true},
 		JoinedAt:   pgtype.Timestamptz{Time: member.JoinedAt, Valid: true},
-	})
+	}); err != nil {
+		return err
+	}
+
+	if buildEvents != nil {
+		if err := outbox.Enqueue(ctx, tx, buildEvents()...); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
-func (cr *ChatRepository) DeleteMember(ctx context.Context, member *domain.ChatMember) error {
-	q := queries.New(cr.pool)
-	return q.DeleteChatMember(ctx, queries.DeleteChatMemberParams{
+func (cr *ChatRepository) DeleteMember(ctx context.Context, member *domain.ChatMember, msgs ...outbox.Message) error {
+	tx, err := cr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := queries.New(tx)
+
+	if err := qtx.DeleteChatMember(ctx, queries.DeleteChatMemberParams{
 		UserID: member.UserId,
 		ChatID: member.ChatId,
-	})
+	}); err != nil {
+		return err
+	}
+
+	if len(msgs) > 0 {
+		if err := outbox.Enqueue(ctx, tx, msgs...); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (cr *ChatRepository) UpdateMemberLastSeenAt(ctx context.Context, member *domain.ChatMember) error {
@@ -88,7 +123,7 @@ func (cr *ChatRepository) UpdateMemberLastSeenAt(ctx context.Context, member *do
 	})
 }
 
-func (cr *ChatRepository) CreateMessage(ctx context.Context, message *domain.ChatMessage) error {
+func (cr *ChatRepository) CreateMessage(ctx context.Context, message *domain.ChatMessage, buildEvents func() []outbox.Message) error {
 	tx, err := cr.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -123,6 +158,12 @@ func (cr *ChatRepository) CreateMessage(ctx context.Context, message *domain.Cha
 	})
 	if err != nil {
 		return err
+	}
+
+	if buildEvents != nil {
+		if err := outbox.Enqueue(ctx, tx, buildEvents()...); err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit(ctx)
@@ -364,7 +405,7 @@ func (cr *ChatRepository) GetMessageById(ctx context.Context, id uuid.UUID) (*do
 	return result, nil
 }
 
-func (cr *ChatRepository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId uuid.UUID, readAt time.Time, message *domain.ChatMessage) error {
+func (cr *ChatRepository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId uuid.UUID, readAt time.Time, message *domain.ChatMessage, msgs ...outbox.Message) error {
 	tx, err := cr.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -392,6 +433,12 @@ func (cr *ChatRepository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, us
 			Column5:   message.Id,
 		})
 		if err != nil {
+			return err
+		}
+	}
+
+	if len(msgs) > 0 {
+		if err := outbox.Enqueue(ctx, tx, msgs...); err != nil {
 			return err
 		}
 	}

@@ -11,6 +11,10 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/subscriber"
 )
 
+type Notifier interface {
+	SendNotification(ctx context.Context, notification *domain.Notification) error
+}
+
 type ForwardSubscriber struct {
 	logger     *slog.Logger
 	subscriber *subscriber.Subscriber

@@ -176,7 +176,7 @@ func TestTaskService_Move(t *testing.T) {
 			}, nil)
 
 			tt.mockSetup(mockRepo, mockProjectRepo)
-			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			task, err := service.Move(ctx, tt.request)

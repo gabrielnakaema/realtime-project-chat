@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -49,8 +49,8 @@ type accessChecker interface {
 	CheckAccess(ctx context.Context, userID uuid.UUID, resourceID uuid.UUID) error
 }
 
-type publisher interface {
-	Publish(ctx context.Context, event events.Topic, data events.Payload) error
+type outboxEnqueuer interface {
+	Enqueue(ctx context.Context, msgs ...outbox.Message) error
 }
 
 type Server struct {
@@ -62,10 +62,10 @@ type Server struct {
 	chatAuthorizer       accessChecker
 	projectAuthorizer    accessChecker
 	authorizationTimeout time.Duration
-	publisher            publisher
+	enqueuer             outboxEnqueuer
 }
 
-func NewServer(ctx context.Context, tokenProvider tokenProvider, logger *slog.Logger, chatAuthorizer accessChecker, projectAuthorizer accessChecker, authorizationTimeout time.Duration, publisher publisher) *Server {
+func NewServer(ctx context.Context, tokenProvider tokenProvider, logger *slog.Logger, chatAuthorizer accessChecker, projectAuthorizer accessChecker, authorizationTimeout time.Duration, enqueuer outboxEnqueuer) *Server {
 	if authorizationTimeout <= 0 {
 		authorizationTimeout = 2 * time.Second
 	}
@@ -77,7 +77,7 @@ func NewServer(ctx context.Context, tokenProvider tokenProvider, logger *slog.Lo
 		chatAuthorizer:       chatAuthorizer,
 		projectAuthorizer:    projectAuthorizer,
 		authorizationTimeout: authorizationTimeout,
-		publisher:            publisher,
+		enqueuer:             enqueuer,
 		users:                make(map[uuid.UUID]*WsUser),
 	}
 

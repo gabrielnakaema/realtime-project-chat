@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/queries"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -35,7 +36,7 @@ func NewProjectRepository(pool *pgxpool.Pool) *ProjectRepository {
 	}
 }
 
-func (pr *ProjectRepository) Create(ctx context.Context, project *domain.Project) error {
+func (pr *ProjectRepository) Create(ctx context.Context, project *domain.Project, buildEvents func() []outbox.Message) error {
 	tx, err := pr.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -94,6 +95,12 @@ func (pr *ProjectRepository) Create(ctx context.Context, project *domain.Project
 
 		project.Columns[i].Id = statusID
 		project.Columns[i].ProjectId = project.Id
+	}
+
+	if buildEvents != nil {
+		if err := outbox.Enqueue(ctx, tx, buildEvents()...); err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit(ctx)
@@ -241,7 +248,7 @@ type UpdateProjectWithColumnsParams struct {
 	Deletions []ProjectColumnDeletion
 }
 
-func (pr *ProjectRepository) UpdateWithColumns(ctx context.Context, params UpdateProjectWithColumnsParams) error {
+func (pr *ProjectRepository) UpdateWithColumns(ctx context.Context, params UpdateProjectWithColumnsParams, buildEvents func() []outbox.Message) error {
 	tx, err := pr.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -339,11 +346,23 @@ func (pr *ProjectRepository) UpdateWithColumns(ctx context.Context, params Updat
 		}
 	}
 
+	if buildEvents != nil {
+		if err := outbox.Enqueue(ctx, tx, buildEvents()...); err != nil {
+			return err
+		}
+	}
+
 	return tx.Commit(ctx)
 }
 
-func (pr *ProjectRepository) CreateMember(ctx context.Context, member *domain.ProjectMember) error {
-	q := queries.New(pr.pool)
+func (pr *ProjectRepository) CreateMember(ctx context.Context, member *domain.ProjectMember, buildEvents func() []outbox.Message) error {
+	tx, err := pr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := queries.New(tx)
 
 	params := queries.CreateProjectMemberParams{
 		UserID:    member.UserId,
@@ -351,7 +370,7 @@ func (pr *ProjectRepository) CreateMember(ctx context.Context, member *domain.Pr
 		Role:      string(member.Role),
 	}
 
-	id, err := q.CreateProjectMember(ctx, params)
+	id, err := qtx.CreateProjectMember(ctx, params)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -367,10 +386,16 @@ func (pr *ProjectRepository) CreateMember(ctx context.Context, member *domain.Pr
 
 	member.Id = id
 
-	return nil
+	if buildEvents != nil {
+		if err := outbox.Enqueue(ctx, tx, buildEvents()...); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
-func (pr *ProjectRepository) RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) error {
+func (pr *ProjectRepository) RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID, msgs ...outbox.Message) error {
 	tx, err := pr.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -408,6 +433,12 @@ func (pr *ProjectRepository) RemoveMember(ctx context.Context, projectId uuid.UU
 		return err
 	}
 
+	if len(msgs) > 0 {
+		if err := outbox.Enqueue(ctx, tx, msgs...); err != nil {
+			return err
+		}
+	}
+
 	return tx.Commit(ctx)
 }
 
@@ -437,10 +468,26 @@ func (pr *ProjectRepository) GetMemberByUserIdAndProjectId(ctx context.Context, 
 	return &member, nil
 }
 
-func (pr *ProjectRepository) MarkUpdatedAt(ctx context.Context, projectId uuid.UUID) error {
-	q := queries.New(pr.pool)
+func (pr *ProjectRepository) MarkUpdatedAt(ctx context.Context, projectId uuid.UUID, msgs ...outbox.Message) error {
+	tx, err := pr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
 
-	return q.MarkProjectUpdatedAt(ctx, projectId)
+	qtx := queries.New(tx)
+
+	if err := qtx.MarkProjectUpdatedAt(ctx, projectId); err != nil {
+		return err
+	}
+
+	if len(msgs) > 0 {
+		if err := outbox.Enqueue(ctx, tx, msgs...); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (pr *ProjectRepository) CreateColumn(ctx context.Context, status *domain.ProjectColumn) error {

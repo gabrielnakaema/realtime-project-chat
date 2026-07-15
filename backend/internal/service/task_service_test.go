@@ -8,6 +8,7 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/gabrielnakaema/project-chat/internal/fracindex"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -18,6 +19,7 @@ import (
 
 type mockTaskRepository struct {
 	mock.Mock
+	builtEvents []outbox.Message
 }
 
 func mustGenerateTestOrder(t *testing.T, left, right string) string {
@@ -29,9 +31,13 @@ func mustGenerateTestOrder(t *testing.T, left, right string) string {
 	return key
 }
 
-func (m *mockTaskRepository) Create(ctx context.Context, task *domain.Task) error {
+func (m *mockTaskRepository) Create(ctx context.Context, task *domain.Task, buildEvents func(*domain.Task) []outbox.Message) error {
 	args := m.Called(ctx, task)
-	return args.Error(0)
+	err := args.Error(0)
+	if err == nil && buildEvents != nil {
+		m.builtEvents = append(m.builtEvents, buildEvents(task)...)
+	}
+	return err
 }
 
 func (m *mockTaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error) {
@@ -66,12 +72,13 @@ func (m *mockTaskRepository) ListByProjectId(ctx context.Context, projectId uuid
 	return args.Get(0).(*utils.CursorPaginated[domain.Task]), args.Error(1)
 }
 
-func (m *mockTaskRepository) Update(ctx context.Context, task *domain.Task) error {
+func (m *mockTaskRepository) Update(ctx context.Context, task *domain.Task, msgs ...outbox.Message) error {
 	args := m.Called(ctx, task)
-	if args.Get(0) == nil {
-		return args.Error(0)
+	err := args.Error(0)
+	if err == nil {
+		m.builtEvents = append(m.builtEvents, msgs...)
 	}
-	return args.Error(0)
+	return err
 }
 
 func (m *mockTaskRepository) CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error {
@@ -98,12 +105,16 @@ func (m *mockTaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.
 	return args.Get(0).(*domain.Task), args.Error(1)
 }
 
-func (m *mockTaskRepository) MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID) (*domain.Task, error) {
+func (m *mockTaskRepository) MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error) {
 	args := m.Called(ctx, task, userId)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*domain.Task), args.Error(1)
+	result := args.Get(0).(*domain.Task)
+	if args.Error(1) == nil && buildEvents != nil {
+		m.builtEvents = append(m.builtEvents, buildEvents(result)...)
+	}
+	return result, args.Error(1)
 }
 
 func (m *mockTaskRepository) CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error) {
@@ -341,7 +352,7 @@ func TestTaskService_Create(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 
 			tt.mockSetup(mockRepo, mockProjectRepo, mockUserRepo)
-			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			task, err := service.Create(ctx, tt.request)
@@ -408,7 +419,7 @@ func TestTaskService_FindTaskByCode(t *testing.T) {
 		}, nil)
 		taskRepo.On("GetById", mock.Anything, validTaskID).Return(validTask, nil)
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
 		task, err := svc.FindTaskByCode(context.Background(), service.FindTaskByCodeRequest{
 			ProjectId: validProjectID,
 			UserId:    validUserID,
@@ -428,7 +439,7 @@ func TestTaskService_FindTaskByCode(t *testing.T) {
 		projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
 		taskRepo.On("FindTaskRefsByProjectAndCode", mock.Anything, validProjectID, "BACKEND-5").Return([]domain.TaskDependencyRef{}, nil)
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
 		task, err := svc.FindTaskByCode(context.Background(), service.FindTaskByCodeRequest{
 			ProjectId: validProjectID,
 			UserId:    validUserID,
@@ -451,7 +462,7 @@ func TestTaskService_FindTaskByCode(t *testing.T) {
 			{Id: uuid.New(), Title: "Duplicate task", Code: "BACKEND-5"},
 		}, nil)
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
 		task, err := svc.FindTaskByCode(context.Background(), service.FindTaskByCodeRequest{
 			ProjectId: validProjectID,
 			UserId:    validUserID,
@@ -486,7 +497,7 @@ func TestTaskService_SuggestTaskCodes(t *testing.T) {
 		projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
 		taskRepo.On("SuggestTaskCodesByProjectPrefix", mock.Anything, validProjectID, "BACKEND-", 8).Return(expected, nil)
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
 		result, err := svc.SuggestTaskCodes(context.Background(), service.SuggestTaskCodesRequest{
 			ProjectId: validProjectID,
 			UserId:    validUserID,
@@ -505,7 +516,7 @@ func TestTaskService_SuggestTaskCodes(t *testing.T) {
 		projectRepo := &mockProjectRepository{}
 		userRepo := &mockUserRepository{}
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
 		result, err := svc.SuggestTaskCodes(context.Background(), service.SuggestTaskCodesRequest{
 			ProjectId: validProjectID,
 			UserId:    validUserID,
@@ -525,7 +536,7 @@ func TestTaskService_SuggestTaskCodes(t *testing.T) {
 
 		projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo, &mockPublisher{})
+		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
 		result, err := svc.SuggestTaskCodes(context.Background(), service.SuggestTaskCodesRequest{
 			ProjectId: validProjectID,
 			UserId:    uuid.New(),
@@ -568,7 +579,7 @@ func TestTaskService_GroupByColumn_DefaultStatuses(t *testing.T) {
 	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{doingStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
 	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{doneStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
 
-	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 
 	result, err := svc.GroupByColumn(context.Background(), service.GroupByColumnRequest{
 		ProjectId: validProjectId,
@@ -773,7 +784,7 @@ func TestTaskService_Update(t *testing.T) {
 			mockProjectRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
 			tt.mockSetup(mockRepo, mockProjectRepo, mockUserRepo)
-			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			task, err := service.Update(ctx, tt.request)
@@ -843,7 +854,7 @@ func TestTaskService_Update(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&taskWithCode, nil)
 		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		req := baseUpdateRequest()
 		req.Code = nil // not provided — keep existing
 
@@ -860,7 +871,7 @@ func TestTaskService_Update(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&taskWithCode, nil)
 		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		req := baseUpdateRequest()
 		empty := ""
 		req.Code = &empty
@@ -878,7 +889,7 @@ func TestTaskService_Update(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&taskWithCode, nil)
 		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		req := baseUpdateRequest()
 		newCode := "  NEW-99  "
 		req.Code = &newCode
@@ -1033,7 +1044,7 @@ func TestTaskService_Archive(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 
 			tt.mockSetup(mockRepo, mockProjectRepo, mockUserRepo)
-			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			task, err := svc.Archive(ctx, tt.request)
@@ -1090,23 +1101,12 @@ func TestTaskService_Archive_PublishesPreviousProjectColumnID(t *testing.T) {
 	mockRepo := &mockTaskRepository{}
 	mockProjectRepo := &mockProjectRepository{}
 	mockUserRepo := &mockUserRepository{}
-	mockPublisher := &mockPublisher{}
 
 	mockRepo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
 	mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
-	mockPublisher.On("Publish", mock.Anything, events.TaskUpdated, mock.MatchedBy(func(payload events.Payload) bool {
-		taskUpdatedPayload, ok := payload.(*events.TaskUpdatedPayload)
-		if !ok {
-			return false
-		}
 
-		return taskUpdatedPayload.PreviousProjectColumnID != nil &&
-			*taskUpdatedPayload.PreviousProjectColumnID == pendingStatusID &&
-			taskUpdatedPayload.Task.ArchivedAt != nil
-	})).Return(nil)
-
-	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, mockPublisher)
+	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 
 	task, err := svc.Archive(context.Background(), service.ArchiveTaskRequest{
 		TaskId:        validTaskId,
@@ -1117,9 +1117,16 @@ func TestTaskService_Archive_PublishesPreviousProjectColumnID(t *testing.T) {
 	require.NotNil(t, task)
 	assert.Equal(t, domain.TaskStatusArchived, task.Status)
 
+	require.Len(t, mockRepo.builtEvents, 1)
+	assert.Equal(t, events.TaskUpdated, mockRepo.builtEvents[0].Topic)
+	taskUpdatedPayload, ok := mockRepo.builtEvents[0].Payload.(*events.TaskUpdatedPayload)
+	require.True(t, ok)
+	require.NotNil(t, taskUpdatedPayload.PreviousProjectColumnID)
+	assert.Equal(t, pendingStatusID, *taskUpdatedPayload.PreviousProjectColumnID)
+	assert.NotNil(t, taskUpdatedPayload.Task.ArchivedAt)
+
 	mockRepo.AssertExpectations(t)
 	mockProjectRepo.AssertExpectations(t)
-	mockPublisher.AssertExpectations(t)
 }
 
 func TestTaskService_Restore(t *testing.T) {
@@ -1158,7 +1165,6 @@ func TestTaskService_Restore(t *testing.T) {
 	mockRepo := &mockTaskRepository{}
 	mockProjectRepo := &mockProjectRepository{}
 	mockUserRepo := &mockUserRepository{}
-	mockPublisher := &mockPublisher{}
 
 	mockRepo.On("GetById", mock.Anything, validTaskId).Return(&archivedTask, nil)
 	mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
@@ -1168,18 +1174,8 @@ func TestTaskService_Restore(t *testing.T) {
 			task.Status == domain.TaskStatusDoing &&
 			task.DoneAt == nil
 	})).Return(nil)
-	mockPublisher.On("Publish", mock.Anything, events.TaskUpdated, mock.MatchedBy(func(payload events.Payload) bool {
-		taskUpdatedPayload, ok := payload.(*events.TaskUpdatedPayload)
-		if !ok {
-			return false
-		}
 
-		return taskUpdatedPayload.Task.ProjectColumnId == doingStatusID &&
-			taskUpdatedPayload.Task.ArchivedAt == nil &&
-			taskUpdatedPayload.PreviousProjectColumnID == nil
-	})).Return(nil)
-
-	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, mockPublisher)
+	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 
 	task, err := svc.Restore(context.Background(), service.RestoreTaskRequest{
 		TaskId:          validTaskId,
@@ -1193,9 +1189,16 @@ func TestTaskService_Restore(t *testing.T) {
 	assert.Nil(t, task.ArchivedAt)
 	assert.Equal(t, domain.TaskStatusDoing, task.Status)
 
+	require.Len(t, mockRepo.builtEvents, 1)
+	assert.Equal(t, events.TaskUpdated, mockRepo.builtEvents[0].Topic)
+	taskUpdatedPayload, ok := mockRepo.builtEvents[0].Payload.(*events.TaskUpdatedPayload)
+	require.True(t, ok)
+	assert.Equal(t, doingStatusID, taskUpdatedPayload.Task.ProjectColumnId)
+	assert.Nil(t, taskUpdatedPayload.Task.ArchivedAt)
+	assert.Nil(t, taskUpdatedPayload.PreviousProjectColumnID)
+
 	mockRepo.AssertExpectations(t)
 	mockProjectRepo.AssertExpectations(t)
-	mockPublisher.AssertExpectations(t)
 }
 
 func TestTaskService_Update_LoadsResponsibleDetailsForChangedAssignee(t *testing.T) {
@@ -1261,7 +1264,7 @@ func TestTaskService_Update_LoadsResponsibleDetailsForChangedAssignee(t *testing
 	mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 	mockUserRepo.On("GetById", mock.Anything, newResponsibleID).Return(&newResponsible, nil)
 
-	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 	task, err := svc.Update(context.Background(), service.UpdateTaskRequest{
 		TaskId:          validTaskId,
 		Title:           "Test Task",
@@ -1413,7 +1416,7 @@ func TestTaskService_List(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 
 			tt.mockSetup(mockRepo, mockProjectRepo)
-			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			result, err := svc.List(ctx, tt.request)
@@ -1540,7 +1543,7 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 
 			tt.mockSetup(mockRepo, mockProjectRepo)
-			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			result, err := svc.GroupByColumn(ctx, tt.request)
@@ -1606,7 +1609,7 @@ func TestTaskService_MarkTaskDone(t *testing.T) {
 			DoneAt:          func() *time.Time { now := time.Now(); return &now }(),
 		}, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		result, err := svc.MarkTaskDone(context.Background(), service.MarkTaskDoneRequest{
 			TaskId:        taskID,
 			RequestUserId: requestUserID,
@@ -1641,7 +1644,7 @@ func TestTaskService_MarkTaskDone(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, taskID).Return(task, nil)
 		mockProjectRepo.On("GetById", mock.Anything, projectID).Return(projectWithMultipleDoneColumns, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		result, err := svc.MarkTaskDone(context.Background(), service.MarkTaskDoneRequest{
 			TaskId:        taskID,
 			RequestUserId: requestUserID,
@@ -1704,7 +1707,7 @@ func TestTaskService_AssignTaskToSelf(t *testing.T) {
 			return updated.ResponsibleId != nil && *updated.ResponsibleId == requestUserID
 		})).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		result, err := svc.AssignTaskToSelf(context.Background(), service.AssignTaskToSelfRequest{
 			TaskId:        taskID,
 			RequestUserId: requestUserID,
@@ -1738,7 +1741,7 @@ func TestTaskService_AssignTaskToSelf(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, taskID).Return(task, nil)
 		mockProjectRepo.On("GetById", mock.Anything, projectID).Return(project, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		result, err := svc.AssignTaskToSelf(context.Background(), service.AssignTaskToSelfRequest{
 			TaskId:        taskID,
 			RequestUserId: requestUserID,
@@ -1798,7 +1801,7 @@ func TestTaskService_Dependencies(t *testing.T) {
 		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
 		mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		task, err := svc.Create(context.Background(), service.CreateTaskRequest{
 			ProjectId:       validProjectId,
 			ProjectColumnId: pendingStatusID,
@@ -1824,7 +1827,7 @@ func TestTaskService_Dependencies(t *testing.T) {
 		mockRepo.On("GetTaskDependencyRefsByProjectAndIds", mock.Anything, validProjectId, []uuid.UUID{dependencyTaskId}).Return([]domain.TaskDependencyRef{{Id: dependencyTaskId, Title: "Dependency Task", Code: "DEP-1"}}, nil)
 		mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		task, err := svc.Create(context.Background(), service.CreateTaskRequest{
 			ProjectId:        validProjectId,
 			ProjectColumnId:  pendingStatusID,
@@ -1850,7 +1853,7 @@ func TestTaskService_Dependencies(t *testing.T) {
 		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
 		mockRepo.On("GetTaskDependencyRefsByProjectAndIds", mock.Anything, validProjectId, []uuid.UUID{dependencyTaskId}).Return([]domain.TaskDependencyRef{}, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		_, err := svc.Create(context.Background(), service.CreateTaskRequest{
 			ProjectId:        validProjectId,
 			ProjectColumnId:  pendingStatusID,
@@ -1875,7 +1878,7 @@ func TestTaskService_Dependencies(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
 		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		_, err := svc.Update(context.Background(), service.UpdateTaskRequest{
 			TaskId:           validTaskId,
 			Title:            validTask.Title,
@@ -1904,7 +1907,7 @@ func TestTaskService_Dependencies(t *testing.T) {
 			{TaskId: dependencyTaskId, DependsOnTaskId: validTaskId},
 		}, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		_, err := svc.Update(context.Background(), service.UpdateTaskRequest{
 			TaskId:           validTaskId,
 			Title:            validTask.Title,
@@ -1932,7 +1935,7 @@ func TestTaskService_Dependencies(t *testing.T) {
 		mockRepo.On("ListTaskDependenciesByProjectId", mock.Anything, validProjectId).Return([]domain.TaskDependencyEdge{}, nil)
 		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo, &mockPublisher{})
+		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		task, err := svc.Update(context.Background(), service.UpdateTaskRequest{
 			TaskId:           validTaskId,
 			Title:            validTask.Title,

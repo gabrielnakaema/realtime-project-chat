@@ -15,7 +15,7 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/apphost"
 	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/token"
 	"github.com/gabrielnakaema/project-chat/internal/ws"
 	"github.com/google/uuid"
@@ -28,16 +28,16 @@ func (accessCheckerStub) CheckAccess(context.Context, uuid.UUID, uuid.UUID) erro
 	return nil
 }
 
-type publisherStub struct{}
+type enqueuerStub struct{}
 
-func (publisherStub) Publish(context.Context, events.Topic, events.Payload) error { return nil }
+func (enqueuerStub) Enqueue(context.Context, ...outbox.Message) error { return nil }
 
 func newTestApp(t *testing.T) (*App, context.CancelFunc) {
 	t.Helper()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	rt := apphost.NewForTest(log)
 	cfg := &config.Config{JwtSecret: "websocket-test-secret"}
-	server := ws.NewServer(rt.Ctx, token.NewTokenProvider(cfg), log, accessCheckerStub{}, accessCheckerStub{}, time.Second, publisherStub{})
+	server := ws.NewServer(rt.Ctx, token.NewTokenProvider(cfg), log, accessCheckerStub{}, accessCheckerStub{}, time.Second, enqueuerStub{})
 	return &App{rt: rt, Ws: server}, func() { rt.Close() }
 }
 

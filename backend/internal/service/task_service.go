@@ -9,21 +9,22 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/gabrielnakaema/project-chat/internal/fracindex"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 )
 
 type taskRepository interface {
-	Create(ctx context.Context, task *domain.Task) error
+	Create(ctx context.Context, task *domain.Task, buildEvents func(*domain.Task) []outbox.Message) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
 	FindTaskRefsByProjectAndCode(ctx context.Context, projectId uuid.UUID, code string) ([]domain.TaskDependencyRef, error)
 	SuggestTaskCodesByProjectPrefix(ctx context.Context, projectId uuid.UUID, prefix string, limit int) ([]domain.TaskCodeSuggestion, error)
 	ListByProjectId(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, archived bool, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
-	Update(ctx context.Context, task *domain.Task) error
+	Update(ctx context.Context, task *domain.Task, msgs ...outbox.Message) error
 	CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error
 	GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, projectColumnID uuid.UUID) (*domain.Task, error)
 	GetProjectTaskAfterId(ctx context.Context, id uuid.UUID, projectId uuid.UUID) (*domain.Task, error)
-	MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID) (*domain.Task, error)
+	MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error)
 	CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error)
 	ListUserDueTasks(ctx context.Context, userId uuid.UUID, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 	SearchTasksForUser(ctx context.Context, userId uuid.UUID, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
@@ -41,23 +42,17 @@ type taskServiceUserRepository interface {
 	GetById(ctx context.Context, id uuid.UUID) (*domain.User, error)
 }
 
-type taskServicePublisher interface {
-	Publish(ctx context.Context, topic events.Topic, payload events.Payload) error
-}
-
 type TaskService struct {
 	taskRepository    taskRepository
 	projectRepository taskServiceProjectRepository
 	userRepository    taskServiceUserRepository
-	publisher         taskServicePublisher
 }
 
-func NewTaskService(taskRepository taskRepository, projectRepository taskServiceProjectRepository, userRepository taskServiceUserRepository, publisher taskServicePublisher) *TaskService {
+func NewTaskService(taskRepository taskRepository, projectRepository taskServiceProjectRepository, userRepository taskServiceUserRepository) *TaskService {
 	return &TaskService{
 		taskRepository:    taskRepository,
 		projectRepository: projectRepository,
 		userRepository:    userRepository,
-		publisher:         publisher,
 	}
 }
 
@@ -184,20 +179,21 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		task.DoneAt = &now
 	}
 
-	err = ts.taskRepository.Create(ctx, &task)
-	if err != nil {
-		return nil, domain.ServerError("failed to create task", err)
-	}
-
-	err = ts.publisher.Publish(ctx, events.TaskCreated, &events.TaskCreatedPayload{
-		Task:         task,
-		ActionOrigin: domain.ActionOriginFromContext(ctx),
-		User: domain.User{
-			Id: request.RequestUserId,
-		},
+	err = ts.taskRepository.Create(ctx, &task, func(t *domain.Task) []outbox.Message {
+		return []outbox.Message{{
+			Topic:       events.TaskCreated,
+			AggregateID: t.Id,
+			Payload: &events.TaskCreatedPayload{
+				Task:         *t,
+				ActionOrigin: domain.ActionOriginFromContext(ctx),
+				User: domain.User{
+					Id: request.RequestUserId,
+				},
+			},
+		}}
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to publish task created event", err)
+		return nil, domain.ServerError("failed to create task", err)
 	}
 
 	return &task, nil
@@ -391,22 +387,21 @@ func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) 
 	archivedTask.UpdatedAt = time.Now()
 	archivedTask.Updates = []domain.TaskUpdate{}
 
-	err = ts.taskRepository.Update(ctx, &archivedTask)
-	if err != nil {
-		return nil, domain.ServerError("failed to archive task", err)
-	}
-
-	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
-		Task:         archivedTask,
-		PreviousTask: task,
-		ActionOrigin: domain.ActionOriginFromContext(ctx),
-		User: domain.User{
-			Id: request.RequestUserId,
+	err = ts.taskRepository.Update(ctx, &archivedTask, outbox.Message{
+		Topic:       events.TaskUpdated,
+		AggregateID: archivedTask.Id,
+		Payload: &events.TaskUpdatedPayload{
+			Task:         archivedTask,
+			PreviousTask: task,
+			ActionOrigin: domain.ActionOriginFromContext(ctx),
+			User: domain.User{
+				Id: request.RequestUserId,
+			},
+			PreviousProjectColumnID: &task.ProjectColumnId,
 		},
-		PreviousProjectColumnID: &task.ProjectColumnId,
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to publish task archived event", err)
+		return nil, domain.ServerError("failed to archive task", err)
 	}
 
 	return &archivedTask, nil
@@ -475,22 +470,21 @@ func (ts *TaskService) Restore(ctx context.Context, request RestoreTaskRequest) 
 		restoredTask.DoneAt = nil
 	}
 
-	err = ts.taskRepository.Update(ctx, &restoredTask)
-	if err != nil {
-		return nil, domain.ServerError("failed to restore task", err)
-	}
-
-	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
-		Task:         restoredTask,
-		PreviousTask: task,
-		ActionOrigin: domain.ActionOriginFromContext(ctx),
-		User: domain.User{
-			Id: request.RequestUserId,
+	err = ts.taskRepository.Update(ctx, &restoredTask, outbox.Message{
+		Topic:       events.TaskUpdated,
+		AggregateID: restoredTask.Id,
+		Payload: &events.TaskUpdatedPayload{
+			Task:         restoredTask,
+			PreviousTask: task,
+			ActionOrigin: domain.ActionOriginFromContext(ctx),
+			User: domain.User{
+				Id: request.RequestUserId,
+			},
+			PreviousProjectColumnID: nil,
 		},
-		PreviousProjectColumnID: nil,
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to publish task restored event", err)
+		return nil, domain.ServerError("failed to restore task", err)
 	}
 
 	return &restoredTask, nil
@@ -627,7 +621,27 @@ func (ts *TaskService) moveLoadedTask(ctx context.Context, oldTask *domain.Task,
 		task.DoneAt = &now
 	}
 
-	updatedTask, err := ts.taskRepository.MoveTask(ctx, &task, request.RequestUserId)
+	updatedTask, err := ts.taskRepository.MoveTask(ctx, &task, request.RequestUserId, func(moved *domain.Task) []outbox.Message {
+		// Only include previous status if it changed
+		var previousProjectColumnID *uuid.UUID
+		if oldTask.ProjectColumnId != moved.ProjectColumnId {
+			previousProjectColumnID = &oldTask.ProjectColumnId
+		}
+
+		return []outbox.Message{{
+			Topic:       events.TaskUpdated,
+			AggregateID: moved.Id,
+			Payload: &events.TaskUpdatedPayload{
+				Task:         *moved,
+				PreviousTask: oldTask,
+				ActionOrigin: domain.ActionOriginFromContext(ctx),
+				User: domain.User{
+					Id: request.RequestUserId,
+				},
+				PreviousProjectColumnID: previousProjectColumnID,
+			},
+		}}
+	})
 	if err != nil {
 		var domainErr domain.DomainError
 		if errors.As(err, &domainErr) {
@@ -637,25 +651,6 @@ func (ts *TaskService) moveLoadedTask(ctx context.Context, oldTask *domain.Task,
 			return nil, domainErr
 		}
 		return nil, domain.ServerError("failed to move task", err)
-	}
-
-	// Only include previous status if it changed
-	var previousProjectColumnID *uuid.UUID
-	if oldTask.ProjectColumnId != updatedTask.ProjectColumnId {
-		previousProjectColumnID = &oldTask.ProjectColumnId
-	}
-
-	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
-		Task:         *updatedTask,
-		PreviousTask: oldTask,
-		ActionOrigin: domain.ActionOriginFromContext(ctx),
-		User: domain.User{
-			Id: request.RequestUserId,
-		},
-		PreviousProjectColumnID: previousProjectColumnID,
-	})
-	if err != nil {
-		return nil, domain.ServerError("failed to publish task moved event", err)
 	}
 
 	return updatedTask, nil
@@ -733,27 +728,26 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 		updatedTask.DoneAt = &now
 	}
 
-	err = ts.taskRepository.Update(ctx, &updatedTask)
-	if err != nil {
-		return nil, domain.ServerError("failed to update task", err)
-	}
-
 	var previousProjectColumnID *uuid.UUID
 	if oldProjectColumnID != updatedTask.ProjectColumnId {
 		previousProjectColumnID = &oldProjectColumnID
 	}
 
-	err = ts.publisher.Publish(ctx, events.TaskUpdated, &events.TaskUpdatedPayload{
-		Task:         updatedTask,
-		PreviousTask: task,
-		ActionOrigin: domain.ActionOriginFromContext(ctx),
-		User: domain.User{
-			Id: request.RequestUserId,
+	err = ts.taskRepository.Update(ctx, &updatedTask, outbox.Message{
+		Topic:       events.TaskUpdated,
+		AggregateID: updatedTask.Id,
+		Payload: &events.TaskUpdatedPayload{
+			Task:         updatedTask,
+			PreviousTask: task,
+			ActionOrigin: domain.ActionOriginFromContext(ctx),
+			User: domain.User{
+				Id: request.RequestUserId,
+			},
+			PreviousProjectColumnID: previousProjectColumnID,
 		},
-		PreviousProjectColumnID: previousProjectColumnID,
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to publish task updated event", err)
+		return nil, domain.ServerError("failed to update task", err)
 	}
 
 	return &updatedTask, nil

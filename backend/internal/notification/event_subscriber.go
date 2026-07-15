@@ -14,23 +14,17 @@ import (
 )
 
 type eventRepository interface {
-	CreateMany(ctx context.Context, notifications []domain.Notification) ([]uuid.UUID, error)
-	ListByIDs(ctx context.Context, ids []uuid.UUID) ([]domain.Notification, error)
-}
-
-type Notifier interface {
-	SendNotification(ctx context.Context, notification *domain.Notification) error
+	CreateManyAndEnqueue(ctx context.Context, notifications []domain.Notification) error
 }
 
 type EventSubscriber struct {
 	logger     *slog.Logger
 	subscriber *subscriber.Subscriber
 	repository eventRepository
-	notifier   Notifier
 	now        func() time.Time
 }
 
-func NewEventSubscriber(ctx context.Context, cfg *config.Config, logger *slog.Logger, repository eventRepository, notifier Notifier) (*EventSubscriber, error) {
+func NewEventSubscriber(ctx context.Context, cfg *config.Config, logger *slog.Logger, repository eventRepository) (*EventSubscriber, error) {
 	sub, err := subscriber.NewSubscriber(cfg, "notification.subscriber")
 	if err != nil {
 		return nil, err
@@ -40,7 +34,6 @@ func NewEventSubscriber(ctx context.Context, cfg *config.Config, logger *slog.Lo
 		logger:     logger,
 		subscriber: sub,
 		repository: repository,
-		notifier:   notifier,
 		now:        time.Now,
 	}
 
@@ -195,20 +188,8 @@ func (es *EventSubscriber) handleTaskCommentCreated(ctx context.Context, message
 }
 
 func (es *EventSubscriber) persistAndNotify(ctx context.Context, notifications []domain.Notification) error {
-	ids, err := es.repository.CreateMany(ctx, notifications)
-	if err != nil {
+	if err := es.repository.CreateManyAndEnqueue(ctx, notifications); err != nil {
 		return domain.ServerError("failed to create notifications", err)
-	}
-
-	createdNotifications, err := es.repository.ListByIDs(ctx, ids)
-	if err != nil {
-		return domain.ServerError("failed to list created notifications", err)
-	}
-
-	for _, notification := range createdNotifications {
-		if err := es.notifier.SendNotification(ctx, &notification); err != nil {
-			return domain.ServerError("failed to send notification", err)
-		}
 	}
 
 	return nil

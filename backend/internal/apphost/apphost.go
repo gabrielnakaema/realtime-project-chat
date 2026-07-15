@@ -16,17 +16,15 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/db"
 	"github.com/gabrielnakaema/project-chat/internal/logger"
-	"github.com/gabrielnakaema/project-chat/internal/publisher"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Runtime struct {
-	Name      string
-	Config    *config.Config
-	Pool      *pgxpool.Pool
-	Publisher *publisher.Publisher
-	Logger    *slog.Logger
-	Ctx       context.Context
+	Name   string
+	Config *config.Config
+	Pool   *pgxpool.Pool
+	Logger *slog.Logger
+	Ctx    context.Context
 
 	cancel      context.CancelFunc
 	subscribers []io.Closer
@@ -34,14 +32,6 @@ type Runtime struct {
 }
 
 func New(name, portEnvVar, defaultPort string) (*Runtime, error) {
-	return newRuntime(name, portEnvVar, defaultPort, true)
-}
-
-func NewWithoutDB(name, portEnvVar, defaultPort string) (*Runtime, error) {
-	return newRuntime(name, portEnvVar, defaultPort, false)
-}
-
-func newRuntime(name, portEnvVar, defaultPort string, withDB bool) (*Runtime, error) {
 	cfg, err := config.New()
 	if err != nil {
 		return nil, err
@@ -57,32 +47,20 @@ func newRuntime(name, portEnvVar, defaultPort string, withDB bool) (*Runtime, er
 
 	log := logger.Init(cfg)
 
-	var pool *pgxpool.Pool
-	if withDB {
-		pool, err = db.NewPool(cfg)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	pub, err := publisher.NewPublisher(cfg, log)
+	pool, err := db.NewPool(cfg)
 	if err != nil {
-		if pool != nil {
-			pool.Close()
-		}
 		return nil, err
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Runtime{
-		Name:      name,
-		Config:    cfg,
-		Pool:      pool,
-		Publisher: pub,
-		Logger:    log,
-		Ctx:       ctx,
-		cancel:    cancel,
+		Name:   name,
+		Config: cfg,
+		Pool:   pool,
+		Logger: log,
+		Ctx:    ctx,
+		cancel: cancel,
 	}, nil
 }
 
@@ -99,12 +77,6 @@ func (r *Runtime) Close() {
 		for i := len(r.subscribers) - 1; i >= 0; i-- {
 			if err := r.subscribers[i].Close(); err != nil {
 				r.Logger.Error("error closing subscriber", "service", r.Name, "error", err)
-			}
-		}
-
-		if r.Publisher != nil {
-			if err := r.Publisher.Close(); err != nil {
-				r.Logger.Error("error closing publisher", "service", r.Name, "error", err)
 			}
 		}
 

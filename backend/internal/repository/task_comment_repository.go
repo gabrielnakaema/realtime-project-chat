@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/queries"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -28,9 +29,16 @@ func NewTaskCommentRepository(pool *pgxpool.Pool) *TaskCommentRepository {
 	}
 }
 
-func (r *TaskCommentRepository) Create(ctx context.Context, comment *domain.TaskComment, parentCommentID *uuid.UUID) error {
-	q := queries.New(r.pool)
+func (r *TaskCommentRepository) Create(ctx context.Context, comment *domain.TaskComment, parentCommentID *uuid.UUID, buildEvents func(*domain.TaskComment) []outbox.Message) error {
 	actionOrigin := domain.ActionOriginFromContext(ctx)
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := queries.New(tx)
 
 	params := queries.CreateTaskCommentParams{
 		TaskID:       comment.Task.Id,
@@ -48,14 +56,20 @@ func (r *TaskCommentRepository) Create(ctx context.Context, comment *domain.Task
 		comment.ParentCommentID = &parentID
 	}
 
-	id, err := q.CreateTaskComment(ctx, params)
+	id, err := qtx.CreateTaskComment(ctx, params)
 	if err != nil {
 		return err
 	}
 
 	comment.ID = id.String()
 
-	return nil
+	if buildEvents != nil {
+		if err := outbox.Enqueue(ctx, tx, buildEvents(comment)...); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (r *TaskCommentRepository) ListByTaskID(

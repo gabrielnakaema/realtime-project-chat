@@ -8,6 +8,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/repository"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -25,15 +26,15 @@ var defaultProjectColumnColors = []string{
 var projectColumnColorPattern = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
 type projectRepository interface {
-	Create(ctx context.Context, project *domain.Project) error
+	Create(ctx context.Context, project *domain.Project, buildEvents func() []outbox.Message) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Project, error)
 	ListByUserId(ctx context.Context, userId uuid.UUID, memberRole string, searchQuery string) ([]domain.Project, error)
-	UpdateWithColumns(ctx context.Context, params repository.UpdateProjectWithColumnsParams) error
-	MarkUpdatedAt(ctx context.Context, projectId uuid.UUID) error
+	UpdateWithColumns(ctx context.Context, params repository.UpdateProjectWithColumnsParams, buildEvents func() []outbox.Message) error
+	MarkUpdatedAt(ctx context.Context, projectId uuid.UUID, msgs ...outbox.Message) error
 	UpdateColumn(ctx context.Context, status *domain.ProjectColumn) error
 	GetColumnById(ctx context.Context, id uuid.UUID) (*domain.ProjectColumn, error)
-	CreateMember(ctx context.Context, member *domain.ProjectMember) error
-	RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) error
+	CreateMember(ctx context.Context, member *domain.ProjectMember, buildEvents func() []outbox.Message) error
+	RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID, msgs ...outbox.Message) error
 	GetMemberByUserIdAndProjectId(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) (*domain.ProjectMember, error)
 	ListMembersByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.ProjectMember, error)
 }
@@ -46,22 +47,16 @@ type projectServiceUserRepository interface {
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 }
 
-type projectServicePublisher interface {
-	Publish(ctx context.Context, topic events.Topic, payload events.Payload) error
-}
-
 type ProjectService struct {
 	activityRepository projectServiceActivityRepository
 	projectRepository  projectRepository
 	userRepository     projectServiceUserRepository
-	publisher          projectServicePublisher
 }
 
-func NewProjectService(projectRepository projectRepository, userRepository projectServiceUserRepository, publisher projectServicePublisher, activityRepository projectServiceActivityRepository) *ProjectService {
+func NewProjectService(projectRepository projectRepository, userRepository projectServiceUserRepository, activityRepository projectServiceActivityRepository) *ProjectService {
 	return &ProjectService{
 		projectRepository:  projectRepository,
 		userRepository:     userRepository,
-		publisher:          publisher,
 		activityRepository: activityRepository,
 	}
 }
@@ -103,20 +98,21 @@ func (ps *ProjectService) Create(ctx context.Context, request CreateProjectReque
 		Columns: defaultProjectColumns(request.Columns),
 	}
 
-	err := ps.projectRepository.Create(ctx, &project)
-	if err != nil {
-		return nil, domain.ServerError("failed to create project", err)
-	}
-
-	err = ps.publisher.Publish(ctx, events.ProjectCreated, &events.ProjectCreatedPayload{
-		Project:      project,
-		ActionOrigin: domain.ActionOriginFromContext(ctx),
-		User: domain.User{
-			Id: request.UserId,
-		},
+	err := ps.projectRepository.Create(ctx, &project, func() []outbox.Message {
+		return []outbox.Message{{
+			Topic:       events.ProjectCreated,
+			AggregateID: project.Id,
+			Payload: &events.ProjectCreatedPayload{
+				Project:      project,
+				ActionOrigin: domain.ActionOriginFromContext(ctx),
+				User: domain.User{
+					Id: request.UserId,
+				},
+			},
+		}}
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to publish project created event", err)
+		return nil, domain.ServerError("failed to create project", err)
 	}
 
 	return &project, nil
@@ -293,26 +289,27 @@ func (ps *ProjectService) Update(ctx context.Context, request UpdateProjectReque
 		})
 	}
 
+	project.Columns = request.Columns
+
 	err = ps.projectRepository.UpdateWithColumns(ctx, repository.UpdateProjectWithColumnsParams{
 		Project:   project,
 		Columns:   request.Columns,
 		Deletions: deletions,
+	}, func() []outbox.Message {
+		return []outbox.Message{{
+			Topic:       events.ProjectUpdated,
+			AggregateID: project.Id,
+			Payload: &events.ProjectUpdatedPayload{
+				Project:      *project,
+				ActionOrigin: domain.ActionOriginFromContext(ctx),
+				User: domain.User{
+					Id: request.UserId,
+				},
+			},
+		}}
 	})
 	if err != nil {
 		return nil, domain.ServerError("failed to update project", err)
-	}
-
-	project.Columns = request.Columns
-
-	err = ps.publisher.Publish(ctx, events.ProjectUpdated, &events.ProjectUpdatedPayload{
-		Project:      *project,
-		ActionOrigin: domain.ActionOriginFromContext(ctx),
-		User: domain.User{
-			Id: request.UserId,
-		},
-	})
-	if err != nil {
-		return nil, domain.ServerError("failed to publish project updated event", err)
 	}
 
 	return project, nil
@@ -397,10 +394,6 @@ func (ps *ProjectService) UpdateColumn(ctx context.Context, request UpdateProjec
 		return nil, domain.ServerError("failed to update project column", err)
 	}
 
-	if err := ps.projectRepository.MarkUpdatedAt(ctx, project.Id); err != nil {
-		return nil, domain.ServerError("failed to mark project updated at", err)
-	}
-
 	project.UpdatedAt = now
 	for i := range project.Columns {
 		if project.Columns[i].Id == column.Id {
@@ -412,15 +405,18 @@ func (ps *ProjectService) UpdateColumn(ctx context.Context, request UpdateProjec
 		}
 	}
 
-	err = ps.publisher.Publish(ctx, events.ProjectUpdated, &events.ProjectUpdatedPayload{
-		Project:      *project,
-		ActionOrigin: domain.ActionOriginFromContext(ctx),
-		User: domain.User{
-			Id: request.UserId,
+	if err := ps.projectRepository.MarkUpdatedAt(ctx, project.Id, outbox.Message{
+		Topic:       events.ProjectUpdated,
+		AggregateID: project.Id,
+		Payload: &events.ProjectUpdatedPayload{
+			Project:      *project,
+			ActionOrigin: domain.ActionOriginFromContext(ctx),
+			User: domain.User{
+				Id: request.UserId,
+			},
 		},
-	})
-	if err != nil {
-		return nil, domain.ServerError("failed to publish project updated event", err)
+	}); err != nil {
+		return nil, domain.ServerError("failed to mark project updated at", err)
 	}
 
 	return column, nil
@@ -573,7 +569,19 @@ func (ps *ProjectService) CreateMember(ctx context.Context, request CreateMember
 		Role:      domain.ProjectMemberRoleMember,
 	}
 
-	err = ps.projectRepository.CreateMember(ctx, &member)
+	err = ps.projectRepository.CreateMember(ctx, &member, func() []outbox.Message {
+		return []outbox.Message{{
+			Topic:       events.ProjectMemberCreated,
+			AggregateID: member.ProjectId,
+			Payload: &events.ProjectMemberCreatedPayload{
+				ProjectMember: member,
+				ActionOrigin:  domain.ActionOriginFromContext(ctx),
+				User: domain.User{
+					Id: request.RequestUserId,
+				},
+			},
+		}}
+	})
 	if err != nil {
 		var domainErr domain.DomainError
 		if errors.As(err, &domainErr) {
@@ -583,17 +591,6 @@ func (ps *ProjectService) CreateMember(ctx context.Context, request CreateMember
 			return nil, domainErr
 		}
 		return nil, domain.ServerError("failed to create member", err)
-	}
-
-	err = ps.publisher.Publish(ctx, events.ProjectMemberCreated, &events.ProjectMemberCreatedPayload{
-		ProjectMember: member,
-		ActionOrigin:  domain.ActionOriginFromContext(ctx),
-		User: domain.User{
-			Id: request.RequestUserId,
-		},
-	})
-	if err != nil {
-		return nil, domain.ServerError("failed to publish project member created event", err)
 	}
 
 	return &member, nil
@@ -744,20 +741,19 @@ func (ps *ProjectService) RemoveMember(ctx context.Context, request RemoveMember
 		return domain.ForbiddenError("forbidden")
 	}
 
-	err = ps.projectRepository.RemoveMember(ctx, request.ProjectId, request.UserId)
-	if err != nil {
-		return domain.ServerError("failed to remove member", err)
-	}
-
-	err = ps.publisher.Publish(ctx, events.ProjectMemberRemoved, &events.ProjectMemberRemovedPayload{
-		ProjectMember: member,
-		ActionOrigin:  domain.ActionOriginFromContext(ctx),
-		User: domain.User{
-			Id: request.RequestUserId,
+	err = ps.projectRepository.RemoveMember(ctx, request.ProjectId, request.UserId, outbox.Message{
+		Topic:       events.ProjectMemberRemoved,
+		AggregateID: request.ProjectId,
+		Payload: &events.ProjectMemberRemovedPayload{
+			ProjectMember: member,
+			ActionOrigin:  domain.ActionOriginFromContext(ctx),
+			User: domain.User{
+				Id: request.RequestUserId,
+			},
 		},
 	})
 	if err != nil {
-		return domain.ServerError("failed to publish project member removed event", err)
+		return domain.ServerError("failed to remove member", err)
 	}
 
 	return nil

@@ -30,7 +30,7 @@ func New() (*App, error) {
 	notificationService := notification.NewService(notificationRepo)
 	notificationHandler := notification.NewHandler(notificationService)
 
-	notificationSub, err := notification.NewEventSubscriber(rt.Ctx, rt.Config, rt.Logger, notificationRepo, notification.NewKafkaNotifier(rt.Publisher))
+	notificationSub, err := notification.NewEventSubscriber(rt.Ctx, rt.Config, rt.Logger, notificationRepo)
 	if err != nil {
 		rt.Close()
 		return nil, err

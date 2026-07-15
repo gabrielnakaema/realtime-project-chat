@@ -8,12 +8,13 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/repository"
 	"github.com/google/uuid"
 )
 
 type ProjectRepository interface {
-	MarkUpdatedAt(ctx context.Context, projectId uuid.UUID) error
+	MarkUpdatedAt(ctx context.Context, projectId uuid.UUID, msgs ...outbox.Message) error
 }
 
 type ProjectActivitySubscriber struct {

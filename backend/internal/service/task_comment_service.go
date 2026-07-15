@@ -7,12 +7,13 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 )
 
 type taskCommentRepository interface {
-	Create(ctx context.Context, comment *domain.TaskComment, parentCommentID *uuid.UUID) error
+	Create(ctx context.Context, comment *domain.TaskComment, parentCommentID *uuid.UUID, buildEvents func(*domain.TaskComment) []outbox.Message) error
 	ListByTaskID(
 		ctx context.Context,
 		taskID uuid.UUID,
@@ -37,16 +38,14 @@ type TaskCommentService struct {
 	taskRepository        taskCommentTaskRepository
 	projectRepository     taskCommentProjectRepository
 	userRepository        taskServiceUserRepository
-	publisher             taskServicePublisher
 }
 
-func NewTaskCommentService(taskCommentRepository taskCommentRepository, taskRepository taskCommentTaskRepository, projectRepository taskCommentProjectRepository, userRepository taskServiceUserRepository, publisher taskServicePublisher) *TaskCommentService {
+func NewTaskCommentService(taskCommentRepository taskCommentRepository, taskRepository taskCommentTaskRepository, projectRepository taskCommentProjectRepository, userRepository taskServiceUserRepository) *TaskCommentService {
 	return &TaskCommentService{
 		taskCommentRepository: taskCommentRepository,
 		taskRepository:        taskRepository,
 		projectRepository:     projectRepository,
 		userRepository:        userRepository,
-		publisher:             publisher,
 	}
 }
 
@@ -106,20 +105,21 @@ func (s *TaskCommentService) Create(ctx context.Context, request CreateTaskComme
 		Replies:      []domain.TaskComment{},
 	}
 
-	err = s.taskCommentRepository.Create(ctx, &comment, request.ParentCommentID)
-	if err != nil {
-		return nil, domain.ServerError("failed to create task comment", err)
-	}
-
-	err = s.publisher.Publish(ctx, events.TaskCommentCreated, &events.TaskCommentCreatedPayload{
-		TaskComment:  comment,
-		ActionOrigin: domain.ActionOriginFromContext(ctx),
-		User: domain.User{
-			Id: request.RequestUserID,
-		},
+	err = s.taskCommentRepository.Create(ctx, &comment, request.ParentCommentID, func(c *domain.TaskComment) []outbox.Message {
+		return []outbox.Message{{
+			Topic:       events.TaskCommentCreated,
+			AggregateID: c.Task.Id,
+			Payload: &events.TaskCommentCreatedPayload{
+				TaskComment:  *c,
+				ActionOrigin: domain.ActionOriginFromContext(ctx),
+				User: domain.User{
+					Id: request.RequestUserID,
+				},
+			},
+		}}
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to publish task comment created event", err)
+		return nil, domain.ServerError("failed to create task comment", err)
 	}
 
 	return &comment, nil

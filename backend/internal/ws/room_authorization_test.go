@@ -13,6 +13,7 @@ import (
 	chatv1 "github.com/gabrielnakaema/project-chat/internal/chat/v1"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/project"
 	projectv1 "github.com/gabrielnakaema/project-chat/internal/project/v1"
 	"github.com/google/uuid"
@@ -35,7 +36,6 @@ func (s accessCheckerStub) CheckAccess(ctx context.Context, userID, resourceID u
 	return s.check(ctx, userID, resourceID)
 }
 
-// failIfCalled fails the test if the checker is ever invoked.
 func failIfCalled(t *testing.T) accessCheckerStub {
 	return accessCheckerStub{check: func(context.Context, uuid.UUID, uuid.UUID) error {
 		t.Helper()
@@ -44,22 +44,24 @@ func failIfCalled(t *testing.T) accessCheckerStub {
 	}}
 }
 
-type testPublisher struct {
-	published chan events.Topic
+type testEnqueuer struct {
+	enqueued chan events.Topic
 }
 
-func (p testPublisher) Publish(_ context.Context, topic events.Topic, _ events.Payload) error {
-	if p.published != nil {
-		p.published <- topic
+func (e testEnqueuer) Enqueue(_ context.Context, msgs ...outbox.Message) error {
+	if e.enqueued != nil {
+		for _, m := range msgs {
+			e.enqueued <- m.Topic
+		}
 	}
 	return nil
 }
 
-func newRoomTestServer(t *testing.T, chatAuthorizer, projectAuthorizer accessChecker, timeout time.Duration, publisher publisher) (*Server, uuid.UUID) {
+func newRoomTestServer(t *testing.T, chatAuthorizer, projectAuthorizer accessChecker, timeout time.Duration, enqueuer outboxEnqueuer) (*Server, uuid.UUID) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	server := NewServer(ctx, nil, slog.New(slog.NewTextHandler(io.Discard, nil)), chatAuthorizer, projectAuthorizer, timeout, publisher)
+	server := NewServer(ctx, nil, slog.New(slog.NewTextHandler(io.Discard, nil)), chatAuthorizer, projectAuthorizer, timeout, enqueuer)
 	userID := uuid.New()
 	server.users[userID] = &WsUser{id: userID, rooms: map[uuid.UUID]bool{}, writer: make(chan any, 4)}
 	return server, userID
@@ -75,7 +77,7 @@ func TestConnectUserToRoomAuthorizesBeforeMutationAndPublication(t *testing.T) {
 		authorized = true
 		return nil
 	}}
-	server, userID := newRoomTestServer(t, chatAuthorizer, failIfCalled(t), time.Second, testPublisher{published: published})
+	server, userID := newRoomTestServer(t, chatAuthorizer, failIfCalled(t), time.Second, testEnqueuer{enqueued: published})
 	roomID := uuid.New()
 
 	ctx := context.WithValue(context.Background(), requestKey, "connection-context")
@@ -87,7 +89,7 @@ func TestConnectUserToRoomAuthorizesBeforeMutationAndPublication(t *testing.T) {
 }
 
 func TestUserRoomAuthorizationRemainsLocal(t *testing.T) {
-	server, userID := newRoomTestServer(t, failIfCalled(t), failIfCalled(t), time.Second, testPublisher{})
+	server, userID := newRoomTestServer(t, failIfCalled(t), failIfCalled(t), time.Second, testEnqueuer{})
 
 	err := server.connectUserToRoom(context.Background(), userID, uuid.New(), WsRoomTypeUser)
 	require.Error(t, err)
@@ -100,7 +102,7 @@ func TestConnectUserToRoomFailsClosedForAuthorizationErrors(t *testing.T) {
 			projectAuthorizer := accessCheckerStub{check: func(context.Context, uuid.UUID, uuid.UUID) error {
 				return status.Error(code, "denied")
 			}}
-			server, userID := newRoomTestServer(t, failIfCalled(t), projectAuthorizer, time.Second, testPublisher{})
+			server, userID := newRoomTestServer(t, failIfCalled(t), projectAuthorizer, time.Second, testEnqueuer{})
 			roomID := uuid.New()
 
 			err := server.connectUserToRoom(context.Background(), userID, roomID, WsRoomTypeProject)
@@ -115,7 +117,7 @@ func TestDeniedConnectionDoesNotEmitUserConnected(t *testing.T) {
 	chatAuthorizer := accessCheckerStub{check: func(context.Context, uuid.UUID, uuid.UUID) error {
 		return status.Error(codes.Unavailable, "authorization unavailable")
 	}}
-	server, userID := newRoomTestServer(t, chatAuthorizer, failIfCalled(t), time.Second, testPublisher{})
+	server, userID := newRoomTestServer(t, chatAuthorizer, failIfCalled(t), time.Second, testEnqueuer{})
 	roomID := uuid.New()
 	writer := server.users[userID].writer
 
@@ -137,7 +139,7 @@ func TestConnectUserToRoomAppliesAuthorizationDeadline(t *testing.T) {
 		<-ctx.Done()
 		return status.Error(codes.DeadlineExceeded, ctx.Err().Error())
 	}}
-	server, userID := newRoomTestServer(t, chatAuthorizer, failIfCalled(t), 10*time.Millisecond, testPublisher{})
+	server, userID := newRoomTestServer(t, chatAuthorizer, failIfCalled(t), 10*time.Millisecond, testEnqueuer{})
 	roomID := uuid.New()
 
 	err := server.connectUserToRoom(context.Background(), userID, roomID, WsRoomTypeChat)
@@ -167,9 +169,6 @@ func (s splitProjectService) GetById(context.Context, uuid.UUID, uuid.UUID) (*do
 	return &domain.Project{}, nil
 }
 
-// TestSplitServiceRoomAuthorization exercises the full gRPC path: the WS server
-// routes each room type to its domain client, which calls the matching domain
-// server registered on the core service.
 func TestSplitServiceRoomAuthorization(t *testing.T) {
 	for _, test := range []struct {
 		name           string
@@ -200,7 +199,7 @@ func TestSplitServiceRoomAuthorization(t *testing.T) {
 
 			chatAuthorizer := chat.NewClient(chatv1.NewChatServiceClient(connection))
 			projectAuthorizer := project.NewClient(projectv1.NewProjectServiceClient(connection))
-			server, userID := newRoomTestServer(t, chatAuthorizer, projectAuthorizer, time.Second, testPublisher{})
+			server, userID := newRoomTestServer(t, chatAuthorizer, projectAuthorizer, time.Second, testEnqueuer{})
 			err = server.connectUserToRoom(context.Background(), userID, uuid.New(), test.roomType)
 			require.Equal(t, test.wantCode, status.Code(err))
 			require.Equal(t, test.wantCode == codes.OK, len(server.rooms) == 1)

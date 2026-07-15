@@ -9,6 +9,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 )
@@ -16,9 +17,9 @@ import (
 type chatRepository interface {
 	Create(ctx context.Context, chat *domain.Chat) error
 	GetByProjectId(ctx context.Context, projectId uuid.UUID) (*domain.Chat, error)
-	CreateMember(ctx context.Context, member *domain.ChatMember) error
-	DeleteMember(ctx context.Context, member *domain.ChatMember) error
-	CreateMessage(ctx context.Context, message *domain.ChatMessage) error
+	CreateMember(ctx context.Context, member *domain.ChatMember, buildEvents func() []outbox.Message) error
+	DeleteMember(ctx context.Context, member *domain.ChatMember, msgs ...outbox.Message) error
+	CreateMessage(ctx context.Context, message *domain.ChatMessage, buildEvents func() []outbox.Message) error
 	UpdateMemberLastSeenAt(ctx context.Context, member *domain.ChatMember) error
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Chat, error)
 	ListMessages(ctx context.Context, chatId uuid.UUID, params utils.PaginationBeforeParams) ([]domain.ChatMessage, error)
@@ -26,7 +27,7 @@ type chatRepository interface {
 	ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error)
 	GetUnreadSummary(ctx context.Context, chatId uuid.UUID, userId uuid.UUID) (*domain.ChatUnreadSummary, error)
 	GetMessageById(ctx context.Context, id uuid.UUID) (*domain.ChatMessage, error)
-	MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId uuid.UUID, readAt time.Time, message *domain.ChatMessage) error
+	MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId uuid.UUID, readAt time.Time, message *domain.ChatMessage, msgs ...outbox.Message) error
 	ListMessageReads(ctx context.Context, messageId uuid.UUID) ([]domain.ChatMessageRead, error)
 }
 
@@ -34,21 +35,15 @@ type chatUserRepository interface {
 	GetById(ctx context.Context, id uuid.UUID) (*domain.User, error)
 }
 
-type publisher interface {
-	Publish(ctx context.Context, topic events.Topic, payload events.Payload) error
-}
-
 type ChatService struct {
 	chatRepository chatRepository
 	userRepository chatUserRepository
-	publisher      publisher
 }
 
-func NewChatService(chatRepository chatRepository, userRepository chatUserRepository, publisher publisher) *ChatService {
+func NewChatService(chatRepository chatRepository, userRepository chatUserRepository) *ChatService {
 	return &ChatService{
 		chatRepository: chatRepository,
 		userRepository: userRepository,
-		publisher:      publisher,
 	}
 }
 
@@ -96,20 +91,21 @@ func (cs *ChatService) CreateMemberFromProjectMember(ctx context.Context, projec
 		LastSeenAt: time.Now(),
 	}
 
-	err = cs.chatRepository.CreateMember(ctx, &member)
-	if err != nil {
-		return domain.ServerError("failed to create member", err)
-	}
-
-	err = cs.publisher.Publish(ctx, events.ChatMemberCreated, &events.ChatMemberCreatedPayload{
-		ChatMember:    member,
-		ProjectMember: *projectMember,
-		User: domain.User{
-			Id: projectMember.UserId,
-		},
+	err = cs.chatRepository.CreateMember(ctx, &member, func() []outbox.Message {
+		return []outbox.Message{{
+			Topic:       events.ChatMemberCreated,
+			AggregateID: member.ChatId,
+			Payload: &events.ChatMemberCreatedPayload{
+				ChatMember:    member,
+				ProjectMember: *projectMember,
+				User: domain.User{
+					Id: projectMember.UserId,
+				},
+			},
+		}}
 	})
 	if err != nil {
-		return domain.ServerError("failed to publish chat member created event", err)
+		return domain.ServerError("failed to create member", err)
 	}
 
 	return nil
@@ -125,16 +121,16 @@ func (cs *ChatService) RemoveMemberFromProjectMember(ctx context.Context, projec
 		UserId: projectMember.UserId,
 		ChatId: chat.Id,
 	}
-	if err := cs.chatRepository.DeleteMember(ctx, member); err != nil {
-		return nil, domain.ServerError("failed to remove project chat member", err)
-	}
-
-	if err := cs.publisher.Publish(ctx, events.ChatMemberRemoved, &events.ChatMemberRemovedPayload{
-		ChatMember:    *member,
-		ProjectMember: *projectMember,
-		User:          domain.User{Id: projectMember.UserId},
+	if err := cs.chatRepository.DeleteMember(ctx, member, outbox.Message{
+		Topic:       events.ChatMemberRemoved,
+		AggregateID: member.ChatId,
+		Payload: &events.ChatMemberRemovedPayload{
+			ChatMember:    *member,
+			ProjectMember: *projectMember,
+			User:          domain.User{Id: projectMember.UserId},
+		},
 	}); err != nil {
-		return nil, domain.ServerError("failed to publish chat member removed event", err)
+		return nil, domain.ServerError("failed to remove project chat member", err)
 	}
 
 	return member, nil
@@ -155,19 +151,20 @@ func (cs *ChatService) CreateJoinedMessage(ctx context.Context, chatMember *doma
 		UpdatedAt:   chatMember.JoinedAt,
 	}
 
-	err = cs.chatRepository.CreateMessage(ctx, &message)
-	if err != nil {
-		return domain.ServerError("failed to create joined message", err)
-	}
-
-	err = cs.publisher.Publish(ctx, events.ChatMessageCreated, &events.ChatMessageCreatedPayload{
-		ChatMessage: message,
-		User: domain.User{
-			Id: chatMember.UserId,
-		},
+	err = cs.chatRepository.CreateMessage(ctx, &message, func() []outbox.Message {
+		return []outbox.Message{{
+			Topic:       events.ChatMessageCreated,
+			AggregateID: message.ChatId,
+			Payload: &events.ChatMessageCreatedPayload{
+				ChatMessage: message,
+				User: domain.User{
+					Id: chatMember.UserId,
+				},
+			},
+		}}
 	})
 	if err != nil {
-		return domain.ServerError("failed to create publisher event", err)
+		return domain.ServerError("failed to create joined message", err)
 	}
 
 	return nil
@@ -219,19 +216,20 @@ func (cs *ChatService) CreateMessage(ctx context.Context, request CreateChatMess
 		UpdatedAt:   time.Now(),
 	}
 
-	err = cs.chatRepository.CreateMessage(ctx, &message)
-	if err != nil {
-		return nil, domain.ServerError("failed to create message", err)
-	}
-
-	err = cs.publisher.Publish(ctx, events.ChatMessageCreated, &events.ChatMessageCreatedPayload{
-		ChatMessage: message,
-		User: domain.User{
-			Id: request.UserId,
-		},
+	err = cs.chatRepository.CreateMessage(ctx, &message, func() []outbox.Message {
+		return []outbox.Message{{
+			Topic:       events.ChatMessageCreated,
+			AggregateID: message.ChatId,
+			Payload: &events.ChatMessageCreatedPayload{
+				ChatMessage: message,
+				User: domain.User{
+					Id: request.UserId,
+				},
+			},
+		}}
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to publish chat message created event", err)
+		return nil, domain.ServerError("failed to create message", err)
 	}
 
 	return &message, nil
@@ -535,24 +533,27 @@ func (cs *ChatService) MarkChatRead(ctx context.Context, request MarkChatReadReq
 	}
 
 	readAt := time.Now()
-	err = cs.chatRepository.MarkReadUpTo(ctx, request.ChatId, request.UserId, readAt, message)
-	if err != nil {
-		return domain.ServerError("failed to mark chat as read", err)
+
+	var msgs []outbox.Message
+	if message != nil {
+		msgs = []outbox.Message{{
+			Topic:       events.ChatMessageRead,
+			AggregateID: request.ChatId,
+			Payload: &events.ChatMessageReadPayload{
+				ChatID:    request.ChatId,
+				MessageID: message.Id,
+				Read: domain.ChatMessageRead{
+					MessageId: message.Id,
+					UserId:    request.UserId,
+					ReadAt:    readAt,
+				},
+			},
+		}}
 	}
 
-	if message != nil {
-		err = cs.publisher.Publish(ctx, events.ChatMessageRead, &events.ChatMessageReadPayload{
-			ChatID:    request.ChatId,
-			MessageID: message.Id,
-			Read: domain.ChatMessageRead{
-				MessageId: message.Id,
-				UserId:    request.UserId,
-				ReadAt:    readAt,
-			},
-		})
-		if err != nil {
-			return domain.ServerError("failed to publish chat read event", err)
-		}
+	err = cs.chatRepository.MarkReadUpTo(ctx, request.ChatId, request.UserId, readAt, message, msgs...)
+	if err != nil {
+		return domain.ServerError("failed to mark chat as read", err)
 	}
 
 	return nil
