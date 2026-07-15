@@ -116,7 +116,7 @@ services:
       - "traefik.http.services.websocket-service.loadbalancer.server.port=${WEBSOCKET_SERVICE_PORT:-3336}"
 
   gateway:
-    image: traefik:v3.1
+    image: traefik:v3.6.17
     container_name: gateway_projectmanagement_${ENV_NAME}
     command:
       - "--providers.docker=true"
