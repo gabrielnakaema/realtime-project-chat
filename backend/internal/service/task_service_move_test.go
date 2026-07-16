@@ -185,6 +185,8 @@ func TestTaskService_Move(t *testing.T) {
 				assert.NoError(t, err)
 				assert.NotNil(t, task)
 				assert.Equal(t, tt.expectedOrder, task.Order)
+				assert.Equal(t, []uuid.UUID{tt.request.ProjectColumnId}, mockRepo.moveLockColumns,
+					"move must run inside the destination column's advisory lock")
 			} else {
 				assert.Error(t, err)
 			}

@@ -25,6 +25,7 @@ type taskRepository interface {
 	GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, projectColumnID uuid.UUID) (*domain.Task, error)
 	GetProjectTaskAfterId(ctx context.Context, id uuid.UUID, projectId uuid.UUID) (*domain.Task, error)
 	MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error)
+	WithProjectColumnMoveLock(ctx context.Context, projectColumnID uuid.UUID, fn func(context.Context) error) error
 	CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error)
 	ListUserDueTasks(ctx context.Context, userId uuid.UUID, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 	SearchTasksForUser(ctx context.Context, userId uuid.UUID, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
@@ -599,52 +600,53 @@ func (ts *TaskService) moveLoadedTask(ctx context.Context, oldTask *domain.Task,
 		return nil, err
 	}
 
-	newOrder, err := ts.calculateOrder(ctx, request)
-	if err != nil {
-		var domainErr domain.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("task not found")
+	var updatedTask *domain.Task
+	err = ts.taskRepository.WithProjectColumnMoveLock(ctx, request.ProjectColumnId, func(ctx context.Context) error {
+		newOrder, err := ts.calculateOrder(ctx, request)
+		if err != nil {
+			return err
+		}
+
+		task := domain.Task{
+			Id:              request.TaskId,
+			ProjectId:       request.ProjectId,
+			Order:           newOrder,
+			Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
+			ProjectColumnId: request.ProjectColumnId,
+			ProjectColumn:   projectColumn,
+		}
+
+		if projectColumn.IsDoneColumn {
+			now := time.Now()
+			task.DoneAt = &now
+		}
+
+		moved, err := ts.taskRepository.MoveTask(ctx, &task, request.RequestUserId, func(moved *domain.Task) []outbox.Message {
+			var previousProjectColumnID *uuid.UUID
+			if oldTask.ProjectColumnId != moved.ProjectColumnId {
+				previousProjectColumnID = &oldTask.ProjectColumnId
 			}
-			return nil, domainErr
-		}
-		return nil, domain.ServerError("failed to calculate order", err)
-	}
 
-	task := domain.Task{
-		Id:              request.TaskId,
-		ProjectId:       request.ProjectId,
-		Order:           newOrder,
-		Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
-		ProjectColumnId: request.ProjectColumnId,
-		ProjectColumn:   projectColumn,
-	}
-
-	if projectColumn.IsDoneColumn {
-		now := time.Now()
-		task.DoneAt = &now
-	}
-
-	updatedTask, err := ts.taskRepository.MoveTask(ctx, &task, request.RequestUserId, func(moved *domain.Task) []outbox.Message {
-		// Only include previous status if it changed
-		var previousProjectColumnID *uuid.UUID
-		if oldTask.ProjectColumnId != moved.ProjectColumnId {
-			previousProjectColumnID = &oldTask.ProjectColumnId
-		}
-
-		return []outbox.Message{{
-			Topic:       events.TaskUpdated,
-			AggregateID: moved.Id,
-			Payload: &events.TaskUpdatedPayload{
-				Task:         *moved,
-				PreviousTask: oldTask,
-				ActionOrigin: domain.ActionOriginFromContext(ctx),
-				User: domain.User{
-					Id: request.RequestUserId,
+			return []outbox.Message{{
+				Topic:       events.TaskUpdated,
+				AggregateID: moved.Id,
+				Payload: &events.TaskUpdatedPayload{
+					Task:         *moved,
+					PreviousTask: oldTask,
+					ActionOrigin: domain.ActionOriginFromContext(ctx),
+					User: domain.User{
+						Id: request.RequestUserId,
+					},
+					PreviousProjectColumnID: previousProjectColumnID,
 				},
-				PreviousProjectColumnID: previousProjectColumnID,
-			},
-		}}
+			}}
+		})
+		if err != nil {
+			return err
+		}
+
+		updatedTask = moved
+		return nil
 	})
 	if err != nil {
 		var domainErr domain.DomainError

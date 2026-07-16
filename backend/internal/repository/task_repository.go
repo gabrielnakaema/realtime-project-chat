@@ -280,8 +280,9 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 		}
 	}
 
-	if len(projectColumnIDs) > 0 {
-		params.ProjectColumnIds = projectColumnIDs
+	params.ProjectColumnIds = projectColumnIDs
+	if params.ProjectColumnIds == nil {
+		params.ProjectColumnIds = []uuid.UUID{}
 	}
 
 	results, err := q.ListTasksByProjectId(ctx, params)
@@ -475,8 +476,6 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task, buildEv
 		return err
 	}
 
-	// The version and updated_at are assigned by the database, so reflect the
-	// freshly-persisted values on the task before building the outbox event.
 	task.Version = int(updated.Version)
 	task.UpdatedAt = updated.UpdatedAt.Time
 
@@ -647,6 +646,24 @@ func (tr *TaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.UUI
 	}
 
 	return &task, nil
+}
+
+func (tr *TaskRepository) WithProjectColumnMoveLock(ctx context.Context, projectColumnID uuid.UUID, fn func(context.Context) error) error {
+	tx, err := tr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", projectColumnID.String()); err != nil {
+		return err
+	}
+
+	if err := fn(ctx); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error) {

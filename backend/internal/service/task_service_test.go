@@ -19,7 +19,8 @@ import (
 
 type mockTaskRepository struct {
 	mock.Mock
-	builtEvents []outbox.Message
+	builtEvents     []outbox.Message
+	moveLockColumns []uuid.UUID
 }
 
 func mustGenerateTestOrder(t *testing.T, left, right string) string {
@@ -103,6 +104,11 @@ func (m *mockTaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.Task), args.Error(1)
+}
+
+func (m *mockTaskRepository) WithProjectColumnMoveLock(ctx context.Context, projectColumnID uuid.UUID, fn func(context.Context) error) error {
+	m.moveLockColumns = append(m.moveLockColumns, projectColumnID)
+	return fn(ctx)
 }
 
 func (m *mockTaskRepository) MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error) {
