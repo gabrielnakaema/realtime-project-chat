@@ -1,5 +1,7 @@
 import dompurify from 'dompurify';
 
+export const richTextListClassName = '[&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6';
+
 export const sanitizeHTML = (html: string) => {
   return dompurify.sanitize(html);
 };

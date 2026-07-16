@@ -1,7 +1,8 @@
 import { TaskStatusBadge } from '../task-status-badge';
 import { TaskDataGrid } from './task-data-grid';
 import type { Task } from '@/types/task';
-import { isHtmlContentEmpty, sanitizeHTML } from '@/utils/html';
+import { isHtmlContentEmpty, richTextListClassName, sanitizeHTML } from '@/utils/html';
+import { cn } from '@/lib/utils';
 
 interface TaskOverviewSectionProps {
   task: Task;
@@ -22,7 +23,10 @@ export const TaskOverviewSection = ({ task }: TaskOverviewSectionProps) => {
           {isHtmlContentEmpty(task.description) ? (
             <p className="m-0 text-slate-500 dark:text-slate-400">No description provided yet.</p>
           ) : (
-            <div dangerouslySetInnerHTML={{ __html: sanitizeHTML(task.description) }} />
+            <div
+              className={cn(richTextListClassName)}
+              dangerouslySetInnerHTML={{ __html: sanitizeHTML(task.description) }}
+            />
           )}
         </div>
       </div>

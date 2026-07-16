@@ -1,7 +1,8 @@
 import { Link } from '@tanstack/react-router';
 import type { Project } from '@/types/project';
 import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
-import { sanitizeHTML } from '@/utils/html';
+import { richTextListClassName, sanitizeHTML } from '@/utils/html';
+import { cn } from '@/lib/utils';
 
 interface ProjectCardProps {
   project: Project;
@@ -69,7 +70,10 @@ export const ProjectCardSkeleton = ({ className }: { className?: string }) => {
 const ProjectCardDescription = ({ description }: { description: string }) => {
   return (
     <div
-      className="line-clamp-3 max-h-16 min-h-16 overflow-hidden text-sm text-ellipsis text-slate-600 dark:text-slate-400"
+      className={cn(
+        'line-clamp-3 max-h-16 min-h-16 overflow-hidden text-sm text-ellipsis text-slate-600 dark:text-slate-400',
+        richTextListClassName,
+      )}
       dangerouslySetInnerHTML={{ __html: sanitizeHTML(description) }}
     />
   );

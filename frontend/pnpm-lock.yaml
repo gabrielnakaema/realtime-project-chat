@@ -23,6 +23,9 @@ importers:
       '@lexical/html':
         specifier: ^0.40.0
         version: 0.40.0
+      '@lexical/list':
+        specifier: ^0.40.0
+        version: 0.40.0
       '@lexical/react':
         specifier: ^0.40.0
         version: 0.40.0(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(yjs@13.6.29)

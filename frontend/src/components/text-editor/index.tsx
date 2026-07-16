@@ -4,8 +4,10 @@ import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
+import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
+import { ListItemNode, ListNode } from '@lexical/list';
 import { $getRoot, $insertNodes, ParagraphNode, TextNode } from 'lexical';
 
 import { ToolbarPlugin } from './toolbar-plugin';
@@ -19,7 +21,7 @@ const editorConfig = {
     import: constructImportMap(),
   },
   namespace: 'TextEditor',
-  nodes: [ParagraphNode, TextNode],
+  nodes: [ParagraphNode, TextNode, ListNode, ListItemNode],
   onError(error: Error) {
     throw error;
   },
@@ -69,7 +71,7 @@ export const TextEditor = ({ initialValue, onChange, label, id, error, placehold
             <RichTextPlugin
               contentEditable={
                 <ContentEditable
-                  className="relative min-h-40 p-4 font-sans text-base text-gray-700 outline-none dark:text-slate-100"
+                  className="relative min-h-40 p-4 font-sans text-base text-gray-700 outline-none dark:text-slate-100 [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
                   aria-placeholder={placeholder ?? ''}
                   placeholder={
                     <div className="absolute top-4 left-4 font-sans text-base text-slate-400 dark:text-slate-500">
@@ -83,6 +85,7 @@ export const TextEditor = ({ initialValue, onChange, label, id, error, placehold
             />
             <OnChangePlugin onChange={handleChange} />
             <HistoryPlugin />
+            <ListPlugin />
             <AutoFocusPlugin />
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}

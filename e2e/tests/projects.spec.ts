@@ -6,6 +6,7 @@ import {
   loginAsUser,
 } from "../src/fixtures/authenticated-page.js";
 import { registerUser } from "../src/fixtures/test-user.js";
+import { fillRichTextList } from "../src/fixtures/rich-text-editor.js";
 import type { Locator, Page } from "@playwright/test";
 
 async function fillRichText(editor: Locator, page: Page, value: string) {
@@ -148,6 +149,55 @@ test.describe("projects", () => {
 
     await expect(createDialog.getByText("Name is required")).toBeVisible();
     await expect(createDialog).toBeVisible();
+  });
+
+  test("project descriptions preserve numbered lists through settings and reload", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Project List ${crypto.randomUUID()}`;
+    const listItems = ["Create the project", "Review the workflow"];
+
+    await page
+      .getByRole("banner")
+      .getByRole("button", { name: "Create project" })
+      .click();
+
+    const createDialog = page.getByRole("dialog", { name: "Create project" });
+    await createDialog.locator("#name").fill(projectName);
+    await fillRichTextList(createDialog, "numbered", listItems);
+    await createDialog.getByRole("button", { name: "Create project" }).click();
+
+    await expectToast(page, "Project created successfully");
+    await page.getByRole("link", { name: new RegExp(projectName) }).click();
+    await page.getByRole("button", { name: "View details" }).click();
+
+    let detailsSheet = page.getByRole("dialog", { name: projectName });
+    let renderedList = detailsSheet.locator("ol").filter({
+      hasText: listItems[0],
+    });
+    await expect(renderedList.locator("li")).toHaveText(listItems);
+    await expect(renderedList).toHaveCSS("list-style-type", "decimal");
+
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Settings" }).click();
+
+    const settingsDialog = page.getByRole("dialog", {
+      name: "Project settings",
+    });
+    await expect(settingsDialog.locator("#description ol > li")).toHaveText(
+      listItems
+    );
+    await settingsDialog.getByRole("button", { name: "Save changes" }).click();
+    await expectToast(page, "Project saved successfully");
+
+    await page.reload();
+    await page.getByRole("button", { name: "View details" }).click();
+    detailsSheet = page.getByRole("dialog", { name: projectName });
+    renderedList = detailsSheet.locator("ol").filter({
+      hasText: listItems[0],
+    });
+    await expect(renderedList.locator("li")).toHaveText(listItems);
+    await expect(renderedList).toHaveCSS("list-style-type", "decimal");
   });
 
   test("user can find a project through global search and open it", async ({
