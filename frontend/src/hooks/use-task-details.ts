@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { reconcileTask } from './task-board-cache';
 import { archiveTask, getTask } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
 
@@ -13,9 +14,9 @@ export const useTaskDetails = (taskId: string, open: boolean, onClose: () => voi
 
   const { mutate: archive, isPending: isArchiving } = useMutation({
     mutationFn: () => archiveTask(taskId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys._allGrouped() });
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys._allCounts() });
+    onSuccess: (archivedTask) => {
+      reconcileTask(queryClient, archivedTask);
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.archived(archivedTask.project_id) });
       onClose();
     },
   });

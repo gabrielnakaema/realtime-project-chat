@@ -83,15 +83,6 @@ export interface TaskChange {
   subject: User | null;
 }
 
-export interface ListTasksRequest {
-  projectId: string;
-  projectColumnIds: string[];
-  archived: boolean;
-  taskOrder: string;
-  updatedAt: null | string;
-  limit: number;
-}
-
 export interface ListUserDueTasksRequest {
   cursorDueDate: null | string;
   cursorUpdatedAt: null | string;

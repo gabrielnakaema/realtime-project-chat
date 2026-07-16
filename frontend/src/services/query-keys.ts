@@ -1,5 +1,8 @@
-import type { ListTasksRequest } from '@/types/task';
-import type { SearchProjectTasksForDependenciesRequest, SearchTasksForUserRequest, SuggestTaskCodesRequest } from './tasks';
+import type {
+  SearchProjectTasksForDependenciesRequest,
+  SearchTasksForUserRequest,
+  SuggestTaskCodesRequest,
+} from './tasks';
 
 export interface TaskCommentsQueryKeyState {
   taskId: string;
@@ -44,9 +47,12 @@ export const taskQueryKeys = {
       limit: options?.limit ?? null,
     },
   ],
-  list: (request: ListTasksRequest) => ['tasks', 'list', request],
-  listGroupedByProjectId: (request: ListTasksRequest) => ['tasks', 'list', 'grouped', request],
-  countByColumn: (projectId: string, projectColumnIds: string[]) => ['tasks', 'count', { projectId, projectColumnIds }],
+
+  board: (projectId: string) => ['tasks', 'board', projectId] as const,
+  boardColumn: (projectId: string, columnId: string) => ['tasks', 'board', projectId, columnId] as const,
+  counts: (projectId: string) => ['tasks', 'count', projectId] as const,
+  countsFor: (projectId: string, columnIds: string[]) => ['tasks', 'count', projectId, { columnIds }] as const,
+  archived: (projectId: string) => ['tasks', 'archived', projectId] as const,
   listUserDueTasks: ['tasks', 'list', 'user'],
   search: (request: SearchTasksForUserRequest) => ['tasks', 'search', request],
   searchProjectDependencies: (request: SearchProjectTasksForDependenciesRequest) => [
@@ -55,9 +61,6 @@ export const taskQueryKeys = {
     request,
   ],
   codeSuggestions: (request: SuggestTaskCodesRequest) => ['tasks', 'code-suggestions', request],
-
-  _allGrouped: () => ['tasks', 'list', 'grouped'] as const,
-  _allCounts: () => ['tasks', 'count'] as const,
 } as const;
 
 export const chatMessageQueryKeys = {

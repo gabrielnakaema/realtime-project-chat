@@ -2,13 +2,12 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import { useMemo, useState } from 'react';
 import type { CursorPaginated } from '@/types/paginated';
 import type { Project } from '@/types/project';
-import type { ListTasksRequest, Task } from '@/types/task';
+import type { Task } from '@/types/task';
 import { DEFAULT_TASK_LIMIT } from '@/constants/tasks';
+import { reconcileTask } from '@/hooks/task-board-cache';
 import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { taskQueryKeys } from '@/services/query-keys';
-import { listGroupedTasksByProjectId, restoreTask } from '@/services/tasks';
-
-type ArchivedTasksPage = Record<string, CursorPaginated<Task>>;
+import { listColumnTasks, restoreTask } from '@/services/tasks';
 
 interface ArchivedTasksPageParam {
   taskOrder: string;
@@ -25,27 +24,12 @@ const INITIAL_ARCHIVED_TASKS_PAGE_PARAM: ArchivedTasksPageParam = {
   updatedAt: null,
 };
 
-export function buildArchivedTasksRequest(
-  projectId: string,
-  pageParam: ArchivedTasksPageParam = INITIAL_ARCHIVED_TASKS_PAGE_PARAM,
-): ListTasksRequest {
-  return {
-    projectId,
-    projectColumnIds: [],
-    archived: true,
-    taskOrder: pageParam.taskOrder,
-    updatedAt: pageParam.updatedAt,
-    limit: DEFAULT_TASK_LIMIT,
-  };
-}
-
-export function getNextArchivedTasksPageParam(lastPage: ArchivedTasksPage): ArchivedTasksPageParam | undefined {
-  const firstColumn = Object.values(lastPage)[0];
-  if (!firstColumn.has_next) {
+export function getNextArchivedTasksPageParam(lastPage: CursorPaginated<Task>): ArchivedTasksPageParam | undefined {
+  if (!lastPage.has_next) {
     return undefined;
   }
 
-  const lastTask = firstColumn.data.at(-1);
+  const lastTask = lastPage.data.at(-1);
   if (!lastTask) {
     return undefined;
   }
@@ -56,23 +40,26 @@ export function getNextArchivedTasksPageParam(lastPage: ArchivedTasksPage): Arch
   };
 }
 
-export function flattenArchivedTasks(pages?: ArchivedTasksPage[]) {
-  return pages?.flatMap((page) => Object.values(page).flatMap((column) => column.data)) ?? [];
-}
-
 export const useArchivedTasksList = (project: Project, open: boolean) => {
   const queryClient = useQueryClient();
   const [pickingStatusForTaskId, setPickingStatusForTaskId] = useState<string | null>(null);
 
   const query = useInfiniteQuery({
-    queryKey: taskQueryKeys.listGroupedByProjectId(buildArchivedTasksRequest(project.id)),
-    queryFn: ({ pageParam }) => listGroupedTasksByProjectId(buildArchivedTasksRequest(project.id, pageParam)),
+    queryKey: taskQueryKeys.archived(project.id),
+    queryFn: ({ pageParam }) =>
+      listColumnTasks({
+        projectId: project.id,
+        archived: true,
+        limit: DEFAULT_TASK_LIMIT,
+        taskOrder: pageParam.taskOrder,
+        updatedAt: pageParam.updatedAt,
+      }),
     getNextPageParam: getNextArchivedTasksPageParam,
     initialPageParam: INITIAL_ARCHIVED_TASKS_PAGE_PARAM,
     enabled: open,
   });
 
-  const archivedTasks = useMemo(() => flattenArchivedTasks(query.data?.pages), [query.data]);
+  const archivedTasks = useMemo(() => query.data?.pages.flatMap((page) => page.data) ?? [], [query.data]);
 
   const {
     mutate: restore,
@@ -80,13 +67,10 @@ export const useArchivedTasksList = (project: Project, open: boolean) => {
     variables: restoreVariables,
   } = useMutation({
     mutationFn: ({ taskId, projectColumnId }: RestoreArchivedTaskInput) => restoreTask(taskId, projectColumnId),
-    onSuccess: () => {
+    onSuccess: (restoredTask) => {
       setPickingStatusForTaskId(null);
-      queryClient.invalidateQueries({
-        queryKey: taskQueryKeys.listGroupedByProjectId(buildArchivedTasksRequest(project.id)),
-      });
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys._allGrouped() });
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys._allCounts() });
+      reconcileTask(queryClient, restoredTask);
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.archived(project.id) });
     },
   });
 

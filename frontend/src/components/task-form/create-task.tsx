@@ -21,6 +21,7 @@ import type { SubmitHandler } from 'react-hook-form';
 import type { ITaskForm } from '@/schemas/task-schema';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { handleSuccess } from '@/utils/handle-success';
+import { reconcileTask } from '@/hooks/task-board-cache';
 import { createTask } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
 import { taskSchema } from '@/schemas/task-schema';
@@ -75,9 +76,10 @@ export const CreateTask = ({
 
   const { mutate, isPending } = useMutation({
     mutationFn: createTask,
-    onSuccess: () => {
+    onSuccess: (task) => {
       handleSuccess('Task created successfully');
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+      reconcileTask(queryClient, task);
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.listUserDueTasks });
       setOpen(false);
       reset({
         project_column_id: initialProjectColumnId,

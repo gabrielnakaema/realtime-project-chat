@@ -1,8 +1,10 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useCallback } from 'react';
+import { sortedColumnTasks } from './task-board-cache';
+import type { BoardColumnPage, ColumnCache } from './task-board-cache';
 import { useInfiniteScrollObserver } from '@/hooks/use-infinite-scroll-observer';
 import { taskQueryKeys } from '@/services/query-keys';
-import { listGroupedTasksByProjectId } from '@/services/tasks';
+import { listColumnTasks } from '@/services/tasks';
 
 interface UseBoardColumnTasksProps {
   projectId: string;
@@ -17,53 +19,40 @@ interface PageParam {
 
 export const useBoardColumnTasks = ({ projectId, columnId, limit }: UseBoardColumnTasksProps) => {
   const infiniteQueryResult = useInfiniteQuery({
-    queryKey: taskQueryKeys.listGroupedByProjectId({
-      projectId,
-      projectColumnIds: [columnId],
-      archived: false,
-      limit,
-      taskOrder: '',
-      updatedAt: null,
-    }),
-    queryFn: ({ pageParam }) => {
-      return listGroupedTasksByProjectId({
+    // eslint-disable-next-line @tanstack/query/exhaustive-deps
+    queryKey: taskQueryKeys.boardColumn(projectId, columnId),
+    queryFn: async ({ pageParam }): Promise<BoardColumnPage> => {
+      const page = await listColumnTasks({
         projectId,
-        projectColumnIds: [columnId],
+        columnId,
         archived: false,
+        limit,
         taskOrder: pageParam.taskOrder,
         updatedAt: pageParam.updatedAt,
-        limit,
       });
-    },
-    getNextPageParam: (lastPage) => {
-      if (!lastPage[columnId].has_next) {
-        return undefined;
-      }
 
-      const lastTask = lastPage[columnId].data[lastPage[columnId].data.length - 1];
-
+      const lastTask = page.data.at(-1);
       return {
-        taskOrder: lastTask.order,
-        updatedAt: lastTask.updated_at,
+        ...page,
+        cursor: lastTask ? { taskOrder: lastTask.order, updatedAt: lastTask.updated_at } : null,
       };
     },
+    getNextPageParam: (lastPage): PageParam | undefined =>
+      lastPage.has_next && lastPage.cursor ? lastPage.cursor : undefined,
     initialPageParam: {
       taskOrder: '',
       updatedAt: null,
     } as PageParam,
+    select: useCallback((data: ColumnCache) => sortedColumnTasks(data), []),
   });
   const { fetchNextPage } = infiniteQueryResult;
-
-  const columnTasks = useMemo(() => {
-    return infiniteQueryResult.data?.pages.flatMap((page) => page[columnId].data) ?? [];
-  }, [infiniteQueryResult.data, columnId]);
 
   const sentinelRef = useInfiniteScrollObserver<HTMLDivElement>({
     onLoadMore: fetchNextPage,
   });
 
   return {
-    columnTasks,
+    columnTasks: infiniteQueryResult.data ?? [],
     queryResult: infiniteQueryResult,
     sentinelRef,
   };

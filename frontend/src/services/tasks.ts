@@ -1,15 +1,8 @@
 import { parse } from 'date-fns';
 import { api } from './api';
-import type {
-  ListTasksRequest,
-  ListUserDueTasksRequest,
-  Task,
-  TaskCodeSuggestion,
-  TaskComment,
-  TaskDependencyRef,
-} from '@/types/task';
+import type { ListUserDueTasksRequest, Task, TaskCodeSuggestion, TaskComment, TaskDependencyRef } from '@/types/task';
 import type { ITaskForm } from '@/schemas/task-schema';
-import type { CursorPaginated, Paginated } from '@/types/paginated';
+import type { CursorPaginated } from '@/types/paginated';
 
 export const countTasksByColumn = async (projectId: string, projectColumnIds: string[]) => {
   const searchParams = new URLSearchParams();
@@ -26,52 +19,33 @@ export const countTasksByColumn = async (projectId: string, projectColumnIds: st
   return json;
 };
 
-export const listGroupedTasksByProjectId = async (request: ListTasksRequest) => {
+export interface ListColumnTasksRequest {
+  projectId: string;
+  columnId?: string;
+  archived: boolean;
+  limit: number;
+  taskOrder?: string;
+  updatedAt?: string | null;
+}
+
+export const listColumnTasks = async (request: ListColumnTasksRequest) => {
   const searchParams = new URLSearchParams();
   searchParams.set('project_id', request.projectId);
-  if (request.projectColumnIds.length > 0) {
-    searchParams.set('project_column_ids', request.projectColumnIds.join(','));
+  if (request.columnId) {
+    searchParams.set('project_column_ids', request.columnId);
   }
   searchParams.set('archived', String(request.archived));
+  searchParams.set('limit', request.limit.toString());
   if (request.taskOrder) {
     searchParams.set('task_order', request.taskOrder);
   }
-
-  if (request.limit) {
-    searchParams.set('limit', request.limit.toString());
-  }
-
   if (request.updatedAt) {
     searchParams.set('updated_at', request.updatedAt);
   }
 
-  const response = await api.get('tasks/group-by-column', {
-    searchParams,
-  });
+  const response = await api.get('tasks', { searchParams });
 
-  const json = await response.json<Record<string, CursorPaginated<Task>>>();
-  return json;
-};
-
-export const listTasksByProjectId = async (request: ListTasksRequest) => {
-  const searchParams = new URLSearchParams();
-  searchParams.set('project_id', request.projectId);
-  if (request.projectColumnIds.length > 0) {
-    searchParams.set('project_column_ids', request.projectColumnIds.join(','));
-  }
-  searchParams.set('archived', String(request.archived));
-  if (request.taskOrder) {
-    searchParams.set('task_order', request.taskOrder);
-  }
-  if (request.limit) {
-    searchParams.set('limit', request.limit.toString());
-  }
-
-  const response = await api.get('tasks', {
-    searchParams,
-  });
-
-  const json = await response.json<Paginated<Task>>();
+  const json = await response.json<CursorPaginated<Task>>();
   return json;
 };
 

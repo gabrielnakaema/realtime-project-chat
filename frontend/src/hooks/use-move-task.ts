@@ -1,7 +1,41 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { findTaskInBoardCaches, reconcileTaskInBoard } from './task-cache-helpers';
+import { findTaskOnBoard, invalidateBoard, reconcileTask, sortedColumnTasks } from './task-board-cache';
+import type { ColumnCache } from './task-board-cache';
+import type { QueryClient } from '@tanstack/react-query';
+import { generateKeyBetween } from '@/lib/fracindex';
 import { taskQueryKeys } from '@/services/query-keys';
 import { moveTask } from '@/services/tasks';
+
+const computeProvisionalOrder = (
+  queryClient: QueryClient,
+  projectId: string,
+  columnId: string,
+  taskId: string,
+  afterTaskId: string | null,
+): string | undefined => {
+  const cache = queryClient.getQueryData<ColumnCache>(taskQueryKeys.boardColumn(projectId, columnId));
+  const neighbors = sortedColumnTasks(cache).filter((t) => t.id !== taskId);
+
+  let left = '';
+  let right = '';
+  if (afterTaskId === null) {
+    right = neighbors[0]?.order ?? '';
+  } else {
+    const afterIndex = neighbors.findIndex((t) => t.id === afterTaskId);
+    if (afterIndex === -1) {
+      left = neighbors.at(-1)?.order ?? '';
+    } else {
+      left = neighbors[afterIndex].order;
+      right = neighbors[afterIndex + 1]?.order ?? '';
+    }
+  }
+
+  try {
+    return generateKeyBetween(left, right);
+  } catch {
+    return undefined;
+  }
+};
 
 export const useMoveTask = () => {
   const queryClient = useQueryClient();
@@ -9,28 +43,41 @@ export const useMoveTask = () => {
   return useMutation({
     mutationFn: moveTask,
     onMutate: async (variables) => {
-      const found = findTaskInBoardCaches(queryClient, variables.projectId, variables.taskId);
-      if (!found) return;
+      const found = findTaskOnBoard(queryClient, variables.projectId, variables.taskId);
+      if (!found) return { sourceColumnId: undefined };
 
       const { task: taskSnapshot, columnId: sourceColumnId } = found;
 
-      await queryClient.cancelQueries({ queryKey: taskQueryKeys._allGrouped() });
+      await queryClient.cancelQueries({ queryKey: taskQueryKeys.board(variables.projectId) });
 
-      reconcileTaskInBoard(
+      const provisionalOrder = computeProvisionalOrder(
         queryClient,
         variables.projectId,
-        { ...taskSnapshot, project_column_id: variables.projectColumnId },
-        { force: true },
+        variables.projectColumnId,
+        variables.taskId,
+        variables.afterTaskId,
       );
 
-      return { taskSnapshot, sourceColumnId };
+      reconcileTask(
+        queryClient,
+        {
+          ...taskSnapshot,
+          project_column_id: variables.projectColumnId,
+          order: provisionalOrder ?? taskSnapshot.order,
+        },
+        { optimistic: true },
+      );
+
+      return { sourceColumnId };
     },
-    onError: (_err, variables, context) => {
-      if (!context) return;
-      reconcileTaskInBoard(queryClient, variables.projectId, context.taskSnapshot, { force: true });
+    onError: (_err, variables) => {
+      invalidateBoard(queryClient, variables.projectId);
     },
-    onSuccess: (updatedTask, variables) => {
-      reconcileTaskInBoard(queryClient, variables.projectId, updatedTask);
+    onSuccess: (updatedTask, _variables, context) => {
+      reconcileTask(queryClient, updatedTask);
+      if (context.sourceColumnId !== undefined && context.sourceColumnId !== updatedTask.project_column_id) {
+        queryClient.invalidateQueries({ queryKey: taskQueryKeys.counts(updatedTask.project_id) });
+      }
     },
   });
 };

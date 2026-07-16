@@ -11,6 +11,7 @@ import type { SubmitHandler } from 'react-hook-form';
 import type { ITaskForm } from '@/schemas/task-schema';
 import { useProjectMembers } from '@/hooks/use-project-members';
 import { handleSuccess } from '@/utils/handle-success';
+import { reconcileTask } from '@/hooks/task-board-cache';
 import { getTask, updateTask } from '@/services/tasks';
 import { taskQueryKeys } from '@/services/query-keys';
 import { taskSchema } from '@/schemas/task-schema';
@@ -40,8 +41,10 @@ function useEditTaskForm(taskId: string, open: boolean, onOpenChange: (open: boo
 
   const { mutate: submitTask, isPending } = useMutation({
     mutationFn: updateTask,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.all });
+    onSuccess: (updatedTask) => {
+      reconcileTask(queryClient, updatedTask);
+      queryClient.setQueryData(taskQueryKeys.details(updatedTask.id), updatedTask);
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.listUserDueTasks });
       handleSuccess('Task updated successfully');
       onOpenChange(false);
       reset();

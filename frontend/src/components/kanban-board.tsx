@@ -21,10 +21,10 @@ export const KanbanBoard = ({ project }: KanbanBoardProps) => {
     return project.columns.map((column) => column.id).filter(Boolean);
   }, [project.columns]);
 
-  useRealtimeTaskSync(projectId, projectColumnIds);
+  useRealtimeTaskSync(projectId);
 
   const { data: countData } = useQuery({
-    queryKey: taskQueryKeys.countByColumn(projectId, projectColumnIds),
+    queryKey: taskQueryKeys.countsFor(projectId, projectColumnIds),
     queryFn: () => countTasksByColumn(projectId, projectColumnIds),
   });
 
