@@ -4,6 +4,7 @@ import {
   expectToast,
   test,
 } from "../src/fixtures/authenticated-page.js";
+import { fillRichTextList } from "../src/fixtures/rich-text-editor.js";
 import type { Locator, Page } from "@playwright/test";
 
 async function fillRichText(editor: Locator, page: Page, value: string) {
@@ -342,6 +343,66 @@ test.describe("tasks", () => {
     await expect(createDialog.getByText("Title is required")).toBeVisible();
     await expect(createDialog.getByText("Priority is required")).toBeVisible();
     await expect(createDialog).toBeVisible();
+  });
+
+  test("task descriptions preserve bulleted lists through create, edit, and reload", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Task List Project ${crypto.randomUUID()}`;
+    const taskTitle = `E2E Task List ${crypto.randomUUID()}`;
+    const listItems = ["Plan the change", "Verify the result"];
+    const addedItem = "Document the behavior";
+
+    await createProject(page, projectName);
+    await page.getByRole("button", { name: "Create task" }).click();
+
+    const createDialog = page.getByRole("dialog", { name: "Create task" });
+    await createDialog.locator("#title").fill(taskTitle);
+    await fillRichTextList(createDialog, "bulleted", listItems);
+    await selectOption(createDialog, page, "priority", "Medium");
+    await createDialog.getByRole("button", { name: "Create task" }).click();
+
+    await expectToast(page, "Task created successfully");
+
+    let taskDetails = await openTaskDetails(page, taskTitle);
+    let renderedList = taskDetails.locator("ul").filter({
+      hasText: listItems[0],
+    });
+    await expect(renderedList.locator("li")).toHaveText(listItems);
+    await expect(renderedList).toHaveCSS("list-style-type", "disc");
+
+    await taskDetails.getByRole("button", { name: "Edit task" }).click();
+    const editDialog = page.getByRole("dialog", { name: "Edit task" });
+    const editorList = editDialog.locator("#description ul");
+    await expect(editorList.locator("li")).toHaveText(listItems);
+
+    await editorList.locator("li").last().click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type(addedItem);
+    await editDialog.getByRole("button", { name: "Save changes" }).click();
+
+    await expectToast(page, "Task updated successfully");
+    taskDetails = page.getByRole("dialog", { name: taskTitle });
+    renderedList = taskDetails.locator("ul").filter({
+      hasText: listItems[0],
+    });
+    await expect(renderedList.locator("li")).toHaveText([
+      ...listItems,
+      addedItem,
+    ]);
+
+    await page.keyboard.press("Escape");
+    await page.reload();
+    taskDetails = await openTaskDetails(page, taskTitle);
+    renderedList = taskDetails.locator("ul").filter({
+      hasText: listItems[0],
+    });
+    await expect(renderedList.locator("li")).toHaveText([
+      ...listItems,
+      addedItem,
+    ]);
+    await expect(renderedList).toHaveCSS("list-style-type", "disc");
   });
 
   test("project owner can create a task with all optional fields, edit it, and see the activity timeline update", async ({
