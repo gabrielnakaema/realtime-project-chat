@@ -2,7 +2,8 @@ import { Calendar, Crown, Loader2, Users } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { ProjectActivity } from './project-activity';
 import type { Project } from '@/types/project';
-import { sanitizeHTML } from '@/utils/html';
+import { richTextListClassName, sanitizeHTML } from '@/utils/html';
+import { cn } from '@/lib/utils';
 import { formatLongDate } from '@/utils/date';
 import { ProjectMemberRole } from '@/types/project';
 import { useProjectActivities } from '@/hooks/use-project-activities';
@@ -55,7 +56,7 @@ export const ProjectDetailsSheet = ({ project, children }: ProjectDetailsSheetPr
             <div className="flex flex-col gap-2">
               <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">Description</h3>
               <div
-                className="text-sm text-slate-700 dark:text-slate-300"
+                className={cn('text-sm text-slate-700 dark:text-slate-300', richTextListClassName)}
                 dangerouslySetInnerHTML={{ __html: sanitizeHTML(project.description) }}
               />
             </div>

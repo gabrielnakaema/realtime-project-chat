@@ -1,6 +1,12 @@
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { mergeRegister } from '@lexical/utils';
 import {
+  $isListNode,
+  INSERT_ORDERED_LIST_COMMAND,
+  INSERT_UNORDERED_LIST_COMMAND,
+  REMOVE_LIST_COMMAND,
+} from '@lexical/list';
+import {
   $getSelection,
   $isRangeSelection,
   CAN_REDO_COMMAND,
@@ -19,12 +25,15 @@ import {
   AlignRight,
   Bold,
   ItalicIcon,
+  List,
+  ListOrdered,
   Redo,
   Strikethrough,
   Underline,
   Undo,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ListType } from '@lexical/list';
 import { cn } from '@/lib/utils';
 
 export const ToolbarPlugin = () => {
@@ -36,6 +45,7 @@ export const ToolbarPlugin = () => {
   const [isItalic, setIsItalic] = useState(false);
   const [isUnderline, setIsUnderline] = useState(false);
   const [isStrikethrough, setIsStrikethrough] = useState(false);
+  const [listType, setListType] = useState<ListType | null>(null);
 
   const $updateToolbar = useCallback(() => {
     const selection = $getSelection();
@@ -44,6 +54,10 @@ export const ToolbarPlugin = () => {
       setIsItalic(selection.hasFormat('italic'));
       setIsUnderline(selection.hasFormat('underline'));
       setIsStrikethrough(selection.hasFormat('strikethrough'));
+
+      const anchorNode = selection.anchor.getNode();
+      const topLevelElement = anchorNode.getTopLevelElementOrThrow();
+      setListType($isListNode(topLevelElement) ? topLevelElement.getListType() : null);
     }
   }, []);
 
@@ -92,7 +106,7 @@ export const ToolbarPlugin = () => {
 
   return (
     <div
-      className="flex items-center gap-2 rounded-tl-md rounded-tr-md bg-white p-2 dark:bg-slate-700"
+      className="flex flex-wrap items-center gap-2 rounded-tl-md rounded-tr-md bg-white p-2 dark:bg-slate-700"
       ref={toolbarRef}
     >
       <button
@@ -116,6 +130,32 @@ export const ToolbarPlugin = () => {
         type="button"
       >
         <Redo className={cn(iconClassName, canRedo ? activeIconClassName : '')} />
+      </button>
+      <div className={dividerClassName} />
+      <button
+        onClick={() => {
+          editor.dispatchCommand(
+            listType === 'bullet' ? REMOVE_LIST_COMMAND : INSERT_UNORDERED_LIST_COMMAND,
+            undefined,
+          );
+        }}
+        className={cn(iconButtonClassName, listType === 'bullet' ? activeIconButtonClassName : '')}
+        aria-label="Bulleted List"
+        aria-pressed={listType === 'bullet'}
+        type="button"
+      >
+        <List className={cn(iconClassName, listType === 'bullet' ? activeIconClassName : '')} />
+      </button>
+      <button
+        onClick={() => {
+          editor.dispatchCommand(listType === 'number' ? REMOVE_LIST_COMMAND : INSERT_ORDERED_LIST_COMMAND, undefined);
+        }}
+        className={cn(iconButtonClassName, listType === 'number' ? activeIconButtonClassName : '')}
+        aria-label="Numbered List"
+        aria-pressed={listType === 'number'}
+        type="button"
+      >
+        <ListOrdered className={cn(iconClassName, listType === 'number' ? activeIconClassName : '')} />
       </button>
       <div className={dividerClassName} />
       <button
