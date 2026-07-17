@@ -1,7 +1,6 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import type { CursorPaginated } from '@/types/paginated';
-import type { Project } from '@/types/project';
 import type { Task } from '@/types/task';
 import { DEFAULT_TASK_LIMIT } from '@/constants/tasks';
 import { reconcileTask } from '@/hooks/task-board-cache';
@@ -40,15 +39,15 @@ export function getNextArchivedTasksPageParam(lastPage: CursorPaginated<Task>): 
   };
 }
 
-export const useArchivedTasksList = (project: Project, open: boolean) => {
+export const useArchivedTasksList = (projectId: string, open: boolean) => {
   const queryClient = useQueryClient();
   const [pickingStatusForTaskId, setPickingStatusForTaskId] = useState<string | null>(null);
 
   const query = useInfiniteQuery({
-    queryKey: taskQueryKeys.archived(project.id),
+    queryKey: taskQueryKeys.archived(projectId),
     queryFn: ({ pageParam }) =>
       listColumnTasks({
-        projectId: project.id,
+        projectId: projectId,
         archived: true,
         limit: DEFAULT_TASK_LIMIT,
         taskOrder: pageParam.taskOrder,
@@ -70,7 +69,7 @@ export const useArchivedTasksList = (project: Project, open: boolean) => {
     onSuccess: (restoredTask) => {
       setPickingStatusForTaskId(null);
       reconcileTask(queryClient, restoredTask);
-      queryClient.invalidateQueries({ queryKey: taskQueryKeys.archived(project.id) });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.archived(projectId) });
     },
   });
 

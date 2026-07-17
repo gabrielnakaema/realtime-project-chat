@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArchivedTasksModal } from './archived-tasks-modal';
 import { BoardColumn } from './board-column';
-import { CreateTask } from './task-form/create-task';
 import type { Project } from '@/types/project';
 import { ProjectMemberRole } from '@/types/project';
 import { useRealtimeTaskSync } from '@/hooks/use-realtime-task-sync';
@@ -49,15 +47,7 @@ export const KanbanBoard = ({ project }: KanbanBoardProps) => {
 
   return (
     <div className="h-full">
-      <div className="flex items-center justify-between pb-6">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Task Board</h2>
-          {isOwner && <ArchivedTasksModal project={project} />}
-        </div>
-        <CreateTask projectId={projectId} initialProjectColumnId={project.columns[0]?.id} />
-      </div>
-
-      <div className="flex h-[calc(100vh-200px)] w-full max-w-full gap-6 overflow-x-auto pb-3">
+      <div className="flex h-[calc(100vh-100px)] w-full max-w-full gap-6 overflow-x-auto pb-3">
         {columns.map((column) => (
           <BoardColumn canEditColumns={isOwner} column={column} key={column.id} />
         ))}

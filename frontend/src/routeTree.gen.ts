@@ -19,6 +19,7 @@ import { Route as ProtectedProjectsRouteRouteImport } from './routes/_protected/
 import { Route as ProtectedSearchIndexRouteImport } from './routes/_protected/search/index'
 import { Route as ProtectedProjectsIndexRouteImport } from './routes/_protected/projects/index'
 import { Route as ProtectedProjectsProjectIdIndexRouteImport } from './routes/_protected/projects/$projectId/index'
+import { Route as ProtectedProjectsProjectIdSettingsRouteImport } from './routes/_protected/projects/$projectId/settings'
 import { Route as ProtectedProjectsProjectIdChatRouteImport } from './routes/_protected/projects/$projectId/chat'
 
 const SignUpRoute = SignUpRouteImport.update({
@@ -71,6 +72,12 @@ const ProtectedProjectsProjectIdIndexRoute =
     path: '/$projectId/',
     getParentRoute: () => ProtectedProjectsRouteRoute,
   } as any)
+const ProtectedProjectsProjectIdSettingsRoute =
+  ProtectedProjectsProjectIdSettingsRouteImport.update({
+    id: '/$projectId/settings',
+    path: '/$projectId/settings',
+    getParentRoute: () => ProtectedProjectsRouteRoute,
+  } as any)
 const ProtectedProjectsProjectIdChatRoute =
   ProtectedProjectsProjectIdChatRouteImport.update({
     id: '/$projectId/chat',
@@ -88,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/projects/': typeof ProtectedProjectsIndexRoute
   '/search/': typeof ProtectedSearchIndexRoute
   '/projects/$projectId/chat': typeof ProtectedProjectsProjectIdChatRoute
+  '/projects/$projectId/settings': typeof ProtectedProjectsProjectIdSettingsRoute
   '/projects/$projectId': typeof ProtectedProjectsProjectIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -98,6 +106,7 @@ export interface FileRoutesByTo {
   '/projects': typeof ProtectedProjectsIndexRoute
   '/search': typeof ProtectedSearchIndexRoute
   '/projects/$projectId/chat': typeof ProtectedProjectsProjectIdChatRoute
+  '/projects/$projectId/settings': typeof ProtectedProjectsProjectIdSettingsRoute
   '/projects/$projectId': typeof ProtectedProjectsProjectIdIndexRoute
 }
 export interface FileRoutesById {
@@ -112,6 +121,7 @@ export interface FileRoutesById {
   '/_protected/projects/': typeof ProtectedProjectsIndexRoute
   '/_protected/search/': typeof ProtectedSearchIndexRoute
   '/_protected/projects/$projectId/chat': typeof ProtectedProjectsProjectIdChatRoute
+  '/_protected/projects/$projectId/settings': typeof ProtectedProjectsProjectIdSettingsRoute
   '/_protected/projects/$projectId/': typeof ProtectedProjectsProjectIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/projects/'
     | '/search/'
     | '/projects/$projectId/chat'
+    | '/projects/$projectId/settings'
     | '/projects/$projectId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -136,6 +147,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/search'
     | '/projects/$projectId/chat'
+    | '/projects/$projectId/settings'
     | '/projects/$projectId'
   id:
     | '__root__'
@@ -149,6 +161,7 @@ export interface FileRouteTypes {
     | '/_protected/projects/'
     | '/_protected/search/'
     | '/_protected/projects/$projectId/chat'
+    | '/_protected/projects/$projectId/settings'
     | '/_protected/projects/$projectId/'
   fileRoutesById: FileRoutesById
 }
@@ -231,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedProjectsProjectIdIndexRouteImport
       parentRoute: typeof ProtectedProjectsRouteRoute
     }
+    '/_protected/projects/$projectId/settings': {
+      id: '/_protected/projects/$projectId/settings'
+      path: '/$projectId/settings'
+      fullPath: '/projects/$projectId/settings'
+      preLoaderRoute: typeof ProtectedProjectsProjectIdSettingsRouteImport
+      parentRoute: typeof ProtectedProjectsRouteRoute
+    }
     '/_protected/projects/$projectId/chat': {
       id: '/_protected/projects/$projectId/chat'
       path: '/$projectId/chat'
@@ -244,6 +264,7 @@ declare module '@tanstack/react-router' {
 interface ProtectedProjectsRouteRouteChildren {
   ProtectedProjectsIndexRoute: typeof ProtectedProjectsIndexRoute
   ProtectedProjectsProjectIdChatRoute: typeof ProtectedProjectsProjectIdChatRoute
+  ProtectedProjectsProjectIdSettingsRoute: typeof ProtectedProjectsProjectIdSettingsRoute
   ProtectedProjectsProjectIdIndexRoute: typeof ProtectedProjectsProjectIdIndexRoute
 }
 
@@ -251,6 +272,8 @@ const ProtectedProjectsRouteRouteChildren: ProtectedProjectsRouteRouteChildren =
   {
     ProtectedProjectsIndexRoute: ProtectedProjectsIndexRoute,
     ProtectedProjectsProjectIdChatRoute: ProtectedProjectsProjectIdChatRoute,
+    ProtectedProjectsProjectIdSettingsRoute:
+      ProtectedProjectsProjectIdSettingsRoute,
     ProtectedProjectsProjectIdIndexRoute: ProtectedProjectsProjectIdIndexRoute,
   }
 

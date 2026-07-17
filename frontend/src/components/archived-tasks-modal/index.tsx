@@ -5,13 +5,12 @@ import { EditTask } from '../task-form/edit-task';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { ScrollArea } from '../ui/scroll-area';
 import { ArchivedTasksList } from './archived-tasks-list';
-import type { Project } from '@/types/project';
 
 interface ArchivedTasksModalProps {
-  project: Project;
+  projectId: string;
 }
 
-export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
+export const ArchivedTasksModal = ({ projectId }: ArchivedTasksModalProps) => {
   const [open, setOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -21,7 +20,7 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+        className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-300"
       >
         <Archive className="h-3.5 w-3.5" />
         Archived
@@ -37,7 +36,7 @@ export const ArchivedTasksModal = ({ project }: ArchivedTasksModalProps) => {
           </DialogHeader>
 
           <ScrollArea className="max-h-[60vh]">
-            <ArchivedTasksList project={project} open={open} onSelectTask={setSelectedTaskId} />
+            <ArchivedTasksList projectId={projectId} open={open} onSelectTask={setSelectedTaskId} />
           </ScrollArea>
         </DialogContent>
       </Dialog>

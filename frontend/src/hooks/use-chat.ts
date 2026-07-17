@@ -3,20 +3,17 @@ import { useEffect, useEffectEvent } from 'react';
 import { useChatMessageFeed } from './use-chat-message-feed';
 import { useChatMessageListBehavior } from './use-chat-message-list-behavior';
 import { useOnlineUsers } from './use-online-users';
+import { useProjectDetails } from './use-project-details';
 import { useSocket } from './use-socket';
 import type { SocketEvent } from '@/types/websocket';
 import { isProjectMembershipEvent } from '@/types/websocket';
-import { getChatByProjectId, listMessagesByProjectId } from '@/services/chat';
-import { getProject } from '@/services/projects';
 import { chatMessageQueryKeys, projectChatQueryKeys, projectQueryKeys } from '@/services/query-keys';
+import { getChatByProjectId, listMessagesByProjectId } from '@/services/chat';
 
 export const useProjectChatView = (projectId: string) => {
   const queryClient = useQueryClient();
 
-  const { data: project } = useQuery({
-    queryKey: projectQueryKeys.details(projectId),
-    queryFn: () => getProject(projectId),
-  });
+  const { data: project } = useProjectDetails(projectId);
 
   const { data: chat } = useQuery({
     queryKey: projectChatQueryKeys.detailsByProjectId(projectId),

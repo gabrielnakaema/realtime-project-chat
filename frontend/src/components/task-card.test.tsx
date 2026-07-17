@@ -85,7 +85,13 @@ describe('TaskCard', () => {
       stopEditingTask: vi.fn(),
     });
 
-    render(<TaskCard task={task} onDrop={vi.fn()} />);
+    render(
+      <TaskCard
+        task={task}
+        onDrop={vi.fn()}
+        columnSurface={{ backgroundColor: '', accentColor: '', badgeBackground: '', borderColor: '' }}
+      />,
+    );
 
     fireEvent.click(screen.getByText('Ship prop-drilling fix'));
 

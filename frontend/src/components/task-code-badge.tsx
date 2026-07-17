@@ -15,7 +15,7 @@ export const TaskCodeBadge = ({ code, className }: TaskCodeBadgeProps) => {
   return (
     <span
       className={cn(
-        'inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-md border border-slate-300 bg-slate-100 px-2 py-1 font-mono text-[10px] leading-none font-semibold tracking-[0.08em] text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300',
+        'inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-md font-mono text-[10px] leading-none font-semibold tracking-[0.02em] text-slate-600 dark:text-slate-400',
         className,
       )}
       title={normalizedCode}

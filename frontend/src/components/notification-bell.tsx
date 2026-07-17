@@ -28,7 +28,7 @@ export const NotificationBell = () => {
           className="relative rounded-md p-2 text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
           aria-label="Notifications"
         >
-          <Bell className="h-5 w-5" />
+          <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
               {unreadCount > 99 ? '+99' : unreadCount}
@@ -60,7 +60,9 @@ export const NotificationBell = () => {
         ) : !notifications.length ? (
           <div className="px-4 py-10 text-center">
             <p className="text-sm font-medium text-slate-900 dark:text-slate-100">No notifications yet</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">New assignments and comments will show up here.</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              New assignments and comments will show up here.
+            </p>
           </div>
         ) : (
           <>
@@ -111,7 +113,9 @@ const NotificationRow = ({
         <p className="text-sm text-slate-900 dark:text-slate-100">{getNotificationText(notification)}</p>
         {!notification.read_at && <span className="mt-1 h-2 w-2 rounded-full bg-blue-600" aria-hidden="true" />}
       </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400">{formatRelativeActivityDateString(notification.created_at)}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        {formatRelativeActivityDateString(notification.created_at)}
+      </p>
     </button>
   );
 };

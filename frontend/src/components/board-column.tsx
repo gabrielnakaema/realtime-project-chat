@@ -1,8 +1,10 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { useCallback, useEffect, useRef } from 'react';
+import { Plus } from 'lucide-react';
 import { ProjectColumnActions } from './project-column-actions';
 import { TaskCard } from './task-card';
+import { CreateTask } from './task-form/create-task';
 import type {
   BaseEventPayload,
   DropTargetLocalizedData,
@@ -15,6 +17,7 @@ import { buildProjectColumnSurface } from '@/lib/project-column-colors';
 import { useMoveTask } from '@/hooks/use-move-task';
 import { useBoardColumnTasks } from '@/hooks/use-board-column-tasks';
 import { DEFAULT_TASK_LIMIT } from '@/constants/tasks';
+import { sanitizeHTML } from '@/utils/html';
 
 interface BoardColumnProps {
   column: Column;
@@ -27,11 +30,16 @@ export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
 
   const mutation = useMoveTask();
 
-  const { columnTasks: tasks, sentinelRef } = useBoardColumnTasks({
+  const {
+    columnTasks: tasks,
+    sentinelRef,
+    queryResult,
+  } = useBoardColumnTasks({
     projectId: column.project_id,
     columnId: column.columnId,
     limit: DEFAULT_TASK_LIMIT,
   });
+  const { isLoading } = queryResult;
 
   const handleColumnDrop = useCallback(
     (args: BaseEventPayload<ElementDragType> & DropTargetLocalizedData) => {
@@ -106,27 +114,51 @@ export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
   const surface = buildProjectColumnSurface(column.color);
 
   return (
-    <div
-      key={column.id}
-      className={cn('flex min-w-84 flex-1 shrink-0 flex-col overflow-hidden rounded-2xl border p-4 shadow-sm')}
-      style={{ backgroundColor: surface.backgroundColor, borderColor: surface.borderColor }}
-      ref={columnRef}
-    >
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-slate-900 dark:text-slate-100">{column.title}</h3>
-          <span
-            className="inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium"
-            style={{
-              backgroundColor: surface.badgeBackground,
-              borderColor: surface.borderColor,
-              color: surface.accentColor,
-            }}
-          >
-            {column.total}
-          </span>
+    <div key={column.id} className={cn('flex min-w-84 flex-1 shrink-0 flex-col overflow-hidden')} ref={columnRef}>
+      <div className="mb-4 flex w-full flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-2 min-h-2 w-2 min-w-2 rounded-full" style={{ backgroundColor: surface.accentColor }} />
+            <span
+              className="inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-semibold"
+              style={{
+                backgroundColor: surface.backgroundColor,
+                color: surface.accentColor,
+              }}
+            >
+              {column.total}
+            </span>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{column.title}</h3>
+          </div>
+          <div className="flex items-center gap-3">
+            {column.isDoneColumn && (
+              <div className="w-fit rounded-sm bg-green-500/10 px-1.5 py-0.5 text-[10px] font-bold tracking-[0.04em] text-green-500 uppercase">
+                DONE
+              </div>
+            )}
+            <ProjectColumnActions
+              canEditColumn={canEditColumns}
+              column={column}
+              surfaceAccentColor={surface.accentColor}
+            />
+          </div>
         </div>
-        <ProjectColumnActions canEditColumn={canEditColumns} column={column} surfaceAccentColor={surface.accentColor} />
+
+        <div className="flex w-full items-stretch gap-4">
+          <div
+            className="ml-1 h-full min-w-[2px]"
+            style={{
+              background: surface.borderColor,
+            }}
+          />
+
+          <div
+            className="prose line-clamp-2 truncate overflow-hidden text-xs break-all whitespace-pre-wrap italic dark:text-slate-400"
+            dangerouslySetInnerHTML={{
+              __html: sanitizeHTML(column.description),
+            }}
+          />
+        </div>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto" ref={scrollableRef}>
@@ -135,8 +167,33 @@ export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
             key={task.id}
             task={task}
             onDrop={(edge, droppedTaskId) => handleTaskDrop(edge, droppedTaskId, index)}
+            columnSurface={surface}
           />
         ))}
+
+        {tasks.length === 0 && !isLoading && (
+          <p className="text-center text-xs font-medium tracking-tight dark:text-slate-500">
+            There are no tasks for this column.
+          </p>
+        )}
+
+        <CreateTask
+          projectId={column.project_id}
+          initialProjectColumnId={column.id}
+          trigger={
+            <button
+              type="button"
+              className="mt-4 flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed text-xs font-semibold"
+              style={{
+                borderColor: surface.borderColor,
+                color: surface.accentColor,
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Create task
+            </button>
+          }
+        />
         <div ref={sentinelRef} className="h-1" aria-hidden="true" />
       </div>
     </div>

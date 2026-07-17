@@ -107,7 +107,7 @@ export const ProjectMembersModal = ({ project }: ProjectMembersModalProps) => {
           className="flex w-fit items-center gap-2 rounded-md p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-700"
           title="View project members"
         >
-          <Users className="h-5 w-5 text-slate-500" />
+          <Users className="h-5 w-5 text-slate-300" />
         </button>
       </DialogTrigger>
 

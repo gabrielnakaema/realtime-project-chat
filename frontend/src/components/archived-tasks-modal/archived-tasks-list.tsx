@@ -1,16 +1,20 @@
 import { ArchiveRestore, X } from 'lucide-react';
 import { TaskPriorityBadge } from '../task-priority-badge';
 import { useArchivedTasksList } from './use-archived-tasks-list';
-import type { Project } from '@/types/project';
+import { useProjectDetails } from '@/hooks/use-project-details';
 
 interface ArchivedTasksListProps {
   open: boolean;
   onSelectTask: (taskId: string) => void;
-  project: Project;
+  projectId: string;
 }
 
-export const ArchivedTasksList = ({ project, open, onSelectTask }: ArchivedTasksListProps) => {
-  const columns = project.columns.filter((column) => !!column.id);
+export const ArchivedTasksList = ({ projectId, open, onSelectTask }: ArchivedTasksListProps) => {
+  const { data: project } = useProjectDetails(projectId, {
+    enabled: open,
+  });
+
+  const columns = project?.columns.filter((column) => !!column.id) || [];
   const {
     archivedTasks,
     isFetchingNextPage,
@@ -21,7 +25,7 @@ export const ArchivedTasksList = ({ project, open, onSelectTask }: ArchivedTasks
     restoreTaskToColumn,
     restoringProjectColumnId,
     stopPickingStatus,
-  } = useArchivedTasksList(project, open);
+  } = useArchivedTasksList(project?.id || '', open && !!project?.id);
 
   if (archivedTasks.length === 0 && !isFetchingNextPage) {
     return <p className="py-8 text-center text-sm text-slate-400 dark:text-slate-500">No archived tasks</p>;

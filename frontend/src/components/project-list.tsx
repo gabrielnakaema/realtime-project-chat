@@ -1,15 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
-import { CreateProject } from './project-form/create-project';
 import { ProjectCard, ProjectCardSkeleton } from './project-card';
-import { listProjects } from '@/services/projects';
-import { projectQueryKeys } from '@/services/query-keys';
+import { CreateProject } from './project-form/create-project';
+import { useListProjects } from '@/hooks/use-list-projects';
 
 export const ProjectList = () => {
-  const { data: projects, isLoading } = useQuery({
-    queryKey: projectQueryKeys.list,
-    queryFn: () => listProjects(),
-  });
+  const { data: projects, isLoading } = useListProjects();
 
   if (isLoading) {
     return <ProjectListSkeleton />;
