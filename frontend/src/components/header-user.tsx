@@ -25,8 +25,8 @@ export const HeaderUser = () => {
           <button type="button" className="flex items-center gap-2">
             <div
               className={cn(
-                'text-foreground flex items-center justify-center rounded-full bg-blue-600 text-sm font-medium',
-                'h-8 min-h-8 w-8 min-w-8 border border-transparent hover:outline-2 hover:outline-blue-200',
+                'bg-primary text-primary-foreground flex items-center justify-center rounded-full text-sm font-medium',
+                'hover:outline-primary/30 h-8 min-h-8 w-8 min-w-8 border border-transparent hover:outline-2',
               )}
             >
               {name.charAt(0).toUpperCase()}

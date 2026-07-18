@@ -38,8 +38,8 @@ export const MembersAvatarList = ({ members = [], max = 4, onlineUserIds = [] }:
           <TooltipTrigger>
             <div
               className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-xs font-medium text-white dark:border-slate-800',
-                member.online && 'border-green-500 dark:border-green-500',
+                'border-card bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-medium',
+                member.online && 'border-success',
               )}
             >
               {member.name.charAt(0).toUpperCase()}
@@ -51,8 +51,8 @@ export const MembersAvatarList = ({ members = [], max = 4, onlineUserIds = [] }:
       {remaining > 0 && (
         <Tooltip>
           <TooltipTrigger>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-slate-200 dark:border-slate-800 dark:bg-slate-700">
-              <span className="text-xs font-medium text-slate-600 dark:text-slate-400">+{remaining}</span>
+            <div className="border-card bg-muted flex h-8 w-8 items-center justify-center rounded-full border-2">
+              <span className="text-muted-foreground text-xs font-medium">+{remaining}</span>
             </div>
           </TooltipTrigger>
           <TooltipContent>

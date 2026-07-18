@@ -3,8 +3,7 @@ import { useState } from 'react';
 import { Button } from '../button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 
-const helpCodeBlockClassName =
-  'overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-sm dark:border-slate-700 dark:bg-slate-900';
+const helpCodeBlockClassName = 'overflow-x-auto rounded-xl border border-border bg-muted p-3 font-mono text-sm  ';
 
 export const MCPHelpDialog = ({ serverUrl, rawSecret }: { serverUrl: string; rawSecret?: string }) => {
   const [open, setOpen] = useState(false);
@@ -27,25 +26,25 @@ export const MCPHelpDialog = ({ serverUrl, rawSecret }: { serverUrl: string; raw
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="border-border bg-muted/80 space-y-4 rounded-2xl border p-4">
           <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Quick setup help</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <h3 className="text-foreground text-sm font-semibold">Quick setup help</h3>
+            <p className="text-muted-foreground text-sm">
               Most MCP clients need the server URL plus your key in the `Authorization` header.
             </p>
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Server URL</p>
+            <p className="text-foreground text-sm font-medium">Server URL</p>
             <div className={helpCodeBlockClassName}>{serverUrl}</div>
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Authorization header</p>
+            <p className="text-foreground text-sm font-medium">Authorization header</p>
             <div className={helpCodeBlockClassName}>Authorization: {authorizationExample}</div>
           </div>
 
-          <div className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+          <div className="text-muted-foreground space-y-2 text-sm">
             <p>1. Copy the server URL into your MCP client configuration.</p>
             <p>2. Paste the generated key as a Bearer token in the `Authorization` header.</p>
             <p>3. Keep the key in a secure secret manager or client config, not in shared notes.</p>

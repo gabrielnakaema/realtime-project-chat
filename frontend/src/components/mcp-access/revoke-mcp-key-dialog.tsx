@@ -53,8 +53,8 @@ export const RevokeMCPKeyDialog = ({ isOpen, keyData, onOpenChange }: RevokeMCPK
         <DialogHeader>
           <DialogTitle>Revoke MCP key</DialogTitle>
           <DialogDescription>
-            Revoke <span className="font-medium text-slate-900 dark:text-slate-100">{keyData.name}</span>? Existing MCP
-            clients using this key will stop working immediately.
+            Revoke <span className="text-foreground font-medium">{keyData.name}</span>? Existing MCP clients using this
+            key will stop working immediately.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

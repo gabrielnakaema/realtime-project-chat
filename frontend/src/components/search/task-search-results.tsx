@@ -14,7 +14,7 @@ export const TaskSearchResults = ({ query }: TaskSearchResultsProps) => {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Tasks</h2>
+      <h2 className="text-foreground text-xl font-bold">Tasks</h2>
       {areTasksEmpty ? (
         <SearchEmptyState
           icon={<ListTodo className="h-4 w-4" />}
@@ -22,7 +22,7 @@ export const TaskSearchResults = ({ query }: TaskSearchResultsProps) => {
           description="There are no tasks for your search. Try adjusting your search terms."
         />
       ) : (
-        <div className="flex w-full flex-col gap-4 overflow-hidden rounded-lg border border-slate-200 bg-white p-6 pr-2 transition-shadow hover:shadow-lg dark:border-slate-700 dark:bg-slate-800">
+        <div className="border-border bg-card flex w-full flex-col gap-4 overflow-hidden rounded-lg border p-6 pr-2 transition-shadow hover:shadow-lg">
           <div className="flex max-h-96 w-full flex-col gap-4 overflow-y-auto pr-2">
             {isLoading && <TaskSearchSkeleton />}
 
@@ -56,15 +56,12 @@ export const TaskSearchResults = ({ query }: TaskSearchResultsProps) => {
 
 const TaskSearchSkeleton = () => {
   return Array.from({ length: 5 }).map((_, index) => (
-    <div
-      key={index}
-      className="flex w-full items-center justify-between rounded-md border-b pb-2 dark:border-slate-700"
-    >
+    <div key={index} className="flex w-full items-center justify-between rounded-md border-b pb-2">
       <div className="flex flex-col gap-2">
-        <div className="h-4 w-48 animate-pulse rounded bg-slate-200 dark:bg-slate-600" />
-        <div className="h-3 w-72 animate-pulse rounded bg-slate-200 dark:bg-slate-600" />
+        <div className="bg-muted h-4 w-48 animate-pulse rounded" />
+        <div className="bg-muted h-3 w-72 animate-pulse rounded" />
       </div>
-      <div className="h-4 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-600" />
+      <div className="bg-muted h-4 w-20 animate-pulse rounded" />
     </div>
   ));
 };

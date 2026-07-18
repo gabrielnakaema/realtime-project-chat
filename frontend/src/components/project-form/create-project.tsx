@@ -43,9 +43,9 @@ export const CreateProject = () => {
       </DialogTrigger>
 
       <DialogContent className="flex max-h-[calc(100vh-5rem)] flex-col gap-0 overflow-y-auto p-0 md:max-w-5xl">
-        <DialogHeader className="bg-background sticky top-0 z-10 shrink-0 border-b border-slate-200 px-6 py-5 dark:border-slate-700">
+        <DialogHeader className="bg-background border-border sticky top-0 z-10 shrink-0 border-b px-6 py-5">
           <DialogTitle className="flex items-center gap-2">
-            <FolderKanban className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <FolderKanban className="text-primary h-5 w-5" />
             Create project
           </DialogTitle>
           <DialogDescription>

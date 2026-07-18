@@ -4,20 +4,22 @@ import { ProjectActivityText } from './project-activity-text';
 import type { ProjectActivity as ProjectActivityType } from '@/types/project-activity';
 import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
 
-export const ProjectActivity = ({ activity, showProject = true }: { activity: ProjectActivityType; showProject?: boolean }) => {
+export const ProjectActivity = ({
+  activity,
+  showProject = true,
+}: {
+  activity: ProjectActivityType;
+  showProject?: boolean;
+}) => {
   return (
     <div className="flex items-center gap-4">
       {activityIcons[activity.activity_type]}
       <div className="flex flex-col gap-1">
         <ProjectActivityText activity={activity} />
-        <p className="text-xs text-slate-500 dark:text-slate-400">
+        <p className="text-muted-foreground text-xs">
           {showProject && activity.project && (
             <>
-              <Link
-                to="/projects/$projectId"
-                params={{ projectId: activity.project.id }}
-                className="hover:underline"
-              >
+              <Link to="/projects/$projectId" params={{ projectId: activity.project.id }} className="hover:underline">
                 {activity.project.name}
               </Link>
               {' · '}

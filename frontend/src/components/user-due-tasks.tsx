@@ -31,10 +31,10 @@ export const UserDueTasks = () => {
   if (isLoading) return <UserDueTasksSkeleton />;
 
   return (
-    <section className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 transition-shadow hover:shadow-lg dark:border-slate-700 dark:bg-slate-800">
+    <section className="border-border bg-card flex flex-col gap-6 rounded-lg border p-6 transition-shadow hover:shadow-lg">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Upcoming deadlines</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Tasks assigned to you with approaching due dates</p>
+        <h2 className="text-foreground text-xl font-semibold">Upcoming deadlines</h2>
+        <p className="text-muted-foreground text-sm">Tasks assigned to you with approaching due dates</p>
       </div>
 
       <div className="flex max-h-96 flex-col gap-4 overflow-y-auto pr-1">
@@ -44,7 +44,7 @@ export const UserDueTasks = () => {
             task={task}
             trailingContent={
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500 dark:text-slate-400">{formatMonthDay(task.due_date)}</span>
+                <span className="text-muted-foreground text-sm">{formatMonthDay(task.due_date)}</span>
                 <DueBadge date={task.due_date} />
               </div>
             }
@@ -62,23 +62,23 @@ export const UserDueTasks = () => {
 };
 
 const UserDueTasksSkeleton = () => (
-  <section className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 transition-shadow hover:shadow-lg dark:border-slate-700 dark:bg-slate-800">
+  <section className="border-border bg-card flex flex-col gap-6 rounded-lg border p-6 transition-shadow hover:shadow-lg">
     <div className="flex flex-col gap-1">
-      <div className="h-6 w-48 animate-pulse rounded bg-slate-200 dark:bg-slate-600" />
-      <div className="h-4 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-600" />
+      <div className="bg-muted h-6 w-48 animate-pulse rounded" />
+      <div className="bg-muted h-4 w-64 animate-pulse rounded" />
     </div>
 
     <div className="flex max-h-96 flex-col gap-4 overflow-y-auto pr-1">
       {Array.from({ length: 5 }).map((_, i) => (
         <article
           key={i}
-          className="group flex w-full flex-row items-center justify-between gap-2 border-b border-slate-200 pb-2 dark:border-slate-700"
+          className="group border-border flex w-full flex-row items-center justify-between gap-2 border-b pb-2"
         >
           <div className="flex flex-col gap-1">
-            <div className="h-4 w-48 animate-pulse rounded bg-slate-200 dark:bg-slate-600" />
-            <div className="h-3 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-600" />
+            <div className="bg-muted h-4 w-48 animate-pulse rounded" />
+            <div className="bg-muted h-3 w-24 animate-pulse rounded" />
           </div>
-          <div className="h-4 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-600" />
+          <div className="bg-muted h-4 w-20 animate-pulse rounded" />
         </article>
       ))}
     </div>

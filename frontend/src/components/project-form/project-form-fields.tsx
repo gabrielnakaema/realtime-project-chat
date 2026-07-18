@@ -1,5 +1,5 @@
 import { useFormContext } from 'react-hook-form';
-import { TextEditor } from '../text-editor';
+import { TextEditor } from '../../shared/components/text-editor';
 import { Input } from '../input';
 import { getProjectColumnKey } from './project-form-utils';
 import { ProjectColumnsEditor } from './project-columns-editor';
@@ -38,25 +38,22 @@ export const ProjectFormFields = ({
   const namePlaceholder = mode === 'create' ? 'Website redesign' : 'Enter project name';
   const previewClassName =
     mode === 'create'
-      ? 'rounded-2xl border border-blue-200 bg-blue-50/80 p-4 text-sm text-blue-950 shadow-sm dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100'
-      : 'rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/50';
+      ? 'rounded-2xl border border-primary/30 bg-primary/10 p-4 text-sm text-primary shadow-sm   '
+      : 'rounded-2xl border border-border bg-muted/80 p-4 shadow-sm  ';
   const previewTitle = mode === 'create' ? 'A good flow stays lightweight.' : 'Current workflow';
   const previewDescription =
     mode === 'create'
       ? 'Start with the default three-column board if you want something simple, or add review and testing stages now.'
       : 'Reorder stages, rename them, or remove old steps. Removed columns will ask where their tasks should move.';
-  const previewDescriptionClassName =
-    mode === 'create'
-      ? 'mt-2 text-blue-900/80 dark:text-blue-100/80'
-      : 'mt-1 text-sm text-slate-600 dark:text-slate-400';
+  const previewDescriptionClassName = mode === 'create' ? 'mt-2 text-primary ' : 'mt-1 text-sm text-muted-foreground';
 
   return (
     <>
-      <div className="">
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+      <div>
+        <div className="border-border bg-card space-y-4 rounded-2xl border p-4 shadow-sm">
           <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Project details</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">{detailsCopy}</p>
+            <h3 className="text-foreground text-sm font-semibold">Project details</h3>
+            <p className="text-muted-foreground text-sm">{detailsCopy}</p>
           </div>
 
           <Input
@@ -78,8 +75,8 @@ export const ProjectFormFields = ({
           />
 
           <div className="space-y-1 pt-2">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Repository details</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <h3 className="text-foreground text-sm font-semibold">Repository details</h3>
+            <p className="text-muted-foreground text-sm">
               Keep these optional fields filled in when this board maps to a code repository.
             </p>
           </div>

@@ -32,19 +32,19 @@ export const ProjectDetailsSheet = ({ project, children }: ProjectDetailsSheetPr
 
         <div className="flex flex-col gap-6 overflow-y-auto p-6">
           <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
               <Calendar className="h-4 w-4" />
               <span>Created on {formattedDate}</span>
             </div>
 
             {creator && (
-              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
                 <Crown className="h-4 w-4" />
                 <span>Created by {creator.user.name}</span>
               </div>
             )}
 
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
               <Users className="h-4 w-4" />
               <span>
                 {project.members.length} {project.members.length === 1 ? 'member' : 'members'}
@@ -54,9 +54,9 @@ export const ProjectDetailsSheet = ({ project, children }: ProjectDetailsSheetPr
 
           {project.description && (
             <div className="flex flex-col gap-2">
-              <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">Description</h3>
+              <h3 className="text-foreground text-sm font-medium">Description</h3>
               <div
-                className={cn('text-sm text-slate-700 dark:text-slate-300', richTextListClassName)}
+                className={cn('text-foreground text-sm', richTextListClassName)}
                 dangerouslySetInnerHTML={{ __html: sanitizeHTML(project.description) }}
               />
             </div>
@@ -64,7 +64,7 @@ export const ProjectDetailsSheet = ({ project, children }: ProjectDetailsSheetPr
 
           {activities.length > 0 && (
             <div className="flex flex-col gap-2">
-              <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">Activity</h3>
+              <h3 className="text-foreground text-sm font-medium">Activity</h3>
               <div className="flex flex-col gap-4 overflow-y-auto pr-1">
                 {activities.map((activity) => (
                   <ProjectActivity key={activity.id} activity={activity} showProject={false} />
@@ -72,7 +72,7 @@ export const ProjectDetailsSheet = ({ project, children }: ProjectDetailsSheetPr
                 <div ref={sentinelRef} className="h-1" aria-hidden="true" />
                 {isFetchingNextPage && (
                   <div className="flex justify-center py-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                    <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
                   </div>
                 )}
               </div>

@@ -6,9 +6,8 @@ interface ButtonProps extends React.ComponentPropsWithoutRef<'button'> {
 }
 
 const variantClassnames = {
-  primary: 'text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400',
-  secondary:
-    'text-white bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-600 dark:disabled:bg-gray-500',
+  primary: 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/50',
+  secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 disabled:bg-secondary/50',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(

@@ -42,9 +42,9 @@ export const CreateMCPKeyButton = ({ className }: CreateMCPKeyButtonProps) => {
           onEscapeKeyDown={isRevealMode ? (event) => event.preventDefault() : undefined}
           onPointerDownOutside={isRevealMode ? (event) => event.preventDefault() : undefined}
         >
-          <DialogHeader className="border-b border-slate-200 bg-slate-50/80 px-6 py-5 dark:border-slate-800 dark:bg-slate-900/80">
+          <DialogHeader className="border-border bg-muted/80 border-b px-6 py-5">
             <DialogTitle className="flex items-center gap-2">
-              <KeyRound className="h-5 w-5 text-blue-600" />
+              <KeyRound className="text-primary h-5 w-5" />
               {isRevealMode ? 'Save your new MCP key' : 'Create MCP key'}
             </DialogTitle>
             <DialogDescription>

@@ -30,7 +30,7 @@ export const ProjectColumnActions = ({ column, canEditColumn, surfaceAccentColor
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="rounded p-1 text-slate-500 transition-colors hover:text-slate-700 dark:hover:bg-slate-800"
+            className="text-muted-foreground hover:text-foreground rounded p-1 transition-colors"
             style={{ color: surfaceAccentColor }}
             aria-label={`Open actions for ${column.title}`}
           >

@@ -12,9 +12,9 @@ interface TaskDataGridProps {
 }
 
 const infoFieldClassNames = 'grid grid-cols-[1rem_1fr] items-center gap-2';
-const infoTitleClassNames = 'text-sm font-medium text-slate-700 dark:text-slate-300';
-const infoValueClassNames = 'text-sm text-slate-500 dark:text-slate-400 col-start-2';
-const infoIconClassNames = 'h-4 w-4 text-slate-500 dark:text-slate-400';
+const infoTitleClassNames = 'text-sm font-medium text-foreground';
+const infoValueClassNames = 'text-sm text-muted-foreground col-start-2';
+const infoIconClassNames = 'h-4 w-4 text-muted-foreground';
 
 export const TaskDataGrid = ({ task }: TaskDataGridProps) => {
   const { openTask } = useTaskDetailsRouting();
@@ -22,7 +22,7 @@ export const TaskDataGrid = ({ task }: TaskDataGridProps) => {
   const dependencies = task.depends_on_tasks ?? [];
 
   return (
-    <div className="grid gap-4 rounded-2xl border border-slate-200 p-5 md:grid-cols-2 dark:border-slate-700">
+    <div className="border-border grid gap-4 rounded-2xl border p-5 md:grid-cols-2">
       <div className={infoFieldClassNames}>
         <Hash className={infoIconClassNames} />
         <p className={infoTitleClassNames}>Code</p>
@@ -85,7 +85,7 @@ export const TaskDataGrid = ({ task }: TaskDataGridProps) => {
                 key={dependency.id}
                 type="button"
                 onClick={() => openTask(dependency.id)}
-                className="inline-flex max-w-full min-w-0 items-center gap-2 rounded-full border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-900 dark:hover:text-slate-100"
+                className="border-border text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground inline-flex max-w-full min-w-0 items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
               >
                 {dependency.code ? <TaskCodeBadge code={dependency.code} /> : null}
                 <span className="truncate">{dependency.title}</span>
@@ -105,7 +105,7 @@ export const TaskDataGrid = ({ task }: TaskDataGridProps) => {
             tags.map((tag) => (
               <div
                 key={tag}
-                className="rounded-full border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                className="border-border text-muted-foreground rounded-full border px-2.5 py-1 text-xs font-medium"
               >
                 {tag}
               </div>

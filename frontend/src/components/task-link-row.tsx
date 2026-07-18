@@ -20,7 +20,7 @@ export const TaskLinkRow = ({ task, trailingContent }: TaskLinkRowProps) => {
 
   return (
     <div
-      className="group flex w-full cursor-pointer items-center justify-between gap-4 border-b border-slate-200 pb-2 dark:border-slate-700"
+      className="group border-border flex w-full cursor-pointer items-center justify-between gap-4 border-b pb-2"
       role="button"
       tabIndex={0}
       onClick={openTask}
@@ -32,9 +32,7 @@ export const TaskLinkRow = ({ task, trailingContent }: TaskLinkRowProps) => {
       }}
     >
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-medium text-slate-900 hover:underline dark:text-slate-100">
-          {task.title}
-        </p>
+        <p className="text-foreground truncate text-base font-medium hover:underline">{task.title}</p>
 
         <Link
           to="/projects/$projectId"
@@ -47,7 +45,7 @@ export const TaskLinkRow = ({ task, trailingContent }: TaskLinkRowProps) => {
             event.stopPropagation();
           }}
         >
-          <p className="truncate text-sm text-slate-500 hover:underline dark:text-slate-400">{task.project?.name}</p>
+          <p className="text-muted-foreground truncate text-sm hover:underline">{task.project?.name}</p>
         </Link>
       </div>
 
@@ -56,7 +54,7 @@ export const TaskLinkRow = ({ task, trailingContent }: TaskLinkRowProps) => {
         <button
           type="button"
           aria-label={`Open task ${task.title}`}
-          className="rounded-sm p-1 text-slate-500 transition-colors hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none dark:text-slate-400 dark:hover:text-slate-300 dark:focus-visible:ring-slate-600"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-sm p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
           onClick={(event) => {
             event.stopPropagation();
             openTask();

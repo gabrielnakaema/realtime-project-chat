@@ -15,10 +15,10 @@ export const TaskDetailsHeaderActions = ({ status, isArchiving, onEdit, onArchiv
   if (isConfirmingArchive) {
     return (
       <>
-        <span className="text-xs text-slate-500 dark:text-slate-400">Archive task?</span>
+        <span className="text-muted-foreground text-xs">Archive task?</span>
         <button
           type="button"
-          className="rounded-md px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+          className="text-destructive hover:bg-destructive/10 rounded-md px-2 py-1 text-xs font-medium transition-colors"
           onClick={onArchive}
           disabled={isArchiving}
         >
@@ -26,7 +26,7 @@ export const TaskDetailsHeaderActions = ({ status, isArchiving, onEdit, onArchiv
         </button>
         <button
           type="button"
-          className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+          className="text-muted-foreground hover:bg-muted rounded-md px-2 py-1 text-xs font-medium transition-colors"
           onClick={() => setIsConfirmingArchive(false)}
         >
           Cancel
@@ -40,19 +40,19 @@ export const TaskDetailsHeaderActions = ({ status, isArchiving, onEdit, onArchiv
       <button
         type="button"
         aria-label="Edit task"
-        className="w-fit rounded-md p-2 font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+        className="hover:bg-muted w-fit rounded-md p-2 font-medium transition-colors"
         onClick={onEdit}
       >
-        <Pencil className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+        <Pencil className="text-muted-foreground h-4 w-4" />
       </button>
       {status !== 'archived' && (
         <button
           type="button"
           aria-label="Archive task"
-          className="w-fit rounded-md p-2 font-medium transition-colors hover:bg-red-50 dark:hover:bg-red-950"
+          className="hover:bg-destructive/10 w-fit rounded-md p-2 font-medium transition-colors"
           onClick={() => setIsConfirmingArchive(true)}
         >
-          <Trash2 className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+          <Trash2 className="text-muted-foreground h-4 w-4" />
         </button>
       )}
     </>

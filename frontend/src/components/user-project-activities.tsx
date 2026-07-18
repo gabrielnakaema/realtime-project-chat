@@ -11,10 +11,10 @@ export const UserProjectActivities = () => {
   }
 
   return (
-    <section className="flex flex-col gap-6 rounded-lg border border-slate-200 bg-white p-6 transition-shadow hover:shadow-lg dark:border-slate-700 dark:bg-slate-800">
+    <section className="border-border bg-card flex flex-col gap-6 rounded-lg border p-6 transition-shadow hover:shadow-lg">
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Recent activity</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Latest updates from projects you're a member of</p>
+        <h2 className="text-foreground text-xl font-semibold">Recent activity</h2>
+        <p className="text-muted-foreground text-sm">Latest updates from projects you're a member of</p>
       </div>
 
       <div className="flex max-h-96 flex-col gap-4 overflow-y-auto pr-1">
@@ -24,7 +24,7 @@ export const UserProjectActivities = () => {
         <div ref={sentinelRef} className="h-1" aria-hidden="true" />
         {isFetchingNextPage && (
           <div className="flex justify-center py-2">
-            <Loader2Icon className="h-4 w-4 animate-spin text-slate-400" />
+            <Loader2Icon className="text-muted-foreground h-4 w-4 animate-spin" />
           </div>
         )}
       </div>

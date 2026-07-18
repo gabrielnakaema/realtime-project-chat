@@ -42,7 +42,7 @@ export const TaskCommentsFeed = ({ taskComments }: TaskCommentsFeedProps) => {
             variant="secondary"
             onClick={() => fetchPreviousPage()}
             disabled={isFetchingPreviousPage}
-            className="text-slate-500 dark:bg-transparent dark:text-gray-100 dark:hover:bg-gray-900"
+            className="text-muted-foreground hover:bg-card bg-transparent"
           >
             {isFetchingPreviousPage ? <LoadingSpinner size="1rem" /> : 'Load recent comments'}
           </Button>

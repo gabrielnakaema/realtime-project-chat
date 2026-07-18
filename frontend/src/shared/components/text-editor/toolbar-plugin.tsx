@@ -98,23 +98,20 @@ export const ToolbarPlugin = () => {
     );
   }, [editor, $updateToolbar]);
 
-  const iconClassName = 'w-5 h-5 text-slate-500';
-  const iconButtonClassName = 'toolbar-item spaced hover:bg-gray-100 p-1 rounded-sm dark:hover:bg-slate-600';
-  const activeIconButtonClassName = '';
-  const activeIconClassName = 'text-slate-900 dark:text-slate-100';
-  const dividerClassName = 'h-[16px] w-[1px] min-w-[1px] bg-slate-200 dark:bg-slate-600';
+  const iconClassName = 'w-5 h-5 text-muted-foreground';
+  const iconButtonClassName = 'toolbar-item spaced rounded-sm p-1 hover:bg-muted ';
+  const activeIconButtonClassName = 'bg-card';
+  const activeIconClassName = 'text-foreground';
+  const dividerClassName = 'h-[16px] w-[1px] min-w-[1px] bg-border';
 
   return (
-    <div
-      className="flex flex-wrap items-center gap-2 rounded-tl-md rounded-tr-md bg-white p-2 dark:bg-slate-700"
-      ref={toolbarRef}
-    >
+    <div className="bg-card flex flex-wrap items-center gap-2 rounded-tl-md rounded-tr-md p-2" ref={toolbarRef}>
       <button
         disabled={!canUndo}
         onClick={() => {
           editor.dispatchCommand(UNDO_COMMAND, undefined);
         }}
-        className={cn(iconButtonClassName, canUndo ? activeIconButtonClassName : '')}
+        className={cn(iconButtonClassName, canUndo ? 'text-foreground' : '')}
         aria-label="Undo"
         type="button"
       >
@@ -125,7 +122,7 @@ export const ToolbarPlugin = () => {
         onClick={() => {
           editor.dispatchCommand(REDO_COMMAND, undefined);
         }}
-        className={cn(iconButtonClassName, canRedo ? activeIconButtonClassName : '')}
+        className={cn(iconButtonClassName, canRedo ? 'text-foreground' : '')}
         aria-label="Redo"
         type="button"
       >

@@ -14,7 +14,7 @@ vi.mock('./use-task-comments', () => ({
   useTaskComments: vi.fn(),
 }));
 
-vi.mock('../text-editor', () => ({
+vi.mock('../../shared/components/text-editor', () => ({
   TextEditor: ({ onChange, placeholder }: { onChange: (value: string) => void; placeholder?: string }) => (
     <textarea
       aria-label={placeholder ?? 'Comment editor'}

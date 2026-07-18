@@ -16,8 +16,8 @@ export const UnreadCountBadge = ({ count, hasMoreUnread = false, className }: Un
   return (
     <span
       className={cn(
-        'rounded-full px-2 py-0.5 text-[10px] font-semibold text-white',
-        showOverflowStyle ? 'bg-red-600' : 'bg-blue-600',
+        'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+        showOverflowStyle ? 'bg-destructive text-primary-foreground' : 'bg-primary text-primary-foreground',
         className,
       )}
     >

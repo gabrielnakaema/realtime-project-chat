@@ -17,12 +17,12 @@ interface SelectProps {
 
 export const Select = ({ options, value, onChange, label, error, id, placeholder }: SelectProps) => {
   return (
-    <div className="w-full space-y-2">
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+    <div className="relative w-full space-y-[6px]">
+      <label htmlFor={id} className={cn('block text-[11px] font-semibold tracking-wider')}>
         {label}
       </label>
       <SelectPrimitive value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-full rounded-md border border-slate-300 bg-white px-3 py-5 text-base text-slate-900 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 [&[data-placeholder]]:text-slate-500 dark:[&[data-placeholder]]:text-slate-400">
+        <SelectTrigger className="border-border bg-card text-foreground focus:ring-ring [&[data-placeholder]]:text-muted-foreground h-[39px] w-full rounded-md border px-3 text-base focus:border-transparent focus:ring-2 focus:outline-none">
           <SelectValue id={id} placeholder={placeholder} className="text-base focus:ring-0" />
         </SelectTrigger>
         <SelectContent>
@@ -33,7 +33,7 @@ export const Select = ({ options, value, onChange, label, error, id, placeholder
           ))}
         </SelectContent>
       </SelectPrimitive>
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 };

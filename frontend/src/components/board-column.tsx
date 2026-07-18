@@ -128,11 +128,11 @@ export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
             >
               {column.total}
             </span>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{column.title}</h3>
+            <h3 className="text-foreground text-sm font-semibold">{column.title}</h3>
           </div>
           <div className="flex items-center gap-3">
             {column.isDoneColumn && (
-              <div className="w-fit rounded-sm bg-green-500/10 px-1.5 py-0.5 text-[10px] font-bold tracking-[0.04em] text-green-500 uppercase">
+              <div className="bg-success/10 text-success w-fit rounded-sm px-1.5 py-0.5 text-[10px] font-bold tracking-[0.04em] uppercase">
                 DONE
               </div>
             )}
@@ -153,7 +153,7 @@ export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
           />
 
           <div
-            className="prose line-clamp-2 truncate overflow-hidden text-xs break-all whitespace-pre-wrap italic dark:text-slate-400"
+            className="prose line-clamp-2 truncate overflow-hidden text-xs break-all whitespace-pre-wrap italic"
             dangerouslySetInnerHTML={{
               __html: sanitizeHTML(column.description),
             }}
@@ -172,9 +172,7 @@ export const BoardColumn = ({ column, canEditColumns }: BoardColumnProps) => {
         ))}
 
         {tasks.length === 0 && !isLoading && (
-          <p className="text-center text-xs font-medium tracking-tight dark:text-slate-500">
-            There are no tasks for this column.
-          </p>
+          <p className="text-center text-xs font-medium tracking-tight">There are no tasks for this column.</p>
         )}
 
         <CreateTask

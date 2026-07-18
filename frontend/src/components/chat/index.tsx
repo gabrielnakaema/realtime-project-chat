@@ -9,8 +9,8 @@ export const MessagesSheet = () => {
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px]" onClick={close} />
-      <aside className="fixed top-0 right-0 z-50 flex h-full w-full max-w-[420px] flex-col border-l border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+      <div className="bg-overlay/25 fixed inset-0 z-40 backdrop-blur-[2px]" onClick={close} />
+      <aside className="border-border bg-card fixed top-0 right-0 z-50 flex h-full w-full max-w-[420px] flex-col border-l shadow-2xl">
         {view === 'chat' && selectedChatId ? <ChatView chatId={selectedChatId} /> : <MessagesListView />}
       </aside>
     </>

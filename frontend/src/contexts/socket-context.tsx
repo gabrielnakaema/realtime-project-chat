@@ -236,21 +236,21 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       {visibleConnectionNotice.type !== 'hidden' ? (
         <div
           aria-live="polite"
-          className="pointer-events-none fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-sm shadow-md backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/95"
+          className="border-border bg-card/95 pointer-events-none fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm shadow-md backdrop-blur-sm"
           role="status"
         >
           {visibleConnectionNotice.type === 'reconnecting' ? (
             <>
-              <Loader2 aria-hidden="true" className="size-4 animate-spin text-amber-500" />
-              <span className="text-slate-700 dark:text-slate-200">
+              <Loader2 aria-hidden="true" className="text-warning size-4 animate-spin" />
+              <span className="text-foreground">
                 Reconnecting in {visibleConnectionNotice.seconds}{' '}
                 {visibleConnectionNotice.seconds === 1 ? 'second' : 'seconds'}…
               </span>
             </>
           ) : (
             <>
-              <CircleCheck aria-hidden="true" className="animate-in zoom-in-50 size-4 text-emerald-500 duration-300" />
-              <span className="text-slate-700 dark:text-slate-200">Connection restored</span>
+              <CircleCheck aria-hidden="true" className="animate-in zoom-in-50 text-success size-4 duration-300" />
+              <span className="text-foreground">Connection restored</span>
             </>
           )}
         </div>

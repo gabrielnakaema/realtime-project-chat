@@ -19,14 +19,14 @@ export const MCPAccessOverview = () => {
 
   return (
     <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <div className="border-border bg-card rounded-2xl border p-5 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-blue-100 p-2 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+          <div className="bg-primary/10 text-primary rounded-xl p-2">
             <Shield className="h-5 w-5" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">What MCP access does</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <h2 className="text-foreground text-lg font-semibold">What MCP access does</h2>
+            <p className="text-muted-foreground text-sm">
               Generate scoped API keys for compatible MCP clients. Each key acts as your signed-in user, so only grant
               the permissions a client actually needs.
             </p>
@@ -35,13 +35,11 @@ export const MCPAccessOverview = () => {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Server endpoint</p>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          Configure your external MCP client with this server URL.
-        </p>
+      <div className="border-border bg-muted/80 rounded-2xl border p-5 shadow-sm">
+        <p className="text-foreground text-sm font-semibold">Server endpoint</p>
+        <p className="text-muted-foreground mt-1 text-sm">Configure your external MCP client with this server URL.</p>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm break-all dark:border-slate-700 dark:bg-slate-950">
+          <div className="border-border bg-card min-w-0 flex-1 rounded-xl border px-3 py-2 font-mono text-sm break-all">
             {serverUrl}
           </div>
           <Button type="button" variant="secondary" className="sm:shrink-0" onClick={() => void copyServerURL()}>

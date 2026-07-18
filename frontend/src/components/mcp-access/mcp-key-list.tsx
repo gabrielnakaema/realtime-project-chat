@@ -16,11 +16,11 @@ import { cn } from '@/lib/utils';
 export const MCPKeyList = () => {
   return (
     <>
-      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <section className="border-border bg-card space-y-4 rounded-2xl border p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Your keys</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <h2 className="text-foreground text-lg font-semibold">Your keys</h2>
+            <p className="text-muted-foreground text-sm">
               Review active access, identify unused keys, and revoke integrations you no longer trust.
             </p>
           </div>
@@ -49,7 +49,7 @@ const MCPKeyListContent = () => {
 
   if (isFetching) {
     return (
-      <div className="flex min-h-40 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 p-6 dark:border-slate-800 dark:bg-slate-900/50">
+      <div className="border-border bg-muted flex min-h-40 items-center justify-center rounded-2xl border p-6">
         <LoadingSpinner size="2rem" />
       </div>
     );
@@ -57,12 +57,10 @@ const MCPKeyListContent = () => {
 
   if (isError) {
     return (
-      <div className="space-y-3 rounded-2xl border border-red-200 bg-red-50 p-5 dark:border-red-900/80 dark:bg-red-950/30">
+      <div className="border-destructive/30 bg-destructive/10 space-y-3 rounded-2xl border p-5">
         <div className="space-y-1">
-          <p className="font-semibold text-red-900 dark:text-red-100">Could not load your MCP keys</p>
-          <p className="text-sm text-red-700 dark:text-red-300">
-            Retry to fetch the current list and continue managing access.
-          </p>
+          <p className="text-destructive font-semibold">Could not load your MCP keys</p>
+          <p className="text-destructive text-sm">Retry to fetch the current list and continue managing access.</p>
         </div>
         <Button type="button" variant="secondary" onClick={() => refetch()}>
           <RefreshCcw className="h-4 w-4" />
@@ -74,9 +72,9 @@ const MCPKeyListContent = () => {
 
   if (keys.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-8 text-center dark:border-slate-700 dark:bg-slate-900/60">
-        <p className="font-semibold text-slate-900 dark:text-slate-100">No MCP keys yet</p>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+      <div className="border-border bg-muted/80 rounded-2xl border border-dashed p-8 text-center">
+        <p className="text-foreground font-semibold">No MCP keys yet</p>
+        <p className="text-muted-foreground mt-1 text-sm">
           Create your first key to connect an external agent or MCP client.
         </p>
         <CreateMCPKeyButton className="mx-auto mt-4" />
@@ -94,14 +92,13 @@ const MCPKeyListContent = () => {
 };
 
 const revokedClassNames = {
-  container:
-    'border-slate-200 bg-slate-50/70 text-slate-500 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400',
-  badge: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+  container: 'border-border bg-muted/70 text-muted-foreground   ',
+  badge: 'bg-muted text-foreground',
 };
 
 const activeClassNames = {
-  container: 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950',
-  badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
+  container: 'border-border bg-card  ',
+  badge: 'bg-success/10 text-success  ',
 };
 
 const MCPKeyCard = ({ keyData, availableScopes }: { keyData: MCPAPIKey; availableScopes: MCPAPIAvailableScope[] }) => {
@@ -117,7 +114,7 @@ const MCPKeyCard = ({ keyData, availableScopes }: { keyData: MCPAPIKey; availabl
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-semibold text-slate-900 dark:text-slate-100">{keyData.name}</h3>
+              <h3 className="text-foreground font-semibold">{keyData.name}</h3>
               <span className={cn('rounded-full px-2 py-1 text-xs font-medium', classNames.badge)}>
                 {isRevoked ? 'Revoked' : 'Active'}
               </span>
@@ -134,7 +131,7 @@ const MCPKeyCard = ({ keyData, availableScopes }: { keyData: MCPAPIKey; availabl
               <Button
                 type="button"
                 variant="secondary"
-                className="bg-gray-600 text-white hover:bg-gray-700 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
                 onClick={() => setRevokeDialogOpen(true)}
               >
                 <Trash2 className="h-4 w-4" />
@@ -144,22 +141,22 @@ const MCPKeyCard = ({ keyData, availableScopes }: { keyData: MCPAPIKey; availabl
           )}
         </div>
 
-        <div className="grid gap-3 text-sm text-slate-600 md:grid-cols-3 dark:text-slate-400">
+        <div className="text-muted-foreground grid gap-3 text-sm md:grid-cols-3">
           <div>
-            <p className="font-medium text-slate-900 dark:text-slate-100">Created</p>
+            <p className="text-foreground font-medium">Created</p>
             <p>{formatDateTime(keyData.created_at)}</p>
           </div>
           <div>
-            <p className="font-medium text-slate-900 dark:text-slate-100">Last used</p>
+            <p className="text-foreground font-medium">Last used</p>
             <p>{formatMCPAPIKeyLastUsed(keyData.last_used_at)}</p>
           </div>
           <div>
-            <p className="font-medium text-slate-900 dark:text-slate-100">Scopes</p>
+            <p className="text-foreground font-medium">Scopes</p>
             <div className="mt-1 flex flex-wrap gap-2">
               {keyData.scopes.map((scope) => (
                 <span
                   key={scope}
-                  className="rounded-full border border-slate-200 bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                  className="border-border bg-muted text-foreground rounded-full border px-2 py-1 text-xs"
                 >
                   {getMCPAccessScopeLabel(scope, availableScopes)}
                 </span>

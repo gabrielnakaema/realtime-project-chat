@@ -52,11 +52,11 @@ export const TaskCodeAutocomplete = ({ projectId }: TaskCodeAutocompleteProps) =
 
   return (
     <div className="w-full space-y-2">
-      <span className="block text-sm font-medium text-slate-700 dark:text-slate-300">Code</span>
+      <span className="text-foreground block text-sm font-medium">Code</span>
       <Command
         label="Code"
         shouldFilter={false}
-        className="h-auto overflow-visible border border-slate-300 bg-white focus-within:border-transparent focus-within:ring-2 focus-within:ring-blue-500 dark:border-slate-600 dark:bg-slate-700 [&_[data-slot=command-input-wrapper]]:border-b-0"
+        className="border-border bg-card focus-within:ring-ring h-auto overflow-visible border focus-within:border-transparent focus-within:ring-2 [&_[data-slot=command-input-wrapper]]:border-b-0"
       >
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverAnchor className="block w-full">
@@ -103,9 +103,7 @@ export const TaskCodeAutocomplete = ({ projectId }: TaskCodeAutocompleteProps) =
           >
             <CommandList id="code-suggestions">
               {!isDebouncing && !hasEnoughPrefix && (
-                <div className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
-                  Type at least 2 characters.
-                </div>
+                <div className="text-muted-foreground py-6 text-center text-sm">Type at least 2 characters.</div>
               )}
               {(isDebouncing || (hasEnoughPrefix && isFetching)) && (
                 <div className="flex items-center justify-center py-6">
@@ -113,13 +111,9 @@ export const TaskCodeAutocomplete = ({ projectId }: TaskCodeAutocompleteProps) =
                 </div>
               )}
               {!isDebouncing && hasEnoughPrefix && !isFetching && isError && (
-                <div className="space-y-3 px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                <div className="text-muted-foreground space-y-3 px-4 py-6 text-center text-sm">
                   <p>Could not load code suggestions.</p>
-                  <button
-                    type="button"
-                    className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-                    onClick={() => refetch()}
-                  >
+                  <button type="button" className="text-primary font-medium hover:underline" onClick={() => refetch()}>
                     Try again
                   </button>
                 </div>
@@ -145,7 +139,7 @@ export const TaskCodeAutocomplete = ({ projectId }: TaskCodeAutocompleteProps) =
                         <Check className={cn('h-4 w-4', selected ? 'opacity-100' : 'opacity-0')} />
                         <div className="min-w-0 flex-1">
                           <div className="truncate font-medium">{suggestion.code}</div>
-                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                          <p className="text-muted-foreground truncate text-xs">
                             {suggestion.kind === 'next' ? 'Next available code' : 'Existing task code'}
                           </p>
                         </div>
@@ -159,7 +153,7 @@ export const TaskCodeAutocomplete = ({ projectId }: TaskCodeAutocompleteProps) =
         </Popover>
       </Command>
       {fieldState.error?.message && (
-        <p id="code-error" className="text-sm text-red-500">
+        <p id="code-error" className="text-destructive text-sm">
           {fieldState.error.message}
         </p>
       )}

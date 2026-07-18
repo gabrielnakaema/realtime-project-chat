@@ -59,24 +59,22 @@ export const TextEditor = ({ initialValue, onChange, label, id, error, placehold
 
   return (
     <LexicalComposer initialConfig={initialConfig}>
-      <div className="w-full space-y-2">
+      <div className="w-full space-y-1.5">
         {label && (
-          <label htmlFor={id} className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label htmlFor={id} className="text-foreground block text-[11px] font-semibold tracking-wider">
             {label}
           </label>
         )}
         <div className="flex w-full flex-col">
           <ToolbarPlugin />
-          <div className="relative w-full rounded-b-md border-t border-t-gray-50 bg-white dark:border-t-slate-600 dark:bg-slate-700 dark:text-slate-100">
+          <div className="border-border bg-card text-foreground relative w-full rounded-b-md border border-t">
             <RichTextPlugin
               contentEditable={
                 <ContentEditable
-                  className="relative min-h-40 p-4 font-sans text-base text-gray-700 outline-none dark:text-slate-100 [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
+                  className="text-foreground relative min-h-40 p-4 font-sans text-base outline-none [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
                   aria-placeholder={placeholder ?? ''}
                   placeholder={
-                    <div className="absolute top-4 left-4 font-sans text-base text-slate-400 dark:text-slate-500">
-                      {placeholder}
-                    </div>
+                    <div className="text-muted-foreground absolute top-4 left-4 font-sans text-base">{placeholder}</div>
                   }
                   id={id}
                 />
@@ -88,7 +86,7 @@ export const TextEditor = ({ initialValue, onChange, label, id, error, placehold
             <ListPlugin />
             <AutoFocusPlugin />
           </div>
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
       </div>
     </LexicalComposer>

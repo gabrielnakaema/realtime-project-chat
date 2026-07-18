@@ -25,16 +25,16 @@ export const TaskComments = ({
   useTargetCommentHighlight({ open, targetCommentId });
 
   return (
-    <div className="border-t border-slate-200 bg-slate-50/40 xl:h-full xl:min-h-0 xl:overflow-hidden xl:border-t-0 xl:border-l dark:border-slate-700 dark:bg-slate-950/20">
+    <div className="border-border bg-muted/40 border-t xl:h-full xl:min-h-0 xl:overflow-hidden xl:border-t-0 xl:border-l">
       <ScrollArea className="xl:h-full xl:min-h-0">
         <div className="flex min-h-full flex-col">
-          <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-700">
+          <div className="border-border border-b px-6 py-5">
             <div className="mb-4 flex items-center gap-3">
-              <div className="rounded-full bg-slate-100 p-2 dark:bg-slate-800">
-                <MessageSquare className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+              <div className="bg-muted rounded-full p-2">
+                <MessageSquare className="text-muted-foreground h-4 w-4" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Comments</p>
+                <p className="text-foreground text-sm font-semibold">Comments</p>
               </div>
             </div>
 

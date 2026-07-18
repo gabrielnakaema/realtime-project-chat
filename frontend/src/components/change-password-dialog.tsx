@@ -66,9 +66,9 @@ export const ChangePasswordDialog = ({ open, onOpenChange }: ChangePasswordDialo
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
-        <DialogHeader className="border-b border-slate-200 bg-slate-50/80 px-6 py-5 dark:border-slate-800 dark:bg-slate-900/80">
+        <DialogHeader className="border-border bg-muted/80 border-b px-6 py-5">
           <DialogTitle className="flex items-center gap-2">
-            <KeyRound className="h-5 w-5 text-blue-600" />
+            <KeyRound className="text-primary h-5 w-5" />
             Change password
           </DialogTitle>
           <DialogDescription>Update your password without leaving the current page.</DialogDescription>
@@ -104,10 +104,10 @@ export const ChangePasswordDialog = ({ open, onOpenChange }: ChangePasswordDialo
               {...register('new_password_confirmation')}
             />
 
-            {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
+            {errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
           </div>
 
-          <DialogFooter className="border-t border-slate-200 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
+          <DialogFooter className="border-border bg-muted/80 border-t px-6 py-4">
             <Button type="button" variant="secondary" onClick={closeDialog}>
               Cancel
             </Button>

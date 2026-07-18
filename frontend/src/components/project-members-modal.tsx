@@ -104,23 +104,23 @@ export const ProjectMembersModal = ({ project }: ProjectMembersModalProps) => {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="flex w-fit items-center gap-2 rounded-md p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-700"
+          className="hover:bg-muted flex w-fit items-center gap-2 rounded-md p-2 transition-colors"
           title="View project members"
         >
-          <Users className="h-5 w-5 text-slate-300" />
+          <Users className="text-foreground h-5 w-5" />
         </button>
       </DialogTrigger>
 
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-slate-500" />
+            <Users className="text-muted-foreground h-5 w-5" />
             Project members
           </DialogTitle>
           <DialogDescription>{formatMemberCount()}</DialogDescription>
         </DialogHeader>
 
-        <section className="flex w-full min-w-0 flex-col gap-3 overflow-hidden border-t border-slate-200 pt-3 dark:border-slate-700">
+        <section className="border-border flex w-full min-w-0 flex-col gap-3 overflow-hidden border-t pt-3">
           {project?.members.map((member) => (
             <article
               key={member.id}
@@ -129,7 +129,7 @@ export const ProjectMembersModal = ({ project }: ProjectMembersModalProps) => {
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <div
                   className={cn(
-                    'flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-xs font-medium text-white dark:border-slate-800',
+                    'border-card bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-medium',
                   )}
                   aria-hidden="true"
                 >
@@ -137,17 +137,17 @@ export const ProjectMembersModal = ({ project }: ProjectMembersModalProps) => {
                 </div>
                 <div className="flex flex-col gap-0.5 truncate">
                   <p className="truncate text-sm font-medium">{member.user.name}</p>
-                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">{member.user.email}</p>
+                  <p className="text-muted-foreground truncate text-xs">{member.user.email}</p>
                 </div>
               </div>
               <div className="grid shrink-0 grid-cols-[1fr_24px] items-center gap-2">
-                <div className="flex items-center gap-1 rounded-md border border-slate-900 px-2 py-0.5 text-sm whitespace-nowrap text-slate-500">
+                <div className="border-border text-muted-foreground flex items-center gap-1 rounded-md border px-2 py-0.5 text-sm whitespace-nowrap">
                   {memberRoleIcon[member.role]}
                   {memberRoleLabel[member.role]}
                 </div>
                 {isCreator && member.user_id !== userId && (
                   <Button
-                    className="hover:bg-accent invisible bg-transparent px-2 text-slate-500 opacity-0 group-hover:visible group-hover:opacity-100 hover:text-red-500"
+                    className="hover:bg-accent text-muted-foreground hover:text-destructive invisible bg-transparent px-2 opacity-0 group-hover:visible group-hover:opacity-100"
                     aria-label="Remove member from project"
                     onClick={() => handleRemoveMember(member)}
                   >

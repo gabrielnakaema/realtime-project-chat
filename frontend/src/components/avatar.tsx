@@ -19,7 +19,7 @@ export const Avatar = ({ name, size = 'sm', containerClassName }: AvatarProps) =
       <TooltipTrigger>
         <div
           className={cn(
-            'text-foreground flex items-center justify-center rounded-full bg-blue-600 text-xs font-medium',
+            'bg-primary text-primary-foreground flex items-center justify-center rounded-full text-xs font-medium',
             sizeClassNames[size],
             containerClassName,
           )}

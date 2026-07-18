@@ -29,13 +29,13 @@ function RouteComponent() {
   const hasMoreUnread = generalChats.some((chat) => chat.has_more_unread) || unreadCount > 99;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <header className="border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+    <div className="bg-muted min-h-screen">
+      <header className="border-border bg-card border-b">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">TaskFlow</h1>
-              <p className="text-slate-600 dark:text-slate-400">Welcome back, {user?.name}</p>
+              <h1 className="text-foreground text-2xl font-bold">TaskFlow</h1>
+              <p className="text-muted-foreground">Welcome back, {user?.name}</p>
             </div>
 
             <SearchBar action="/search" searchName="query" formClassName="w-full max-w-md" />
@@ -43,7 +43,7 @@ function RouteComponent() {
             <div className="flex items-center gap-4">
               <button
                 onClick={openMessages}
-                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+                className="text-foreground hover:bg-muted flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors"
               >
                 <MessageSquare className="h-4 w-4" />
                 Messages

@@ -1,6 +1,6 @@
 import { Button } from '../button';
 import { LoadingSpinner } from '../loading';
-import { TextEditor } from '../text-editor';
+import { TextEditor } from '../../shared/components/text-editor';
 import type { TaskComment } from '@/types/task';
 import { isHtmlContentEmpty } from '@/utils/html';
 
@@ -24,7 +24,7 @@ export const ReplyComposer = ({
   onSubmit,
 }: ReplyComposerProps) => {
   return (
-    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950/30">
+    <div className="border-border bg-muted mt-4 rounded-xl border p-3">
       <TextEditor
         key={`${comment.id}-${composerKey}`}
         initialValue=""

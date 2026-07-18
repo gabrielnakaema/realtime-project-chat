@@ -68,7 +68,7 @@ export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
 
   let content = (
     <div className="flex min-h-50 flex-1 flex-col items-center justify-center px-6 py-6">
-      <p className="text-sm text-slate-500 dark:text-slate-400">Project not found</p>
+      <p className="text-muted-foreground text-sm">Project not found</p>
     </div>
   );
 
@@ -102,14 +102,14 @@ export const ProjectSettings = ({ projectId }: ProjectSettingsProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600">
+        <button className="border-border bg-card text-foreground hover:bg-muted inline-flex items-center rounded-md border px-3 py-2 font-medium transition-colors">
           <Settings className="mr-2 h-4 w-4" />
           Settings
         </button>
       </DialogTrigger>
 
       <DialogContent className="flex max-h-[calc(100vh-5rem)] flex-col gap-0 overflow-y-auto p-0 md:max-w-5xl">
-        <DialogHeader className="bg-background sticky top-0 z-10 shrink-0 border-b border-slate-200 px-6 py-5 dark:border-slate-700">
+        <DialogHeader className="bg-background border-border sticky top-0 z-10 shrink-0 border-b px-6 py-5">
           <DialogTitle>Project settings</DialogTitle>
           <DialogDescription>
             Update project details and refine the board flow without changing the rest of the workspace.

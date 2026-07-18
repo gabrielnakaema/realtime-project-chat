@@ -28,15 +28,13 @@ export const TaskDetailsUpdate = ({
 }) => {
   return (
     <div className="relative flex gap-3">
-      {!isLast && <div className="absolute top-6 bottom-0 left-[11px] w-px bg-slate-200 dark:bg-slate-700" />}
+      {!isLast && <div className="bg-border absolute top-6 bottom-0 left-[11px] w-px" />}
       <div className="relative z-10 mt-0.5 shrink-0">
         <Avatar name={update.user.name} size="sm" />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 pb-5">
         <UpdateSummary update={update} currentUserId={currentUserId} />
-        <span className="text-xs text-slate-400 dark:text-slate-500">
-          {formatRelativeActivityDateString(update.created_at)}
-        </span>
+        <span className="text-muted-foreground text-xs">{formatRelativeActivityDateString(update.created_at)}</span>
         <UpdateChanges update={update} />
       </div>
     </div>
@@ -53,12 +51,10 @@ const Actor = ({
   isCurrentUser?: boolean;
 }) => (
   <span className="inline-flex flex-wrap items-center gap-1.5 align-middle">
-    <span className="font-medium text-slate-900 dark:text-slate-100">{name}</span>
+    <span className="text-foreground font-medium">{name}</span>
     <ActionOriginBadge origin={actionOrigin} />
     {isCurrentUser && (
-      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
-        You
-      </span>
+      <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[11px] font-medium">You</span>
     )}
   </span>
 );
@@ -70,7 +66,7 @@ const UpdateSummary = ({ update, currentUserId }: { update: TaskUpdate; currentU
 
   if (update.update_type === 'created') {
     return (
-      <p className="text-sm text-slate-600 dark:text-slate-300">
+      <p className="text-muted-foreground text-sm">
         <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> created the
         task
       </p>
@@ -80,16 +76,16 @@ const UpdateSummary = ({ update, currentUserId }: { update: TaskUpdate; currentU
   if (update.update_type === 'assigned') {
     const subject = responsibleChange?.subject?.name ?? getDisplayValue(responsibleChange, 'new');
     return (
-      <p className="text-sm text-slate-600 dark:text-slate-300">
+      <p className="text-muted-foreground text-sm">
         <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> assigned to{' '}
-        <span className="font-medium text-slate-900 dark:text-slate-100">{subject}</span>
+        <span className="text-foreground font-medium">{subject}</span>
       </p>
     );
   }
 
   if (update.update_type === 'unassigned') {
     return (
-      <p className="text-sm text-slate-600 dark:text-slate-300">
+      <p className="text-muted-foreground text-sm">
         <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> removed the
         assignee
       </p>
@@ -98,7 +94,7 @@ const UpdateSummary = ({ update, currentUserId }: { update: TaskUpdate; currentU
 
   if (update.update_type === 'done') {
     return (
-      <p className="text-sm text-slate-600 dark:text-slate-300">
+      <p className="text-muted-foreground text-sm">
         <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> marked as
         done
       </p>
@@ -112,7 +108,7 @@ const UpdateSummary = ({ update, currentUserId }: { update: TaskUpdate; currentU
 
   if (isColumnOnly) {
     return (
-      <p className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+      <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm">
         <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> moved to{' '}
         <TaskStatusBadge status={changes[0].new_value} label={changes[0].new_display_value ?? changes[0].new_value} />
       </p>
@@ -123,7 +119,7 @@ const UpdateSummary = ({ update, currentUserId }: { update: TaskUpdate; currentU
 
   if (isPriorityOnly) {
     return (
-      <p className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+      <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm">
         <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> set priority
         to <TaskPriorityBadge priority={changes[0].new_value as TaskPriority} />
       </p>
@@ -133,9 +129,9 @@ const UpdateSummary = ({ update, currentUserId }: { update: TaskUpdate; currentU
   const fieldNames = changes.map((c) => fieldLabels[c.field] ?? c.field).join(', ');
 
   return (
-    <p className="text-sm text-slate-600 dark:text-slate-300">
+    <p className="text-muted-foreground text-sm">
       <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> updated{' '}
-      <span className="text-slate-700 dark:text-slate-200">{fieldNames}</span>
+      <span className="text-foreground">{fieldNames}</span>
     </p>
   );
 };
@@ -163,9 +159,9 @@ const ChangeRow = ({ change }: { change: TaskChange }) => {
   if (change.field === 'column') {
     return (
       <div className="flex items-center gap-1.5">
-        <span className="w-20 shrink-0 text-xs text-slate-400 dark:text-slate-500">{fieldLabels.column}</span>
+        <span className="text-muted-foreground w-20 shrink-0 text-xs">{fieldLabels.column}</span>
         <TaskStatusBadge status={change.old_value} label={change.old_display_value ?? change.old_value} />
-        <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
+        <ArrowRight className="text-muted-foreground h-3 w-3 shrink-0" />
         <TaskStatusBadge status={change.new_value} label={change.new_display_value ?? change.new_value} />
       </div>
     );
@@ -174,9 +170,9 @@ const ChangeRow = ({ change }: { change: TaskChange }) => {
   if (change.field === 'priority') {
     return (
       <div className="flex items-center gap-1.5">
-        <span className="w-20 shrink-0 text-xs text-slate-400 dark:text-slate-500">{fieldLabels.priority}</span>
+        <span className="text-muted-foreground w-20 shrink-0 text-xs">{fieldLabels.priority}</span>
         <TaskPriorityBadge priority={change.old_value as TaskPriority} />
-        <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
+        <ArrowRight className="text-muted-foreground h-3 w-3 shrink-0" />
         <TaskPriorityBadge priority={change.new_value as TaskPriority} />
       </div>
     );
@@ -184,7 +180,7 @@ const ChangeRow = ({ change }: { change: TaskChange }) => {
 
   if (change.field === 'description') {
     return (
-      <p className="text-xs text-slate-400 dark:text-slate-500">
+      <p className="text-muted-foreground text-xs">
         <span className="w-20 shrink-0">{fieldLabels.description}</span> was updated
       </p>
     );
@@ -193,10 +189,10 @@ const ChangeRow = ({ change }: { change: TaskChange }) => {
   if (change.field === 'due_date') {
     return (
       <div className="flex items-center gap-1.5">
-        <span className="w-20 shrink-0 text-xs text-slate-400 dark:text-slate-500">{fieldLabels.due_date}</span>
-        <span className="text-xs text-slate-400 dark:text-slate-500">{formatTaskDueDate(change.old_value)}</span>
-        <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
-        <span className="text-xs text-slate-700 dark:text-slate-200">{formatTaskDueDate(change.new_value)}</span>
+        <span className="text-muted-foreground w-20 shrink-0 text-xs">{fieldLabels.due_date}</span>
+        <span className="text-muted-foreground text-xs">{formatTaskDueDate(change.old_value)}</span>
+        <ArrowRight className="text-muted-foreground h-3 w-3 shrink-0" />
+        <span className="text-foreground text-xs">{formatTaskDueDate(change.new_value)}</span>
       </div>
     );
   }
@@ -209,19 +205,19 @@ const ChangeRow = ({ change }: { change: TaskChange }) => {
   if (isLong) {
     return (
       <div className="flex flex-col gap-0.5">
-        <span className="text-xs text-slate-400 dark:text-slate-500">{label}</span>
-        <span className="text-xs text-slate-400 line-through">{oldValue || '—'}</span>
-        <span className="text-xs text-slate-700 dark:text-slate-200">{newValue || '—'}</span>
+        <span className="text-muted-foreground text-xs">{label}</span>
+        <span className="text-muted-foreground text-xs line-through">{oldValue || '—'}</span>
+        <span className="text-foreground text-xs">{newValue || '—'}</span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+    <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
       <span className="w-20 shrink-0">{label}</span>
       <span className="line-through">{oldValue || '—'}</span>
-      <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
-      <span className="text-slate-700 dark:text-slate-200">{newValue || '—'}</span>
+      <ArrowRight className="text-muted-foreground h-3 w-3 shrink-0" />
+      <span className="text-foreground">{newValue || '—'}</span>
     </div>
   );
 };

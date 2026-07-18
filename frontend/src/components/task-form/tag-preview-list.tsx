@@ -12,7 +12,7 @@ export const TagPreviewList = ({ tags }: TagPreviewListProps) => {
       {tags.map((tag) => (
         <div
           key={tag}
-          className="w-fit rounded-sm border border-slate-200 px-2 py-0.5 text-xs font-medium text-slate-500 dark:border-slate-700 dark:text-slate-400"
+          className="border-border text-muted-foreground w-fit rounded-sm border px-2 py-0.5 text-xs font-medium"
         >
           {tag}
         </div>

@@ -21,9 +21,7 @@ export const ChatMessageList = ({ messages, currentUserId, chatContainerRef, obs
           if (item.type === 'date') {
             return (
               <div key={item.id} className="my-4 flex justify-center">
-                <span className="rounded-full bg-slate-100 px-3 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                  {item.label}
-                </span>
+                <span className="bg-muted text-muted-foreground rounded-full px-3 py-0.5 text-xs">{item.label}</span>
               </div>
             );
           }

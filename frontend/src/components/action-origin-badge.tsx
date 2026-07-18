@@ -16,7 +16,7 @@ export const ActionOriginBadge = ({ origin, className }: ActionOriginBadgeProps)
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-900/80 dark:bg-emerald-950/40 dark:text-emerald-300',
+        'border-success/30 bg-success/10 text-success inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
         className,
       )}
       title="Action performed by AI agent via MCP"

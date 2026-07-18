@@ -19,8 +19,11 @@ import { Route as ProtectedProjectsRouteRouteImport } from './routes/_protected/
 import { Route as ProtectedSearchIndexRouteImport } from './routes/_protected/search/index'
 import { Route as ProtectedProjectsIndexRouteImport } from './routes/_protected/projects/index'
 import { Route as ProtectedProjectsProjectIdIndexRouteImport } from './routes/_protected/projects/$projectId/index'
-import { Route as ProtectedProjectsProjectIdSettingsRouteImport } from './routes/_protected/projects/$projectId/settings'
 import { Route as ProtectedProjectsProjectIdChatRouteImport } from './routes/_protected/projects/$projectId/chat'
+import { Route as ProtectedProjectsProjectIdSettingsRouteRouteImport } from './routes/_protected/projects/$projectId/settings/route'
+import { Route as ProtectedProjectsProjectIdSettingsIndexRouteImport } from './routes/_protected/projects/$projectId/settings/index'
+import { Route as ProtectedProjectsProjectIdSettingsMembersRouteImport } from './routes/_protected/projects/$projectId/settings/members'
+import { Route as ProtectedProjectsProjectIdSettingsColumnsRouteImport } from './routes/_protected/projects/$projectId/settings/columns'
 
 const SignUpRoute = SignUpRouteImport.update({
   id: '/sign-up',
@@ -72,17 +75,35 @@ const ProtectedProjectsProjectIdIndexRoute =
     path: '/$projectId/',
     getParentRoute: () => ProtectedProjectsRouteRoute,
   } as any)
-const ProtectedProjectsProjectIdSettingsRoute =
-  ProtectedProjectsProjectIdSettingsRouteImport.update({
-    id: '/$projectId/settings',
-    path: '/$projectId/settings',
-    getParentRoute: () => ProtectedProjectsRouteRoute,
-  } as any)
 const ProtectedProjectsProjectIdChatRoute =
   ProtectedProjectsProjectIdChatRouteImport.update({
     id: '/$projectId/chat',
     path: '/$projectId/chat',
     getParentRoute: () => ProtectedProjectsRouteRoute,
+  } as any)
+const ProtectedProjectsProjectIdSettingsRouteRoute =
+  ProtectedProjectsProjectIdSettingsRouteRouteImport.update({
+    id: '/$projectId/settings',
+    path: '/$projectId/settings',
+    getParentRoute: () => ProtectedProjectsRouteRoute,
+  } as any)
+const ProtectedProjectsProjectIdSettingsIndexRoute =
+  ProtectedProjectsProjectIdSettingsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => ProtectedProjectsProjectIdSettingsRouteRoute,
+  } as any)
+const ProtectedProjectsProjectIdSettingsMembersRoute =
+  ProtectedProjectsProjectIdSettingsMembersRouteImport.update({
+    id: '/members',
+    path: '/members',
+    getParentRoute: () => ProtectedProjectsProjectIdSettingsRouteRoute,
+  } as any)
+const ProtectedProjectsProjectIdSettingsColumnsRoute =
+  ProtectedProjectsProjectIdSettingsColumnsRouteImport.update({
+    id: '/columns',
+    path: '/columns',
+    getParentRoute: () => ProtectedProjectsProjectIdSettingsRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -94,9 +115,12 @@ export interface FileRoutesByFullPath {
   '/mcp-access': typeof ProtectedMcpAccessRoute
   '/projects/': typeof ProtectedProjectsIndexRoute
   '/search/': typeof ProtectedSearchIndexRoute
+  '/projects/$projectId/settings': typeof ProtectedProjectsProjectIdSettingsRouteRouteWithChildren
   '/projects/$projectId/chat': typeof ProtectedProjectsProjectIdChatRoute
-  '/projects/$projectId/settings': typeof ProtectedProjectsProjectIdSettingsRoute
   '/projects/$projectId': typeof ProtectedProjectsProjectIdIndexRoute
+  '/projects/$projectId/settings/columns': typeof ProtectedProjectsProjectIdSettingsColumnsRoute
+  '/projects/$projectId/settings/members': typeof ProtectedProjectsProjectIdSettingsMembersRoute
+  '/projects/$projectId/settings/': typeof ProtectedProjectsProjectIdSettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -106,8 +130,10 @@ export interface FileRoutesByTo {
   '/projects': typeof ProtectedProjectsIndexRoute
   '/search': typeof ProtectedSearchIndexRoute
   '/projects/$projectId/chat': typeof ProtectedProjectsProjectIdChatRoute
-  '/projects/$projectId/settings': typeof ProtectedProjectsProjectIdSettingsRoute
   '/projects/$projectId': typeof ProtectedProjectsProjectIdIndexRoute
+  '/projects/$projectId/settings/columns': typeof ProtectedProjectsProjectIdSettingsColumnsRoute
+  '/projects/$projectId/settings/members': typeof ProtectedProjectsProjectIdSettingsMembersRoute
+  '/projects/$projectId/settings': typeof ProtectedProjectsProjectIdSettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -120,9 +146,12 @@ export interface FileRoutesById {
   '/_protected/mcp-access': typeof ProtectedMcpAccessRoute
   '/_protected/projects/': typeof ProtectedProjectsIndexRoute
   '/_protected/search/': typeof ProtectedSearchIndexRoute
+  '/_protected/projects/$projectId/settings': typeof ProtectedProjectsProjectIdSettingsRouteRouteWithChildren
   '/_protected/projects/$projectId/chat': typeof ProtectedProjectsProjectIdChatRoute
-  '/_protected/projects/$projectId/settings': typeof ProtectedProjectsProjectIdSettingsRoute
   '/_protected/projects/$projectId/': typeof ProtectedProjectsProjectIdIndexRoute
+  '/_protected/projects/$projectId/settings/columns': typeof ProtectedProjectsProjectIdSettingsColumnsRoute
+  '/_protected/projects/$projectId/settings/members': typeof ProtectedProjectsProjectIdSettingsMembersRoute
+  '/_protected/projects/$projectId/settings/': typeof ProtectedProjectsProjectIdSettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -135,9 +164,12 @@ export interface FileRouteTypes {
     | '/mcp-access'
     | '/projects/'
     | '/search/'
-    | '/projects/$projectId/chat'
     | '/projects/$projectId/settings'
+    | '/projects/$projectId/chat'
     | '/projects/$projectId'
+    | '/projects/$projectId/settings/columns'
+    | '/projects/$projectId/settings/members'
+    | '/projects/$projectId/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -147,8 +179,10 @@ export interface FileRouteTypes {
     | '/projects'
     | '/search'
     | '/projects/$projectId/chat'
-    | '/projects/$projectId/settings'
     | '/projects/$projectId'
+    | '/projects/$projectId/settings/columns'
+    | '/projects/$projectId/settings/members'
+    | '/projects/$projectId/settings'
   id:
     | '__root__'
     | '/'
@@ -160,9 +194,12 @@ export interface FileRouteTypes {
     | '/_protected/mcp-access'
     | '/_protected/projects/'
     | '/_protected/search/'
-    | '/_protected/projects/$projectId/chat'
     | '/_protected/projects/$projectId/settings'
+    | '/_protected/projects/$projectId/chat'
     | '/_protected/projects/$projectId/'
+    | '/_protected/projects/$projectId/settings/columns'
+    | '/_protected/projects/$projectId/settings/members'
+    | '/_protected/projects/$projectId/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -244,13 +281,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedProjectsProjectIdIndexRouteImport
       parentRoute: typeof ProtectedProjectsRouteRoute
     }
-    '/_protected/projects/$projectId/settings': {
-      id: '/_protected/projects/$projectId/settings'
-      path: '/$projectId/settings'
-      fullPath: '/projects/$projectId/settings'
-      preLoaderRoute: typeof ProtectedProjectsProjectIdSettingsRouteImport
-      parentRoute: typeof ProtectedProjectsRouteRoute
-    }
     '/_protected/projects/$projectId/chat': {
       id: '/_protected/projects/$projectId/chat'
       path: '/$projectId/chat'
@@ -258,22 +288,71 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProtectedProjectsProjectIdChatRouteImport
       parentRoute: typeof ProtectedProjectsRouteRoute
     }
+    '/_protected/projects/$projectId/settings': {
+      id: '/_protected/projects/$projectId/settings'
+      path: '/$projectId/settings'
+      fullPath: '/projects/$projectId/settings'
+      preLoaderRoute: typeof ProtectedProjectsProjectIdSettingsRouteRouteImport
+      parentRoute: typeof ProtectedProjectsRouteRoute
+    }
+    '/_protected/projects/$projectId/settings/': {
+      id: '/_protected/projects/$projectId/settings/'
+      path: '/'
+      fullPath: '/projects/$projectId/settings/'
+      preLoaderRoute: typeof ProtectedProjectsProjectIdSettingsIndexRouteImport
+      parentRoute: typeof ProtectedProjectsProjectIdSettingsRouteRoute
+    }
+    '/_protected/projects/$projectId/settings/members': {
+      id: '/_protected/projects/$projectId/settings/members'
+      path: '/members'
+      fullPath: '/projects/$projectId/settings/members'
+      preLoaderRoute: typeof ProtectedProjectsProjectIdSettingsMembersRouteImport
+      parentRoute: typeof ProtectedProjectsProjectIdSettingsRouteRoute
+    }
+    '/_protected/projects/$projectId/settings/columns': {
+      id: '/_protected/projects/$projectId/settings/columns'
+      path: '/columns'
+      fullPath: '/projects/$projectId/settings/columns'
+      preLoaderRoute: typeof ProtectedProjectsProjectIdSettingsColumnsRouteImport
+      parentRoute: typeof ProtectedProjectsProjectIdSettingsRouteRoute
+    }
   }
 }
 
+interface ProtectedProjectsProjectIdSettingsRouteRouteChildren {
+  ProtectedProjectsProjectIdSettingsColumnsRoute: typeof ProtectedProjectsProjectIdSettingsColumnsRoute
+  ProtectedProjectsProjectIdSettingsMembersRoute: typeof ProtectedProjectsProjectIdSettingsMembersRoute
+  ProtectedProjectsProjectIdSettingsIndexRoute: typeof ProtectedProjectsProjectIdSettingsIndexRoute
+}
+
+const ProtectedProjectsProjectIdSettingsRouteRouteChildren: ProtectedProjectsProjectIdSettingsRouteRouteChildren =
+  {
+    ProtectedProjectsProjectIdSettingsColumnsRoute:
+      ProtectedProjectsProjectIdSettingsColumnsRoute,
+    ProtectedProjectsProjectIdSettingsMembersRoute:
+      ProtectedProjectsProjectIdSettingsMembersRoute,
+    ProtectedProjectsProjectIdSettingsIndexRoute:
+      ProtectedProjectsProjectIdSettingsIndexRoute,
+  }
+
+const ProtectedProjectsProjectIdSettingsRouteRouteWithChildren =
+  ProtectedProjectsProjectIdSettingsRouteRoute._addFileChildren(
+    ProtectedProjectsProjectIdSettingsRouteRouteChildren,
+  )
+
 interface ProtectedProjectsRouteRouteChildren {
   ProtectedProjectsIndexRoute: typeof ProtectedProjectsIndexRoute
+  ProtectedProjectsProjectIdSettingsRouteRoute: typeof ProtectedProjectsProjectIdSettingsRouteRouteWithChildren
   ProtectedProjectsProjectIdChatRoute: typeof ProtectedProjectsProjectIdChatRoute
-  ProtectedProjectsProjectIdSettingsRoute: typeof ProtectedProjectsProjectIdSettingsRoute
   ProtectedProjectsProjectIdIndexRoute: typeof ProtectedProjectsProjectIdIndexRoute
 }
 
 const ProtectedProjectsRouteRouteChildren: ProtectedProjectsRouteRouteChildren =
   {
     ProtectedProjectsIndexRoute: ProtectedProjectsIndexRoute,
+    ProtectedProjectsProjectIdSettingsRouteRoute:
+      ProtectedProjectsProjectIdSettingsRouteRouteWithChildren,
     ProtectedProjectsProjectIdChatRoute: ProtectedProjectsProjectIdChatRoute,
-    ProtectedProjectsProjectIdSettingsRoute:
-      ProtectedProjectsProjectIdSettingsRoute,
     ProtectedProjectsProjectIdIndexRoute: ProtectedProjectsProjectIdIndexRoute,
   }
 

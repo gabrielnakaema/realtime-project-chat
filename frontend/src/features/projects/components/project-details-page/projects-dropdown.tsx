@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { ChevronDown } from 'lucide-react';
-import { LoadingSpinner } from '../loading';
+import { LoadingSpinner } from '../../../../components/loading';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useListProjects } from '@/hooks/use-list-projects';
+import { Button } from '@/shared/components/button';
 
 interface ProjectsDropdownProps {
   current: {
@@ -22,14 +23,11 @@ export const ProjectsDropdown = ({ current }: ProjectsDropdownProps) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="dark:text-foreground flex items-center gap-2 rounded-sm p-2 pl-3 font-sans text-[13px] font-medium tracking-[-0.01em]"
-        >
+        <Button type="button" variant="ghost">
           <span>{current.label}</span>
 
-          <ChevronDown className="h-4 w-4 text-slate-500" />
-        </button>
+          <ChevronDown className="text-muted-foreground h-4 w-4" />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {isLoading && <LoadingSpinner size="2rem" />}

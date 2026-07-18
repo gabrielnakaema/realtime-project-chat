@@ -13,7 +13,7 @@ export const ProjectSearchResults = ({ query }: ProjectSearchResultsProps) => {
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-xl font-bold text-slate-900 dark:border-slate-700 dark:text-slate-100">Projects</h2>
+      <h2 className="text-foreground text-xl font-bold">Projects</h2>
       <div className="flex w-full max-w-full gap-4 overflow-x-auto overflow-y-auto">
         {isLoading && <ProjectSearchSkeleton />}
         {areProjectsEmpty && (

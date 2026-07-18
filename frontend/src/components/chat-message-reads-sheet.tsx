@@ -41,7 +41,7 @@ export const ChatMessageReadsSheet = ({
   const renderBody = () => {
     if (isLoading) {
       return (
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-muted-foreground text-sm">
           <LoadingSpinner size="2rem" />
         </p>
       );
@@ -49,7 +49,7 @@ export const ChatMessageReadsSheet = ({
 
     if (!hasReads) {
       return (
-        <div className="rounded-2xl border border-dashed border-slate-200 p-5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <div className="border-border text-muted-foreground rounded-2xl border border-dashed p-5 text-sm">
           No one has read this message yet.
         </div>
       );
@@ -76,8 +76,8 @@ export const ChatMessageReadsSheet = ({
         </SheetHeader>
 
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
-            <p className="text-sm leading-relaxed [overflow-wrap:anywhere] whitespace-pre-line text-slate-700 dark:text-slate-200">
+          <div className="border-border bg-muted rounded-2xl border p-4">
+            <p className="text-foreground text-sm leading-relaxed [overflow-wrap:anywhere] whitespace-pre-line">
               {message.content}
             </p>
           </div>

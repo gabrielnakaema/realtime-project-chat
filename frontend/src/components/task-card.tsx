@@ -93,7 +93,7 @@ export const TaskCard = ({ task, onDrop, columnSurface }: TaskCardProps) => {
       <div
         ref={ref}
         className={cn(
-          'cursor-pointer rounded-lg border border-l-3 border-slate-200 bg-white p-3 transition-shadow hover:shadow-md dark:border-slate-800 dark:bg-slate-900',
+          'border-border bg-card cursor-pointer rounded-lg border border-l-3 p-3 transition-shadow hover:shadow-md',
           isDragging && 'opacity-40 transition-opacity',
         )}
         style={{
@@ -107,7 +107,7 @@ export const TaskCard = ({ task, onDrop, columnSurface }: TaskCardProps) => {
               <TaskPriorityBadge priority={task.priority} />
               {task.code && <TaskCodeBadge code={task.code} />}
             </div>
-            <h4 className="min-w-0 flex-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{task.title}</h4>
+            <h4 className="text-foreground min-w-0 flex-1 text-sm font-semibold">{task.title}</h4>
           </div>
 
           {!!task.tags?.length && (
@@ -115,7 +115,7 @@ export const TaskCard = ({ task, onDrop, columnSurface }: TaskCardProps) => {
               {task.tags.map((tag) => (
                 <div
                   key={tag}
-                  className="w-fit rounded-sm bg-slate-800 px-2 py-0.5 font-mono text-[10px] font-medium text-slate-600 dark:text-slate-400"
+                  className="bg-card text-muted-foreground w-fit rounded-sm px-2 py-0.5 font-mono text-[10px] font-medium"
                 >
                   {tag}
                 </div>
@@ -126,16 +126,16 @@ export const TaskCard = ({ task, onDrop, columnSurface }: TaskCardProps) => {
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
-            <div className="flex min-h-5 min-w-5 items-center justify-center rounded-sm border p-1 font-mono text-[9px] leading-1 font-semibold uppercase dark:border-slate-700 dark:text-slate-300">
+            <div className="flex min-h-5 min-w-5 items-center justify-center rounded-sm border p-1 font-mono text-[9px] leading-1 font-semibold uppercase">
               {task.responsible ? getResponsibleInitials(task.responsible.name) : '-'}
             </div>
-            <p className="font-sans text-[11px] leading-1.5 font-normal dark:text-slate-300">
+            <p className="font-sans text-[11px] leading-1.5 font-normal">
               {task.responsible ? task.responsible.name : 'Unassigned'}
             </p>
           </div>
 
           {task.due_date && (
-            <div className="flex items-center gap-1 font-sans text-[11px] font-medium text-slate-500 dark:text-slate-300">
+            <div className="text-muted-foreground flex items-center gap-1 font-sans text-[11px] font-medium">
               <Calendar className="h-3 w-3" />
               <span>{new Date(task.due_date).toLocaleDateString()}</span>
             </div>

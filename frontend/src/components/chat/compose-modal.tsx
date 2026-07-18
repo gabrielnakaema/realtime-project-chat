@@ -9,47 +9,47 @@ export const ComposeModal = () => {
 
   return (
     <div
-      className="absolute inset-0 z-10 flex items-start justify-center bg-black/20 pt-14 backdrop-blur-[2px]"
+      className="bg-overlay/20 absolute inset-0 z-10 flex items-start justify-center pt-14 backdrop-blur-[2px]"
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           closeCompose();
         }
       }}
     >
-      <div className="mx-3 w-full overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-800">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+      <div className="bg-card mx-3 w-full overflow-hidden rounded-2xl shadow-2xl">
+        <div className="border-border flex items-center justify-between border-b px-4 py-3">
           <div>
-            <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">New chat</span>
-            <p className="text-xs text-slate-400">Select one or more teammates</p>
+            <span className="text-foreground text-sm font-semibold">New chat</span>
+            <p className="text-muted-foreground text-xs">Select one or more teammates</p>
           </div>
           <button
             onClick={closeCompose}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
+            className="text-muted-foreground hover:bg-muted hover:text-muted-foreground flex h-6 w-6 items-center justify-center rounded-full transition-colors"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        <div className="border-b border-slate-100 px-4 py-2 dark:border-slate-700">
+        <div className="border-border border-b px-4 py-2">
           <div className="flex items-center gap-2">
-            <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            <Search className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
             <input
               autoFocus
               type="text"
               placeholder="Search people..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="w-full bg-transparent py-1 text-sm text-slate-900 placeholder-slate-400 outline-none dark:text-slate-100"
+              className="text-foreground placeholder-muted-foreground w-full bg-transparent py-1 text-sm outline-none"
             />
           </div>
           {selectedUserIds.length > 0 && (
             <div className="mt-2 flex items-center justify-between">
-              <p className="text-xs text-slate-500 dark:text-slate-400">{selectedUserIds.length} selected</p>
+              <p className="text-muted-foreground text-xs">{selectedUserIds.length} selected</p>
               <button
                 type="button"
                 onClick={submit}
                 disabled={isPending}
-                className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50"
               >
                 Start chat
               </button>
@@ -59,7 +59,7 @@ export const ComposeModal = () => {
 
         <ul className="max-h-64 overflow-y-auto py-1">
           {filteredUsers.length === 0 ? (
-            <li className="px-4 py-5 text-center text-sm text-slate-400">
+            <li className="text-muted-foreground px-4 py-5 text-center text-sm">
               {search ? 'No people found' : 'No users available'}
             </li>
           ) : (
@@ -69,7 +69,7 @@ export const ComposeModal = () => {
                   type="button"
                   disabled={isPending}
                   onClick={() => toggleUser(user.id)}
-                  className="flex w-full items-center gap-3 px-4 py-2 text-left transition-colors hover:bg-slate-50 disabled:opacity-50 dark:hover:bg-slate-700/50"
+                  className="hover:bg-muted flex w-full items-center gap-3 px-4 py-2 text-left transition-colors disabled:opacity-50"
                 >
                   <div
                     className={cn(
@@ -80,11 +80,11 @@ export const ComposeModal = () => {
                     {user.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{user.name}</p>
-                    <p className="truncate text-xs text-slate-400">{user.email}</p>
+                    <p className="text-foreground truncate text-sm font-medium">{user.name}</p>
+                    <p className="text-muted-foreground truncate text-xs">{user.email}</p>
                   </div>
                   {isUserSelected(selectedUserIds, user.id) && (
-                    <div className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white">
+                    <div className="bg-primary text-primary-foreground ml-auto flex h-6 w-6 items-center justify-center rounded-full">
                       <Check className="h-3.5 w-3.5" />
                     </div>
                   )}

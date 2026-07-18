@@ -23,7 +23,7 @@ export const CreateMCPKeyRevealStep = ({
     <>
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <section className="space-y-5">
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 dark:border-amber-700/70 dark:bg-amber-950/40 dark:text-amber-100">
+          <div className="border-warning/30 bg-warning/10 text-warning rounded-2xl border p-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
               <div className="space-y-1">
@@ -61,7 +61,7 @@ export const CreateMCPKeyRevealStep = ({
         </section>
       </div>
 
-      <DialogFooter className="border-t border-slate-200 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
+      <DialogFooter className="border-border bg-muted/80 border-t px-6 py-4">
         <Button type="button" onClick={onClose}>
           Close
         </Button>
@@ -127,18 +127,18 @@ const CopyableSecretCard = ({
   const isCopied = copiedValue === copyType;
 
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+    <div className="border-border bg-card space-y-3 rounded-2xl border p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{label}</p>
-          <p className="text-sm text-slate-600 dark:text-slate-400">{helperText}</p>
+          <p className="text-foreground text-sm font-semibold">{label}</p>
+          <p className="text-muted-foreground text-sm">{helperText}</p>
         </div>
         <Button type="button" variant="secondary" className="shrink-0" onClick={() => void onCopy(value, copyType)}>
           {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {isCopied ? 'Copied' : copyLabel}
         </Button>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-sm break-all dark:border-slate-700 dark:bg-slate-900">
+      <div className="border-border bg-muted overflow-x-auto rounded-xl border p-3 font-mono text-sm break-all">
         {value}
       </div>
     </div>

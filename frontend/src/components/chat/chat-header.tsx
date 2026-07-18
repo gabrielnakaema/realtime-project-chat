@@ -14,10 +14,10 @@ export const ChatHeader = ({ chat, currentUserId, onBack, onClose }: ChatHeaderP
   const avatarSeed = chat ? getChatAvatarSeed(chat, currentUserId) : '';
 
   return (
-    <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-3 dark:border-slate-700">
+    <div className="border-border flex shrink-0 items-center gap-2 border-b px-3 py-3">
       <button
         onClick={onBack}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+        className="text-muted-foreground hover:bg-muted hover:text-muted-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
       </button>
@@ -31,14 +31,14 @@ export const ChatHeader = ({ chat, currentUserId, onBack, onClose }: ChatHeaderP
           >
             {avatarSeed.charAt(0).toUpperCase()}
           </div>
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+          <p className="text-foreground min-w-0 flex-1 truncate text-sm font-semibold">
             {getChatTitle(chat, currentUserId)}
           </p>
         </>
       )}
       <button
         onClick={onClose}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+        className="text-muted-foreground hover:bg-muted hover:text-muted-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
       >
         <X className="h-4 w-4" />
       </button>

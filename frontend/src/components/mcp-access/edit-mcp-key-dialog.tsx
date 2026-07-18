@@ -20,9 +20,9 @@ export const EditMCPKeyDialog = ({ isOpen, keyData, onOpenChange }: EditMCPKeyDi
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="border-b border-slate-200 bg-slate-50/80 px-6 py-5 dark:border-slate-800 dark:bg-slate-900/80">
+        <DialogHeader className="border-border bg-muted/80 border-b px-6 py-5">
           <DialogTitle className="flex items-center gap-2">
-            <KeyRound className="h-5 w-5 text-blue-600" />
+            <KeyRound className="text-primary h-5 w-5" />
             Edit MCP key
           </DialogTitle>
           <DialogDescription>Update the key name or permissions without rotating the secret.</DialogDescription>

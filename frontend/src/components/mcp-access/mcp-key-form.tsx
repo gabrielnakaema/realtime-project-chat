@@ -53,7 +53,7 @@ export const MCPAPIKeyForm = ({
           <LoadingSpinner size="2rem" />
         </div>
 
-        <DialogFooter className="border-t border-slate-200 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
+        <DialogFooter className="border-border bg-muted/80 border-t px-6 py-4">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
           </Button>
@@ -66,10 +66,10 @@ export const MCPAPIKeyForm = ({
     return (
       <>
         <div className="px-6 py-5">
-          <div className="space-y-3 rounded-2xl border border-red-200 bg-red-50 p-5 dark:border-red-900/80 dark:bg-red-950/30">
+          <div className="border-destructive/30 bg-destructive/10 space-y-3 rounded-2xl border p-5">
             <div className="space-y-1">
-              <p className="font-semibold text-red-900 dark:text-red-100">Could not load available scopes</p>
-              <p className="text-sm text-red-700 dark:text-red-300">
+              <p className="text-destructive font-semibold">Could not load available scopes</p>
+              <p className="text-destructive text-sm">
                 Retry to load the current MCP permissions before saving this key.
               </p>
             </div>
@@ -79,7 +79,7 @@ export const MCPAPIKeyForm = ({
           </div>
         </div>
 
-        <DialogFooter className="border-t border-slate-200 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
+        <DialogFooter className="border-border bg-muted/80 border-t px-6 py-4">
           <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
           </Button>
@@ -104,10 +104,8 @@ export const MCPAPIKeyForm = ({
 
           <div className="space-y-2">
             <div>
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Scopes</p>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Select one or more permissions for this MCP client.
-              </p>
+              <p className="text-foreground text-sm font-medium">Scopes</p>
+              <p className="text-muted-foreground text-sm">Select one or more permissions for this MCP client.</p>
             </div>
 
             <Controller
@@ -126,9 +124,7 @@ export const MCPAPIKeyForm = ({
                           key={scope.scope}
                           className={cn(
                             'flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors',
-                            selected
-                              ? 'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30'
-                              : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/60 dark:hover:bg-slate-900',
+                            selected ? 'border-primary/30 bg-primary/10' : 'border-border bg-muted/70 hover:bg-muted',
                           )}
                         >
                           <input
@@ -141,11 +137,11 @@ export const MCPAPIKeyForm = ({
                                 : [...selectedScopes, scope.scope];
                               field.onChange(nextScopes);
                             }}
-                            className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                            className="border-border text-primary focus:ring-ring mt-1 h-4 w-4 rounded focus:ring-2"
                           />
                           <div className="space-y-1">
-                            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{scope.label}</p>
-                            <p className="text-sm text-slate-600 dark:text-slate-400">{scope.title}</p>
+                            <p className="text-foreground text-sm font-medium">{scope.label}</p>
+                            <p className="text-muted-foreground text-sm">{scope.title}</p>
                           </div>
                         </label>
                       );
@@ -155,13 +151,13 @@ export const MCPAPIKeyForm = ({
               }}
             />
 
-            {errors.scopes?.message && <p className="text-sm text-red-500">{errors.scopes.message}</p>}
-            {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
+            {errors.scopes?.message && <p className="text-destructive text-sm">{errors.scopes.message}</p>}
+            {errorMessage && <p className="text-destructive text-sm">{errorMessage}</p>}
           </div>
         </section>
       </div>
 
-      <DialogFooter className="border-t border-slate-200 bg-slate-50/80 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/80">
+      <DialogFooter className="border-border bg-muted/80 border-t px-6 py-4">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>

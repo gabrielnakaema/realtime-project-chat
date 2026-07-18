@@ -33,7 +33,7 @@ export const ChatComposer = ({ chatId }: ChatComposerProps) => {
   };
 
   return (
-    <div className="shrink-0 border-t border-slate-100 p-3 dark:border-slate-700">
+    <div className="border-border shrink-0 border-t p-3">
       <form onSubmit={handleSubmit(onSubmit)} className="flex items-end gap-2">
         <Controller
           control={control}
@@ -42,7 +42,7 @@ export const ChatComposer = ({ chatId }: ChatComposerProps) => {
             <ExpandingTextarea
               placeholder="Message..."
               wrapperClassName="flex-1"
-              className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm [overflow-wrap:anywhere] text-slate-900 placeholder-slate-400 focus:border-blue-400 focus:bg-white focus:ring-1 focus:ring-blue-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:bg-slate-700"
+              className="border-border bg-muted text-foreground placeholder-muted-foreground focus:border-ring focus:bg-card focus:ring-ring rounded-md border px-3 py-2 text-sm [overflow-wrap:anywhere] focus:ring-1 focus:outline-none"
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault();
@@ -56,7 +56,7 @@ export const ChatComposer = ({ chatId }: ChatComposerProps) => {
         <button
           type="submit"
           disabled={isPending || !chatId}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-50"
         >
           {isPending ? <LoadingSpinner size="0.875em" /> : <Send className="h-4 w-4" />}
         </button>

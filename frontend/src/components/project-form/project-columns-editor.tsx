@@ -119,14 +119,14 @@ export const ProjectColumnsEditor = ({
       }));
 
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-900/50">
+    <section className="border-border bg-muted/80 space-y-4 rounded-2xl border p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Flag className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Board columns</h3>
+            <Flag className="text-primary h-4 w-4" />
+            <h3 className="text-foreground text-sm font-semibold">Board columns</h3>
           </div>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
+          <p className="text-muted-foreground text-sm">
             Define the flow for this project. Every project needs at least one column and exactly one done column.
           </p>
         </div>
@@ -176,15 +176,13 @@ export const ProjectColumnsEditor = ({
               key={getColumnKey(column, index)}
               style={{ borderColor: column.is_done_column ? undefined : surface.borderColor }}
               className={cn(
-                'rounded-2xl border bg-white p-4 shadow-sm transition-colors dark:bg-slate-950',
-                column.is_done_column
-                  ? 'border-emerald-300/80 ring-1 ring-emerald-200 dark:border-emerald-700 dark:ring-emerald-900/60'
-                  : 'border-slate-200 dark:border-slate-700',
+                'bg-card rounded-2xl border p-4 shadow-sm transition-colors',
+                column.is_done_column ? 'border-success/30 ring-success/30 ring-1' : 'border-border',
               )}
             >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
                 <div className="flex min-w-0 flex-1 items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  <div className="bg-muted text-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-semibold">
                     {index + 1}
                   </div>
 
@@ -199,10 +197,7 @@ export const ProjectColumnsEditor = ({
                       />
 
                       <div className="space-y-2">
-                        <label
-                          htmlFor={`column-color-${index}`}
-                          className="block text-sm font-medium text-slate-700 dark:text-slate-300"
-                        >
+                        <label htmlFor={`column-color-${index}`} className="text-foreground block text-sm font-medium">
                           Color
                         </label>
                         <div
@@ -217,10 +212,8 @@ export const ProjectColumnsEditor = ({
                             className="h-9 w-12 cursor-pointer rounded border-0 bg-transparent p-0"
                           />
                           <div className="min-w-0">
-                            <p className="text-xs tracking-wide text-slate-500 uppercase dark:text-slate-400">
-                              Main color
-                            </p>
-                            <p className="font-mono text-sm text-slate-800 dark:text-slate-100">{column.color}</p>
+                            <p className="text-muted-foreground text-xs tracking-wide uppercase">Main color</p>
+                            <p className="text-foreground font-mono text-sm">{column.color}</p>
                           </div>
                         </div>
                       </div>
@@ -234,7 +227,7 @@ export const ProjectColumnsEditor = ({
                       onChange={(event) => updateColumn(index, { description: event.target.value })}
                       placeholder="Optional guidance or instructions for this column."
                     />
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Optional.</p>
+                    <p className="text-muted-foreground text-xs">Optional.</p>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span
@@ -254,8 +247,8 @@ export const ProjectColumnsEditor = ({
                         className={cn(
                           'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
                           column.is_done_column
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-slate-100',
+                            ? 'border-success/30 bg-success/10 text-success'
+                            : 'border-border bg-card text-muted-foreground hover:border-border hover:text-foreground',
                         )}
                       >
                         <CheckCircle2 className="h-4 w-4" />
@@ -263,7 +256,7 @@ export const ProjectColumnsEditor = ({
                       </button>
 
                       {column.id && (
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="bg-muted text-muted-foreground rounded-full px-3 py-1 text-xs font-medium">
                           Existing column
                         </span>
                       )}
@@ -311,12 +304,10 @@ export const ProjectColumnsEditor = ({
       </div>
 
       {removedColumns.length > 0 && onDeletedColumnsChange && (
-        <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-900 dark:bg-amber-950/40">
+        <div className="border-warning/30 bg-warning/10 space-y-3 rounded-2xl border p-4">
           <div className="space-y-1">
-            <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-100">Pending removals</h4>
-            <p className="text-sm text-amber-800/80 dark:text-amber-200/80">
-              Choose where tasks should move before these columns are removed.
-            </p>
+            <h4 className="text-warning text-sm font-semibold">Pending removals</h4>
+            <p className="text-warning text-sm">Choose where tasks should move before these columns are removed.</p>
           </div>
 
           <div className="grid gap-3">
@@ -325,16 +316,11 @@ export const ProjectColumnsEditor = ({
               const targetOptions = availableReassignmentTargets(removedColumn.id);
 
               return (
-                <div
-                  key={removedColumn.id}
-                  className="rounded-xl border border-amber-200 bg-white/80 p-3 dark:border-amber-900 dark:bg-slate-950/70"
-                >
+                <div key={removedColumn.id} className="border-warning/30 bg-card/80 rounded-xl border p-3">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{removedColumn.name}</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
-                        Tasks in this column need a destination.
-                      </p>
+                      <p className="text-foreground text-sm font-medium">{removedColumn.name}</p>
+                      <p className="text-muted-foreground text-xs">Tasks in this column need a destination.</p>
                     </div>
 
                     <div className="w-full lg:max-w-xs">
@@ -371,7 +357,7 @@ export const ProjectColumnsEditor = ({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-destructive text-sm">{error}</p>}
     </section>
   );
 };

@@ -28,7 +28,7 @@ export const ArchivedTasksList = ({ projectId, open, onSelectTask }: ArchivedTas
   } = useArchivedTasksList(project?.id || '', open && !!project?.id);
 
   if (archivedTasks.length === 0 && !isFetchingNextPage) {
-    return <p className="py-8 text-center text-sm text-slate-400 dark:text-slate-500">No archived tasks</p>;
+    return <p className="text-muted-foreground py-8 text-center text-sm">No archived tasks</p>;
   }
 
   return (
@@ -40,7 +40,7 @@ export const ArchivedTasksList = ({ projectId, open, onSelectTask }: ArchivedTas
         return (
           <div
             key={task.id}
-            className="group flex w-full items-center gap-2 rounded-md px-3 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="group hover:bg-muted flex w-full items-center gap-2 rounded-md px-3 py-2 transition-colors"
           >
             <button
               type="button"
@@ -53,7 +53,7 @@ export const ArchivedTasksList = ({ projectId, open, onSelectTask }: ArchivedTas
               }}
               className="flex min-w-0 flex-1 items-center gap-3 text-left"
             >
-              <span className="truncate text-sm text-slate-700 dark:text-slate-300">{task.title}</span>
+              <span className="text-foreground truncate text-sm">{task.title}</span>
               {!isPickingStatus && <TaskPriorityBadge priority={task.priority} />}
             </button>
 
@@ -62,7 +62,7 @@ export const ArchivedTasksList = ({ projectId, open, onSelectTask }: ArchivedTas
                 type="button"
                 title="Restore task"
                 onClick={() => startPickingStatus(task.id)}
-                className="shrink-0 rounded p-1 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                className="text-muted-foreground hover:bg-accent hover:text-muted-foreground shrink-0 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100"
               >
                 <ArchiveRestore className="h-3.5 w-3.5" />
               </button>
@@ -84,7 +84,7 @@ export const ArchivedTasksList = ({ projectId, open, onSelectTask }: ArchivedTas
                 <button
                   type="button"
                   onClick={stopPickingStatus}
-                  className="ml-0.5 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                  className="text-muted-foreground hover:bg-accent hover:text-muted-foreground ml-0.5 rounded p-0.5"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -94,7 +94,7 @@ export const ArchivedTasksList = ({ projectId, open, onSelectTask }: ArchivedTas
         );
       })}
       <div ref={sentinelRef} className="h-1" aria-hidden="true" />
-      {isFetchingNextPage && <p className="py-2 text-center text-xs text-slate-400">Loading...</p>}
+      {isFetchingNextPage && <p className="text-muted-foreground py-2 text-center text-xs">Loading...</p>}
     </div>
   );
 };

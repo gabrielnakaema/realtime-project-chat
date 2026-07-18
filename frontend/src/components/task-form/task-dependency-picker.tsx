@@ -106,14 +106,14 @@ export const TaskDependencyPicker = ({
                 {selectedTasks.map((task) => (
                   <div
                     key={task.id}
-                    className="inline-flex max-w-full min-w-0 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                    className="border-border bg-muted text-foreground inline-flex max-w-full min-w-0 items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium"
                   >
                     {task.code ? <TaskCodeBadge code={task.code} /> : null}
                     <span className="truncate">{task.title}</span>
                     <button
                       type="button"
                       aria-label={`Remove dependency ${task.title}`}
-                      className="rounded-full p-0.5 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                      className="text-muted-foreground hover:bg-accent hover:text-foreground rounded-full p-0.5 transition-colors"
                       onClick={() => toggleTask(task)}
                     >
                       <X className="h-3.5 w-3.5" />
@@ -128,7 +128,7 @@ export const TaskDependencyPicker = ({
                 <Button
                   type="button"
                   variant="secondary"
-                  className="w-full justify-between border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="border-border bg-card text-foreground hover:bg-muted w-full justify-between border"
                 >
                   <span>{selectedTasks.length > 0 ? 'Add another dependency' : 'Search tasks to depend on'}</span>
                   <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-60" />
@@ -148,7 +148,7 @@ export const TaskDependencyPicker = ({
                   />
                   <CommandList>
                     {debouncedSearch.length === 0 && (
-                      <div className="py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                      <div className="text-muted-foreground py-6 text-center text-sm">
                         Type to search project tasks.
                       </div>
                     )}
@@ -178,7 +178,7 @@ export const TaskDependencyPicker = ({
                                   {task.code ? <TaskCodeBadge code={task.code} /> : null}
                                   <span className="truncate font-medium">{task.title}</span>
                                 </div>
-                                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                                <p className="text-muted-foreground truncate text-xs">
                                   {formatTaskDependencyLabel(task)}
                                 </p>
                               </div>
@@ -193,7 +193,7 @@ export const TaskDependencyPicker = ({
             </Popover>
 
             {errors.depends_on_task_ids?.message && (
-              <p className="text-sm text-red-500">{errors.depends_on_task_ids.message}</p>
+              <p className="text-destructive text-sm">{errors.depends_on_task_ids.message}</p>
             )}
           </div>
         );

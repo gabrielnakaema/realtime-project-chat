@@ -1,7 +1,7 @@
 import { Controller, useFormContext } from 'react-hook-form';
 import { Input } from '../input';
 import { Select } from '../select';
-import { TextEditor } from '../text-editor';
+import { TextEditor } from '../../shared/components/text-editor';
 import { TaskCodeAutocomplete } from './task-code-autocomplete';
 import { TagPreviewList } from './tag-preview-list';
 import { TaskDependencyPicker } from './task-dependency-picker';
@@ -107,10 +107,10 @@ export const TaskFormFields = ({
             );
           }}
         />
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+        <div className="border-border bg-card space-y-4 rounded-2xl border p-4 shadow-sm">
           <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Dependencies</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <h3 className="text-foreground text-sm font-semibold">Dependencies</h3>
+            <p className="text-muted-foreground text-sm">
               Link tasks that should be finished before this one moves forward.
             </p>
           </div>

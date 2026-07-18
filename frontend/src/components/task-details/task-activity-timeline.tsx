@@ -15,29 +15,23 @@ export const TaskActivityTimeline = ({ updates = [] }: TaskActivityTimelineProps
   const [open, setOpen] = useState(false);
 
   return (
-    <Collapsible
-      open={open}
-      onOpenChange={setOpen}
-      className="rounded-2xl border border-slate-200 dark:border-slate-700"
-    >
-      <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-900/50">
+    <Collapsible open={open} onOpenChange={setOpen} className="border-border rounded-2xl border">
+      <CollapsibleTrigger className="hover:bg-muted flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors">
         <div className="flex items-center gap-3">
-          <div className="rounded-full bg-slate-100 p-2 dark:bg-slate-800">
-            <Activity className="h-4 w-4 text-slate-600 dark:text-slate-300" />
+          <div className="bg-muted rounded-full p-2">
+            <Activity className="text-muted-foreground h-4 w-4" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Activity timeline</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-foreground text-sm font-semibold">Activity timeline</p>
+            <p className="text-muted-foreground text-xs">
               {updates.length > 0 ? `${updates.length} updates` : 'No activity yet'}
             </p>
           </div>
         </div>
-        <ChevronDown
-          className={cn('h-4 w-4 text-slate-500 transition-transform dark:text-slate-400', open && 'rotate-180')}
-        />
+        <ChevronDown className={cn('text-muted-foreground h-4 w-4 transition-transform', open && 'rotate-180')} />
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="border-t border-slate-200 px-5 py-4 dark:border-slate-700">
+        <div className="border-border border-t px-5 py-4">
           {updates.length > 0 && (
             <div className="flex flex-col">
               {updates.map((update, index) => (
@@ -51,7 +45,7 @@ export const TaskActivityTimeline = ({ updates = [] }: TaskActivityTimelineProps
             </div>
           )}
           {updates.length === 0 && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Activity will appear here as the task changes.</p>
+            <p className="text-muted-foreground text-sm">Activity will appear here as the task changes.</p>
           )}
         </div>
       </CollapsibleContent>

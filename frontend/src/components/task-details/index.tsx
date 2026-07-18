@@ -40,7 +40,7 @@ export const TaskDetails = ({
   if (!task) {
     return (
       <TaskDetailsStateDialog open={open} onOpenChange={onOpenChange}>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Task not found</p>
+        <p className="text-muted-foreground text-sm">Task not found</p>
       </TaskDetailsStateDialog>
     );
   }
@@ -52,12 +52,10 @@ export const TaskDetails = ({
         autoFocus={false}
         showCloseButton={false}
       >
-        <DialogHeader className="bg-background flex flex-row items-center justify-between gap-4 border-b border-slate-200 px-6 py-5 dark:border-slate-700">
+        <DialogHeader className="bg-background border-border flex flex-row items-center justify-between gap-4 border-b px-6 py-5">
           <div className="min-w-0 space-y-2">
             <TaskCodeBadge code={task.code} className="max-w-full" />
-            <DialogTitle className="truncate text-2xl font-semibold text-slate-900 dark:text-slate-100">
-              {task.title}
-            </DialogTitle>
+            <DialogTitle className="text-foreground truncate text-2xl font-semibold">{task.title}</DialogTitle>
           </div>
           <div className="flex items-center gap-2">
             <TaskDetailsHeaderActions
@@ -67,11 +65,8 @@ export const TaskDetails = ({
               onArchive={archive}
             />
             <DialogClose asChild>
-              <button
-                type="button"
-                className="w-fit rounded-md p-2 font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <X className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              <button type="button" className="hover:bg-muted w-fit rounded-md p-2 font-medium transition-colors">
+                <X className="text-muted-foreground h-4 w-4" />
               </button>
             </DialogClose>
           </div>

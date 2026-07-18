@@ -109,7 +109,7 @@ export const EditTask = ({ taskId, open, onOpenChange }: EditTaskProps) => {
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <div className="flex min-h-50 flex-col items-center justify-center">
-            <p className="text-sm text-slate-500 dark:text-slate-400">Task not found</p>
+            <p className="text-muted-foreground text-sm">Task not found</p>
           </div>
         </DialogContent>
       </Dialog>
@@ -119,7 +119,7 @@ export const EditTask = ({ taskId, open, onOpenChange }: EditTaskProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 md:max-w-5xl">
-        <DialogHeader className="shrink-0 border-b border-slate-200 px-6 py-5 dark:border-slate-700">
+        <DialogHeader className="border-border shrink-0 border-b px-6 py-5">
           <DialogTitle>Edit task</DialogTitle>
           <DialogDescription>Edit the task details</DialogDescription>
         </DialogHeader>
@@ -136,7 +136,7 @@ export const EditTask = ({ taskId, open, onOpenChange }: EditTaskProps) => {
                 descriptionEditorKey={task.id}
               />
             </div>
-            <div className="flex w-full shrink-0 items-center justify-end gap-4 border-t border-slate-200 px-6 py-4 dark:border-slate-700">
+            <div className="border-border flex w-full shrink-0 items-center justify-end gap-4 border-t px-6 py-4">
               <DialogClose asChild>
                 <Button type="button" variant="secondary">
                   Cancel

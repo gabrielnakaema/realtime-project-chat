@@ -103,29 +103,26 @@ export const EditColumnDialog = ({ column, open, onOpenChange }: EditColumnDialo
           />
 
           <div className="space-y-2">
-            <label
-              htmlFor={`column-color-${column.id}`}
-              className="block text-sm font-medium text-slate-700 dark:text-slate-300"
-            >
+            <label htmlFor={`column-color-${column.id}`} className="text-foreground block text-sm font-medium">
               Color
             </label>
-            <div className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2 dark:border-slate-700">
+            <div className="border-border flex items-center gap-3 rounded-xl border px-3 py-2">
               <input
                 id={`column-color-${column.id}`}
                 type="color"
                 className="h-10 w-12 cursor-pointer rounded border-0 bg-transparent p-0"
                 {...register('color')}
               />
-              <span className="font-mono text-sm text-slate-700 dark:text-slate-200">{color}</span>
+              <span className="text-foreground font-mono text-sm">{color}</span>
             </div>
-            {errors.color?.message && <p className="text-sm text-red-500">{errors.color.message}</p>}
+            {errors.color?.message && <p className="text-destructive text-sm">{errors.color.message}</p>}
           </div>
 
-          <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-3 dark:border-slate-700">
+          <label className="border-border flex items-center gap-3 rounded-xl border px-3 py-3">
             <input type="checkbox" className="h-4 w-4" {...register('is_done_column')} />
             <div className="space-y-1">
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Done column</p>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
+              <p className="text-foreground text-sm font-medium">Done column</p>
+              <p className="text-muted-foreground text-sm">
                 {isDoneColumn
                   ? 'Tasks moved here will be treated as completed.'
                   : 'Mark this column as the completed stage for the board.'}
@@ -133,7 +130,7 @@ export const EditColumnDialog = ({ column, open, onOpenChange }: EditColumnDialo
             </div>
           </label>
 
-          <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+          <div className="border-border flex items-center justify-end gap-3 border-t pt-4">
             <DialogClose asChild>
               <Button type="button" variant="secondary">
                 Cancel
