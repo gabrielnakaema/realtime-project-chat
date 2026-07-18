@@ -11,6 +11,7 @@ import { generalProjectSettingsSchema } from '@/features/projects/schemas/genera
 import { useProjectDetails } from '@/hooks/use-project-details';
 import { invalidateProjectBoardData } from '@/services/project-board-invalidation';
 import { updateProject } from '@/services/projects';
+import { projectQueryKeys } from '@/services/query-keys';
 import { ConfirmationDialog } from '@/shared/components/confirmation-dialog';
 import { Input } from '@/shared/components/input';
 import { Button } from '@/shared/components/button';
@@ -35,7 +36,6 @@ export const GeneralProjectSettingsForm = ({ projectId }: { projectId: string })
   const { data: project, isLoading } = useProjectDetails(projectId);
 
   const {
-    getValues,
     register,
     handleSubmit,
     reset,
@@ -49,6 +49,7 @@ export const GeneralProjectSettingsForm = ({ projectId }: { projectId: string })
   const updateMutation = useMutation({
     mutationFn: updateProject,
     onSuccess: async (updatedProject) => {
+      queryClient.setQueryData(projectQueryKeys.details(projectId), updatedProject);
       reset(getGeneralProjectSettingsFormValues(updatedProject));
       setEditorKey((current) => current + 1);
       await invalidateProjectBoardData(queryClient);
@@ -100,8 +101,8 @@ export const GeneralProjectSettingsForm = ({ projectId }: { projectId: string })
       />
 
       <TextEditor
-        key={editorKey}
-        initialValue={getValues('description')}
+        key={`${editorKey}:${project.description}`}
+        initialValue={project.description}
         onChange={(newValue) => {
           setValue('description', newValue, {
             shouldDirty: true,

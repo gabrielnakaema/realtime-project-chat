@@ -1,7 +1,6 @@
 import { ChevronLeft, Cog, MessageSquare, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { ProjectHeader } from '../project-header';
 import type { Project } from '@/types/project';
 import { MembersAvatarList } from '@/components/members-avatar-list';
 import { NotificationBell } from '@/components/notification-bell';
@@ -15,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { getChatByProjectId } from '@/services/chat';
 import { projectChatQueryKeys } from '@/services/query-keys';
 import { Button, buttonVariants } from '@/shared/components/button';
+import { HeaderActions, HeaderLogo, HeaderShell, HeaderStart } from '@/shared/components/header-shell';
 
 export const ProjectDetailsHeader = ({ project }: { project: Project }) => {
   const projectId = project.id;
@@ -29,37 +29,42 @@ export const ProjectDetailsHeader = ({ project }: { project: Project }) => {
   const hasMoreUnread = chat?.has_more_unread ?? false;
 
   return (
-    <ProjectHeader>
-      <div className="flex w-full items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <ProjectHeader.Logo />
+    <HeaderShell>
+      <HeaderStart>
+        <div className="flex items-center gap-1">
+          <HeaderLogo className="hidden sm:block" />
 
-            <Link type="button" to="/projects" className={cn(buttonVariants({ variant: 'ghost', className: 'pl-1' }))}>
-              <ChevronLeft className="h-4 w-4" />
-              <h1 className="text-foreground text-sm font-semibold tracking-[-0.01em]">Taskflow</h1>
-            </Link>
-          </div>
-          <ProjectsDropdown
-            current={{
-              label: project.name,
-              value: project.id,
-            }}
-          />
+          <Link
+            type="button"
+            to="/projects"
+            aria-label="Back to projects"
+            className={cn(buttonVariants({ variant: 'ghost' }), 'size-9 px-0 sm:w-fit sm:px-4 sm:pl-1')}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <h1 className="text-foreground hidden text-sm font-semibold tracking-[-0.01em] sm:block">TaskFlow</h1>
+          </Link>
         </div>
-      </div>
+        <ProjectsDropdown
+          current={{
+            label: project.name,
+            value: project.id,
+          }}
+        />
+      </HeaderStart>
 
-      <div className="flex items-center gap-4">
+      <HeaderActions>
         <CreateTask
           projectId={projectId}
           trigger={
-            <Button type="button">
-              <Plus className="h-3 w-3" />
-              Create task
+            <Button type="button" className="size-9 px-0 md:w-fit md:px-4" aria-label="Create task">
+              <Plus className="h-4 w-4" />
+              <span className="hidden md:inline">Create task</span>
             </Button>
           }
         />
-        <ArchivedTasksModal projectId={projectId} />
+        <div className="hidden md:block">
+          <ArchivedTasksModal projectId={projectId} />
+        </div>
         <Tooltip>
           <TooltipTrigger asChild>
             <Link
@@ -78,13 +83,17 @@ export const ProjectDetailsHeader = ({ project }: { project: Project }) => {
           </TooltipTrigger>
           <TooltipContent>Chat</TooltipContent>
         </Tooltip>
-        <NotificationBell />
+        <div className="hidden lg:block">
+          <NotificationBell />
+        </div>
 
-        <MembersAvatarList
-          onlineUserIds={onlineUserIds}
-          members={project.members.map((member) => ({ user_id: member.user_id, name: member.user.name }))}
-          max={4}
-        />
+        <div className="hidden lg:block">
+          <MembersAvatarList
+            onlineUserIds={onlineUserIds}
+            members={project.members.map((member) => ({ user_id: member.user_id, name: member.user.name }))}
+            max={4}
+          />
+        </div>
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -99,7 +108,7 @@ export const ProjectDetailsHeader = ({ project }: { project: Project }) => {
           </TooltipTrigger>
           <TooltipContent>Settings</TooltipContent>
         </Tooltip>
-      </div>
-    </ProjectHeader>
+      </HeaderActions>
+    </HeaderShell>
   );
 };

@@ -1,9 +1,9 @@
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
-import { ProjectHeader } from '../project-header';
 import { useProjectDetails } from '@/hooks/use-project-details';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/shared/components/button';
+import { HeaderActions, HeaderLogo, HeaderShell, HeaderStart } from '@/shared/components/header-shell';
 
 export const ProjectSettingsHeader = ({ projectId }: { projectId: string }) => {
   const { data: project } = useProjectDetails(projectId);
@@ -13,25 +13,28 @@ export const ProjectSettingsHeader = ({ projectId }: { projectId: string }) => {
   }
 
   return (
-    <ProjectHeader>
-      <div className="flex w-full items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ProjectHeader.Logo />
-          <div className="flex items-center gap-2 pl-2">
-            <Link
-              to="/projects/$projectId"
-              params={{
-                projectId,
-              }}
-              className={cn(buttonVariants({ variant: 'link', size: 'sm' }), 'text-muted-foreground text-sm')}
-            >
-              {project.name}
-            </Link>
-            <span className="text-muted-foreground text-sm">/</span>
-            <p className="pl-2 text-sm font-semibold">Settings</p>
-          </div>
+    <HeaderShell>
+      <HeaderStart>
+        <HeaderLogo />
+        <div className="flex min-w-0 items-center gap-2 pl-2">
+          <Link
+            to="/projects/$projectId"
+            params={{
+              projectId,
+            }}
+            className={cn(
+              buttonVariants({ variant: 'link', size: 'sm' }),
+              'text-muted-foreground min-w-0 truncate text-sm',
+            )}
+          >
+            {project.name}
+          </Link>
+          <span className="text-muted-foreground text-sm">/</span>
+          <p className="text-sm font-semibold">Settings</p>
         </div>
+      </HeaderStart>
 
+      <HeaderActions>
         <Link
           to="/projects/$projectId"
           params={{ projectId }}
@@ -40,7 +43,7 @@ export const ProjectSettingsHeader = ({ projectId }: { projectId: string }) => {
           <ArrowLeft className="h-4 w-4" />
           Back to board
         </Link>
-      </div>
-    </ProjectHeader>
+      </HeaderActions>
+    </HeaderShell>
   );
 };

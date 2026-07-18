@@ -38,8 +38,10 @@ export const useUserDueTasks = () => {
 
   return {
     data,
+    isError: query.isError,
     isLoading: query.isLoading,
     isFetchingNextPage,
+    refetch: query.refetch,
     sentinelRef,
   };
 };

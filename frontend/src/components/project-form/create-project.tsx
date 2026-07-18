@@ -13,7 +13,11 @@ import { createProject } from '@/services/projects';
 import { handleSuccess } from '@/utils/handle-success';
 import { projectQueryKeys } from '@/services/query-keys';
 
-export const CreateProject = () => {
+interface CreateProjectProps {
+  trigger?: React.ReactNode;
+}
+
+export const CreateProject = ({ trigger }: CreateProjectProps = {}) => {
   const queryClient = useQueryClient();
 
   const [open, setOpen] = useState(false);
@@ -36,10 +40,12 @@ export const CreateProject = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" className="flex w-fit items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Create project
-        </Button>
+        {trigger ?? (
+          <Button type="button" className="flex w-fit items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create project
+          </Button>
+        )}
       </DialogTrigger>
 
       <DialogContent className="flex max-h-[calc(100vh-5rem)] flex-col gap-0 overflow-y-auto p-0 md:max-w-5xl">

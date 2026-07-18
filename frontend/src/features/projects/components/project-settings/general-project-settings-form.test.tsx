@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GeneralProjectSettingsForm } from './general-project-settings-form';
 import type { Project } from '@/types/project';
@@ -23,13 +24,24 @@ vi.mock('@/shared/components/text-editor', () => ({
     initialValue: string;
     label?: string;
     onChange: (value: string) => void;
-  }) => (
-    <div>
-      <label htmlFor={id}>{label}</label>
-      <textarea id={id} defaultValue={initialValue} onChange={(event) => onChange(event.target.value)} />
-      {error && <p>{error}</p>}
-    </div>
-  ),
+  }) => {
+    const [value, setValue] = useState(initialValue);
+
+    return (
+      <div>
+        <label htmlFor={id}>{label}</label>
+        <textarea
+          id={id}
+          value={value}
+          onChange={(event) => {
+            setValue(event.target.value);
+            onChange(event.target.value);
+          }}
+        />
+        {error && <p>{error}</p>}
+      </div>
+    );
+  },
 }));
 
 vi.mock('@/services/projects', () => ({
@@ -85,7 +97,7 @@ const project: Project = {
   ],
 };
 
-const renderSettings = (updatedProject: Project = project) => {
+const renderSettings = (updatedProject: Project = project, preloadProject = true) => {
   mockGetProject.mockResolvedValue(updatedProject);
   mockUpdateProject.mockResolvedValue(updatedProject);
 
@@ -95,7 +107,9 @@ const renderSettings = (updatedProject: Project = project) => {
       queries: { retry: false, staleTime: Infinity },
     },
   });
-  queryClient.setQueryData(projectQueryKeys.details(project.id), project);
+  if (preloadProject) {
+    queryClient.setQueryData(projectQueryKeys.details(project.id), project);
+  }
   const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
 
   render(
@@ -113,6 +127,15 @@ afterEach(() => {
 });
 
 describe('GeneralProjectSettingsForm', () => {
+  it('fills the project description after the initial project request resolves', async () => {
+    renderSettings(project, false);
+
+    expect(await screen.findByLabelText<HTMLTextAreaElement>('PROJECT DESCRIPTION')).toHaveProperty(
+      'value',
+      project.description,
+    );
+  });
+
   it('saves general settings while preserving the existing project columns', async () => {
     const submittedDescription = '<p>Updated description draft</p>';
     const updatedProject: Project = {
