@@ -110,6 +110,14 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     sharedServiceEnv
   );
 
+  const chatProc = await spawnBackendService(
+    backendDir,
+    "chat-service",
+    "./cmd/chat-service",
+    undefined,
+    sharedServiceEnv
+  );
+
   const gateway = await startGateway(backendDir, requestedGatewayPort);
   const gatewayPort = String(gateway.getMappedPort(80));
 
@@ -124,6 +132,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     await killProcess(frontendProc);
     await gateway.stop();
     await killProcess(relayProc);
+    await killProcess(chatProc);
     await killProcess(websocketProc);
     await killProcess(notificationProc);
     await killProcess(backendProc);

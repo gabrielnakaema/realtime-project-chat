@@ -15,10 +15,7 @@ async function fillRichText(editor: Locator, page: Page, value: string) {
 }
 
 async function createProject(page: Page, name: string) {
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await page.getByRole("button", { name: "New project" }).first().click();
 
   const createDialog = page.getByRole("dialog", { name: "Create project" });
   await createDialog.locator("#name").fill(name);
@@ -119,7 +116,9 @@ async function seedTasksInColumn(
 function boardColumn(page: Page, columnName: string) {
   return page
     .getByRole("button", { name: `Open actions for ${columnName}` })
-    .locator("xpath=ancestor::div[contains(@class, 'min-w-84')][1]");
+    .locator(
+      "xpath=ancestor::div[.//div[contains(@class, 'overflow-y-auto')]][1]"
+    );
 }
 
 function columnTaskHeadings(page: Page, columnName: string) {
@@ -127,7 +126,7 @@ function columnTaskHeadings(page: Page, columnName: string) {
 }
 
 function columnCountBadge(page: Page, columnName: string) {
-  return boardColumn(page, columnName).locator("span.rounded-full").first();
+  return boardColumn(page, columnName).locator("span.inline-flex").first();
 }
 
 function taskCardInColumn(page: Page, columnName: string, title: string) {

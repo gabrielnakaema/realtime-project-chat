@@ -21,7 +21,7 @@ test.describe("auth", () => {
     await page.getByRole("button", { name: "Sign In" }).click();
 
     await expect(
-      page.getByText(`Welcome back, ${testUser.name}`)
+      page.getByRole("heading", { name: "Projects", exact: true })
     ).toBeVisible();
     await expect(page).toHaveURL(/\/projects$/);
   });
@@ -34,7 +34,7 @@ test.describe("auth", () => {
 
     await expect(page).toHaveURL(/\/projects$/);
     await expect(
-      page.getByText(`Welcome back, ${testUser.name}`)
+      page.getByRole("heading", { name: "Projects", exact: true })
     ).toBeVisible();
 
     await page.getByRole("banner").locator("button").last().click();
@@ -92,7 +92,7 @@ test.describe("auth", () => {
 
     await expect(page).toHaveURL(/\/projects$/);
     await expect(
-      page.getByText(`Welcome back, ${testUser.name}`)
+      page.getByRole("heading", { name: "Projects", exact: true })
     ).toBeVisible();
   });
 
@@ -128,7 +128,9 @@ test.describe("auth", () => {
     await page.locator("#password").fill(password);
     await page.getByRole("button", { name: "Sign In" }).click();
 
-    await expect(page.getByText(`Welcome back, ${name}`)).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Projects", exact: true })
+    ).toBeVisible();
     await expect(page).toHaveURL(/\/projects$/);
   });
 });

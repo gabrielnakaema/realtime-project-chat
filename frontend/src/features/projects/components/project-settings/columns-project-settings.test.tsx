@@ -84,6 +84,7 @@ const renderSettings = () => {
   });
   queryClient.setQueryData(projectQueryKeys.details(project.id), project);
   const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+  const removeQueries = vi.spyOn(queryClient, 'removeQueries');
 
   render(
     <QueryClientProvider client={queryClient}>
@@ -91,7 +92,7 @@ const renderSettings = () => {
     </QueryClientProvider>,
   );
 
-  return { invalidateQueries };
+  return { invalidateQueries, removeQueries };
 };
 
 const openColumn = (name: string) => {
@@ -241,7 +242,7 @@ describe('ColumnsProjectSettings', () => {
   });
 
   it('removes a saved column with a valid task reassignment before saving', async () => {
-    renderSettings();
+    const { removeQueries } = renderSettings();
 
     const doingColumn = openColumn('Doing');
     fireEvent.click(within(doingColumn).getByRole('button', { name: 'Delete Doing' }));
@@ -265,6 +266,9 @@ describe('ColumnsProjectSettings', () => {
           ],
         }),
       );
+    });
+    await waitFor(() => {
+      expect(removeQueries).toHaveBeenCalledWith({ queryKey: ['tasks', 'board', project.id] });
     });
   });
 

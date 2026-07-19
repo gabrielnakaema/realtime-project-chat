@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { test, expect } from "@playwright/test";
 import { registerUser } from "../src/fixtures/test-user.js";
 import {
+  addProjectMember,
   backendURL,
   expectToast,
   loginAsUser,
@@ -23,8 +24,8 @@ test("project chat sender can see when a collaborator reads a message", async ({
   const messageContent = `E2E read receipt message ${crypto.randomUUID()}`;
 
   await senderPage
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
+    .getByRole("button", { name: "New project" })
+    .first()
     .click();
   const createProjectDialog = senderPage.getByRole("dialog", {
     name: "Create project",
@@ -40,15 +41,9 @@ test("project chat sender can see when a collaborator reads a message", async ({
 
   await senderPage.getByRole("link", { name: projectName }).click();
   const projectId = senderPage.url().split("/projects/")[1];
-  await senderPage.getByTitle("Add project member").click();
-  const addMemberDialog = senderPage.getByRole("dialog", {
-    name: "Add project member",
-  });
-  await addMemberDialog.getByLabel("Email").fill(recipient.email);
-  await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-  await expectToast(senderPage, "Member added successfully");
+  await addProjectMember(senderPage, recipient.email);
 
-  await senderPage.getByRole("link", { name: "Chat" }).click();
+  await senderPage.getByRole("link", { name: "Chat", exact: true }).click();
   await recipientPage.goto(`/projects/${projectId}/chat`);
   await expect(senderPage.locator('form button[type="submit"]')).toBeEnabled({
     timeout: 15_000,
@@ -61,7 +56,7 @@ test("project chat sender can see when a collaborator reads a message", async ({
   await expect(
     senderPage
       .getByRole("button", { name: "R", exact: true })
-      .locator("div.border-green-500")
+      .locator("div.border-success")
       .first()
   ).toBeVisible({ timeout: 15_000 });
 

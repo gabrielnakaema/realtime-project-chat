@@ -16,10 +16,7 @@ async function fillRichText(editor: Locator, page: Page, value: string) {
 }
 
 async function createProject(page: Page, name: string) {
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await page.getByRole("button", { name: "New project" }).first().click();
 
   const createDialog = page.getByRole("dialog", { name: "Create project" });
   await createDialog.locator("#name").fill(name);
@@ -49,10 +46,16 @@ function taskCard(page: Page, title: string) {
   return page.getByText(title, { exact: true });
 }
 
+function headerCreateTaskButton(page: Page) {
+  return page.locator("header").getByRole("button", { name: "Create task" });
+}
+
 function boardColumn(page: Page, columnName: string) {
   return page
     .getByRole("button", { name: `Open actions for ${columnName}` })
-    .locator("xpath=ancestor::div[contains(@class, 'min-w-84')][1]");
+    .locator(
+      "xpath=ancestor::div[.//div[contains(@class, 'overflow-y-auto')]][1]"
+    );
 }
 
 function taskCardInColumn(page: Page, columnName: string, title: string) {
@@ -181,7 +184,7 @@ test.describe("tasks", () => {
 
     await createProject(page, projectName);
 
-    await page.getByRole("button", { name: "Create task" }).click();
+    await headerCreateTaskButton(page).click();
     let createDialog = page.getByRole("dialog", { name: "Create task" });
     await createDialog.locator("#title").fill(existingTaskTitle);
     await fillRichText(
@@ -194,7 +197,7 @@ test.describe("tasks", () => {
     await createDialog.getByRole("button", { name: "Create task" }).click();
     await expectToast(page, "Task created successfully");
 
-    await page.getByRole("button", { name: "Create task" }).click();
+    await headerCreateTaskButton(page).click();
     createDialog = page.getByRole("dialog", { name: "Create task" });
     await createDialog.locator("#title").fill(taskTitle);
     await fillRichText(
@@ -287,7 +290,7 @@ test.describe("tasks", () => {
     await createProject(page, projectName);
 
     const createTask = async (title: string) => {
-      await page.getByRole("button", { name: "Create task" }).click();
+      await headerCreateTaskButton(page).click();
       const createDialog = page.getByRole("dialog", { name: "Create task" });
       await createDialog.locator("#title").fill(title);
       await fillRichText(
@@ -335,7 +338,7 @@ test.describe("tasks", () => {
 
     await createProject(page, projectName);
 
-    await page.getByRole("button", { name: "Create task" }).click();
+    await headerCreateTaskButton(page).click();
 
     const createDialog = page.getByRole("dialog", { name: "Create task" });
     await createDialog.getByRole("button", { name: "Create task" }).click();
@@ -354,7 +357,7 @@ test.describe("tasks", () => {
     const addedItem = "Document the behavior";
 
     await createProject(page, projectName);
-    await page.getByRole("button", { name: "Create task" }).click();
+    await headerCreateTaskButton(page).click();
 
     const createDialog = page.getByRole("dialog", { name: "Create task" });
     await createDialog.locator("#title").fill(taskTitle);
@@ -415,7 +418,7 @@ test.describe("tasks", () => {
 
     await createProject(page, projectName);
 
-    await page.getByRole("button", { name: "Create task" }).click();
+    await headerCreateTaskButton(page).click();
 
     const createDialog = page.getByRole("dialog", { name: "Create task" });
     await createDialog.locator("#title").fill(taskTitle);

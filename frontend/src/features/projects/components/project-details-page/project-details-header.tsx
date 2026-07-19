@@ -18,6 +18,7 @@ import { HeaderActions, HeaderLogo, HeaderShell, HeaderStart } from '@/shared/co
 
 export const ProjectDetailsHeader = ({ project }: { project: Project }) => {
   const projectId = project.id;
+  const initialProjectColumnId = [...project.columns].sort((left, right) => left.position - right.position)[0]?.id;
   const { onlineUserIds } = useOnlineUsers(projectId, 'project');
 
   const { data: chat } = useQuery({
@@ -55,6 +56,7 @@ export const ProjectDetailsHeader = ({ project }: { project: Project }) => {
       <HeaderActions>
         <CreateTask
           projectId={projectId}
+          initialProjectColumnId={initialProjectColumnId}
           trigger={
             <Button type="button" className="size-9 px-0 md:w-fit md:px-4" aria-label="Create task">
               <Plus className="h-4 w-4" />
@@ -71,6 +73,7 @@ export const ProjectDetailsHeader = ({ project }: { project: Project }) => {
               to="/projects/$projectId/chat"
               className={cn(buttonVariants({ variant: 'ghost', size: 'icon', className: 'relative' }))}
               params={{ projectId }}
+              aria-label="Chat"
               title="Chat"
             >
               <MessageSquare className="h-4 w-4" />

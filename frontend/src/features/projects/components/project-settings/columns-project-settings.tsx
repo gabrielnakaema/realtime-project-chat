@@ -20,6 +20,7 @@ import { updateProject } from '@/features/projects/services/projects';
 import { Button } from '@/shared/components/button';
 import { Input } from '@/shared/components/input';
 import { Input as Textarea } from '@/shared/components/textarea';
+import { taskQueryKeys } from '@/shared/services/query-keys';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/shared/components/ui/accordion';
 import { handleError } from '@/shared/utils/handle-error';
 import { handleSuccess } from '@/shared/utils/handle-success';
@@ -76,6 +77,7 @@ export const ColumnsProjectSettings = ({ projectId }: { projectId: string }) => 
     mutationFn: updateProject,
     onSuccess: async (updatedProject) => {
       reset(getColumnsFormValues(updatedProject));
+      queryClient.removeQueries({ queryKey: taskQueryKeys.board(projectId) });
       await invalidateProjectBoardData(queryClient);
       handleSuccess('Project columns saved successfully');
     },

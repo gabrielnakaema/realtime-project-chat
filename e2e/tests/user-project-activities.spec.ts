@@ -12,10 +12,7 @@ test("project owner sees task creation in recent activity and can return to the 
   const projectName = `E2E Activity Project ${crypto.randomUUID()}`;
   const taskTitle = `E2E Activity Task ${crypto.randomUUID()}`;
 
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await page.getByRole("button", { name: "New project" }).first().click();
 
   const createProjectDialog = page.getByRole("dialog", {
     name: "Create project",
@@ -46,12 +43,7 @@ test("project owner sees task creation in recent activity and can return to the 
   await expectToast(page, "Task created successfully");
 
   await page.goto("/projects");
-  const activityFeed = page
-    .getByRole("heading", {
-      name: "Recent activity",
-      exact: true,
-    })
-    .locator("xpath=ancestor::section[1]");
+  const activityFeed = page.getByRole("region", { name: "Recent Activity" });
   await expect(activityFeed.getByText(taskTitle, { exact: true })).toBeVisible({
     timeout: 15_000,
   });
@@ -59,16 +51,14 @@ test("project owner sees task creation in recent activity and can return to the 
     activityFeed.getByText(`${testUser.name} created task`, { exact: false })
   ).toBeVisible();
 
-  const taskActivity = activityFeed
-    .getByText(taskTitle, { exact: true })
-    .locator(
-      "xpath=ancestor::div[contains(@class, 'flex items-center gap-4')][1]"
-    );
+  const taskActivity = activityFeed.getByRole("article").filter({
+    hasText: taskTitle,
+  });
   await taskActivity
     .getByRole("link", { name: projectName, exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: projectName, exact: true })
+    page.getByRole("button", { name: projectName, exact: true })
   ).toBeVisible();
 });
 
@@ -79,10 +69,7 @@ test("project owner sees a task move in recent activity and can return to the pr
   const projectName = `E2E Updated Activity Project ${crypto.randomUUID()}`;
   const taskTitle = `E2E Updated Activity Task ${crypto.randomUUID()}`;
 
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await page.getByRole("button", { name: "New project" }).first().click();
   const createProjectDialog = page.getByRole("dialog", {
     name: "Create project",
   });
@@ -115,7 +102,9 @@ test("project owner sees a task move in recent activity and can return to the pr
     .locator("xpath=ancestor::div[contains(@class, 'cursor-pointer')][1]");
   const doneColumn = page
     .getByRole("button", { name: "Open actions for Done" })
-    .locator("xpath=ancestor::div[contains(@class, 'min-w-84')][1]");
+    .locator(
+      "xpath=ancestor::div[.//div[contains(@class, 'overflow-y-auto')]][1]"
+    );
   const moveResponsePromise = page.waitForResponse((response) => {
     const url = new URL(response.url());
 
@@ -130,17 +119,13 @@ test("project owner sees a task move in recent activity and can return to the pr
   expect((await moveResponsePromise).ok()).toBe(true);
 
   await page.goto("/projects");
-  const activityFeed = page
-    .getByRole("heading", {
-      name: "Recent activity",
-      exact: true,
-    })
-    .locator("xpath=ancestor::section[1]");
+  const activityFeed = page.getByRole("region", { name: "Recent Activity" });
   const updatedTaskActivity = activityFeed
-    .getByText(`${testUser.name} updated task`, { exact: false })
-    .locator(
-      "xpath=ancestor::div[contains(@class, 'flex items-center gap-4')][1]"
-    );
+    .getByRole("article")
+    .filter({
+      hasText: taskTitle,
+    })
+    .filter({ hasText: `${testUser.name} updated task` });
   await expect(updatedTaskActivity).toBeVisible({ timeout: 15_000 });
   await expect(
     updatedTaskActivity.getByText(taskTitle, { exact: true })
@@ -150,6 +135,6 @@ test("project owner sees a task move in recent activity and can return to the pr
     .getByRole("link", { name: projectName, exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: projectName, exact: true })
+    page.getByRole("button", { name: projectName, exact: true })
   ).toBeVisible();
 });

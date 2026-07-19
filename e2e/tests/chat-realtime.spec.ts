@@ -2,9 +2,11 @@ import crypto from "node:crypto";
 import { test, expect } from "@playwright/test";
 import { registerUser } from "../src/fixtures/test-user.js";
 import {
+  addProjectMember,
   backendURL,
   expectToast,
   loginAsUser,
+  openProjectMembersSettings,
 } from "../src/fixtures/authenticated-page.js";
 
 test("a chat message sent by one member appears for another member in real time", async ({
@@ -19,10 +21,7 @@ test("a chat message sent by one member appears for another member in real time"
 
   const projectName = `E2E Project ${crypto.randomUUID()}`;
 
-  await pageA
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await pageA.getByRole("button", { name: "New project" }).first().click();
   await pageA.locator("#name").fill(projectName);
   await pageA.locator("#description").click();
   await pageA
@@ -38,24 +37,39 @@ test("a chat message sent by one member appears for another member in real time"
   await expect(pageA).toHaveURL(/\/projects\/[^/]+$/);
   const projectId = pageA.url().split("/projects/")[1];
 
-  await pageA.getByTitle("Add project member").click();
-  await pageA.locator("#email").fill(userB.email);
-  await pageA.getByRole("button", { name: "Add member" }).click();
-  await expectToast(pageA, "Member added successfully");
+  await addProjectMember(pageA, userB.email);
 
-  await pageA.getByRole("link", { name: "Chat" }).click();
-  await pageB.goto(`/projects/${projectId}/chat`);
-
+  await pageA.getByRole("link", { name: "Chat", exact: true }).click();
   await expect(pageA.locator('form button[type="submit"]')).toBeEnabled({
     timeout: 15_000,
   });
+
+  const unreadMessage = `Unread project message ${crypto.randomUUID()}`;
+  const unreadMessageResponsePromise = pageA.waitForResponse((response) => {
+    const url = new URL(response.url());
+
+    return (
+      response.request().method() === "POST" &&
+      url.pathname.endsWith("/chats/messages")
+    );
+  });
+  await pageA.getByPlaceholder("Message...").fill(unreadMessage);
+  await pageA.getByPlaceholder("Message...").press("Enter");
+  expect((await unreadMessageResponsePromise).ok()).toBe(true);
+
+  await pageB.goto(`/projects/${projectId}`);
+  const chatLink = pageB.getByRole("link", { name: "Chat", exact: true });
+  await expect(chatLink.getByText(/^(?:\+99|\d+)$/)).toBeVisible();
+  await chatLink.click();
+  await expect(pageB.getByText(unreadMessage, { exact: true })).toBeVisible();
+
   await expect(pageB.locator('form button[type="submit"]')).toBeEnabled({
     timeout: 15_000,
   });
   await expect(
     pageB
       .getByRole("button", { name: "B", exact: true })
-      .locator("div.border-green-500")
+      .locator("div.border-success")
   ).toBeVisible({ timeout: 15_000 });
 
   const messageContent = `Hello from Alice ${crypto.randomUUID()}`;
@@ -97,10 +111,7 @@ test("project collaborators can start a direct message and receive it in real ti
   const pageB = await loginAsUser(browser, userB);
 
   const projectName = `E2E Direct Message Project ${crypto.randomUUID()}`;
-  await pageA
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await pageA.getByRole("button", { name: "New project" }).first().click();
   const createProjectDialog = pageA.getByRole("dialog", {
     name: "Create project",
   });
@@ -114,13 +125,7 @@ test("project collaborators can start a direct message and receive it in real ti
   await expectToast(pageA, "Project created successfully");
 
   await pageA.getByRole("link", { name: projectName }).click();
-  await pageA.getByTitle("Add project member").click();
-  const addMemberDialog = pageA.getByRole("dialog", {
-    name: "Add project member",
-  });
-  await addMemberDialog.getByLabel("Email").fill(userB.email);
-  await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-  await expectToast(pageA, "Member added successfully");
+  await addProjectMember(pageA, userB.email);
 
   await pageA.goto("/projects");
   await pageA.getByRole("button", { name: "Messages" }).click();
@@ -197,10 +202,7 @@ test("project collaborators can start a group message and all recipients receive
   const pageC = await loginAsUser(browser, userC);
   const projectName = `E2E Group Message Project ${crypto.randomUUID()}`;
 
-  await pageA
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await pageA.getByRole("button", { name: "New project" }).first().click();
   const createProjectDialog = pageA.getByRole("dialog", {
     name: "Create project",
   });
@@ -214,25 +216,25 @@ test("project collaborators can start a group message and all recipients receive
   await expectToast(pageA, "Project created successfully");
 
   await pageA.getByRole("link", { name: projectName }).click();
-  await pageA.getByTitle("Add project member").click();
-  let addMemberDialog = pageA.getByRole("dialog", {
-    name: "Add project member",
-  });
-  await addMemberDialog.getByLabel("Email").fill(userB.email);
-  await addMemberDialog.getByRole("button", { name: "Add member" }).click();
+  await openProjectMembersSettings(pageA);
+  await pageA.getByLabel("Email address").fill(userB.email);
+  await pageA.getByRole("button", { name: "Add member" }).click();
   await expectToast(pageA, "Member added successfully");
 
-  await pageA.getByTitle("Add project member").click();
-  addMemberDialog = pageA.getByRole("dialog", { name: "Add project member" });
-  await addMemberDialog.getByLabel("Email").fill(userC.email);
+  await pageA.getByLabel("Email address").fill(userC.email);
   const addUserCResponse = pageA.waitForResponse((response) => {
     const url = new URL(response.url());
 
-    return response.request().method() === "POST" && /\/projects\/[^/]+\/members$/.test(url.pathname);
+    return (
+      response.request().method() === "POST" &&
+      /\/projects\/[^/]+\/members$/.test(url.pathname)
+    );
   });
-  await addMemberDialog.getByRole("button", { name: "Add member" }).click();
+  await pageA.getByRole("button", { name: "Add member" }).click();
   expect((await addUserCResponse).ok()).toBe(true);
-  await expect(pageA.getByText("Member added successfully").last()).toBeVisible();
+  await expect(
+    pageA.getByText("Member added successfully").last()
+  ).toBeVisible();
 
   await pageA.goto("/projects");
   await pageA.getByRole("button", { name: "Messages" }).click();

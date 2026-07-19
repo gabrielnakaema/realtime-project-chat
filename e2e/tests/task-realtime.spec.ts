@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import {
+  addProjectMember,
   expect,
   expectToast,
   loginAsUser,
@@ -11,7 +12,9 @@ import type { Page } from "@playwright/test";
 function boardColumn(page: Page, columnName: string) {
   return page
     .getByRole("button", { name: `Open actions for ${columnName}` })
-    .locator("xpath=ancestor::div[contains(@class, 'min-w-84')][1]");
+    .locator(
+      "xpath=ancestor::div[.//div[contains(@class, 'overflow-y-auto')]][1]"
+    );
 }
 
 test("project collaborators see task creation and movement on their board in real time", async ({
@@ -27,10 +30,7 @@ test("project collaborators see task creation and movement on their board in rea
   const projectName = `E2E Realtime Task Project ${crypto.randomUUID()}`;
   const taskTitle = `E2E Realtime Task ${crypto.randomUUID()}`;
 
-  await ownerPage
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await ownerPage.getByRole("button", { name: "New project" }).first().click();
   const createProjectDialog = ownerPage.getByRole("dialog", {
     name: "Create project",
   });
@@ -45,22 +45,16 @@ test("project collaborators see task creation and movement on their board in rea
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   const projectId = ownerPage.url().split("/projects/")[1];
-  await ownerPage.getByTitle("Add project member").click();
-  const addMemberDialog = ownerPage.getByRole("dialog", {
-    name: "Add project member",
-  });
-  await addMemberDialog.getByLabel("Email").fill(member.email);
-  await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-  await expectToast(ownerPage, "Member added successfully");
+  await addProjectMember(ownerPage, member.email);
 
   await ownerPage.reload();
   await memberPage.goto(`/projects/${projectId}`);
   await expect(
-    memberPage.getByRole("heading", { name: projectName, exact: true })
+    memberPage.getByRole("button", { name: projectName, exact: true })
   ).toBeVisible();
 
   await expect(
-    ownerPage.locator("div.border-green-500").filter({ hasText: "R" })
+    ownerPage.locator("div.border-success").filter({ hasText: "R" })
   ).toBeVisible({ timeout: 15_000 });
 
   await ownerPage

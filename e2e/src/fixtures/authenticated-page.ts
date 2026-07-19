@@ -55,6 +55,22 @@ export async function expectToast(page: Page, message: string | RegExp) {
   await expect(page.getByText(message)).toBeVisible();
 }
 
+export async function openProjectMembersSettings(page: Page) {
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: "Members", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true })
+  ).toBeVisible();
+}
+
+export async function addProjectMember(page: Page, email: string) {
+  await openProjectMembersSettings(page);
+  await page.getByLabel("Email address").fill(email);
+  await page.getByRole("button", { name: "Add member" }).click();
+  await expectToast(page, "Member added successfully");
+  await page.getByRole("link", { name: "Back to board" }).click();
+}
+
 export async function loginAsUser(
   browser: Browser,
   user: TestUser
@@ -69,7 +85,7 @@ export async function loginAsUser(
   const page = await context.newPage();
 
   await page.goto("/projects");
-  await page.getByText(`Welcome back, ${user.name}`).waitFor();
+  await page.getByRole("heading", { name: "Projects", exact: true }).waitFor();
 
   return page;
 }

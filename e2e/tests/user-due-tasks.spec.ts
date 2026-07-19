@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import {
+  addProjectMember,
   expect,
   expectToast,
   loginAsUser,
@@ -21,10 +22,7 @@ test("assigned user can open an upcoming task from the dashboard", async ({
   const taskTitle = `E2E Due Task ${crypto.randomUUID()}`;
   const dueDate = "2026-08-20";
 
-  await ownerPage
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await ownerPage.getByRole("button", { name: "New project" }).first().click();
 
   const createProjectDialog = ownerPage.getByRole("dialog", {
     name: "Create project",
@@ -39,13 +37,7 @@ test("assigned user can open an upcoming task from the dashboard", async ({
   await expectToast(ownerPage, "Project created successfully");
 
   await ownerPage.getByRole("link", { name: projectName }).click();
-  await ownerPage.getByTitle("Add project member").click();
-  const addMemberDialog = ownerPage.getByRole("dialog", {
-    name: "Add project member",
-  });
-  await addMemberDialog.getByLabel("Email").fill(member.email);
-  await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-  await expectToast(ownerPage, "Member added successfully");
+  await addProjectMember(ownerPage, member.email);
 
   await ownerPage.reload();
   await ownerPage
@@ -71,17 +63,15 @@ test("assigned user can open an upcoming task from the dashboard", async ({
   await expectToast(ownerPage, "Task created successfully");
 
   await memberPage.reload();
-  const dueTasks = memberPage
-    .getByRole("heading", {
-      name: "Upcoming deadlines",
-      exact: true,
-    })
-    .locator("xpath=ancestor::section[1]");
-  await expect(dueTasks.getByText(taskTitle, { exact: true })).toBeVisible();
-  await expect(dueTasks.getByText("Aug 20", { exact: true })).toBeVisible();
-  await dueTasks
-    .getByRole("button", { name: `Open task ${taskTitle}`, exact: true })
-    .click();
+  const dueTasks = memberPage.getByRole("region", {
+    name: "Upcoming Deadlines",
+  });
+  const dueTaskLink = dueTasks.getByRole("link", {
+    name: new RegExp(taskTitle),
+  });
+  await expect(dueTaskLink).toBeVisible();
+  await expect(dueTaskLink.getByText(/Due (in|today|tomorrow)/)).toBeVisible();
+  await dueTaskLink.click();
 
   const taskDetails = memberPage.getByRole("dialog", { name: taskTitle });
   await expect(taskDetails).toBeVisible();
@@ -103,10 +93,7 @@ test("assigned user can complete an upcoming task and remove it from the dashboa
   const taskTitle = `E2E Complete Due Task ${crypto.randomUUID()}`;
   const dueDate = "2026-08-20";
 
-  await ownerPage
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await ownerPage.getByRole("button", { name: "New project" }).first().click();
   const createProjectDialog = ownerPage.getByRole("dialog", {
     name: "Create project",
   });
@@ -121,13 +108,7 @@ test("assigned user can complete an upcoming task and remove it from the dashboa
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   const projectId = ownerPage.url().split("/projects/")[1];
-  await ownerPage.getByTitle("Add project member").click();
-  const addMemberDialog = ownerPage.getByRole("dialog", {
-    name: "Add project member",
-  });
-  await addMemberDialog.getByLabel("Email").fill(member.email);
-  await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-  await expectToast(ownerPage, "Member added successfully");
+  await addProjectMember(ownerPage, member.email);
 
   await ownerPage.reload();
   await ownerPage
@@ -152,13 +133,12 @@ test("assigned user can complete an upcoming task and remove it from the dashboa
   await expectToast(ownerPage, "Task created successfully");
 
   await memberPage.reload();
-  const dueTasks = memberPage
-    .getByRole("heading", {
-      name: "Upcoming deadlines",
-      exact: true,
-    })
-    .locator("xpath=ancestor::section[1]");
-  await expect(dueTasks.getByText(taskTitle, { exact: true })).toBeVisible();
+  const dueTasks = memberPage.getByRole("region", {
+    name: "Upcoming Deadlines",
+  });
+  await expect(
+    dueTasks.getByRole("link", { name: new RegExp(taskTitle) })
+  ).toBeVisible();
 
   await memberPage.goto(`/projects/${projectId}`);
   const draggableTask = memberPage
@@ -166,7 +146,9 @@ test("assigned user can complete an upcoming task and remove it from the dashboa
     .locator("xpath=ancestor::div[contains(@class, 'cursor-pointer')][1]");
   const doneColumn = memberPage
     .getByRole("button", { name: "Open actions for Done" })
-    .locator("xpath=ancestor::div[contains(@class, 'min-w-84')][1]");
+    .locator(
+      "xpath=ancestor::div[.//div[contains(@class, 'overflow-y-auto')]][1]"
+    );
   const moveResponsePromise = memberPage.waitForResponse((response) => {
     const url = new URL(response.url());
 
