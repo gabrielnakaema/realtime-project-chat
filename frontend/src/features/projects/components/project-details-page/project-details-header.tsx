@@ -1,18 +1,18 @@
 import { ChevronLeft, Cog, MessageSquare, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import type { Project } from '@/types/project';
-import { MembersAvatarList } from '@/components/members-avatar-list';
-import { NotificationBell } from '@/components/notification-bell';
+import type { Project } from '@/features/projects/types/project';
+import { MembersAvatarList } from '@/shared/components/members-avatar-list';
+import { NotificationBell } from '@/features/notifications/components/notification-bell';
 import { ProjectsDropdown } from '@/features/projects/components/project-details-page/projects-dropdown';
-import { ArchivedTasksModal } from '@/components/archived-tasks-modal';
-import { CreateTask } from '@/components/task-form/create-task';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { UnreadCountBadge } from '@/components/unread-count-badge';
-import { useOnlineUsers } from '@/hooks/use-online-users';
+import { ArchivedTasksModal } from '@/features/tasks/components/archived-tasks-modal';
+import { CreateTask } from '@/features/tasks/components/task-form/create-task';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { UnreadCountBadge } from '@/features/chat/components/unread-count-badge';
+import { useOnlineUsers } from '@/shared/hooks/use-online-users';
 import { cn } from '@/lib/utils';
-import { getChatByProjectId } from '@/services/chat';
-import { projectChatQueryKeys } from '@/services/query-keys';
+import { getChatByProjectId } from '@/features/chat/services/chat';
+import { projectChatQueryKeys } from '@/shared/services/query-keys';
 import { Button, buttonVariants } from '@/shared/components/button';
 import { HeaderActions, HeaderLogo, HeaderShell, HeaderStart } from '@/shared/components/header-shell';
 

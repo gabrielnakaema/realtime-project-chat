@@ -3,13 +3,13 @@ import { useMutation } from '@tanstack/react-query';
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useForm } from 'react-hook-form';
 import type { SubmitHandler } from 'react-hook-form';
-import type { ISignUpForm } from '@/schemas/sign-up-schema';
+import type { ISignUpForm } from '@/features/auth/schemas/sign-up.schema';
 import { Button } from '@/components/button';
 import { Input } from '@/components/input';
-import { LoadingSpinner } from '@/components/loading';
-import { signUpSchema } from '@/schemas/sign-up-schema';
-import { createUser } from '@/services/users';
-import { handleSuccess } from '@/utils/handle-success';
+import { LoadingSpinner } from '@/shared/components/loading';
+import { signUpSchema } from '@/features/auth/schemas/sign-up.schema';
+import { createUser } from '@/features/auth/services/users';
+import { handleSuccess } from '@/shared/utils/handle-success';
 
 export const Route = createFileRoute('/sign-up')({
   component: RouteComponent,

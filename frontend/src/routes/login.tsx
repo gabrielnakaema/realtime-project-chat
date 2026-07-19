@@ -3,12 +3,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import type { SubmitHandler } from 'react-hook-form';
-import type { ILoginForm } from '@/schemas/login-schema';
+import type { ILoginForm } from '@/features/auth/schemas/login.schema';
 import { Input } from '@/components/input';
-import { loginSchema } from '@/schemas/login-schema';
-import { login } from '@/services/auth';
-import { LoadingSpinner } from '@/components/loading';
-import { useAuth } from '@/hooks/use-auth';
+import { loginSchema } from '@/features/auth/schemas/login.schema';
+import { login } from '@/features/auth/services/auth';
+import { LoadingSpinner } from '@/shared/components/loading';
+import { useAuth } from '@/features/auth/hooks/use-auth';
 import { Button } from '@/components/button';
 
 export const Route = createFileRoute('/login')({

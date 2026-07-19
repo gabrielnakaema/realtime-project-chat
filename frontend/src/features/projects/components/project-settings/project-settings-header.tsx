@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
-import { useProjectDetails } from '@/hooks/use-project-details';
+import { useProjectDetails } from '@/features/projects/hooks/use-project-details';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/shared/components/button';
 import { HeaderActions, HeaderLogo, HeaderShell, HeaderStart } from '@/shared/components/header-shell';

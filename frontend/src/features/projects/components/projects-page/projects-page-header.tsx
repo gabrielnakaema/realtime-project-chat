@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { MessageSquare, Search } from 'lucide-react';
-import { HeaderUser } from '@/components/header-user';
-import { NotificationBell } from '@/components/notification-bell';
-import { SearchBar } from '@/components/search-bar';
-import { UnreadCountBadge } from '@/components/unread-count-badge';
-import { useMessagesSheet } from '@/contexts/messages-sheet-context';
-import { listGeneralChats } from '@/services/general-chat';
-import { generalChatQueryKeys } from '@/services/query-keys';
+import { HeaderUser } from '@/features/auth/components/header-user';
+import { NotificationBell } from '@/features/notifications/components/notification-bell';
+import { SearchBar } from '@/features/search/components/search-bar';
+import { UnreadCountBadge } from '@/features/chat/components/unread-count-badge';
+import { useMessagesSheet } from '@/features/chat/components/messages-sheet-context';
+import { listGeneralChats } from '@/features/chat/services/general-chat';
+import { generalChatQueryKeys } from '@/shared/services/query-keys';
 import { HeaderActions, HeaderCenter, HeaderLogo, HeaderShell, HeaderStart } from '@/shared/components/header-shell';
 
 export const ProjectsPageHeader = () => {

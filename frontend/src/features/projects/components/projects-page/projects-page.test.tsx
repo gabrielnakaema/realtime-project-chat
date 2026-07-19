@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProjectSummaryCard } from './projects-grid';
 import { getDueStatus } from './upcoming-deadlines';
 import type { ComponentProps, ReactNode } from 'react';
-import type { Project } from '@/types/project';
+import type { Project } from '@/features/projects/types/project';
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, params, search: _search, to: _to, ...props }: MockLinkProps) => (

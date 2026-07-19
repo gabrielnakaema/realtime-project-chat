@@ -5,21 +5,24 @@ import { useState } from 'react';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import type { SubmitHandler } from 'react-hook-form';
 import type { ColumnsProjectSettingsFormData } from '@/features/projects/schemas/columns-project-settings.schema';
-import type { Project, ProjectColumn } from '@/types/project';
-import { LoadingSpinner } from '@/components/loading';
-import { Select } from '@/components/select';
+import type { Project, ProjectColumn } from '@/features/projects/types/project';
+import { LoadingSpinner } from '@/shared/components/loading';
+import { Select } from '@/shared/components/select';
 import { columnsProjectSettingsSchema } from '@/features/projects/schemas/columns-project-settings.schema';
-import { buildProjectColumnSurface, getDefaultProjectColumnColor } from '@/lib/project-column-colors';
+import {
+  buildProjectColumnSurface,
+  getDefaultProjectColumnColor,
+} from '@/features/projects/utils/project-column-colors';
 import { cn } from '@/lib/utils';
-import { useProjectDetails } from '@/hooks/use-project-details';
-import { invalidateProjectBoardData } from '@/services/project-board-invalidation';
-import { updateProject } from '@/services/projects';
+import { useProjectDetails } from '@/features/projects/hooks/use-project-details';
+import { invalidateProjectBoardData } from '@/features/projects/services/project-board-invalidation';
+import { updateProject } from '@/features/projects/services/projects';
 import { Button } from '@/shared/components/button';
 import { Input } from '@/shared/components/input';
 import { Input as Textarea } from '@/shared/components/textarea';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { handleError } from '@/utils/handle-error';
-import { handleSuccess } from '@/utils/handle-success';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/shared/components/ui/accordion';
+import { handleError } from '@/shared/utils/handle-error';
+import { handleSuccess } from '@/shared/utils/handle-success';
 
 const getColumnsFormValues = (project?: Project): ColumnsProjectSettingsFormData => ({
   columns:

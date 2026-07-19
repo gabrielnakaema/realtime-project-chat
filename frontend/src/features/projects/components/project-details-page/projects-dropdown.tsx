@@ -1,13 +1,13 @@
 import { Link } from '@tanstack/react-router';
 import { ChevronDown } from 'lucide-react';
-import { LoadingSpinner } from '../../../../components/loading';
+import { LoadingSpinner } from '@/shared/components/loading';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useListProjects } from '@/hooks/use-list-projects';
+} from '@/shared/components/ui/dropdown-menu';
+import { useListProjects } from '@/features/projects/hooks/use-list-projects';
 import { cn } from '@/lib/utils';
 import { Button } from '@/shared/components/button';
 

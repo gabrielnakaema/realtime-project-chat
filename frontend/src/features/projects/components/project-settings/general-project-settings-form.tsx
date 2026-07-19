@@ -4,19 +4,19 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { SubmitHandler } from 'react-hook-form';
 import type { GeneralProjectSettingsFormData } from '@/features/projects/schemas/general-project-settings.schema';
-import type { Project } from '@/types/project';
-import { LoadingSpinner } from '@/components/loading';
+import type { Project } from '@/features/projects/types/project';
+import { LoadingSpinner } from '@/shared/components/loading';
 import { TextEditor } from '@/shared/components/text-editor';
 import { generalProjectSettingsSchema } from '@/features/projects/schemas/general-project-settings.schema';
-import { useProjectDetails } from '@/hooks/use-project-details';
-import { invalidateProjectBoardData } from '@/services/project-board-invalidation';
-import { updateProject } from '@/services/projects';
-import { projectQueryKeys } from '@/services/query-keys';
+import { useProjectDetails } from '@/features/projects/hooks/use-project-details';
+import { invalidateProjectBoardData } from '@/features/projects/services/project-board-invalidation';
+import { updateProject } from '@/features/projects/services/projects';
+import { projectQueryKeys } from '@/shared/services/query-keys';
 import { ConfirmationDialog } from '@/shared/components/confirmation-dialog';
 import { Input } from '@/shared/components/input';
 import { Button } from '@/shared/components/button';
-import { handleError } from '@/utils/handle-error';
-import { handleSuccess } from '@/utils/handle-success';
+import { handleError } from '@/shared/utils/handle-error';
+import { handleSuccess } from '@/shared/utils/handle-success';
 
 const getGeneralProjectSettingsFormValues = (project?: Project): GeneralProjectSettingsFormData => ({
   branch_name_prefix: project?.branch_name_prefix ?? '',

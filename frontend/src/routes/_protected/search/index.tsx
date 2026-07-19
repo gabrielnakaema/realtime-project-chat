@@ -1,13 +1,13 @@
 import { Link, createFileRoute } from '@tanstack/react-router';
 import { ArrowLeft, Search } from 'lucide-react';
 import { z } from 'zod';
-import { HeaderUser } from '@/components/header-user';
-import { NotificationBell } from '@/components/notification-bell';
-import { SearchEmptyState } from '@/components/search/empty-state';
-import { ProjectSearchResults } from '@/components/search/project-search-results';
-import { SearchBar } from '@/components/search-bar';
-import { TaskSearchResults } from '@/components/search/task-search-results';
-import { normalizeSearchQuery } from '@/utils/search';
+import { HeaderUser } from '@/features/auth/components/header-user';
+import { NotificationBell } from '@/features/notifications/components/notification-bell';
+import { SearchEmptyState } from '@/features/search/components/empty-state';
+import { ProjectSearchResults } from '@/features/search/components/project-search-results';
+import { SearchBar } from '@/features/search/components/search-bar';
+import { TaskSearchResults } from '@/features/search/components/task-search-results';
+import { normalizeSearchQuery } from '@/shared/utils/search';
 
 export const Route = createFileRoute('/_protected/search/')({
   component: RouteComponent,

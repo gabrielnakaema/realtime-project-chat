@@ -4,29 +4,29 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MembersProjectSettings } from './members-project-settings';
-import type { Project } from '@/types/project';
-import { ProjectMemberRole } from '@/types/project';
-import { useAuth } from '@/hooks/use-auth';
-import { createProjectMember, getProject, removeProjectMember } from '@/services/projects';
-import { projectQueryKeys } from '@/services/query-keys';
-import { handleError } from '@/utils/handle-error';
-import { handleSuccess } from '@/utils/handle-success';
+import type { Project } from '@/features/projects/types/project';
+import { ProjectMemberRole } from '@/features/projects/types/project';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { createProjectMember, getProject, removeProjectMember } from '@/features/projects/services/projects';
+import { projectQueryKeys } from '@/shared/services/query-keys';
+import { handleError } from '@/shared/utils/handle-error';
+import { handleSuccess } from '@/shared/utils/handle-success';
 
-vi.mock('@/hooks/use-auth', () => ({
+vi.mock('@/features/auth/hooks/use-auth', () => ({
   useAuth: vi.fn(),
 }));
 
-vi.mock('@/services/projects', () => ({
+vi.mock('@/features/projects/services/projects', () => ({
   createProjectMember: vi.fn(),
   getProject: vi.fn(),
   removeProjectMember: vi.fn(),
 }));
 
-vi.mock('@/utils/handle-error', () => ({
+vi.mock('@/shared/utils/handle-error', () => ({
   handleError: vi.fn(),
 }));
 
-vi.mock('@/utils/handle-success', () => ({
+vi.mock('@/shared/utils/handle-success', () => ({
   handleSuccess: vi.fn(),
 }));
 

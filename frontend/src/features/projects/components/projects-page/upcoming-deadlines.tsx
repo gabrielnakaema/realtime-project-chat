@@ -1,8 +1,8 @@
 import { Link } from '@tanstack/react-router';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { Loader2, RotateCcw } from 'lucide-react';
-import type { Task } from '@/types/task';
-import { useUserDueTasks } from '@/hooks/use-user-due-tasks';
+import type { Task } from '@/features/tasks/types/task';
+import { useUserDueTasks } from '@/features/tasks/hooks/use-user-due-tasks';
 import { cn } from '@/lib/utils';
 import { Button } from '@/shared/components/button';
 

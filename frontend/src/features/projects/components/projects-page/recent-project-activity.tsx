@@ -1,9 +1,9 @@
 import { Link } from '@tanstack/react-router';
 import { Loader2, RotateCcw } from 'lucide-react';
-import { ProjectActivityText } from '@/components/project-activity-text';
-import { useUserProjectActivities } from '@/hooks/use-user-project-activities';
+import { ProjectActivityText } from '@/features/projects/components/project-activity-text';
+import { useUserProjectActivities } from '@/features/projects/hooks/use-user-project-activities';
 import { Button } from '@/shared/components/button';
-import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
+import { formatRelativeActivityDateString } from '@/shared/utils/format-relative-activity';
 
 export const RecentProjectActivity = () => {
   const { data, queryResult, sentinelRef } = useUserProjectActivities();

@@ -1,13 +1,13 @@
 import { Link } from '@tanstack/react-router';
 import { Plus, RotateCcw } from 'lucide-react';
-import type { Project } from '@/types/project';
-import { ProjectCardSkeleton } from '@/components/project-card';
-import { CreateProject } from '@/components/project-form/create-project';
-import { useListProjects } from '@/hooks/use-list-projects';
+import type { Project } from '@/features/projects/types/project';
+import { ProjectCardSkeleton } from '@/features/projects/components/project-card';
+import { CreateProject } from '@/features/projects/components/project-form/create-project';
+import { useListProjects } from '@/features/projects/hooks/use-list-projects';
 import { cn } from '@/lib/utils';
 import { Button } from '@/shared/components/button';
-import { formatRelativeActivityDateString } from '@/utils/format-relative-activity';
-import { richTextListClassName, sanitizeHTML } from '@/utils/html';
+import { formatRelativeActivityDateString } from '@/shared/utils/format-relative-activity';
+import { richTextListClassName, sanitizeHTML } from '@/shared/utils/html';
 
 export const ProjectsGrid = () => {
   const { data: projects, isError, isLoading, refetch } = useListProjects();

@@ -5,11 +5,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GeneralProjectSettingsForm } from './general-project-settings-form';
-import type { Project } from '@/types/project';
-import { getProject, updateProject } from '@/services/projects';
-import { projectQueryKeys } from '@/services/query-keys';
-import { handleError } from '@/utils/handle-error';
-import { handleSuccess } from '@/utils/handle-success';
+import type { Project } from '@/features/projects/types/project';
+import { getProject, updateProject } from '@/features/projects/services/projects';
+import { projectQueryKeys } from '@/shared/services/query-keys';
+import { handleError } from '@/shared/utils/handle-error';
+import { handleSuccess } from '@/shared/utils/handle-success';
 
 vi.mock('@/shared/components/text-editor', () => ({
   TextEditor: ({
@@ -44,16 +44,16 @@ vi.mock('@/shared/components/text-editor', () => ({
   },
 }));
 
-vi.mock('@/services/projects', () => ({
+vi.mock('@/features/projects/services/projects', () => ({
   getProject: vi.fn(),
   updateProject: vi.fn(),
 }));
 
-vi.mock('@/utils/handle-error', () => ({
+vi.mock('@/shared/utils/handle-error', () => ({
   handleError: vi.fn(),
 }));
 
-vi.mock('@/utils/handle-success', () => ({
+vi.mock('@/shared/utils/handle-success', () => ({
   handleSuccess: vi.fn(),
 }));
 
