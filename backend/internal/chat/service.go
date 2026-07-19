@@ -1,4 +1,4 @@
-package service
+package chat
 
 import (
 	"context"
@@ -35,19 +35,19 @@ type chatUserRepository interface {
 	GetById(ctx context.Context, id uuid.UUID) (*domain.User, error)
 }
 
-type ChatService struct {
+type Service struct {
 	chatRepository chatRepository
 	userRepository chatUserRepository
 }
 
-func NewChatService(chatRepository chatRepository, userRepository chatUserRepository) *ChatService {
-	return &ChatService{
+func NewService(chatRepository chatRepository, userRepository chatUserRepository) *Service {
+	return &Service{
 		chatRepository: chatRepository,
 		userRepository: userRepository,
 	}
 }
 
-func (cs *ChatService) CreateChatFromProject(ctx context.Context, project *domain.Project) error {
+func (cs *Service) CreateChatFromProject(ctx context.Context, project *domain.Project) error {
 	members := []domain.ChatMember{}
 	for _, member := range project.Members {
 		members = append(members, domain.ChatMember{
@@ -74,7 +74,7 @@ func (cs *ChatService) CreateChatFromProject(ctx context.Context, project *domai
 	return nil
 }
 
-func (cs *ChatService) CreateMemberFromProjectMember(ctx context.Context, projectMember *domain.ProjectMember) error {
+func (cs *Service) CreateMemberFromProjectMember(ctx context.Context, projectMember *domain.ProjectMember) error {
 	chat, err := cs.chatRepository.GetByProjectId(ctx, projectMember.ProjectId)
 	if err != nil {
 		var domainErr domain.DomainError
@@ -111,7 +111,7 @@ func (cs *ChatService) CreateMemberFromProjectMember(ctx context.Context, projec
 	return nil
 }
 
-func (cs *ChatService) RemoveMemberFromProjectMember(ctx context.Context, projectMember *domain.ProjectMember) (*domain.ChatMember, error) {
+func (cs *Service) RemoveMemberFromProjectMember(ctx context.Context, projectMember *domain.ProjectMember) (*domain.ChatMember, error) {
 	chat, err := cs.chatRepository.GetByProjectId(ctx, projectMember.ProjectId)
 	if err != nil {
 		return nil, domain.ServerError("failed to get project chat", err)
@@ -136,7 +136,7 @@ func (cs *ChatService) RemoveMemberFromProjectMember(ctx context.Context, projec
 	return member, nil
 }
 
-func (cs *ChatService) CreateJoinedMessage(ctx context.Context, chatMember *domain.ChatMember) error {
+func (cs *Service) CreateJoinedMessage(ctx context.Context, chatMember *domain.ChatMember) error {
 	user, err := cs.userRepository.GetById(ctx, chatMember.UserId)
 	if err != nil {
 		return domain.ServerError("failed to get user", err)
@@ -176,7 +176,7 @@ type CreateChatMessageRequest struct {
 	Content string
 }
 
-func (cs *ChatService) CreateMessage(ctx context.Context, request CreateChatMessageRequest) (*domain.ChatMessage, error) {
+func (cs *Service) CreateMessage(ctx context.Context, request CreateChatMessageRequest) (*domain.ChatMessage, error) {
 	if request.UserId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
@@ -235,7 +235,7 @@ func (cs *ChatService) CreateMessage(ctx context.Context, request CreateChatMess
 	return &message, nil
 }
 
-func (cs *ChatService) GetByProjectId(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) (*domain.Chat, error) {
+func (cs *Service) GetByProjectId(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) (*domain.Chat, error) {
 	if userId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
@@ -279,7 +279,7 @@ type ListMessagesByProjectIdRequest struct {
 	Params    utils.PaginationBeforeParams
 }
 
-func (cs *ChatService) ListMessagesByProjectId(ctx context.Context, request ListMessagesByProjectIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error) {
+func (cs *Service) ListMessagesByProjectId(ctx context.Context, request ListMessagesByProjectIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error) {
 	if request.UserId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
@@ -315,7 +315,7 @@ func (cs *ChatService) ListMessagesByProjectId(ctx context.Context, request List
 	return &cursorPaginated, nil
 }
 
-func (cs *ChatService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Chat, error) {
+func (cs *Service) GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Chat, error) {
 	if userId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
@@ -353,7 +353,7 @@ func (cs *ChatService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UU
 	return chat, nil
 }
 
-func (cs *ChatService) UpdateMemberLastSeenAt(ctx context.Context, userId uuid.UUID, chatId uuid.UUID) error {
+func (cs *Service) UpdateMemberLastSeenAt(ctx context.Context, userId uuid.UUID, chatId uuid.UUID) error {
 	if userId == uuid.Nil {
 		return domain.UnauthorizedError("unauthorized")
 	}
@@ -393,7 +393,7 @@ func SanitizeGeneralChatMemberIDs(currentUserId uuid.UUID, targetUserIds []uuid.
 	return memberIds
 }
 
-func (cs *ChatService) GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, targetUserIds []uuid.UUID) (*domain.Chat, error) {
+func (cs *Service) GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, targetUserIds []uuid.UUID) (*domain.Chat, error) {
 	if currentUserId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
@@ -425,7 +425,7 @@ func (cs *ChatService) GetOrCreateGeneralChat(ctx context.Context, currentUserId
 	return chat, nil
 }
 
-func (cs *ChatService) ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error) {
+func (cs *Service) ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error) {
 	if userId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
@@ -444,7 +444,7 @@ type ListMessagesByChatIdRequest struct {
 	Params utils.PaginationBeforeParams
 }
 
-func (cs *ChatService) ListMessagesByChatId(ctx context.Context, request ListMessagesByChatIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error) {
+func (cs *Service) ListMessagesByChatId(ctx context.Context, request ListMessagesByChatIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error) {
 	if request.UserId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}
@@ -491,7 +491,7 @@ type MarkChatReadRequest struct {
 	MessageId *uuid.UUID
 }
 
-func (cs *ChatService) MarkChatRead(ctx context.Context, request MarkChatReadRequest) error {
+func (cs *Service) MarkChatRead(ctx context.Context, request MarkChatReadRequest) error {
 	if request.UserId == uuid.Nil {
 		return domain.UnauthorizedError("unauthorized")
 	}
@@ -565,7 +565,7 @@ type ListMessageReadsRequest struct {
 	UserId    uuid.UUID
 }
 
-func (cs *ChatService) ListMessageReads(ctx context.Context, request ListMessageReadsRequest) ([]domain.ChatMessageRead, error) {
+func (cs *Service) ListMessageReads(ctx context.Context, request ListMessageReadsRequest) ([]domain.ChatMessageRead, error) {
 	if request.UserId == uuid.Nil {
 		return nil, domain.UnauthorizedError("unauthorized")
 	}

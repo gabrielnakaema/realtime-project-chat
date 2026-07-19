@@ -11,16 +11,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type chatService interface {
+type accessService interface {
 	GetById(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*domain.Chat, error)
 }
 
 type Server struct {
 	chatv1.UnimplementedChatServiceServer
-	chatService chatService
+	chatService accessService
 }
 
-func NewServer(chatService chatService) *Server {
+func NewServer(chatService accessService) *Server {
 	return &Server{chatService: chatService}
 }
 

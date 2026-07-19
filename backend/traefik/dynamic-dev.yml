@@ -4,6 +4,10 @@ http:
       rule: "PathPrefix(`/ws`)"
       service: websocket-service
       priority: 20
+    chat-service:
+      rule: "PathPrefix(`/chats`) || PathRegexp(`^/projects/[^/]+/chat`)"
+      service: chat-service
+      priority: 15
     notification-service:
       rule: "PathPrefix(`/notifications`)"
       service: notification-service
@@ -18,6 +22,10 @@ http:
       loadBalancer:
         servers:
           - url: "http://host.docker.internal:3336"
+    chat-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3337"
     notification-service:
       loadBalancer:
         servers:

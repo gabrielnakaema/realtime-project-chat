@@ -1,4 +1,4 @@
-package handlers_test
+package chat_test
 
 import (
 	"bytes"
@@ -10,9 +10,8 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/auth"
+	"github.com/gabrielnakaema/project-chat/internal/chat"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/handlers"
-	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -40,7 +39,7 @@ func (m *mockChatService) GetById(ctx context.Context, id uuid.UUID, userId uuid
 	return args.Get(0).(*domain.Chat), args.Error(1)
 }
 
-func (m *mockChatService) CreateMessage(ctx context.Context, request service.CreateChatMessageRequest) (*domain.ChatMessage, error) {
+func (m *mockChatService) CreateMessage(ctx context.Context, request chat.CreateChatMessageRequest) (*domain.ChatMessage, error) {
 	args := m.Called(ctx, request)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -48,7 +47,7 @@ func (m *mockChatService) CreateMessage(ctx context.Context, request service.Cre
 	return args.Get(0).(*domain.ChatMessage), args.Error(1)
 }
 
-func (m *mockChatService) ListMessagesByProjectId(ctx context.Context, request service.ListMessagesByProjectIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error) {
+func (m *mockChatService) ListMessagesByProjectId(ctx context.Context, request chat.ListMessagesByProjectIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error) {
 	args := m.Called(ctx, request)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -72,7 +71,7 @@ func (m *mockChatService) ListGeneralChats(ctx context.Context, userId uuid.UUID
 	return args.Get(0).([]domain.Chat), args.Error(1)
 }
 
-func (m *mockChatService) ListMessagesByChatId(ctx context.Context, request service.ListMessagesByChatIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error) {
+func (m *mockChatService) ListMessagesByChatId(ctx context.Context, request chat.ListMessagesByChatIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error) {
 	args := m.Called(ctx, request)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -80,11 +79,11 @@ func (m *mockChatService) ListMessagesByChatId(ctx context.Context, request serv
 	return args.Get(0).(*utils.CursorPaginated[domain.ChatMessage]), args.Error(1)
 }
 
-func (m *mockChatService) MarkChatRead(ctx context.Context, request service.MarkChatReadRequest) error {
+func (m *mockChatService) MarkChatRead(ctx context.Context, request chat.MarkChatReadRequest) error {
 	return m.Called(ctx, request).Error(0)
 }
 
-func (m *mockChatService) ListMessageReads(ctx context.Context, request service.ListMessageReadsRequest) ([]domain.ChatMessageRead, error) {
+func (m *mockChatService) ListMessageReads(ctx context.Context, request chat.ListMessageReadsRequest) ([]domain.ChatMessageRead, error) {
 	args := m.Called(ctx, request)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -143,21 +142,21 @@ func TestChatHandler_GetOrCreateGeneralChat(t *testing.T) {
 		},
 		{
 			name:           "empty user_ids returns 422",
-			requestBody:    handlers.GetOrCreateGeneralChatRequest{UserIds: []uuid.UUID{}},
+			requestBody:    chat.GetOrCreateGeneralChatRequest{UserIds: []uuid.UUID{}},
 			userId:         userId,
 			mockSetup:      func(m *mockChatService) {},
 			expectedStatus: http.StatusUnprocessableEntity,
 		},
 		{
 			name:           "nil UUID in user_ids returns 422",
-			requestBody:    handlers.GetOrCreateGeneralChatRequest{UserIds: []uuid.UUID{uuid.Nil}},
+			requestBody:    chat.GetOrCreateGeneralChatRequest{UserIds: []uuid.UUID{uuid.Nil}},
 			userId:         userId,
 			mockSetup:      func(m *mockChatService) {},
 			expectedStatus: http.StatusUnprocessableEntity,
 		},
 		{
 			name:        "valid request returns 200 with chat",
-			requestBody: handlers.GetOrCreateGeneralChatRequest{UserIds: []uuid.UUID{otherUserId}},
+			requestBody: chat.GetOrCreateGeneralChatRequest{UserIds: []uuid.UUID{otherUserId}},
 			userId:      userId,
 			mockSetup: func(m *mockChatService) {
 				m.On("GetOrCreateGeneralChat", mock.Anything, userId, []uuid.UUID{otherUserId}).
@@ -167,7 +166,7 @@ func TestChatHandler_GetOrCreateGeneralChat(t *testing.T) {
 		},
 		{
 			name:        "service not found returns 404",
-			requestBody: handlers.GetOrCreateGeneralChatRequest{UserIds: []uuid.UUID{otherUserId}},
+			requestBody: chat.GetOrCreateGeneralChatRequest{UserIds: []uuid.UUID{otherUserId}},
 			userId:      userId,
 			mockSetup: func(m *mockChatService) {
 				m.On("GetOrCreateGeneralChat", mock.Anything, userId, []uuid.UUID{otherUserId}).
@@ -181,7 +180,7 @@ func TestChatHandler_GetOrCreateGeneralChat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := &mockChatService{}
 			tt.mockSetup(svc)
-			handler := handlers.NewChatHandler(svc)
+			handler := chat.NewHandler(svc)
 
 			var body *bytes.Buffer
 			if str, ok := tt.requestBody.(string); ok {
@@ -267,7 +266,7 @@ func TestChatHandler_GetChatById(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := &mockChatService{}
 			tt.mockSetup(svc)
-			handler := handlers.NewChatHandler(svc)
+			handler := chat.NewHandler(svc)
 
 			req := httptest.NewRequest(http.MethodGet, "/chats/"+tt.chatId, nil)
 			req = withUserId(req, tt.userId)
@@ -345,7 +344,7 @@ func TestChatHandler_ListChatMessages(t *testing.T) {
 			queryParams: map[string]string{},
 			userId:      userId,
 			mockSetup: func(m *mockChatService) {
-				m.On("ListMessagesByChatId", mock.Anything, mock.MatchedBy(func(req service.ListMessagesByChatIdRequest) bool {
+				m.On("ListMessagesByChatId", mock.Anything, mock.MatchedBy(func(req chat.ListMessagesByChatIdRequest) bool {
 					return req.ChatId == chatId && req.UserId == userId
 				})).Return(emptyResult, nil)
 			},
@@ -357,7 +356,7 @@ func TestChatHandler_ListChatMessages(t *testing.T) {
 			queryParams: map[string]string{"before": "2026-01-01T00:00:00Z", "limit": "5"},
 			userId:      userId,
 			mockSetup: func(m *mockChatService) {
-				m.On("ListMessagesByChatId", mock.Anything, mock.MatchedBy(func(req service.ListMessagesByChatIdRequest) bool {
+				m.On("ListMessagesByChatId", mock.Anything, mock.MatchedBy(func(req chat.ListMessagesByChatIdRequest) bool {
 					return req.ChatId == chatId && req.UserId == userId && req.Params.Limit == 5
 				})).Return(emptyResult, nil)
 			},
@@ -380,7 +379,7 @@ func TestChatHandler_ListChatMessages(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := &mockChatService{}
 			tt.mockSetup(svc)
-			handler := handlers.NewChatHandler(svc)
+			handler := chat.NewHandler(svc)
 
 			req := httptest.NewRequest(http.MethodGet, "/chats/"+tt.chatId+"/messages", nil)
 			q := req.URL.Query()

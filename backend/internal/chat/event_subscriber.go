@@ -1,4 +1,4 @@
-package subscriber
+package chat
 
 import (
 	"context"
@@ -9,42 +9,42 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
-	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/subscriber"
 )
 
-type ChatSubscriber struct {
+type EventSubscriber struct {
 	logger      *slog.Logger
-	subscriber  *Subscriber
-	chatService *service.ChatService
+	subscriber  *subscriber.Subscriber
+	chatService *Service
 }
 
-func NewChatSubscriber(ctx context.Context, config *config.Config, logger *slog.Logger, chatService *service.ChatService) (*ChatSubscriber, error) {
-	subscriber, err := NewSubscriber(config, "chat.subscriber")
+func NewEventSubscriber(ctx context.Context, cfg *config.Config, logger *slog.Logger, chatService *Service) (*EventSubscriber, error) {
+	sub, err := subscriber.NewSubscriber(cfg, "chat.subscriber")
 	if err != nil {
 		return nil, domain.ServerError("failed to create chat subscriber", err)
 	}
 
-	chatSubscriber := &ChatSubscriber{
-		subscriber:  subscriber,
+	eventSubscriber := &EventSubscriber{
+		subscriber:  sub,
 		logger:      logger,
 		chatService: chatService,
 	}
 
 	topics := []events.Topic{events.ProjectCreated, events.ProjectMemberCreated, events.ProjectMemberRemoved, events.ChatMemberCreated, events.ChatMemberViewed}
 
-	err = subscriber.Subscribe(ctx, topics, chatSubscriber.handleChatEvents, chatSubscriber.logger)
+	err = sub.Subscribe(ctx, topics, eventSubscriber.handleChatEvents, eventSubscriber.logger)
 	if err != nil {
 		return nil, domain.ServerError("failed to subscribe to chat events", err)
 	}
 
-	return chatSubscriber, nil
+	return eventSubscriber, nil
 }
 
-func (cs *ChatSubscriber) Close() error {
+func (cs *EventSubscriber) Close() error {
 	return cs.subscriber.Close()
 }
 
-func (cs *ChatSubscriber) handleChatEvents(ctx context.Context, message Message) error {
+func (cs *EventSubscriber) handleChatEvents(ctx context.Context, message subscriber.Message) error {
 	switch message.Topic {
 	case events.ProjectCreated:
 		return cs.handleProjectCreated(ctx, message)
@@ -61,7 +61,7 @@ func (cs *ChatSubscriber) handleChatEvents(ctx context.Context, message Message)
 	return nil
 }
 
-func (cs *ChatSubscriber) handleChatMemberViewed(ctx context.Context, message Message) error {
+func (cs *EventSubscriber) handleChatMemberViewed(ctx context.Context, message subscriber.Message) error {
 	var payload events.ChatMemberViewedPayload
 	err := json.Unmarshal(message.Value, &payload)
 	if err != nil {
@@ -76,7 +76,7 @@ func (cs *ChatSubscriber) handleChatMemberViewed(ctx context.Context, message Me
 	return nil
 }
 
-func (cs *ChatSubscriber) handleProjectCreated(ctx context.Context, message Message) error {
+func (cs *EventSubscriber) handleProjectCreated(ctx context.Context, message subscriber.Message) error {
 	var payload events.ProjectCreatedPayload
 	err := json.Unmarshal(message.Value, &payload)
 	if err != nil {
@@ -100,7 +100,7 @@ func (cs *ChatSubscriber) handleProjectCreated(ctx context.Context, message Mess
 	return nil
 }
 
-func (cs *ChatSubscriber) handleProjectMemberCreated(ctx context.Context, message Message) error {
+func (cs *EventSubscriber) handleProjectMemberCreated(ctx context.Context, message subscriber.Message) error {
 	var payload events.ProjectMemberCreatedPayload
 	err := json.Unmarshal(message.Value, &payload)
 	if err != nil {
@@ -125,7 +125,7 @@ func (cs *ChatSubscriber) handleProjectMemberCreated(ctx context.Context, messag
 	return nil
 }
 
-func (cs *ChatSubscriber) handleProjectMemberRemoved(ctx context.Context, message Message) error {
+func (cs *EventSubscriber) handleProjectMemberRemoved(ctx context.Context, message subscriber.Message) error {
 	var payload events.ProjectMemberRemovedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
 		return domain.ServerError("failed to unmarshal project member removed payload", err)
@@ -139,7 +139,7 @@ func (cs *ChatSubscriber) handleProjectMemberRemoved(ctx context.Context, messag
 	return nil
 }
 
-func (cs *ChatSubscriber) handleChatMemberCreated(ctx context.Context, message Message) error {
+func (cs *EventSubscriber) handleChatMemberCreated(ctx context.Context, message subscriber.Message) error {
 	var payload events.ChatMemberCreatedPayload
 	err := json.Unmarshal(message.Value, &payload)
 	if err != nil {

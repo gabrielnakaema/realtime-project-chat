@@ -93,6 +93,28 @@ services:
       - "traefik.http.routers.notification-service.priority=10"
       - "traefik.http.services.notification-service.loadbalancer.server.port=${NOTIFICATION_SERVICE_PORT}"
 
+  chat-service:
+    container_name: chat_service_projectmanagement_${ENV_NAME}
+    image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+    pull_policy: always
+    command: ["./chat-service"]
+    env_file: .env.prod
+    environment:
+      CHAT_INTERNAL_GRPC_LISTEN_ADDRESS: 0.0.0.0:3338
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: always
+    networks:
+      - project_management_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chat-service.rule=PathPrefix(`/chats`) || PathRegexp(`^/projects/[^/]+/chat`)"
+      - "traefik.http.routers.chat-service.priority=15"
+      - "traefik.http.services.chat-service.loadbalancer.server.port=${CHAT_SERVICE_PORT:-3337}"
+
   websocket-service:
     container_name: websocket_service_projectmanagement_${ENV_NAME}
     image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
@@ -101,8 +123,11 @@ services:
     env_file: .env.prod
     environment:
       AUTHORIZATION_GRPC_TARGET: api:3334
+      CHAT_AUTHORIZATION_GRPC_TARGET: chat-service:3338
     depends_on:
       api:
+        condition: service_started
+      chat-service:
         condition: service_started
       kafka:
         condition: service_healthy
@@ -130,6 +155,7 @@ services:
     depends_on:
       - api
       - notification-service
+      - chat-service
       - websocket-service
     restart: always
     networks:

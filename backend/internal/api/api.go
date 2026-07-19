@@ -7,8 +7,6 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/apphost"
 	"github.com/gabrielnakaema/project-chat/internal/auth"
-	"github.com/gabrielnakaema/project-chat/internal/chat"
-	chatv1 "github.com/gabrielnakaema/project-chat/internal/chat/v1"
 	"github.com/gabrielnakaema/project-chat/internal/handlers"
 	"github.com/gabrielnakaema/project-chat/internal/mcp"
 	"github.com/gabrielnakaema/project-chat/internal/project"
@@ -29,7 +27,6 @@ type Api struct {
 
 type Handlers struct {
 	AuthMiddleware *auth.Middleware
-	Chat           *handlers.ChatHandler
 	MCPAPIKey      *handlers.MCPAPIKeyHandler
 	MCP            *mcp.Handler
 	Project        *handlers.ProjectHandler
@@ -47,7 +44,6 @@ func NewApi() (*Api, error) {
 	jwtProvider := token.NewTokenProvider(rt.Config)
 	authMiddleware := auth.NewMiddleware(jwtProvider)
 
-	chatRepo := repository.NewChatRepository(rt.Pool)
 	projectRepo := repository.NewProjectRepository(rt.Pool)
 	taskRepo := repository.NewTaskRepository(rt.Pool)
 	taskCommentRepo := repository.NewTaskCommentRepository(rt.Pool)
@@ -58,15 +54,7 @@ func NewApi() (*Api, error) {
 	projectService := service.NewProjectService(projectRepo, userRepo, activityRepo)
 	projectHandler := handlers.NewProjectHandler(projectService)
 
-	chatService := service.NewChatService(chatRepo, userRepo)
-	grpcServer := NewInternalGRPCServer(chat.NewServer(chatService), project.NewServer(projectService))
-
-	chatSub, err := subscriber.NewChatSubscriber(rt.Ctx, rt.Config, rt.Logger, chatService)
-	if err != nil {
-		rt.Close()
-		return nil, err
-	}
-	rt.Track(chatSub)
+	grpcServer := NewInternalGRPCServer(project.NewServer(projectService))
 
 	activitySub, err := subscriber.NewProjectActivitySubscriber(rt.Ctx, rt.Config, rt.Logger, activityRepo, projectRepo)
 	if err != nil {
@@ -81,8 +69,6 @@ func NewApi() (*Api, error) {
 		return nil, err
 	}
 	rt.Track(taskUpdateSub)
-
-	chatHandler := handlers.NewChatHandler(chatService)
 
 	userService := service.NewUserService(jwtProvider, userRepo)
 	userHandler := handlers.NewUserHandler(userService, rt.Config)
@@ -100,7 +86,6 @@ func NewApi() (*Api, error) {
 		grpcServer: grpcServer,
 		handlers: &Handlers{
 			AuthMiddleware: authMiddleware,
-			Chat:           chatHandler,
 			MCPAPIKey:      mcpAPIKeyHandler,
 			MCP:            mcpHandler,
 			Project:        projectHandler,
@@ -118,9 +103,8 @@ func (a *Api) Close() {
 	a.rt.Close()
 }
 
-func NewInternalGRPCServer(chatServer chatv1.ChatServiceServer, projectServer projectv1.ProjectServiceServer) *grpc.Server {
+func NewInternalGRPCServer(projectServer projectv1.ProjectServiceServer) *grpc.Server {
 	server := grpc.NewServer()
-	chatv1.RegisterChatServiceServer(server, chatServer)
 	projectv1.RegisterProjectServiceServer(server, projectServer)
 	return server
 }

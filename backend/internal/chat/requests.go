@@ -1,4 +1,4 @@
-package handlers
+package chat
 
 import (
 	"github.com/gabrielnakaema/project-chat/internal/validator"
@@ -27,11 +27,11 @@ func (r *GetOrCreateGeneralChatRequest) Validate(v *validator.Validator) {
 	}
 }
 
-type MarkChatReadRequest struct {
+type MarkChatReadBody struct {
 	MessageId *uuid.UUID `json:"message_id"`
 }
 
-func (r *MarkChatReadRequest) Validate(v *validator.Validator) {
+func (r *MarkChatReadBody) Validate(v *validator.Validator) {
 	if r.MessageId != nil {
 		v.Check("message_id", "message_id is invalid", *r.MessageId != uuid.Nil)
 	}

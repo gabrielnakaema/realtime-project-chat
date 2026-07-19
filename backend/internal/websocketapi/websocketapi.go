@@ -27,7 +27,8 @@ func New() (*App, error) {
 	}
 
 	jwtProvider := token.NewTokenProvider(rt.Config)
-	grpcConnection, err := grpc.NewClient(
+
+	projectGRPCConnection, err := grpc.NewClient(
 		rt.Config.AuthorizationGRPCTarget,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
@@ -35,9 +36,20 @@ func New() (*App, error) {
 		rt.Close()
 		return nil, err
 	}
-	rt.Track(grpcConnection)
-	chatAuthorizer := chat.NewClient(chatv1.NewChatServiceClient(grpcConnection))
-	projectAuthorizer := project.NewClient(projectv1.NewProjectServiceClient(grpcConnection))
+	rt.Track(projectGRPCConnection)
+
+	chatGRPCConnection, err := grpc.NewClient(
+		rt.Config.ChatAuthorizationGRPCTarget,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		rt.Close()
+		return nil, err
+	}
+	rt.Track(chatGRPCConnection)
+
+	chatAuthorizer := chat.NewClient(chatv1.NewChatServiceClient(chatGRPCConnection))
+	projectAuthorizer := project.NewClient(projectv1.NewProjectServiceClient(projectGRPCConnection))
 	server := ws.NewServer(rt.Ctx, jwtProvider, rt.Logger, chatAuthorizer, projectAuthorizer, rt.Config.RoomAuthorizationTimeout, outbox.NewPoolEnqueuer(rt.Pool))
 
 	realtimeSub, err := subscriber.NewRealtimeSubscriber(rt.Ctx, rt.Config, rt.Logger, server)

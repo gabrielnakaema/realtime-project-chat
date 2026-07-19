@@ -54,19 +54,6 @@ func (a *Api) Router() http.Handler {
 			r.Post("/{id}/members", a.handlers.Project.CreateMember)
 			r.Get("/{id}/members", a.handlers.Project.ListMembersByProjectId)
 			r.Delete("/{id}/members/{member_id}", a.handlers.Project.RemoveMember)
-			r.Get("/{id}/chat", a.handlers.Chat.GetChatByProjectId)
-			r.Get("/{id}/chat/messages", a.handlers.Chat.ListMessagesByProjectId)
-		})
-
-		r.Route("/chats", func(r chi.Router) {
-			r.Use(a.handlers.AuthMiddleware.ProtectRoutes)
-			r.Post("/", a.handlers.Chat.GetOrCreateGeneralChat)
-			r.Get("/", a.handlers.Chat.ListGeneralChats)
-			r.Get("/{chatId}", a.handlers.Chat.GetChatById)
-			r.Get("/{chatId}/messages", a.handlers.Chat.ListChatMessages)
-			r.Get("/{chatId}/messages/{messageId}/reads", a.handlers.Chat.ListMessageReads)
-			r.Post("/{chatId}/read", a.handlers.Chat.MarkChatRead)
-			r.Post("/messages", a.handlers.Chat.CreateMessage)
 		})
 
 		r.Route("/tasks", func(r chi.Router) {

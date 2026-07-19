@@ -15,6 +15,9 @@ dev-notification:
 dev-websocket:
 	air -c .air.websocket.toml
 
+dev-chat:
+	air -c .air.chat.toml
+
 generate-proto:
 	go run github.com/bufbuild/buf/cmd/buf@v1.57.2 generate
 

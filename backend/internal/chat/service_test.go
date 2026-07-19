@@ -1,4 +1,4 @@
-package service_test
+package chat_test
 
 import (
 	"context"
@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/chat"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/gabrielnakaema/project-chat/internal/outbox"
-	"github.com/gabrielnakaema/project-chat/internal/service"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -138,11 +138,11 @@ func (m *mockChatUserRepository) GetById(ctx context.Context, id uuid.UUID) (*do
 	return args.Get(0).(*domain.User), args.Error(1)
 }
 
-func newChatService(chatRepo *mockChatRepository, userRepo *mockChatUserRepository) *service.ChatService {
+func newChatService(chatRepo *mockChatRepository, userRepo *mockChatUserRepository) *chat.Service {
 	chatRepo.On("GetUnreadSummary", mock.Anything, mock.Anything, mock.Anything).
 		Return(&domain.ChatUnreadSummary{UnreadCount: 0, HasMoreUnread: false}, nil).
 		Maybe()
-	return service.NewChatService(chatRepo, userRepo)
+	return chat.NewService(chatRepo, userRepo)
 }
 
 func TestChatService_GetOrCreateGeneralChat(t *testing.T) {
@@ -591,7 +591,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		request       service.ListMessagesByChatIdRequest
+		request       chat.ListMessagesByChatIdRequest
 		chatRepoSetup func(*mockChatRepository)
 		shouldSucceed bool
 		expectedCode  domain.ErrorCode
@@ -600,7 +600,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 	}{
 		{
 			name: "unauthorized when userId is nil",
-			request: service.ListMessagesByChatIdRequest{
+			request: chat.ListMessagesByChatIdRequest{
 				ChatId: chatId,
 				UserId: uuid.Nil,
 				Params: paginationParams,
@@ -611,7 +611,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 		},
 		{
 			name: "not found when chat does not exist",
-			request: service.ListMessagesByChatIdRequest{
+			request: chat.ListMessagesByChatIdRequest{
 				ChatId: chatId,
 				UserId: userId,
 				Params: paginationParams,
@@ -624,7 +624,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 		},
 		{
 			name: "forbidden when user is not a member",
-			request: service.ListMessagesByChatIdRequest{
+			request: chat.ListMessagesByChatIdRequest{
 				ChatId: chatId,
 				UserId: userId,
 				Params: paginationParams,
@@ -637,7 +637,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 		},
 		{
 			name: "server error when list messages fails",
-			request: service.ListMessagesByChatIdRequest{
+			request: chat.ListMessagesByChatIdRequest{
 				ChatId: chatId,
 				UserId: userId,
 				Params: paginationParams,
@@ -651,7 +651,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 		},
 		{
 			name: "success returns messages in ascending order",
-			request: service.ListMessagesByChatIdRequest{
+			request: chat.ListMessagesByChatIdRequest{
 				ChatId: chatId,
 				UserId: userId,
 				Params: paginationParams,
@@ -666,7 +666,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 		},
 		{
 			name: "success sets HasNext true when messages equal limit",
-			request: service.ListMessagesByChatIdRequest{
+			request: chat.ListMessagesByChatIdRequest{
 				ChatId: chatId,
 				UserId: userId,
 				Params: utils.PaginationBeforeParams{Limit: 2, Before: time.Now(), Id: uuid.Nil},
@@ -764,7 +764,7 @@ func TestSanitizeGeneralChatMemberIDs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := service.SanitizeGeneralChatMemberIDs(tt.currentUserId, tt.targetUserIds)
+			result := chat.SanitizeGeneralChatMemberIDs(tt.currentUserId, tt.targetUserIds)
 			assert.Len(t, result, tt.expectedLen)
 			if tt.checkFirst {
 				assert.Equal(t, tt.currentUserId, result[0])
@@ -813,7 +813,7 @@ func TestChatService_MarkChatRead(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		request       service.MarkChatReadRequest
+		request       chat.MarkChatReadRequest
 		chatRepoSetup func(*mockChatRepository)
 		shouldSucceed bool
 		expectedCode  domain.ErrorCode
@@ -821,7 +821,7 @@ func TestChatService_MarkChatRead(t *testing.T) {
 	}{
 		{
 			name: "unauthorized when user is nil",
-			request: service.MarkChatReadRequest{
+			request: chat.MarkChatReadRequest{
 				ChatId: chatId,
 				UserId: uuid.Nil,
 			},
@@ -830,7 +830,7 @@ func TestChatService_MarkChatRead(t *testing.T) {
 		},
 		{
 			name: "forbidden when user is not a member",
-			request: service.MarkChatReadRequest{
+			request: chat.MarkChatReadRequest{
 				ChatId: chatId,
 				UserId: userId,
 			},
@@ -841,7 +841,7 @@ func TestChatService_MarkChatRead(t *testing.T) {
 		},
 		{
 			name: "forbidden when message belongs to another chat",
-			request: service.MarkChatReadRequest{
+			request: chat.MarkChatReadRequest{
 				ChatId:    chatId,
 				UserId:    userId,
 				MessageId: &messageId,
@@ -854,7 +854,7 @@ func TestChatService_MarkChatRead(t *testing.T) {
 		},
 		{
 			name: "success without message id does not publish message read event",
-			request: service.MarkChatReadRequest{
+			request: chat.MarkChatReadRequest{
 				ChatId: chatId,
 				UserId: userId,
 			},
@@ -867,7 +867,7 @@ func TestChatService_MarkChatRead(t *testing.T) {
 		},
 		{
 			name: "success with message id publishes message read event",
-			request: service.MarkChatReadRequest{
+			request: chat.MarkChatReadRequest{
 				ChatId:    chatId,
 				UserId:    userId,
 				MessageId: &messageId,
@@ -949,7 +949,7 @@ func TestChatService_ListMessageReads(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		request       service.ListMessageReadsRequest
+		request       chat.ListMessageReadsRequest
 		chatRepoSetup func(*mockChatRepository)
 		shouldSucceed bool
 		expectedCode  domain.ErrorCode
@@ -957,7 +957,7 @@ func TestChatService_ListMessageReads(t *testing.T) {
 	}{
 		{
 			name: "unauthorized when user is nil",
-			request: service.ListMessageReadsRequest{
+			request: chat.ListMessageReadsRequest{
 				ChatId:    chatId,
 				MessageId: messageId,
 				UserId:    uuid.Nil,
@@ -967,7 +967,7 @@ func TestChatService_ListMessageReads(t *testing.T) {
 		},
 		{
 			name: "forbidden when user is not member",
-			request: service.ListMessageReadsRequest{
+			request: chat.ListMessageReadsRequest{
 				ChatId:    chatId,
 				MessageId: messageId,
 				UserId:    userId,
@@ -979,7 +979,7 @@ func TestChatService_ListMessageReads(t *testing.T) {
 		},
 		{
 			name: "forbidden when message belongs to another chat",
-			request: service.ListMessageReadsRequest{
+			request: chat.ListMessageReadsRequest{
 				ChatId:    chatId,
 				MessageId: messageId,
 				UserId:    userId,
@@ -992,7 +992,7 @@ func TestChatService_ListMessageReads(t *testing.T) {
 		},
 		{
 			name: "success returns reads",
-			request: service.ListMessageReadsRequest{
+			request: chat.ListMessageReadsRequest{
 				ChatId:    chatId,
 				MessageId: messageId,
 				UserId:    userId,

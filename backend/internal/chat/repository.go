@@ -1,4 +1,4 @@
-package repository
+package chat
 
 import (
 	"context"
@@ -16,17 +16,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type ChatRepository struct {
+type Repository struct {
 	pool *pgxpool.Pool
 }
 
-func NewChatRepository(pool *pgxpool.Pool) *ChatRepository {
-	return &ChatRepository{
+func NewRepository(pool *pgxpool.Pool) *Repository {
+	return &Repository{
 		pool: pool,
 	}
 }
 
-func (cr *ChatRepository) Create(ctx context.Context, chat *domain.Chat) error {
+func (cr *Repository) Create(ctx context.Context, chat *domain.Chat) error {
 	tx, err := cr.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func (cr *ChatRepository) Create(ctx context.Context, chat *domain.Chat) error {
 	return tx.Commit(ctx)
 }
 
-func (cr *ChatRepository) CreateMember(ctx context.Context, member *domain.ChatMember, buildEvents func() []outbox.Message) error {
+func (cr *Repository) CreateMember(ctx context.Context, member *domain.ChatMember, buildEvents func() []outbox.Message) error {
 	tx, err := cr.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func (cr *ChatRepository) CreateMember(ctx context.Context, member *domain.ChatM
 	return tx.Commit(ctx)
 }
 
-func (cr *ChatRepository) DeleteMember(ctx context.Context, member *domain.ChatMember, msgs ...outbox.Message) error {
+func (cr *Repository) DeleteMember(ctx context.Context, member *domain.ChatMember, msgs ...outbox.Message) error {
 	tx, err := cr.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -114,7 +114,7 @@ func (cr *ChatRepository) DeleteMember(ctx context.Context, member *domain.ChatM
 	return tx.Commit(ctx)
 }
 
-func (cr *ChatRepository) UpdateMemberLastSeenAt(ctx context.Context, member *domain.ChatMember) error {
+func (cr *Repository) UpdateMemberLastSeenAt(ctx context.Context, member *domain.ChatMember) error {
 	q := queries.New(cr.pool)
 	return q.UpdateChatMemberLastSeenAt(ctx, queries.UpdateChatMemberLastSeenAtParams{
 		LastSeenAt: pgtype.Timestamptz{Time: member.LastSeenAt, Valid: true},
@@ -123,7 +123,7 @@ func (cr *ChatRepository) UpdateMemberLastSeenAt(ctx context.Context, member *do
 	})
 }
 
-func (cr *ChatRepository) CreateMessage(ctx context.Context, message *domain.ChatMessage, buildEvents func() []outbox.Message) error {
+func (cr *Repository) CreateMessage(ctx context.Context, message *domain.ChatMessage, buildEvents func() []outbox.Message) error {
 	tx, err := cr.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -169,7 +169,7 @@ func (cr *ChatRepository) CreateMessage(ctx context.Context, message *domain.Cha
 	return tx.Commit(ctx)
 }
 
-func (cr *ChatRepository) GetByProjectId(ctx context.Context, projectId uuid.UUID) (*domain.Chat, error) {
+func (cr *Repository) GetByProjectId(ctx context.Context, projectId uuid.UUID) (*domain.Chat, error) {
 	q := queries.New(cr.pool)
 	chatResult, err := q.GetChatByProjectId(ctx, pgtype.UUID{Bytes: projectId, Valid: true})
 	if err != nil {
@@ -195,7 +195,7 @@ func (cr *ChatRepository) GetByProjectId(ctx context.Context, projectId uuid.UUI
 	}, nil
 }
 
-func (cr *ChatRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Chat, error) {
+func (cr *Repository) GetById(ctx context.Context, id uuid.UUID) (*domain.Chat, error) {
 	q := queries.New(cr.pool)
 	chatResult, err := q.GetChatById(ctx, id)
 	if err != nil {
@@ -220,7 +220,7 @@ func (cr *ChatRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ch
 	}, nil
 }
 
-func (cr *ChatRepository) GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, memberIds []uuid.UUID) (*domain.Chat, error) {
+func (cr *Repository) GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, memberIds []uuid.UUID) (*domain.Chat, error) {
 	q := queries.New(cr.pool)
 
 	existingId, err := q.FindGeneralChatByExactMembers(ctx, memberIds)
@@ -281,7 +281,7 @@ func (cr *ChatRepository) GetOrCreateGeneralChat(ctx context.Context, currentUse
 	}, nil
 }
 
-func (cr *ChatRepository) ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error) {
+func (cr *Repository) ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error) {
 	q := queries.New(cr.pool)
 	rows, err := q.ListGeneralChatsByUserId(ctx, queries.ListGeneralChatsByUserIdParams{
 		UserID:  userId,
@@ -313,7 +313,7 @@ func (cr *ChatRepository) ListGeneralChats(ctx context.Context, userId uuid.UUID
 	return chats, nil
 }
 
-func (cr *ChatRepository) ListMessages(ctx context.Context, chatId uuid.UUID, params utils.PaginationBeforeParams) ([]domain.ChatMessage, error) {
+func (cr *Repository) ListMessages(ctx context.Context, chatId uuid.UUID, params utils.PaginationBeforeParams) ([]domain.ChatMessage, error) {
 	q := queries.New(cr.pool)
 
 	queriesParams := queries.ListChatMessagesParams{
@@ -361,7 +361,7 @@ func (cr *ChatRepository) ListMessages(ctx context.Context, chatId uuid.UUID, pa
 	return messages, nil
 }
 
-func (cr *ChatRepository) GetUnreadSummary(ctx context.Context, chatId uuid.UUID, userId uuid.UUID) (*domain.ChatUnreadSummary, error) {
+func (cr *Repository) GetUnreadSummary(ctx context.Context, chatId uuid.UUID, userId uuid.UUID) (*domain.ChatUnreadSummary, error) {
 	q := queries.New(cr.pool)
 	row, err := q.GetUnreadCountByChatId(ctx, queries.GetUnreadCountByChatIdParams{
 		ChatID:  chatId,
@@ -378,7 +378,7 @@ func (cr *ChatRepository) GetUnreadSummary(ctx context.Context, chatId uuid.UUID
 	}, nil
 }
 
-func (cr *ChatRepository) GetMessageById(ctx context.Context, id uuid.UUID) (*domain.ChatMessage, error) {
+func (cr *Repository) GetMessageById(ctx context.Context, id uuid.UUID) (*domain.ChatMessage, error) {
 	q := queries.New(cr.pool)
 	message, err := q.GetChatMessageById(ctx, id)
 	if err != nil {
@@ -405,7 +405,7 @@ func (cr *ChatRepository) GetMessageById(ctx context.Context, id uuid.UUID) (*do
 	return result, nil
 }
 
-func (cr *ChatRepository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId uuid.UUID, readAt time.Time, message *domain.ChatMessage, msgs ...outbox.Message) error {
+func (cr *Repository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId uuid.UUID, readAt time.Time, message *domain.ChatMessage, msgs ...outbox.Message) error {
 	tx, err := cr.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -446,7 +446,7 @@ func (cr *ChatRepository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, us
 	return tx.Commit(ctx)
 }
 
-func (cr *ChatRepository) ListMessageReads(ctx context.Context, messageId uuid.UUID) ([]domain.ChatMessageRead, error) {
+func (cr *Repository) ListMessageReads(ctx context.Context, messageId uuid.UUID) ([]domain.ChatMessageRead, error) {
 	q := queries.New(cr.pool)
 	rows, err := q.ListChatMessageReads(ctx, messageId)
 	if err != nil {

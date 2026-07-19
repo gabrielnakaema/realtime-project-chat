@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gabrielnakaema/project-chat/internal/api"
 	"github.com/gabrielnakaema/project-chat/internal/chat"
 	chatv1 "github.com/gabrielnakaema/project-chat/internal/chat/v1"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
@@ -184,10 +183,9 @@ func TestSplitServiceRoomAuthorization(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			listener := bufconn.Listen(1024 * 1024)
-			grpcServer := api.NewInternalGRPCServer(
-				chat.NewServer(splitChatService{allowed: test.chatAllowed}),
-				project.NewServer(splitProjectService{allowed: test.projectAllowed}),
-			)
+			grpcServer := grpc.NewServer()
+			chatv1.RegisterChatServiceServer(grpcServer, chat.NewServer(splitChatService{allowed: test.chatAllowed}))
+			projectv1.RegisterProjectServiceServer(grpcServer, project.NewServer(splitProjectService{allowed: test.projectAllowed}))
 			go func() { _ = grpcServer.Serve(listener) }()
 			t.Cleanup(grpcServer.Stop)
 
