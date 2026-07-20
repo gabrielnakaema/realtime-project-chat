@@ -1,0 +1,160 @@
+name: ci
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "e2e/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/backend.yml"
+      - ".github/workflows/frontend.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect deployment changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect changed application paths
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          base: ${{ github.ref }}
+          filters: |
+            backend:
+              - "backend/**"
+            frontend:
+              - "frontend/**"
+              - ".github/workflows/frontend.yml"
+
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Go from go.mod
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Run backend tests
+        run: go test ./...
+
+  frontend-tests:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run frontend tests
+        run: pnpm test
+
+  e2e-tests:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Go from go.mod
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: |
+            frontend/pnpm-lock.yaml
+            e2e/pnpm-lock.yaml
+      - name: Install frontend dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
+      - name: Install E2E dependencies
+        run: pnpm --dir e2e install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm --dir e2e exec playwright install --with-deps chromium
+      - name: Run E2E tests
+        run: pnpm --dir e2e test
+      - name: Upload E2E failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure-artifacts-${{ github.run_id }}
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  backend-publish-and-deploy:
+    name: Backend publish and deploy
+    needs:
+      - changes
+      - backend-tests
+      - frontend-tests
+      - e2e-tests
+    if: >-
+      ${{
+        success() &&
+        github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') &&
+        needs.changes.outputs.backend == 'true'
+      }}
+    uses: ./.github/workflows/backend.yml
+    secrets: inherit
+
+  frontend-build-and-deploy:
+    name: Frontend build and deploy
+    needs:
+      - changes
+      - backend-tests
+      - frontend-tests
+      - e2e-tests
+    if: >-
+      ${{
+        success() &&
+        (
+          github.event_name == 'workflow_dispatch' ||
+          (
+            github.event_name == 'push' &&
+            (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') &&
+            needs.changes.outputs.frontend == 'true'
+          )
+        )
+      }}
+    uses: ./.github/workflows/frontend.yml
+    secrets: inherit

@@ -1,14 +1,7 @@
 name: frontend
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-      - dev
-    paths:
-      - "frontend/**"
-      - ".github/workflows/frontend.yml"
+  workflow_call:
 
 jobs:
   build-and-deploy:
