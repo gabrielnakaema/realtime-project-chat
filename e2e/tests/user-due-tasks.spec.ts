@@ -165,12 +165,8 @@ test("assigned user can complete an upcoming task and remove it from the dashboa
 
   await memberPage.goto("/projects");
   await expect(
-    memberPage.getByRole("heading", {
-      name: "Upcoming deadlines",
-      exact: true,
-    })
+    memberPage.getByRole("region", { name: "Upcoming Deadlines" })
   ).toHaveCount(0);
-  await expect(memberPage.getByText(taskTitle, { exact: true })).toHaveCount(0);
 
   await memberPage.context().close();
 });

@@ -52,7 +52,8 @@ async function makeToastsClickThrough(target: BrowserContext | Page) {
 }
 
 export async function expectToast(page: Page, message: string | RegExp) {
-  await expect(page.getByText(message)).toBeVisible();
+  const toast = page.getByRole("alert").filter({ hasText: message }).last();
+  await expect(toast).toBeVisible();
 }
 
 export async function openProjectMembersSettings(page: Page) {
