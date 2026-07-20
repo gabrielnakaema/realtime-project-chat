@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: postgres_projectmanagement_${ENV_NAME}
+    container_name: postgres_projectmanagement_${ENV_NAME:?ENV_NAME must be set in .env.prod}
     env_file: .env.prod
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -20,7 +20,7 @@ services:
 
   kafka:
     image: apache/kafka:latest
-    container_name: kafka_projectmanagement_${ENV_NAME}
+    container_name: kafka_projectmanagement_${ENV_NAME:?ENV_NAME must be set in .env.prod}
     env_file: .env.prod
     volumes:
       - kafka_data:/var/lib/kafka/data
@@ -53,7 +53,7 @@ services:
       - project_management_network
 
   api:
-    container_name: api_projectmanagement_${ENV_NAME}
+    container_name: api_projectmanagement_${ENV_NAME:?ENV_NAME must be set in .env.prod}
     image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
     pull_policy: always
     env_file: .env.prod
@@ -74,7 +74,7 @@ services:
       - "traefik.http.services.api.loadbalancer.server.port=${API_PORT}"
 
   notification-service:
-    container_name: notification_service_projectmanagement_${ENV_NAME}
+    container_name: notification_service_projectmanagement_${ENV_NAME:?ENV_NAME must be set in .env.prod}
     image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
     pull_policy: always
     command: ["./notification-service"]
@@ -94,7 +94,7 @@ services:
       - "traefik.http.services.notification-service.loadbalancer.server.port=${NOTIFICATION_SERVICE_PORT}"
 
   chat-service:
-    container_name: chat_service_projectmanagement_${ENV_NAME}
+    container_name: chat_service_projectmanagement_${ENV_NAME:?ENV_NAME must be set in .env.prod}
     image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
     pull_policy: always
     command: ["./chat-service"]
@@ -116,7 +116,7 @@ services:
       - "traefik.http.services.chat-service.loadbalancer.server.port=${CHAT_SERVICE_PORT:-3337}"
 
   tasks-service:
-    container_name: tasks_service_projectmanagement_${ENV_NAME}
+    container_name: tasks_service_projectmanagement_${ENV_NAME:?ENV_NAME must be set in .env.prod}
     image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
     pull_policy: always
     command: ["./tasks-service"]
@@ -138,7 +138,7 @@ services:
       - "traefik.http.services.tasks-service.loadbalancer.server.port=${TASKS_SERVICE_PORT:-3339}"
 
   mcp-service:
-    container_name: mcp_service_projectmanagement_${ENV_NAME}
+    container_name: mcp_service_projectmanagement_${ENV_NAME:?ENV_NAME must be set in .env.prod}
     image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
     pull_policy: always
     command: ["./mcp-service"]
@@ -161,7 +161,7 @@ services:
       - "traefik.http.services.mcp-service.loadbalancer.server.port=${MCP_SERVICE_PORT:-3341}"
 
   websocket-service:
-    container_name: websocket_service_projectmanagement_${ENV_NAME}
+    container_name: websocket_service_projectmanagement_${ENV_NAME:?ENV_NAME must be set in .env.prod}
     image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
     pull_policy: always
     command: ["./websocket-service"]
@@ -187,11 +187,11 @@ services:
 
   gateway:
     image: traefik:v3.6.17
-    container_name: gateway_projectmanagement_${ENV_NAME}
+    container_name: gateway_projectmanagement_${ENV_NAME:?ENV_NAME must be set in .env.prod}
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=project_management_network_${ENV_NAME}"
+      - "--providers.docker.network=project_management_network_${ENV_NAME:?ENV_NAME must be set in .env.prod}"
       - "--entrypoints.web.address=:80"
     ports:
       - "127.0.0.1:${GATEWAY_PORT}:80"
@@ -208,10 +208,10 @@ services:
 
 volumes:
   postgres_data:
-    name: postgres_data_${ENV_NAME}
+    name: postgres_data_${ENV_NAME:?ENV_NAME must be set in .env.prod}
   kafka_data:
-    name: kafka_data_${ENV_NAME}
+    name: kafka_data_${ENV_NAME:?ENV_NAME must be set in .env.prod}
 
 networks:
   project_management_network:
-    name: project_management_network_${ENV_NAME}
+    name: project_management_network_${ENV_NAME:?ENV_NAME must be set in .env.prod}

@@ -51,11 +51,16 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
+            set -e
             echo "Connected to VPS"
             cd ${{ secrets.WORK_DIR }}
             echo ${{ secrets.GH_SECRET }} | docker login ghcr.io -u ${{ secrets.GH_ACTOR }} --password-stdin
             export REGISTRY=${{ env.REGISTRY }}
             export IMAGE_NAME=${{ env.IMAGE_NAME }}
             export IMAGE_TAG=${{ env.IMAGE_TAG }}
-            docker compose -f docker-compose-prod.yml pull api notification-service websocket-service
-            docker compose -f docker-compose-prod.yml up -d
+            docker compose --env-file .env.prod -f docker-compose-prod.yml config --quiet
+            docker compose --env-file .env.prod -f docker-compose-prod.yml pull api notification-service chat-service tasks-service mcp-service websocket-service
+            if ! docker compose --env-file .env.prod -f docker-compose-prod.yml up -d --remove-orphans; then
+              echo "Normal deployment failed; recreating containers to repair stale network attachments"
+              docker compose --env-file .env.prod -f docker-compose-prod.yml up -d --remove-orphans --force-recreate
+            fi
