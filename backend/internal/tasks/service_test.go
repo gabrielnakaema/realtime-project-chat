@@ -1,4 +1,4 @@
-package service_test
+package tasks_test
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/gabrielnakaema/project-chat/internal/fracindex"
 	"github.com/gabrielnakaema/project-chat/internal/outbox"
-	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/tasks"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -223,7 +223,7 @@ func TestTaskService_Create(t *testing.T) {
 
 	type testCase struct {
 		name              string
-		request           service.CreateTaskRequest
+		request           tasks.CreateTaskRequest
 		mockSetup         func(*mockTaskRepository, *mockProjectRepository, *mockUserRepository)
 		expectedTask      *domain.Task
 		expectedError     error
@@ -235,7 +235,7 @@ func TestTaskService_Create(t *testing.T) {
 	tests := []testCase{
 		{
 			name: "successful task creation",
-			request: service.CreateTaskRequest{
+			request: tasks.CreateTaskRequest{
 				ProjectId:       validProjectId,
 				ProjectColumnId: pendingStatusID,
 				Title:           "Test Task",
@@ -262,7 +262,7 @@ func TestTaskService_Create(t *testing.T) {
 		},
 		{
 			name: "unauthorized error",
-			request: service.CreateTaskRequest{
+			request: tasks.CreateTaskRequest{
 				ProjectId:       validProjectId,
 				ProjectColumnId: pendingStatusID,
 				Title:           "Test Task",
@@ -276,7 +276,7 @@ func TestTaskService_Create(t *testing.T) {
 		},
 		{
 			name: "project not found",
-			request: service.CreateTaskRequest{
+			request: tasks.CreateTaskRequest{
 				ProjectId:       validProjectId,
 				ProjectColumnId: pendingStatusID,
 				Title:           "Test Task",
@@ -292,7 +292,7 @@ func TestTaskService_Create(t *testing.T) {
 		},
 		{
 			name: "forbidden error",
-			request: service.CreateTaskRequest{
+			request: tasks.CreateTaskRequest{
 				ProjectId:       validProjectId,
 				ProjectColumnId: pendingStatusID,
 				Title:           "Test Task",
@@ -308,7 +308,7 @@ func TestTaskService_Create(t *testing.T) {
 		},
 		{
 			name: "remove empty tags",
-			request: service.CreateTaskRequest{
+			request: tasks.CreateTaskRequest{
 				ProjectId:       validProjectId,
 				ProjectColumnId: pendingStatusID,
 				Title:           "Test Task",
@@ -331,7 +331,7 @@ func TestTaskService_Create(t *testing.T) {
 		},
 		{
 			name: "responsible must be a project member",
-			request: service.CreateTaskRequest{
+			request: tasks.CreateTaskRequest{
 				ProjectId:       validProjectId,
 				ProjectColumnId: pendingStatusID,
 				Title:           "Test Task",
@@ -358,10 +358,10 @@ func TestTaskService_Create(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 
 			tt.mockSetup(mockRepo, mockProjectRepo, mockUserRepo)
-			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+			svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
-			task, err := service.Create(ctx, tt.request)
+			task, err := svc.Create(ctx, tt.request)
 
 			if tt.shouldSucceed {
 				assert.NoError(t, err)
@@ -425,8 +425,8 @@ func TestTaskService_FindTaskByCode(t *testing.T) {
 		}, nil)
 		taskRepo.On("GetById", mock.Anything, validTaskID).Return(validTask, nil)
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
-		task, err := svc.FindTaskByCode(context.Background(), service.FindTaskByCodeRequest{
+		svc := tasks.NewTaskService(taskRepo, projectRepo, userRepo)
+		task, err := svc.FindTaskByCode(context.Background(), tasks.FindTaskByCodeRequest{
 			ProjectId: validProjectID,
 			UserId:    validUserID,
 			Code:      "  BACKEND-5  ",
@@ -445,8 +445,8 @@ func TestTaskService_FindTaskByCode(t *testing.T) {
 		projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
 		taskRepo.On("FindTaskRefsByProjectAndCode", mock.Anything, validProjectID, "BACKEND-5").Return([]domain.TaskDependencyRef{}, nil)
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
-		task, err := svc.FindTaskByCode(context.Background(), service.FindTaskByCodeRequest{
+		svc := tasks.NewTaskService(taskRepo, projectRepo, userRepo)
+		task, err := svc.FindTaskByCode(context.Background(), tasks.FindTaskByCodeRequest{
 			ProjectId: validProjectID,
 			UserId:    validUserID,
 			Code:      "BACKEND-5",
@@ -468,8 +468,8 @@ func TestTaskService_FindTaskByCode(t *testing.T) {
 			{Id: uuid.New(), Title: "Duplicate task", Code: "BACKEND-5"},
 		}, nil)
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
-		task, err := svc.FindTaskByCode(context.Background(), service.FindTaskByCodeRequest{
+		svc := tasks.NewTaskService(taskRepo, projectRepo, userRepo)
+		task, err := svc.FindTaskByCode(context.Background(), tasks.FindTaskByCodeRequest{
 			ProjectId: validProjectID,
 			UserId:    validUserID,
 			Code:      "BACKEND-5",
@@ -503,8 +503,8 @@ func TestTaskService_SuggestTaskCodes(t *testing.T) {
 		projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
 		taskRepo.On("SuggestTaskCodesByProjectPrefix", mock.Anything, validProjectID, "BACKEND-", 8).Return(expected, nil)
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
-		result, err := svc.SuggestTaskCodes(context.Background(), service.SuggestTaskCodesRequest{
+		svc := tasks.NewTaskService(taskRepo, projectRepo, userRepo)
+		result, err := svc.SuggestTaskCodes(context.Background(), tasks.SuggestTaskCodesRequest{
 			ProjectId: validProjectID,
 			UserId:    validUserID,
 			Prefix:    "  BACKEND-  ",
@@ -522,8 +522,8 @@ func TestTaskService_SuggestTaskCodes(t *testing.T) {
 		projectRepo := &mockProjectRepository{}
 		userRepo := &mockUserRepository{}
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
-		result, err := svc.SuggestTaskCodes(context.Background(), service.SuggestTaskCodesRequest{
+		svc := tasks.NewTaskService(taskRepo, projectRepo, userRepo)
+		result, err := svc.SuggestTaskCodes(context.Background(), tasks.SuggestTaskCodesRequest{
 			ProjectId: validProjectID,
 			UserId:    validUserID,
 			Prefix:    "B",
@@ -542,8 +542,8 @@ func TestTaskService_SuggestTaskCodes(t *testing.T) {
 
 		projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
 
-		svc := service.NewTaskService(taskRepo, projectRepo, userRepo)
-		result, err := svc.SuggestTaskCodes(context.Background(), service.SuggestTaskCodesRequest{
+		svc := tasks.NewTaskService(taskRepo, projectRepo, userRepo)
+		result, err := svc.SuggestTaskCodes(context.Background(), tasks.SuggestTaskCodesRequest{
 			ProjectId: validProjectID,
 			UserId:    uuid.New(),
 			Prefix:    "BACKEND-",
@@ -585,9 +585,9 @@ func TestTaskService_GroupByColumn_DefaultStatuses(t *testing.T) {
 	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{doingStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
 	mockRepo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{doneStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil).Once()
 
-	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+	svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 
-	result, err := svc.GroupByColumn(context.Background(), service.GroupByColumnRequest{
+	result, err := svc.GroupByColumn(context.Background(), tasks.GroupByColumnRequest{
 		ProjectId: validProjectId,
 		UserId:    validUserId,
 		Limit:     15,
@@ -655,7 +655,7 @@ func TestTaskService_Update(t *testing.T) {
 
 	type testCase struct {
 		name                      string
-		request                   service.UpdateTaskRequest
+		request                   tasks.UpdateTaskRequest
 		mockSetup                 func(*mockTaskRepository, *mockProjectRepository, *mockUserRepository)
 		expectedTask              *domain.Task
 		expectedError             error
@@ -668,7 +668,7 @@ func TestTaskService_Update(t *testing.T) {
 	tests := []testCase{
 		{
 			name: "successful task update",
-			request: service.UpdateTaskRequest{
+			request: tasks.UpdateTaskRequest{
 				TaskId:          validTaskId,
 				Title:           "Updated Task",
 				Description:     "Updated Deascription",
@@ -695,7 +695,7 @@ func TestTaskService_Update(t *testing.T) {
 		},
 		{
 			name: "unauthorized error",
-			request: service.UpdateTaskRequest{
+			request: tasks.UpdateTaskRequest{
 				TaskId:          validTaskId,
 				Title:           "Updated Task",
 				Description:     "Updated Description",
@@ -709,7 +709,7 @@ func TestTaskService_Update(t *testing.T) {
 		},
 		{
 			name: "project not found",
-			request: service.UpdateTaskRequest{
+			request: tasks.UpdateTaskRequest{
 				TaskId:          validTaskId,
 				Title:           "Updated Task",
 				Description:     "Updated Description",
@@ -726,7 +726,7 @@ func TestTaskService_Update(t *testing.T) {
 		},
 		{
 			name: "forbidden error",
-			request: service.UpdateTaskRequest{
+			request: tasks.UpdateTaskRequest{
 				TaskId:          validTaskId,
 				Title:           "Updated Task",
 				Description:     "Updated Description",
@@ -744,7 +744,7 @@ func TestTaskService_Update(t *testing.T) {
 		},
 		{
 			name: "task not found",
-			request: service.UpdateTaskRequest{
+			request: tasks.UpdateTaskRequest{
 				TaskId:          validTaskId,
 				Title:           "Updated Task",
 				Description:     "Updated Description",
@@ -761,7 +761,7 @@ func TestTaskService_Update(t *testing.T) {
 		},
 		{
 			name: "remove empty tags",
-			request: service.UpdateTaskRequest{
+			request: tasks.UpdateTaskRequest{
 				TaskId:          validTaskId,
 				Title:           "Updated Task",
 				Description:     "Updated Description",
@@ -790,10 +790,10 @@ func TestTaskService_Update(t *testing.T) {
 			mockProjectRepo := &mockProjectRepository{}
 			mockUserRepo := &mockUserRepository{}
 			tt.mockSetup(mockRepo, mockProjectRepo, mockUserRepo)
-			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+			svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
-			task, err := service.Update(ctx, tt.request)
+			task, err := svc.Update(ctx, tt.request)
 
 			if tt.shouldSucceed {
 				assert.NoError(t, err)
@@ -840,8 +840,8 @@ func TestTaskService_Update(t *testing.T) {
 		Tags:            []string{},
 	}
 
-	baseUpdateRequest := func() service.UpdateTaskRequest {
-		return service.UpdateTaskRequest{
+	baseUpdateRequest := func() tasks.UpdateTaskRequest {
+		return tasks.UpdateTaskRequest{
 			TaskId:          validTaskId,
 			Title:           "Test Task",
 			Description:     "Test Description",
@@ -860,7 +860,7 @@ func TestTaskService_Update(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&taskWithCode, nil)
 		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		req := baseUpdateRequest()
 		req.Code = nil // not provided — keep existing
 
@@ -877,7 +877,7 @@ func TestTaskService_Update(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&taskWithCode, nil)
 		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		req := baseUpdateRequest()
 		empty := ""
 		req.Code = &empty
@@ -895,7 +895,7 @@ func TestTaskService_Update(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&taskWithCode, nil)
 		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 		req := baseUpdateRequest()
 		newCode := "  NEW-99  "
 		req.Code = &newCode
@@ -945,7 +945,7 @@ func TestTaskService_Archive(t *testing.T) {
 
 	type testCase struct {
 		name              string
-		request           service.ArchiveTaskRequest
+		request           tasks.ArchiveTaskRequest
 		mockSetup         func(*mockTaskRepository, *mockProjectRepository, *mockUserRepository)
 		expectedErrorCode string
 		shouldSucceed     bool
@@ -954,7 +954,7 @@ func TestTaskService_Archive(t *testing.T) {
 	tests := []testCase{
 		{
 			name: "successful archive",
-			request: service.ArchiveTaskRequest{
+			request: tasks.ArchiveTaskRequest{
 				TaskId:        validTaskId,
 				RequestUserId: validUserId,
 			},
@@ -967,7 +967,7 @@ func TestTaskService_Archive(t *testing.T) {
 		},
 		{
 			name: "member can archive task",
-			request: service.ArchiveTaskRequest{
+			request: tasks.ArchiveTaskRequest{
 				TaskId:        validTaskId,
 				RequestUserId: memberUserId,
 			},
@@ -980,7 +980,7 @@ func TestTaskService_Archive(t *testing.T) {
 		},
 		{
 			name: "archived task has archived status",
-			request: service.ArchiveTaskRequest{
+			request: tasks.ArchiveTaskRequest{
 				TaskId:        validTaskId,
 				RequestUserId: validUserId,
 			},
@@ -995,7 +995,7 @@ func TestTaskService_Archive(t *testing.T) {
 		},
 		{
 			name: "unauthorized",
-			request: service.ArchiveTaskRequest{
+			request: tasks.ArchiveTaskRequest{
 				TaskId:        validTaskId,
 				RequestUserId: uuid.Nil,
 			},
@@ -1005,7 +1005,7 @@ func TestTaskService_Archive(t *testing.T) {
 		},
 		{
 			name: "task not found",
-			request: service.ArchiveTaskRequest{
+			request: tasks.ArchiveTaskRequest{
 				TaskId:        validTaskId,
 				RequestUserId: validUserId,
 			},
@@ -1017,7 +1017,7 @@ func TestTaskService_Archive(t *testing.T) {
 		},
 		{
 			name: "project not found",
-			request: service.ArchiveTaskRequest{
+			request: tasks.ArchiveTaskRequest{
 				TaskId:        validTaskId,
 				RequestUserId: validUserId,
 			},
@@ -1030,7 +1030,7 @@ func TestTaskService_Archive(t *testing.T) {
 		},
 		{
 			name: "forbidden - not a project member",
-			request: service.ArchiveTaskRequest{
+			request: tasks.ArchiveTaskRequest{
 				TaskId:        validTaskId,
 				RequestUserId: uuid.New(),
 			},
@@ -1050,7 +1050,7 @@ func TestTaskService_Archive(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 
 			tt.mockSetup(mockRepo, mockProjectRepo, mockUserRepo)
-			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+			svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			task, err := svc.Archive(ctx, tt.request)
@@ -1112,9 +1112,9 @@ func TestTaskService_Archive_PublishesPreviousProjectColumnID(t *testing.T) {
 	mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 	mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+	svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 
-	task, err := svc.Archive(context.Background(), service.ArchiveTaskRequest{
+	task, err := svc.Archive(context.Background(), tasks.ArchiveTaskRequest{
 		TaskId:        validTaskId,
 		RequestUserId: validUserId,
 	})
@@ -1181,9 +1181,9 @@ func TestTaskService_Restore(t *testing.T) {
 			task.DoneAt == nil
 	})).Return(nil)
 
-	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+	svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 
-	task, err := svc.Restore(context.Background(), service.RestoreTaskRequest{
+	task, err := svc.Restore(context.Background(), tasks.RestoreTaskRequest{
 		TaskId:          validTaskId,
 		ProjectColumnId: doingStatusID,
 		RequestUserId:   validUserId,
@@ -1270,8 +1270,8 @@ func TestTaskService_Update_LoadsResponsibleDetailsForChangedAssignee(t *testing
 	mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 	mockUserRepo.On("GetById", mock.Anything, newResponsibleID).Return(&newResponsible, nil)
 
-	svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
-	task, err := svc.Update(context.Background(), service.UpdateTaskRequest{
+	svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+	task, err := svc.Update(context.Background(), tasks.UpdateTaskRequest{
 		TaskId:          validTaskId,
 		Title:           "Test Task",
 		Description:     "Test Description",
@@ -1333,7 +1333,7 @@ func TestTaskService_List(t *testing.T) {
 
 	type testCase struct {
 		name              string
-		request           service.ListTasksRequest
+		request           tasks.ListTasksRequest
 		mockSetup         func(*mockTaskRepository, *mockProjectRepository)
 		expectedErrorCode string
 		shouldSucceed     bool
@@ -1343,7 +1343,7 @@ func TestTaskService_List(t *testing.T) {
 	tests := []testCase{
 		{
 			name: "successful list",
-			request: service.ListTasksRequest{
+			request: tasks.ListTasksRequest{
 				ProjectId:        validProjectId,
 				RequestUserId:    validUserId,
 				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
@@ -1358,7 +1358,7 @@ func TestTaskService_List(t *testing.T) {
 		},
 		{
 			name: "unauthorized",
-			request: service.ListTasksRequest{
+			request: tasks.ListTasksRequest{
 				ProjectId:        validProjectId,
 				RequestUserId:    uuid.Nil,
 				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
@@ -1370,7 +1370,7 @@ func TestTaskService_List(t *testing.T) {
 		},
 		{
 			name: "forbidden - not a member",
-			request: service.ListTasksRequest{
+			request: tasks.ListTasksRequest{
 				ProjectId:        validProjectId,
 				RequestUserId:    uuid.New(),
 				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
@@ -1384,7 +1384,7 @@ func TestTaskService_List(t *testing.T) {
 		},
 		{
 			name: "creator can list archived tasks",
-			request: service.ListTasksRequest{
+			request: tasks.ListTasksRequest{
 				ProjectId:        validProjectId,
 				RequestUserId:    validUserId,
 				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
@@ -1400,7 +1400,7 @@ func TestTaskService_List(t *testing.T) {
 		},
 		{
 			name: "non-creator can list non-archived tasks",
-			request: service.ListTasksRequest{
+			request: tasks.ListTasksRequest{
 				ProjectId:        validProjectId,
 				RequestUserId:    memberUserId,
 				ProjectColumnIDs: []uuid.UUID{pendingStatusID, doingStatusID},
@@ -1422,7 +1422,7 @@ func TestTaskService_List(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 
 			tt.mockSetup(mockRepo, mockProjectRepo)
-			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+			svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			result, err := svc.List(ctx, tt.request)
@@ -1477,7 +1477,7 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 
 	type testCase struct {
 		name              string
-		request           service.GroupByColumnRequest
+		request           tasks.GroupByColumnRequest
 		mockSetup         func(*mockTaskRepository, *mockProjectRepository)
 		expectedErrorCode string
 		shouldSucceed     bool
@@ -1486,7 +1486,7 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 	tests := []testCase{
 		{
 			name: "successful group by status",
-			request: service.GroupByColumnRequest{
+			request: tasks.GroupByColumnRequest{
 				ProjectId:        validProjectId,
 				UserId:           validUserId,
 				ProjectColumnIDs: []uuid.UUID{pendingStatusID, doingStatusID},
@@ -1501,7 +1501,7 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 		},
 		{
 			name: "unauthorized",
-			request: service.GroupByColumnRequest{
+			request: tasks.GroupByColumnRequest{
 				ProjectId:        validProjectId,
 				UserId:           uuid.Nil,
 				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
@@ -1513,7 +1513,7 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 		},
 		{
 			name: "non-creator can group by non-archived statuses",
-			request: service.GroupByColumnRequest{
+			request: tasks.GroupByColumnRequest{
 				ProjectId:        validProjectId,
 				UserId:           memberUserId,
 				ProjectColumnIDs: []uuid.UUID{pendingStatusID, doneStatusID},
@@ -1528,7 +1528,7 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 		},
 		{
 			name: "forbidden - not a project member",
-			request: service.GroupByColumnRequest{
+			request: tasks.GroupByColumnRequest{
 				ProjectId:        validProjectId,
 				UserId:           uuid.New(),
 				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
@@ -1549,7 +1549,7 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 
 			tt.mockSetup(mockRepo, mockProjectRepo)
-			svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+			svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			result, err := svc.GroupByColumn(ctx, tt.request)
@@ -1615,8 +1615,8 @@ func TestTaskService_MarkTaskDone(t *testing.T) {
 			DoneAt:          func() *time.Time { now := time.Now(); return &now }(),
 		}, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
-		result, err := svc.MarkTaskDone(context.Background(), service.MarkTaskDoneRequest{
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		result, err := svc.MarkTaskDone(context.Background(), tasks.MarkTaskDoneRequest{
 			TaskId:        taskID,
 			RequestUserId: requestUserID,
 		})
@@ -1650,8 +1650,8 @@ func TestTaskService_MarkTaskDone(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, taskID).Return(task, nil)
 		mockProjectRepo.On("GetById", mock.Anything, projectID).Return(projectWithMultipleDoneColumns, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
-		result, err := svc.MarkTaskDone(context.Background(), service.MarkTaskDoneRequest{
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		result, err := svc.MarkTaskDone(context.Background(), tasks.MarkTaskDoneRequest{
 			TaskId:        taskID,
 			RequestUserId: requestUserID,
 		})
@@ -1713,8 +1713,8 @@ func TestTaskService_AssignTaskToSelf(t *testing.T) {
 			return updated.ResponsibleId != nil && *updated.ResponsibleId == requestUserID
 		})).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
-		result, err := svc.AssignTaskToSelf(context.Background(), service.AssignTaskToSelfRequest{
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		result, err := svc.AssignTaskToSelf(context.Background(), tasks.AssignTaskToSelfRequest{
 			TaskId:        taskID,
 			RequestUserId: requestUserID,
 		})
@@ -1747,8 +1747,8 @@ func TestTaskService_AssignTaskToSelf(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, taskID).Return(task, nil)
 		mockProjectRepo.On("GetById", mock.Anything, projectID).Return(project, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
-		result, err := svc.AssignTaskToSelf(context.Background(), service.AssignTaskToSelfRequest{
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		result, err := svc.AssignTaskToSelf(context.Background(), tasks.AssignTaskToSelfRequest{
 			TaskId:        taskID,
 			RequestUserId: requestUserID,
 		})
@@ -1807,8 +1807,8 @@ func TestTaskService_Dependencies(t *testing.T) {
 		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
 		mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
-		task, err := svc.Create(context.Background(), service.CreateTaskRequest{
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		task, err := svc.Create(context.Background(), tasks.CreateTaskRequest{
 			ProjectId:       validProjectId,
 			ProjectColumnId: pendingStatusID,
 			Title:           "Independent task",
@@ -1833,8 +1833,8 @@ func TestTaskService_Dependencies(t *testing.T) {
 		mockRepo.On("GetTaskDependencyRefsByProjectAndIds", mock.Anything, validProjectId, []uuid.UUID{dependencyTaskId}).Return([]domain.TaskDependencyRef{{Id: dependencyTaskId, Title: "Dependency Task", Code: "DEP-1"}}, nil)
 		mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
-		task, err := svc.Create(context.Background(), service.CreateTaskRequest{
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		task, err := svc.Create(context.Background(), tasks.CreateTaskRequest{
 			ProjectId:        validProjectId,
 			ProjectColumnId:  pendingStatusID,
 			Title:            "Blocked task",
@@ -1859,8 +1859,8 @@ func TestTaskService_Dependencies(t *testing.T) {
 		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
 		mockRepo.On("GetTaskDependencyRefsByProjectAndIds", mock.Anything, validProjectId, []uuid.UUID{dependencyTaskId}).Return([]domain.TaskDependencyRef{}, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
-		_, err := svc.Create(context.Background(), service.CreateTaskRequest{
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		_, err := svc.Create(context.Background(), tasks.CreateTaskRequest{
 			ProjectId:        validProjectId,
 			ProjectColumnId:  pendingStatusID,
 			Title:            "Blocked task",
@@ -1884,8 +1884,8 @@ func TestTaskService_Dependencies(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
 		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
-		_, err := svc.Update(context.Background(), service.UpdateTaskRequest{
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		_, err := svc.Update(context.Background(), tasks.UpdateTaskRequest{
 			TaskId:           validTaskId,
 			Title:            validTask.Title,
 			Description:      validTask.Description,
@@ -1913,8 +1913,8 @@ func TestTaskService_Dependencies(t *testing.T) {
 			{TaskId: dependencyTaskId, DependsOnTaskId: validTaskId},
 		}, nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
-		_, err := svc.Update(context.Background(), service.UpdateTaskRequest{
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		_, err := svc.Update(context.Background(), tasks.UpdateTaskRequest{
 			TaskId:           validTaskId,
 			Title:            validTask.Title,
 			Description:      validTask.Description,
@@ -1941,8 +1941,8 @@ func TestTaskService_Dependencies(t *testing.T) {
 		mockRepo.On("ListTaskDependenciesByProjectId", mock.Anything, validProjectId).Return([]domain.TaskDependencyEdge{}, nil)
 		mockRepo.On("Update", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
-		svc := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
-		task, err := svc.Update(context.Background(), service.UpdateTaskRequest{
+		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+		task, err := svc.Update(context.Background(), tasks.UpdateTaskRequest{
 			TaskId:           validTaskId,
 			Title:            validTask.Title,
 			Description:      validTask.Description,

@@ -13,3 +13,16 @@ sql:
             go_type:
               import: "github.com/google/uuid"
               type: "UUID"
+  - engine: "postgresql"
+    queries: "internal/tasks/queries/"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "taskqueries"
+        out: "internal/tasks/queries"
+        sql_package: "pgx/v5"
+        overrides:
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"

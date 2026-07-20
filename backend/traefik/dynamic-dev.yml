@@ -8,6 +8,14 @@ http:
       rule: "PathPrefix(`/chats`) || PathRegexp(`^/projects/[^/]+/chat`)"
       service: chat-service
       priority: 15
+    tasks-service:
+      rule: "PathPrefix(`/tasks`)"
+      service: tasks-service
+      priority: 16
+    mcp-service:
+      rule: "PathPrefix(`/mcp`)"
+      service: mcp-service
+      priority: 12
     notification-service:
       rule: "PathPrefix(`/notifications`)"
       service: notification-service
@@ -26,6 +34,14 @@ http:
       loadBalancer:
         servers:
           - url: "http://host.docker.internal:3337"
+    tasks-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3339"
+    mcp-service:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3341"
     notification-service:
       loadBalancer:
         servers:

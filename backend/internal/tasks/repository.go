@@ -1,4 +1,4 @@
-package repository
+package tasks
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/outbox"
-	"github.com/gabrielnakaema/project-chat/internal/queries"
+	taskqueries "github.com/gabrielnakaema/project-chat/internal/tasks/queries"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -50,7 +50,7 @@ func compatibilityTaskStatus(projectColumnName string, archivedAt *time.Time) do
 }
 
 func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task, buildEvents func(*domain.Task) []outbox.Message) error {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 	actionOrigin := domain.ActionOriginFromContext(ctx)
 
 	tx, err := tr.pool.Begin(ctx)
@@ -61,7 +61,7 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task, buildEv
 
 	qtx := q.WithTx(tx)
 
-	params := queries.CreateTaskParams{
+	params := taskqueries.CreateTaskParams{
 		ProjectID:       task.ProjectId,
 		Title:           task.Title,
 		Description:     task.Description,
@@ -108,7 +108,7 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task, buildEv
 	task.Id = id
 
 	for idx, update := range task.Updates {
-		params := queries.CreateTaskUpdateParams{
+		params := taskqueries.CreateTaskUpdateParams{
 			TaskID:       task.Id,
 			UserID:       update.UserId,
 			UpdateType:   string(update.UpdateType),
@@ -125,7 +125,7 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task, buildEv
 
 	if len(task.Tags) > 0 {
 		for _, tag := range task.Tags {
-			err = qtx.CreateTaskTag(ctx, queries.CreateTaskTagParams{
+			err = qtx.CreateTaskTag(ctx, taskqueries.CreateTaskTagParams{
 				TaskID: task.Id,
 				Name:   tag,
 			})
@@ -137,7 +137,7 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task, buildEv
 
 	if len(task.DependsOnTaskIds) > 0 {
 		for _, dependsOnTaskID := range task.DependsOnTaskIds {
-			err = qtx.CreateTaskDependency(ctx, queries.CreateTaskDependencyParams{
+			err = qtx.CreateTaskDependency(ctx, taskqueries.CreateTaskDependencyParams{
 				TaskID:          task.Id,
 				DependsOnTaskID: dependsOnTaskID,
 			})
@@ -157,10 +157,10 @@ func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task, buildEv
 }
 
 func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error) {
-	return tr.getByID(ctx, queries.New(tr.pool), id)
+	return tr.getByID(ctx, taskqueries.New(tr.pool), id)
 }
 
-func (tr *TaskRepository) getByID(ctx context.Context, q *queries.Queries, id uuid.UUID) (*domain.Task, error) {
+func (tr *TaskRepository) getByID(ctx context.Context, q *taskqueries.Queries, id uuid.UUID) (*domain.Task, error) {
 	result, err := q.GetTaskById(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -258,9 +258,9 @@ func (tr *TaskRepository) getByID(ctx context.Context, q *queries.Queries, id uu
 }
 
 func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, archived bool, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 
-	params := queries.ListTasksByProjectIdParams{
+	params := taskqueries.ListTasksByProjectIdParams{
 		ProjectID: projectId,
 		Archived:  archived,
 		TaskOrder: pgtype.Text{
@@ -382,7 +382,7 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 }
 
 func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task, buildEvents func(*domain.Task) []outbox.Message) error {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 
 	tx, err := tr.pool.Begin(ctx)
 	if err != nil {
@@ -392,7 +392,7 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task, buildEv
 
 	qtx := q.WithTx(tx)
 
-	params := queries.UpdateTaskParams{
+	params := taskqueries.UpdateTaskParams{
 		Title:           task.Title,
 		Description:     task.Description,
 		Code:            pgtype.Text{},
@@ -444,7 +444,7 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task, buildEv
 
 	if len(task.Tags) > 0 {
 		for _, tag := range task.Tags {
-			err = qtx.CreateTaskTag(ctx, queries.CreateTaskTagParams{
+			err = qtx.CreateTaskTag(ctx, taskqueries.CreateTaskTagParams{
 				TaskID: task.Id,
 				Name:   tag,
 			})
@@ -461,7 +461,7 @@ func (tr *TaskRepository) Update(ctx context.Context, task *domain.Task, buildEv
 
 	if len(task.DependsOnTaskIds) > 0 {
 		for _, dependsOnTaskID := range task.DependsOnTaskIds {
-			err = qtx.CreateTaskDependency(ctx, queries.CreateTaskDependencyParams{
+			err = qtx.CreateTaskDependency(ctx, taskqueries.CreateTaskDependencyParams{
 				TaskID:          task.Id,
 				DependsOnTaskID: dependsOnTaskID,
 			})
@@ -495,12 +495,12 @@ func (tr *TaskRepository) CreateUpdates(ctx context.Context, task *domain.Task, 
 	}
 	defer tx.Rollback(ctx)
 
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 	qtx := q.WithTx(tx)
 	actionOrigin := domain.ActionOriginFromContext(ctx)
 
 	for idx, update := range updates {
-		params := queries.CreateTaskUpdateParams{
+		params := taskqueries.CreateTaskUpdateParams{
 			TaskID:       task.Id,
 			UserID:       update.UserId,
 			UpdateType:   string(update.UpdateType),
@@ -516,7 +516,7 @@ func (tr *TaskRepository) CreateUpdates(ctx context.Context, task *domain.Task, 
 
 		if len(update.Changes) > 0 {
 			for changeIdx, change := range update.Changes {
-				params := queries.CreateTaskChangeParams{
+				params := taskqueries.CreateTaskChangeParams{
 					UpdateID: pgtype.UUID{
 						Bytes: id,
 						Valid: true,
@@ -575,9 +575,9 @@ func (tr *TaskRepository) CreateUpdates(ctx context.Context, task *domain.Task, 
 }
 
 func (tr *TaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, projectColumnID uuid.UUID) (*domain.Task, error) {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 
-	result, err := q.GetFirstTaskInColumn(ctx, queries.GetFirstTaskInColumnParams{
+	result, err := q.GetFirstTaskInColumn(ctx, taskqueries.GetFirstTaskInColumnParams{
 		ProjectID:       projectId,
 		ProjectColumnID: projectColumnID,
 	})
@@ -611,9 +611,9 @@ func (tr *TaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uu
 }
 
 func (tr *TaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.UUID, projectId uuid.UUID) (*domain.Task, error) {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 
-	params := queries.GetProjectTaskAfterIdParams{
+	params := taskqueries.GetProjectTaskAfterIdParams{
 		ID:        id,
 		ProjectID: projectId,
 	}
@@ -667,7 +667,7 @@ func (tr *TaskRepository) WithProjectColumnMoveLock(ctx context.Context, project
 }
 
 func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error) {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 	tx, err := tr.pool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -676,7 +676,7 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 
 	qtx := q.WithTx(tx)
 
-	params := queries.MoveTaskParams{
+	params := taskqueries.MoveTaskParams{
 		TaskOrder:       task.Order,
 		ProjectColumnID: task.ProjectColumnId,
 		UserID:          userId,
@@ -722,9 +722,9 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 }
 
 func (tr *TaskRepository) CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error) {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 
-	params := queries.CountTasksByProjectIdAndColumnParams{
+	params := taskqueries.CountTasksByProjectIdAndColumnParams{
 		ProjectID: projectId,
 		Column2:   projectColumnIDs,
 	}
@@ -743,9 +743,9 @@ func (tr *TaskRepository) CountTasksByProjectIdAndColumn(ctx context.Context, pr
 }
 
 func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 
-	params := queries.ListUserDueTasksParams{
+	params := taskqueries.ListUserDueTasksParams{
 		ResponsibleID: pgtype.UUID{
 			Bytes: userId,
 			Valid: true,
@@ -865,9 +865,9 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 }
 
 func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UUID, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 
-	params := queries.SearchTasksForUserParams{
+	params := taskqueries.SearchTasksForUserParams{
 		UserID:          userId,
 		Limit:           int32(limit + 1),
 		Query:           pgtype.Text{String: searchQuery, Valid: true},
@@ -1007,8 +1007,8 @@ func (tr *TaskRepository) CountTasksInProjectByIds(ctx context.Context, projectI
 		return 0, nil
 	}
 
-	q := queries.New(tr.pool)
-	count, err := q.CountTasksInProjectByIds(ctx, queries.CountTasksInProjectByIdsParams{
+	q := taskqueries.New(tr.pool)
+	count, err := q.CountTasksInProjectByIds(ctx, taskqueries.CountTasksInProjectByIdsParams{
 		ProjectID: projectId,
 		Column2:   taskIds,
 	})
@@ -1020,7 +1020,7 @@ func (tr *TaskRepository) CountTasksInProjectByIds(ctx context.Context, projectI
 }
 
 func (tr *TaskRepository) ListTaskDependenciesByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.TaskDependencyEdge, error) {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 	rows, err := q.ListTaskDependenciesByProjectId(ctx, projectId)
 	if err != nil {
 		return nil, err
@@ -1108,9 +1108,9 @@ func (tr *TaskRepository) GetTaskDependencyRefsByProjectAndIds(ctx context.Conte
 }
 
 func (tr *TaskRepository) FindTaskRefsByProjectAndCode(ctx context.Context, projectId uuid.UUID, code string) ([]domain.TaskDependencyRef, error) {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 
-	results, err := q.FindTaskRefsByProjectAndCode(ctx, queries.FindTaskRefsByProjectAndCodeParams{
+	results, err := q.FindTaskRefsByProjectAndCode(ctx, taskqueries.FindTaskRefsByProjectAndCodeParams{
 		ProjectID: projectId,
 		Code:      code,
 	})
@@ -1154,12 +1154,12 @@ func taskCodeLikePattern(value string) string {
 }
 
 func (tr *TaskRepository) SuggestTaskCodesByProjectPrefix(ctx context.Context, projectId uuid.UUID, prefix string, limit int) ([]domain.TaskCodeSuggestion, error) {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 
 	prefixLower := strings.ToLower(prefix)
 	sequenceBase := taskCodeSequenceBase(prefix)
 
-	results, err := q.SuggestTaskCodesByProjectPrefix(ctx, queries.SuggestTaskCodesByProjectPrefixParams{
+	results, err := q.SuggestTaskCodesByProjectPrefix(ctx, taskqueries.SuggestTaskCodesByProjectPrefixParams{
 		ProjectID:           projectId,
 		SequenceBase:        sequenceBase,
 		SequenceBasePattern: taskCodeLikePattern(strings.ToLower(sequenceBase)),
@@ -1188,9 +1188,9 @@ func (tr *TaskRepository) SearchProjectTasksForDependencies(
 	excludeTaskId *uuid.UUID,
 	limit int,
 ) ([]domain.TaskDependencyRef, error) {
-	q := queries.New(tr.pool)
+	q := taskqueries.New(tr.pool)
 
-	params := queries.SearchProjectTasksForDependenciesParams{
+	params := taskqueries.SearchProjectTasksForDependenciesParams{
 		ProjectID: projectId,
 		Query:     query,
 		Limit:     int32(limit),

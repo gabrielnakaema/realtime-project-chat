@@ -1,4 +1,4 @@
-package service
+package tasks
 
 import (
 	"context"
@@ -33,14 +33,18 @@ type taskCommentProjectRepository interface {
 	GetById(ctx context.Context, id uuid.UUID) (*domain.Project, error)
 }
 
+type taskCommentUserRepository interface {
+	GetById(ctx context.Context, id uuid.UUID) (*domain.User, error)
+}
+
 type TaskCommentService struct {
 	taskCommentRepository taskCommentRepository
 	taskRepository        taskCommentTaskRepository
 	projectRepository     taskCommentProjectRepository
-	userRepository        taskServiceUserRepository
+	userRepository        taskCommentUserRepository
 }
 
-func NewTaskCommentService(taskCommentRepository taskCommentRepository, taskRepository taskCommentTaskRepository, projectRepository taskCommentProjectRepository, userRepository taskServiceUserRepository) *TaskCommentService {
+func NewTaskCommentService(taskCommentRepository taskCommentRepository, taskRepository taskCommentTaskRepository, projectRepository taskCommentProjectRepository, userRepository taskCommentUserRepository) *TaskCommentService {
 	return &TaskCommentService{
 		taskCommentRepository: taskCommentRepository,
 		taskRepository:        taskRepository,

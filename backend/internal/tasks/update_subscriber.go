@@ -1,4 +1,4 @@
-package subscriber
+package tasks
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/subscriber"
 )
 
 type TaskUpdateRepository interface {
@@ -17,24 +18,24 @@ type TaskUpdateRepository interface {
 
 type TaskUpdateSubscriber struct {
 	logger     *slog.Logger
-	subscriber *Subscriber
+	subscriber *subscriber.Subscriber
 	repository TaskUpdateRepository
 }
 
 func NewTaskUpdateSubscriber(ctx context.Context, config *config.Config, logger *slog.Logger, repository TaskUpdateRepository) (*TaskUpdateSubscriber, error) {
-	subscriber, err := NewSubscriber(config, "task_update.subscriber")
+	sub, err := subscriber.NewSubscriber(config, "task_update.subscriber")
 	if err != nil {
 		return nil, err
 	}
 
 	taskUpdateSubscriber := &TaskUpdateSubscriber{
 		logger:     logger,
-		subscriber: subscriber,
+		subscriber: sub,
 		repository: repository,
 	}
 
 	topics := []events.Topic{events.TaskCreated, events.TaskUpdated}
-	err = subscriber.Subscribe(ctx, topics, taskUpdateSubscriber.handleTaskUpdateEvents, taskUpdateSubscriber.logger)
+	err = sub.Subscribe(ctx, topics, taskUpdateSubscriber.handleTaskUpdateEvents, taskUpdateSubscriber.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +47,7 @@ func (s *TaskUpdateSubscriber) Close() error {
 	return s.subscriber.Close()
 }
 
-func (s *TaskUpdateSubscriber) handleTaskUpdateEvents(ctx context.Context, message Message) error {
+func (s *TaskUpdateSubscriber) handleTaskUpdateEvents(ctx context.Context, message subscriber.Message) error {
 	switch message.Topic {
 	case events.TaskCreated:
 		if err := s.handleTaskCreated(ctx, message); err != nil {
@@ -63,7 +64,7 @@ func (s *TaskUpdateSubscriber) handleTaskUpdateEvents(ctx context.Context, messa
 	}
 }
 
-func (s *TaskUpdateSubscriber) handleTaskCreated(ctx context.Context, message Message) error {
+func (s *TaskUpdateSubscriber) handleTaskCreated(ctx context.Context, message subscriber.Message) error {
 	var payload events.TaskCreatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
 		return domain.ServerError("failed to unmarshal task created payload", err)
@@ -80,7 +81,7 @@ func (s *TaskUpdateSubscriber) handleTaskCreated(ctx context.Context, message Me
 	return nil
 }
 
-func (s *TaskUpdateSubscriber) handleTaskUpdated(ctx context.Context, message Message) error {
+func (s *TaskUpdateSubscriber) handleTaskUpdated(ctx context.Context, message subscriber.Message) error {
 	var payload events.TaskUpdatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
 		return domain.ServerError("failed to unmarshal task updated payload", err)

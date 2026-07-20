@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package projectchat.tasks.v1;
+
+option go_package = "github.com/gabrielnakaema/project-chat/internal/tasks/v1;tasksv1";
+
+// TaskService exposes task and task-comment operations over gRPC so the api
+// service (which hosts the MCP agent endpoint) can invoke them without
+// instantiating the tasks slice in-process.
+//
+// Responses carry the shared domain object marshaled as JSON so the gRPC
+// contract mirrors the HTTP/WebSocket contract exactly, rather than duplicating
+// the rich Task/TaskComment shape in protobuf.
+service TaskService {
+  rpc CreateTask(CreateTaskRequest) returns (TaskResponse);
+  rpc GetTaskById(GetTaskByIdRequest) returns (TaskResponse);
+  rpc GroupTasksByColumn(GroupTasksByColumnRequest) returns (TasksByColumnResponse);
+  rpc FindTaskByCode(FindTaskByCodeRequest) returns (TaskResponse);
+  rpc MoveTask(MoveTaskRequest) returns (TaskResponse);
+  rpc UpdateTask(UpdateTaskRequest) returns (TaskResponse);
+  rpc MarkTaskDone(MarkTaskDoneRequest) returns (TaskResponse);
+  rpc AssignTaskToSelf(AssignTaskToSelfRequest) returns (TaskResponse);
+  rpc CreateTaskComment(CreateTaskCommentRequest) returns (TaskCommentResponse);
+  rpc ListTaskComments(ListTaskCommentsRequest) returns (TaskCommentsResponse);
+}
+
+message TaskResponse {
+  bytes task_json = 1;
+}
+
+message TasksByColumnResponse {
+  bytes tasks_by_column_json = 1;
+}
+
+message TaskCommentResponse {
+  bytes comment_json = 1;
+}
+
+message TaskCommentsResponse {
+  bytes comments_json = 1;
+}
+
+message CreateTaskRequest {
+  string project_id = 1;
+  string project_column_id = 2;
+  string title = 3;
+  string description = 4;
+  string code = 5;
+  string request_user_id = 6;
+  string priority = 7;
+  optional string due_date = 8; // RFC3339
+  optional string responsible_id = 9;
+  repeated string tags = 10;
+  repeated string depends_on_task_ids = 11;
+}
+
+message GetTaskByIdRequest {
+  string task_id = 1;
+  string user_id = 2;
+}
+
+message GroupTasksByColumnRequest {
+  string project_id = 1;
+  string user_id = 2;
+  repeated string project_column_ids = 3;
+  bool archived = 4;
+  string task_order = 5;
+  optional string cursor_updated_at = 6; // RFC3339
+  int32 limit = 7;
+}
+
+message FindTaskByCodeRequest {
+  string project_id = 1;
+  string user_id = 2;
+  string code = 3;
+}
+
+message MoveTaskRequest {
+  string task_id = 1;
+  string request_user_id = 2;
+  optional string after_task_id = 3;
+  string project_id = 4;
+  string project_column_id = 5;
+}
+
+message UpdateTaskRequest {
+  string task_id = 1;
+  string title = 2;
+  string description = 3;
+  optional string code = 4;
+  string project_column_id = 5;
+  string request_user_id = 6;
+  string priority = 7;
+  optional string due_date = 8; // RFC3339
+  optional string responsible_id = 9;
+  repeated string tags = 10;
+  repeated string depends_on_task_ids = 11;
+}
+
+message MarkTaskDoneRequest {
+  string task_id = 1;
+  string request_user_id = 2;
+}
+
+message AssignTaskToSelfRequest {
+  string task_id = 1;
+  string request_user_id = 2;
+}
+
+message CreateTaskCommentRequest {
+  string task_id = 1;
+  string request_user_id = 2;
+  string content = 3;
+  optional string parent_comment_id = 4;
+}
+
+message ListTaskCommentsRequest {
+  string task_id = 1;
+  string request_user_id = 2;
+  int32 limit = 3;
+  optional string before = 4; // RFC3339
+  optional string before_comment_id = 5;
+  optional string after = 6; // RFC3339
+  optional string after_comment_id = 7;
+}

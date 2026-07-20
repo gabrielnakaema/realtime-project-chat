@@ -12,6 +12,7 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/logger"
 	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/tasks"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 )
@@ -28,19 +29,19 @@ type projectService interface {
 }
 
 type taskService interface {
-	Create(ctx context.Context, request service.CreateTaskRequest) (*domain.Task, error)
-	GroupByColumn(ctx context.Context, request service.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error)
+	Create(ctx context.Context, request tasks.CreateTaskRequest) (*domain.Task, error)
+	GroupByColumn(ctx context.Context, request tasks.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error)
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error)
-	FindTaskByCode(ctx context.Context, request service.FindTaskByCodeRequest) (*domain.Task, error)
-	Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error)
-	Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error)
-	MarkTaskDone(ctx context.Context, request service.MarkTaskDoneRequest) (*domain.Task, error)
-	AssignTaskToSelf(ctx context.Context, request service.AssignTaskToSelfRequest) (*domain.Task, error)
+	FindTaskByCode(ctx context.Context, request tasks.FindTaskByCodeRequest) (*domain.Task, error)
+	Move(ctx context.Context, request tasks.MoveTaskRequest) (*domain.Task, error)
+	Update(ctx context.Context, request tasks.UpdateTaskRequest) (*domain.Task, error)
+	MarkTaskDone(ctx context.Context, request tasks.MarkTaskDoneRequest) (*domain.Task, error)
+	AssignTaskToSelf(ctx context.Context, request tasks.AssignTaskToSelfRequest) (*domain.Task, error)
 }
 
 type taskCommentService interface {
-	Create(ctx context.Context, request service.CreateTaskCommentRequest) (*domain.TaskComment, error)
-	ListByTaskID(ctx context.Context, request service.ListTaskCommentsRequest) (*utils.CursorPaginated[domain.TaskComment], error)
+	Create(ctx context.Context, request tasks.CreateTaskCommentRequest) (*domain.TaskComment, error)
+	ListByTaskID(ctx context.Context, request tasks.ListTaskCommentsRequest) (*utils.CursorPaginated[domain.TaskComment], error)
 }
 
 type Handler struct {
@@ -275,7 +276,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		}
 		limitPerColumn := optionalIntArg(params.Arguments, "limit_per_column", 15)
 		includeArchived := optionalBoolArg(params.Arguments, "include_archived", false)
-		grouped, err := h.taskService.GroupByColumn(ctx, service.GroupByColumnRequest{
+		grouped, err := h.taskService.GroupByColumn(ctx, tasks.GroupByColumnRequest{
 			ProjectId:        projectID,
 			UserId:           principal.UserID,
 			ProjectColumnIDs: projectColumnIDs,
@@ -335,7 +336,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		task, err := h.taskService.Create(ctx, service.CreateTaskRequest{
+		task, err := h.taskService.Create(ctx, tasks.CreateTaskRequest{
 			ProjectId:        projectID,
 			ProjectColumnId:  projectColumnID,
 			Title:            title,
@@ -370,7 +371,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 				return nil, err
 			}
 			commentsLimit := optionalIntArg(params.Arguments, "comments_limit", 10)
-			comments, err := h.taskCommentService.ListByTaskID(ctx, service.ListTaskCommentsRequest{
+			comments, err := h.taskCommentService.ListByTaskID(ctx, tasks.ListTaskCommentsRequest{
 				TaskID:        taskID,
 				RequestUserID: principal.UserID,
 				Limit:         commentsLimit,
@@ -393,7 +394,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		if err != nil {
 			return nil, err
 		}
-		task, err := h.taskService.FindTaskByCode(ctx, service.FindTaskByCodeRequest{
+		task, err := h.taskService.FindTaskByCode(ctx, tasks.FindTaskByCodeRequest{
 			ProjectId: projectID,
 			UserId:    principal.UserID,
 			Code:      code,
@@ -407,7 +408,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 				return nil, err
 			}
 			commentsLimit := optionalIntArg(params.Arguments, "comments_limit", 10)
-			comments, err := h.taskCommentService.ListByTaskID(ctx, service.ListTaskCommentsRequest{
+			comments, err := h.taskCommentService.ListByTaskID(ctx, tasks.ListTaskCommentsRequest{
 				TaskID:        task.Id,
 				RequestUserID: principal.UserID,
 				Limit:         commentsLimit,
@@ -427,7 +428,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		commentsLimit := optionalIntArg(params.Arguments, "limit", 10)
-		comments, err := h.taskCommentService.ListByTaskID(ctx, service.ListTaskCommentsRequest{
+		comments, err := h.taskCommentService.ListByTaskID(ctx, tasks.ListTaskCommentsRequest{
 			TaskID:        taskID,
 			RequestUserID: principal.UserID,
 			Limit:         commentsLimit,
@@ -481,7 +482,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		task, err := h.taskService.Update(ctx, service.UpdateTaskRequest{
+		task, err := h.taskService.Update(ctx, tasks.UpdateTaskRequest{
 			TaskId:           taskID,
 			Title:            title,
 			Description:      description,
@@ -519,7 +520,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		task, err := h.taskService.Move(ctx, service.MoveTaskRequest{
+		task, err := h.taskService.Move(ctx, tasks.MoveTaskRequest{
 			TaskId:          taskID,
 			RequestUserId:   principal.UserID,
 			AfterTaskId:     afterTaskID,
@@ -547,7 +548,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		comment, err := h.taskCommentService.Create(ctx, service.CreateTaskCommentRequest{
+		comment, err := h.taskCommentService.Create(ctx, tasks.CreateTaskCommentRequest{
 			TaskID:          taskID,
 			RequestUserID:   principal.UserID,
 			Content:         content,
@@ -566,7 +567,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		task, err := h.taskService.MarkTaskDone(ctx, service.MarkTaskDoneRequest{
+		task, err := h.taskService.MarkTaskDone(ctx, tasks.MarkTaskDoneRequest{
 			TaskId:        taskID,
 			RequestUserId: principal.UserID,
 		})
@@ -583,7 +584,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		task, err := h.taskService.AssignTaskToSelf(ctx, service.AssignTaskToSelfRequest{
+		task, err := h.taskService.AssignTaskToSelf(ctx, tasks.AssignTaskToSelfRequest{
 			TaskId:        taskID,
 			RequestUserId: principal.UserID,
 		})

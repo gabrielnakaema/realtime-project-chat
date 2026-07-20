@@ -1,4 +1,4 @@
-package handlers
+package tasks
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/handlers"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/gabrielnakaema/project-chat/internal/validator"
 	"github.com/go-chi/chi/v5"
@@ -16,8 +16,8 @@ import (
 )
 
 type taskCommentService interface {
-	Create(ctx context.Context, request service.CreateTaskCommentRequest) (*domain.TaskComment, error)
-	ListByTaskID(ctx context.Context, request service.ListTaskCommentsRequest) (*utils.CursorPaginated[domain.TaskComment], error)
+	Create(ctx context.Context, request CreateTaskCommentRequest) (*domain.TaskComment, error)
+	ListByTaskID(ctx context.Context, request ListTaskCommentsRequest) (*utils.CursorPaginated[domain.TaskComment], error)
 }
 
 type TaskCommentHandler struct {
@@ -34,40 +34,40 @@ func (h *TaskCommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	taskID := chi.URLParam(r, "id")
 	parsedTaskID, err := uuid.Parse(taskID)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
-	var request CreateTaskCommentRequest
+	var request CreateTaskCommentBody
 	err = utils.ReadJSON(w, r, &request)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	v := validator.New()
 	request.Validate(v)
 	if !v.Valid() {
-		ValidationFailedResponse(w, v)
+		handlers.ValidationFailedResponse(w, v)
 		return
 	}
 
 	userID := auth.UserIdFromContext(r.Context())
 
-	comment, err := h.taskCommentService.Create(r.Context(), service.CreateTaskCommentRequest{
+	comment, err := h.taskCommentService.Create(r.Context(), CreateTaskCommentRequest{
 		TaskID:          parsedTaskID,
 		RequestUserID:   userID,
 		Content:         request.Content,
 		ParentCommentID: request.ParentCommentID,
 	})
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusCreated, comment, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -76,25 +76,25 @@ func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request
 	taskID := chi.URLParam(r, "id")
 	parsedTaskID, err := uuid.Parse(taskID)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	limit := utils.GetQueryInt(r, "limit", 10)
 	if limit <= 0 {
-		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		handlers.BadRequestResponse(w, errors.New("limit must be greater than 0"))
 		return
 	}
 
 	if limit > 50 {
-		BadRequestResponse(w, errors.New("limit must be less than 50"))
+		handlers.BadRequestResponse(w, errors.New("limit must be less than 50"))
 		return
 	}
 
 	before := utils.GetQueryString(r, "before", "")
 	after := utils.GetQueryString(r, "after", "")
 	if before != "" && after != "" {
-		BadRequestResponse(w, errors.New("before and after cannot be used together"))
+		handlers.BadRequestResponse(w, errors.New("before and after cannot be used together"))
 		return
 	}
 
@@ -102,7 +102,7 @@ func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request
 	if before != "" {
 		parsedBefore, err := time.Parse(time.RFC3339, before)
 		if err != nil {
-			BadRequestResponse(w, errors.New("invalid before date"))
+			handlers.BadRequestResponse(w, errors.New("invalid before date"))
 			return
 		}
 		beforeTime = &parsedBefore
@@ -112,7 +112,7 @@ func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request
 	if after != "" {
 		parsedAfter, err := time.Parse(time.RFC3339, after)
 		if err != nil {
-			BadRequestResponse(w, errors.New("invalid after date"))
+			handlers.BadRequestResponse(w, errors.New("invalid after date"))
 			return
 		}
 		afterTime = &parsedAfter
@@ -128,7 +128,7 @@ func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request
 	if beforeCommentID != "" {
 		id, err := uuid.Parse(beforeCommentID)
 		if err != nil {
-			BadRequestResponse(w, err)
+			handlers.BadRequestResponse(w, err)
 			return
 		}
 		parsedBeforeCommentID = &id
@@ -139,7 +139,7 @@ func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request
 	if afterCommentID != "" {
 		id, err := uuid.Parse(afterCommentID)
 		if err != nil {
-			BadRequestResponse(w, err)
+			handlers.BadRequestResponse(w, err)
 			return
 		}
 		parsedAfterCommentID = &id
@@ -147,7 +147,7 @@ func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request
 
 	userID := auth.UserIdFromContext(r.Context())
 
-	comments, err := h.taskCommentService.ListByTaskID(r.Context(), service.ListTaskCommentsRequest{
+	comments, err := h.taskCommentService.ListByTaskID(r.Context(), ListTaskCommentsRequest{
 		TaskID:          parsedTaskID,
 		RequestUserID:   userID,
 		Limit:           int(limit),
@@ -157,13 +157,13 @@ func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request
 		AfterCommentID:  parsedAfterCommentID,
 	})
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, comments, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }

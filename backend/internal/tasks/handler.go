@@ -1,4 +1,4 @@
-package handlers
+package tasks
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/handlers"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/gabrielnakaema/project-chat/internal/validator"
 	"github.com/go-chi/chi/v5"
@@ -17,19 +17,19 @@ import (
 )
 
 type taskService interface {
-	Create(ctx context.Context, request service.CreateTaskRequest) (*domain.Task, error)
-	List(ctx context.Context, request service.ListTasksRequest) (*utils.CursorPaginated[domain.Task], error)
+	Create(ctx context.Context, request CreateTaskRequest) (*domain.Task, error)
+	List(ctx context.Context, request ListTasksRequest) (*utils.CursorPaginated[domain.Task], error)
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error)
-	Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error)
-	Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error)
-	GroupByColumn(ctx context.Context, request service.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error)
+	Update(ctx context.Context, request UpdateTaskRequest) (*domain.Task, error)
+	Move(ctx context.Context, request MoveTaskRequest) (*domain.Task, error)
+	GroupByColumn(ctx context.Context, request GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error)
 	CountByColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, requestUserId uuid.UUID) (map[string]int, error)
-	Archive(ctx context.Context, request service.ArchiveTaskRequest) (*domain.Task, error)
-	Restore(ctx context.Context, request service.RestoreTaskRequest) (*domain.Task, error)
-	ListUserDueTasks(ctx context.Context, request service.ListUserDueTasksRequest) (*utils.CursorPaginated[domain.Task], error)
-	SearchTasksForUser(ctx context.Context, request service.SearchTasksForUserRequest) (*utils.CursorPaginated[domain.Task], error)
-	SuggestTaskCodes(ctx context.Context, request service.SuggestTaskCodesRequest) ([]domain.TaskCodeSuggestion, error)
-	SearchProjectTasksForDependencies(ctx context.Context, request service.SearchProjectTasksForDependenciesRequest) ([]domain.TaskDependencyRef, error)
+	Archive(ctx context.Context, request ArchiveTaskRequest) (*domain.Task, error)
+	Restore(ctx context.Context, request RestoreTaskRequest) (*domain.Task, error)
+	ListUserDueTasks(ctx context.Context, request ListUserDueTasksRequest) (*utils.CursorPaginated[domain.Task], error)
+	SearchTasksForUser(ctx context.Context, request SearchTasksForUserRequest) (*utils.CursorPaginated[domain.Task], error)
+	SuggestTaskCodes(ctx context.Context, request SuggestTaskCodesRequest) ([]domain.TaskCodeSuggestion, error)
+	SearchProjectTasksForDependencies(ctx context.Context, request SearchProjectTasksForDependenciesRequest) ([]domain.TaskDependencyRef, error)
 }
 
 type TaskHandler struct {
@@ -44,23 +44,23 @@ func NewTaskHandler(taskService taskService) *TaskHandler {
 
 func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 
-	var request CreateTaskRequest
+	var request CreateTaskBody
 	err := utils.ReadJSON(w, r, &request)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	v := validator.New()
 	request.Validate(v)
 	if !v.Valid() {
-		ValidationFailedResponse(w, v)
+		handlers.ValidationFailedResponse(w, v)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 
-	serviceRequest := service.CreateTaskRequest{
+	serviceRequest := CreateTaskRequest{
 		ProjectId:        request.ProjectId,
 		ProjectColumnId:  request.ProjectColumnId,
 		Title:            request.Title,
@@ -76,13 +76,13 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.taskService.Create(r.Context(), serviceRequest)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusCreated, task, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -90,30 +90,30 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	projectId := utils.GetQueryString(r, "project_id", "")
 	if projectId == "" {
-		BadRequestResponse(w, errors.New("project_id is required"))
+		handlers.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
 	parsedProjectId, err := uuid.Parse(projectId)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	projectColumnIDs, err := parseUUIDQueryParam(utils.GetQueryString(r, "project_column_ids", ""))
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	limit := utils.GetQueryInt(r, "limit", 15)
 	if limit <= 0 {
-		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		handlers.BadRequestResponse(w, errors.New("limit must be greater than 0"))
 		return
 	}
 
 	if limit > 100 {
-		BadRequestResponse(w, errors.New("limit must be less than 100"))
+		handlers.BadRequestResponse(w, errors.New("limit must be less than 100"))
 		return
 	}
 
@@ -124,7 +124,7 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	if cursorUpdatedAt != "" {
 		parsedTime, err := time.Parse(time.RFC3339, cursorUpdatedAt)
 		if err != nil {
-			BadRequestResponse(w, err)
+			handlers.BadRequestResponse(w, err)
 			return
 		}
 		updatedAt = &parsedTime
@@ -133,7 +133,7 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	userId := auth.UserIdFromContext(r.Context())
 	archived := utils.GetQueryString(r, "archived", "") == "true"
 
-	serviceRequest := service.ListTasksRequest{
+	serviceRequest := ListTasksRequest{
 		ProjectId:        parsedProjectId,
 		RequestUserId:    userId,
 		ProjectColumnIDs: projectColumnIDs,
@@ -145,13 +145,13 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.taskService.List(r.Context(), serviceRequest)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, result, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -159,25 +159,25 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *TaskHandler) GroupByColumn(w http.ResponseWriter, r *http.Request) {
 	projectId := utils.GetQueryString(r, "project_id", "")
 	if projectId == "" {
-		BadRequestResponse(w, errors.New("project_id is required"))
+		handlers.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
 	parsedProjectId, err := uuid.Parse(projectId)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	limitInt := utils.GetQueryInt(r, "limit", 15)
 
 	if limitInt < 1 {
-		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		handlers.BadRequestResponse(w, errors.New("limit must be greater than 0"))
 		return
 	}
 
 	if limitInt > 100 {
-		BadRequestResponse(w, errors.New("limit must be less than 100"))
+		handlers.BadRequestResponse(w, errors.New("limit must be less than 100"))
 		return
 	}
 
@@ -188,7 +188,7 @@ func (h *TaskHandler) GroupByColumn(w http.ResponseWriter, r *http.Request) {
 	if cursorUpdatedAt != "" {
 		parsedTime, err := time.Parse(time.RFC3339, cursorUpdatedAt)
 		if err != nil {
-			BadRequestResponse(w, err)
+			handlers.BadRequestResponse(w, err)
 			return
 		}
 		updatedAt = &parsedTime
@@ -196,14 +196,14 @@ func (h *TaskHandler) GroupByColumn(w http.ResponseWriter, r *http.Request) {
 
 	projectColumnIDs, err := parseUUIDQueryParam(utils.GetQueryString(r, "project_column_ids", ""))
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 	archived := utils.GetQueryString(r, "archived", "") == "true"
 
-	serviceRequest := service.GroupByColumnRequest{
+	serviceRequest := GroupByColumnRequest{
 		ProjectId:        parsedProjectId,
 		UserId:           userId,
 		ProjectColumnIDs: projectColumnIDs,
@@ -215,13 +215,13 @@ func (h *TaskHandler) GroupByColumn(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.taskService.GroupByColumn(r.Context(), serviceRequest)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, result, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -229,13 +229,13 @@ func (h *TaskHandler) GroupByColumn(w http.ResponseWriter, r *http.Request) {
 func (h *TaskHandler) CountByColumn(w http.ResponseWriter, r *http.Request) {
 	projectId := utils.GetQueryString(r, "project_id", "")
 	if projectId == "" {
-		BadRequestResponse(w, errors.New("project_id is required"))
+		handlers.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
 	parsedProjectId, err := uuid.Parse(projectId)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
@@ -243,24 +243,24 @@ func (h *TaskHandler) CountByColumn(w http.ResponseWriter, r *http.Request) {
 
 	projectColumnIDs, err := parseUUIDQueryParam(utils.GetQueryString(r, "project_column_ids", ""))
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	if len(projectColumnIDs) == 0 {
-		BadRequestResponse(w, errors.New("project_column_ids are required"))
+		handlers.BadRequestResponse(w, errors.New("project_column_ids are required"))
 		return
 	}
 
 	result, err := h.taskService.CountByColumn(r.Context(), parsedProjectId, projectColumnIDs, userId)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, result, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -270,7 +270,7 @@ func (h *TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	parsedId, err := uuid.Parse(id)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
@@ -278,13 +278,13 @@ func (h *TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.taskService.GetById(r.Context(), parsedId, userId)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, task, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -293,27 +293,27 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	parsedId, err := uuid.Parse(id)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
-	var request UpdateTaskRequest
+	var request UpdateTaskBody
 	err = utils.ReadJSON(w, r, &request)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	v := validator.New()
 	request.Validate(v)
 	if !v.Valid() {
-		ValidationFailedResponse(w, v)
+		handlers.ValidationFailedResponse(w, v)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 
-	serviceRequest := service.UpdateTaskRequest{
+	serviceRequest := UpdateTaskRequest{
 		TaskId:           parsedId,
 		Title:            request.Title,
 		Description:      request.Description,
@@ -329,13 +329,13 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.taskService.Update(r.Context(), serviceRequest)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, task, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -344,26 +344,26 @@ func (h *TaskHandler) Archive(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	parsedId, err := uuid.Parse(id)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 
-	serviceRequest := service.ArchiveTaskRequest{
+	serviceRequest := ArchiveTaskRequest{
 		TaskId:        parsedId,
 		RequestUserId: userId,
 	}
 
 	task, err := h.taskService.Archive(r.Context(), serviceRequest)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, task, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -372,27 +372,27 @@ func (h *TaskHandler) Restore(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	parsedId, err := uuid.Parse(id)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
-	var request RestoreTaskRequest
+	var request RestoreTaskBody
 	err = utils.ReadJSON(w, r, &request)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	v := validator.New()
 	request.Validate(v)
 	if !v.Valid() {
-		ValidationFailedResponse(w, v)
+		handlers.ValidationFailedResponse(w, v)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 
-	serviceRequest := service.RestoreTaskRequest{
+	serviceRequest := RestoreTaskRequest{
 		TaskId:          parsedId,
 		ProjectColumnId: request.ProjectColumnId,
 		RequestUserId:   userId,
@@ -400,13 +400,13 @@ func (h *TaskHandler) Restore(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.taskService.Restore(r.Context(), serviceRequest)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, task, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -415,27 +415,27 @@ func (h *TaskHandler) Move(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	parsedId, err := uuid.Parse(id)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
-	var request MoveTaskRequest
+	var request MoveTaskBody
 	err = utils.ReadJSON(w, r, &request)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	v := validator.New()
 	request.Validate(v)
 	if !v.Valid() {
-		ValidationFailedResponse(w, v)
+		handlers.ValidationFailedResponse(w, v)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 
-	serviceRequest := service.MoveTaskRequest{
+	serviceRequest := MoveTaskRequest{
 		TaskId:          parsedId,
 		RequestUserId:   userId,
 		AfterTaskId:     request.AfterTaskId,
@@ -445,13 +445,13 @@ func (h *TaskHandler) Move(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.taskService.Move(r.Context(), serviceRequest)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, task, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -479,12 +479,12 @@ func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {
 
 	limit := utils.GetQueryInt(r, "limit", 15)
 	if limit <= 0 {
-		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		handlers.BadRequestResponse(w, errors.New("limit must be greater than 0"))
 		return
 	}
 
 	if limit > 100 {
-		BadRequestResponse(w, errors.New("limit must be less than 100"))
+		handlers.BadRequestResponse(w, errors.New("limit must be less than 100"))
 		return
 	}
 
@@ -493,7 +493,7 @@ func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {
 	if cursorDueDate != "" {
 		parsedTime, err := time.Parse(time.RFC3339, cursorDueDate)
 		if err != nil {
-			BadRequestResponse(w, err)
+			handlers.BadRequestResponse(w, err)
 			return
 		}
 		dueDate = &parsedTime
@@ -504,13 +504,13 @@ func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {
 	if cursorUpdatedAt != "" {
 		parsedTime, err := time.Parse(time.RFC3339, cursorUpdatedAt)
 		if err != nil {
-			BadRequestResponse(w, err)
+			handlers.BadRequestResponse(w, err)
 			return
 		}
 		updatedAt = &parsedTime
 	}
 
-	serviceRequest := service.ListUserDueTasksRequest{
+	serviceRequest := ListUserDueTasksRequest{
 		UserId:          userId,
 		Limit:           int(limit),
 		CursorDueDate:   dueDate,
@@ -519,13 +519,13 @@ func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.taskService.ListUserDueTasks(r.Context(), serviceRequest)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, result, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -535,47 +535,47 @@ func (h *TaskHandler) SuggestTaskCodes(w http.ResponseWriter, r *http.Request) {
 
 	projectId := utils.GetQueryString(r, "project_id", "")
 	if projectId == "" {
-		BadRequestResponse(w, errors.New("project_id is required"))
+		handlers.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
 	parsedProjectId, err := uuid.Parse(projectId)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	prefix := strings.TrimSpace(utils.GetQueryString(r, "prefix", ""))
 	if len(prefix) < 2 {
-		BadRequestResponse(w, errors.New("prefix must be at least 2 characters"))
+		handlers.BadRequestResponse(w, errors.New("prefix must be at least 2 characters"))
 		return
 	}
 
 	limit := utils.GetQueryInt(r, "limit", 8)
 	if limit <= 0 {
-		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		handlers.BadRequestResponse(w, errors.New("limit must be greater than 0"))
 		return
 	}
 
 	if limit > 20 {
-		BadRequestResponse(w, errors.New("limit must be at most 20"))
+		handlers.BadRequestResponse(w, errors.New("limit must be at most 20"))
 		return
 	}
 
-	result, err := h.taskService.SuggestTaskCodes(r.Context(), service.SuggestTaskCodesRequest{
+	result, err := h.taskService.SuggestTaskCodes(r.Context(), SuggestTaskCodesRequest{
 		ProjectId: parsedProjectId,
 		UserId:    userId,
 		Prefix:    prefix,
 		Limit:     int(limit),
 	})
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, map[string]any{"data": result}, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -585,30 +585,30 @@ func (h *TaskHandler) SearchProjectTasksForDependencies(w http.ResponseWriter, r
 
 	projectId := utils.GetQueryString(r, "project_id", "")
 	if projectId == "" {
-		BadRequestResponse(w, errors.New("project_id is required"))
+		handlers.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
 	parsedProjectId, err := uuid.Parse(projectId)
 	if err != nil {
-		BadRequestResponse(w, err)
+		handlers.BadRequestResponse(w, err)
 		return
 	}
 
 	searchQuery := strings.TrimSpace(utils.GetQueryString(r, "query", ""))
 	if searchQuery == "" {
-		BadRequestResponse(w, errors.New("query is required"))
+		handlers.BadRequestResponse(w, errors.New("query is required"))
 		return
 	}
 
 	limit := utils.GetQueryInt(r, "limit", 20)
 	if limit <= 0 {
-		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		handlers.BadRequestResponse(w, errors.New("limit must be greater than 0"))
 		return
 	}
 
 	if limit > 100 {
-		BadRequestResponse(w, errors.New("limit must be less than 100"))
+		handlers.BadRequestResponse(w, errors.New("limit must be less than 100"))
 		return
 	}
 
@@ -617,13 +617,13 @@ func (h *TaskHandler) SearchProjectTasksForDependencies(w http.ResponseWriter, r
 	if excludeTaskIdParam != "" {
 		parsedExcludeTaskId, parseErr := uuid.Parse(excludeTaskIdParam)
 		if parseErr != nil {
-			BadRequestResponse(w, parseErr)
+			handlers.BadRequestResponse(w, parseErr)
 			return
 		}
 		excludeTaskId = &parsedExcludeTaskId
 	}
 
-	result, err := h.taskService.SearchProjectTasksForDependencies(r.Context(), service.SearchProjectTasksForDependenciesRequest{
+	result, err := h.taskService.SearchProjectTasksForDependencies(r.Context(), SearchProjectTasksForDependenciesRequest{
 		ProjectId:     parsedProjectId,
 		UserId:        userId,
 		Query:         searchQuery,
@@ -631,13 +631,13 @@ func (h *TaskHandler) SearchProjectTasksForDependencies(w http.ResponseWriter, r
 		Limit:         int(limit),
 	})
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, map[string]any{"data": result}, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -647,18 +647,18 @@ func (h *TaskHandler) SearchTasksForUser(w http.ResponseWriter, r *http.Request)
 
 	limit := utils.GetQueryInt(r, "limit", 15)
 	if limit <= 0 {
-		BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		handlers.BadRequestResponse(w, errors.New("limit must be greater than 0"))
 		return
 	}
 
 	if limit > 100 {
-		BadRequestResponse(w, errors.New("limit must be less than 100"))
+		handlers.BadRequestResponse(w, errors.New("limit must be less than 100"))
 		return
 	}
 
 	searchQuery := utils.GetQueryString(r, "query", "")
 	if searchQuery == "" {
-		BadRequestResponse(w, errors.New("query is required"))
+		handlers.BadRequestResponse(w, errors.New("query is required"))
 		return
 	}
 
@@ -667,7 +667,7 @@ func (h *TaskHandler) SearchTasksForUser(w http.ResponseWriter, r *http.Request)
 	if cursorDueDate != "" {
 		parsedTime, err := time.Parse(time.RFC3339, cursorDueDate)
 		if err != nil {
-			BadRequestResponse(w, err)
+			handlers.BadRequestResponse(w, err)
 			return
 		}
 		dueDate = &parsedTime
@@ -678,13 +678,13 @@ func (h *TaskHandler) SearchTasksForUser(w http.ResponseWriter, r *http.Request)
 	if cursorUpdatedAt != "" {
 		parsedTime, err := time.Parse(time.RFC3339, cursorUpdatedAt)
 		if err != nil {
-			BadRequestResponse(w, err)
+			handlers.BadRequestResponse(w, err)
 			return
 		}
 		updatedAt = &parsedTime
 	}
 
-	serviceRequest := service.SearchTasksForUserRequest{
+	serviceRequest := SearchTasksForUserRequest{
 		UserId:          userId,
 		Limit:           int(limit),
 		SearchQuery:     searchQuery,
@@ -694,13 +694,13 @@ func (h *TaskHandler) SearchTasksForUser(w http.ResponseWriter, r *http.Request)
 
 	result, err := h.taskService.SearchTasksForUser(r.Context(), serviceRequest)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 
 	err = utils.WriteJSON(w, http.StatusOK, result, nil)
 	if err != nil {
-		ErrorResponse(w, r, err)
+		handlers.ErrorResponse(w, r, err)
 		return
 	}
 }

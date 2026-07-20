@@ -18,6 +18,12 @@ dev-websocket:
 dev-chat:
 	air -c .air.chat.toml
 
+dev-tasks:
+	air -c .air.tasks.toml
+
+dev-mcp:
+	air -c .air.mcp.toml
+
 generate-proto:
 	go run github.com/bufbuild/buf/cmd/buf@v1.57.2 generate
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/tasks"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -28,14 +29,14 @@ func (s *stubProjectService) GetById(ctx context.Context, id uuid.UUID, userId u
 }
 
 type stubTaskService struct {
-	createRequest     *service.CreateTaskRequest
+	createRequest     *tasks.CreateTaskRequest
 	task              *domain.Task
 	grouped           map[string]utils.CursorPaginated[domain.Task]
-	findByCodeRequest *service.FindTaskByCodeRequest
-	updateRequest     *service.UpdateTaskRequest
-	moveRequest       *service.MoveTaskRequest
-	markDoneRequest   *service.MarkTaskDoneRequest
-	assignSelfRequest *service.AssignTaskToSelfRequest
+	findByCodeRequest *tasks.FindTaskByCodeRequest
+	updateRequest     *tasks.UpdateTaskRequest
+	moveRequest       *tasks.MoveTaskRequest
+	markDoneRequest   *tasks.MarkTaskDoneRequest
+	assignSelfRequest *tasks.AssignTaskToSelfRequest
 	createOrigin      domain.ActionOrigin
 	updateOrigin      domain.ActionOrigin
 	moveOrigin        domain.ActionOrigin
@@ -43,13 +44,13 @@ type stubTaskService struct {
 	assignSelfOrigin  domain.ActionOrigin
 }
 
-func (s *stubTaskService) Create(ctx context.Context, request service.CreateTaskRequest) (*domain.Task, error) {
+func (s *stubTaskService) Create(ctx context.Context, request tasks.CreateTaskRequest) (*domain.Task, error) {
 	s.createRequest = &request
 	s.createOrigin = domain.ActionOriginFromContext(ctx)
 	return s.task, nil
 }
 
-func (s *stubTaskService) GroupByColumn(ctx context.Context, request service.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error) {
+func (s *stubTaskService) GroupByColumn(ctx context.Context, request tasks.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error) {
 	return s.grouped, nil
 }
 
@@ -57,30 +58,30 @@ func (s *stubTaskService) GetById(ctx context.Context, id uuid.UUID, userId uuid
 	return s.task, nil
 }
 
-func (s *stubTaskService) FindTaskByCode(ctx context.Context, request service.FindTaskByCodeRequest) (*domain.Task, error) {
+func (s *stubTaskService) FindTaskByCode(ctx context.Context, request tasks.FindTaskByCodeRequest) (*domain.Task, error) {
 	s.findByCodeRequest = &request
 	return s.task, nil
 }
 
-func (s *stubTaskService) Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error) {
+func (s *stubTaskService) Move(ctx context.Context, request tasks.MoveTaskRequest) (*domain.Task, error) {
 	s.moveRequest = &request
 	s.moveOrigin = domain.ActionOriginFromContext(ctx)
 	return s.task, nil
 }
 
-func (s *stubTaskService) Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error) {
+func (s *stubTaskService) Update(ctx context.Context, request tasks.UpdateTaskRequest) (*domain.Task, error) {
 	s.updateRequest = &request
 	s.updateOrigin = domain.ActionOriginFromContext(ctx)
 	return s.task, nil
 }
 
-func (s *stubTaskService) MarkTaskDone(ctx context.Context, request service.MarkTaskDoneRequest) (*domain.Task, error) {
+func (s *stubTaskService) MarkTaskDone(ctx context.Context, request tasks.MarkTaskDoneRequest) (*domain.Task, error) {
 	s.markDoneRequest = &request
 	s.markDoneOrigin = domain.ActionOriginFromContext(ctx)
 	return s.task, nil
 }
 
-func (s *stubTaskService) AssignTaskToSelf(ctx context.Context, request service.AssignTaskToSelfRequest) (*domain.Task, error) {
+func (s *stubTaskService) AssignTaskToSelf(ctx context.Context, request tasks.AssignTaskToSelfRequest) (*domain.Task, error) {
 	s.assignSelfRequest = &request
 	s.assignSelfOrigin = domain.ActionOriginFromContext(ctx)
 	return s.task, nil
@@ -89,18 +90,18 @@ func (s *stubTaskService) AssignTaskToSelf(ctx context.Context, request service.
 type stubTaskCommentService struct {
 	comment       *domain.TaskComment
 	comments      *utils.CursorPaginated[domain.TaskComment]
-	createRequest *service.CreateTaskCommentRequest
+	createRequest *tasks.CreateTaskCommentRequest
 	createOrigin  domain.ActionOrigin
-	listRequest   *service.ListTaskCommentsRequest
+	listRequest   *tasks.ListTaskCommentsRequest
 }
 
-func (s *stubTaskCommentService) Create(ctx context.Context, request service.CreateTaskCommentRequest) (*domain.TaskComment, error) {
+func (s *stubTaskCommentService) Create(ctx context.Context, request tasks.CreateTaskCommentRequest) (*domain.TaskComment, error) {
 	s.createRequest = &request
 	s.createOrigin = domain.ActionOriginFromContext(ctx)
 	return s.comment, nil
 }
 
-func (s *stubTaskCommentService) ListByTaskID(ctx context.Context, request service.ListTaskCommentsRequest) (*utils.CursorPaginated[domain.TaskComment], error) {
+func (s *stubTaskCommentService) ListByTaskID(ctx context.Context, request tasks.ListTaskCommentsRequest) (*utils.CursorPaginated[domain.TaskComment], error) {
 	s.listRequest = &request
 	return s.comments, nil
 }

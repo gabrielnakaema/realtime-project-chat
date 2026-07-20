@@ -29,7 +29,7 @@ async function createProject(page: Page, name: string) {
 
   await expectToast(page, "Project created successfully");
   await page.getByRole("link", { name: new RegExp(name) }).click();
-  await expect(page.getByRole("heading", { name })).toBeVisible();
+  await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
 }
 
 async function selectOption(

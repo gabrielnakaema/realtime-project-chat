@@ -1,4 +1,4 @@
-package subscriber
+package tasks
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/subscriber"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -67,7 +68,7 @@ func TestTaskUpdateSubscriberHandleTaskUpdateEvents_SkipsPoisonMessages(t *testi
 		bytes, err := json.Marshal(payload)
 		assert.NoError(t, err)
 
-		err = sub.handleTaskUpdateEvents(context.Background(), Message{
+		err = sub.handleTaskUpdateEvents(context.Background(), subscriber.Message{
 			Topic: events.TaskUpdated,
 			Value: bytes,
 		})
@@ -92,7 +93,7 @@ func TestTaskUpdateSubscriberHandleTaskUpdateEvents_SkipsPoisonMessages(t *testi
 		bytes, err := json.Marshal(payload)
 		assert.NoError(t, err)
 
-		err = sub.handleTaskUpdateEvents(context.Background(), Message{
+		err = sub.handleTaskUpdateEvents(context.Background(), subscriber.Message{
 			Topic: events.TaskUpdated,
 			Value: bytes,
 		})

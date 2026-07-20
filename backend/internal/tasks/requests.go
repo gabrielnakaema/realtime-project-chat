@@ -1,4 +1,4 @@
-package handlers
+package tasks
 
 import (
 	"slices"
@@ -9,20 +9,20 @@ import (
 	"github.com/google/uuid"
 )
 
-type CreateTaskRequest struct {
-	ProjectId       uuid.UUID  `json:"project_id"`
-	ProjectColumnId uuid.UUID  `json:"project_column_id"`
-	Title           string     `json:"title"`
-	Description     string     `json:"description"`
-	Code            string     `json:"code"`
-	Priority        string     `json:"priority"`
-	ResponsibleId   *uuid.UUID `json:"responsible_id"`
-	DueDate         *time.Time `json:"due_date"`
-	Tags              []string    `json:"tags"`
-	DependsOnTaskIds  []uuid.UUID `json:"depends_on_task_ids"`
+type CreateTaskBody struct {
+	ProjectId        uuid.UUID   `json:"project_id"`
+	ProjectColumnId  uuid.UUID   `json:"project_column_id"`
+	Title            string      `json:"title"`
+	Description      string      `json:"description"`
+	Code             string      `json:"code"`
+	Priority         string      `json:"priority"`
+	ResponsibleId    *uuid.UUID  `json:"responsible_id"`
+	DueDate          *time.Time  `json:"due_date"`
+	Tags             []string    `json:"tags"`
+	DependsOnTaskIds []uuid.UUID `json:"depends_on_task_ids"`
 }
 
-func (r *CreateTaskRequest) Validate(v *validator.Validator) {
+func (r *CreateTaskBody) Validate(v *validator.Validator) {
 	v.Check("project_id", "project_id is required", r.ProjectId != uuid.Nil)
 	v.Check("project_column_id", "project_column_id is required", r.ProjectColumnId != uuid.Nil)
 	v.Check("title", "title is required", validator.NotBlank(r.Title))
@@ -33,19 +33,19 @@ func (r *CreateTaskRequest) Validate(v *validator.Validator) {
 
 }
 
-type UpdateTaskRequest struct {
-	Title           string     `json:"title"`
-	Description     string     `json:"description"`
-	Code            string     `json:"code"`
-	ProjectColumnId uuid.UUID  `json:"project_column_id"`
-	Priority        string     `json:"priority"`
-	ResponsibleId   *uuid.UUID `json:"responsible_id"`
-	DueDate         *time.Time `json:"due_date"`
-	Tags              []string    `json:"tags"`
-	DependsOnTaskIds  []uuid.UUID `json:"depends_on_task_ids"`
+type UpdateTaskBody struct {
+	Title            string      `json:"title"`
+	Description      string      `json:"description"`
+	Code             string      `json:"code"`
+	ProjectColumnId  uuid.UUID   `json:"project_column_id"`
+	Priority         string      `json:"priority"`
+	ResponsibleId    *uuid.UUID  `json:"responsible_id"`
+	DueDate          *time.Time  `json:"due_date"`
+	Tags             []string    `json:"tags"`
+	DependsOnTaskIds []uuid.UUID `json:"depends_on_task_ids"`
 }
 
-func (r *UpdateTaskRequest) Validate(v *validator.Validator) {
+func (r *UpdateTaskBody) Validate(v *validator.Validator) {
 	v.Check("title", "title is required", validator.NotBlank(r.Title))
 	v.Check("description", "description is required", validator.NotBlank(r.Description))
 
@@ -56,21 +56,21 @@ func (r *UpdateTaskRequest) Validate(v *validator.Validator) {
 
 }
 
-type MoveTaskRequest struct {
+type MoveTaskBody struct {
 	AfterTaskId     *uuid.UUID `json:"after_task_id"`
 	ProjectId       uuid.UUID  `json:"project_id"`
 	ProjectColumnId uuid.UUID  `json:"project_column_id"`
 }
 
-func (r *MoveTaskRequest) Validate(v *validator.Validator) {
+func (r *MoveTaskBody) Validate(v *validator.Validator) {
 	v.Check("project_id", "project_id is required", r.ProjectId != uuid.Nil)
 	v.Check("project_column_id", "project_column_id is required", r.ProjectColumnId != uuid.Nil)
 }
 
-type RestoreTaskRequest struct {
+type RestoreTaskBody struct {
 	ProjectColumnId uuid.UUID `json:"project_column_id"`
 }
 
-func (r *RestoreTaskRequest) Validate(v *validator.Validator) {
+func (r *RestoreTaskBody) Validate(v *validator.Validator) {
 	v.Check("project_column_id", "project_column_id is required", r.ProjectColumnId != uuid.Nil)
 }

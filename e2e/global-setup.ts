@@ -41,6 +41,9 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     notification: "3335",
     websocket: "3336",
     grpc: "4334",
+    tasks: "3339",
+    tasksGrpc: "3340",
+    mcp: "3341",
   } as const;
   const corsOrigin =
     process.env.E2E_CORS_ORIGIN ?? `http://localhost:${frontendPort}`;
@@ -101,6 +104,28 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       AUTHORIZATION_GRPC_TARGET: `127.0.0.1:${servicePorts.grpc}`,
     }
   );
+  const tasksProc = await spawnBackendService(
+    backendDir,
+    "tasks-service",
+    "./cmd/tasks-service",
+    servicePorts.tasks,
+    {
+      ...sharedServiceEnv,
+      TASKS_SERVICE_PORT: servicePorts.tasks,
+      TASKS_INTERNAL_GRPC_LISTEN_ADDRESS: `127.0.0.1:${servicePorts.tasksGrpc}`,
+    }
+  );
+  const mcpProc = await spawnBackendService(
+    backendDir,
+    "mcp-service",
+    "./cmd/mcp-service",
+    servicePorts.mcp,
+    {
+      ...sharedServiceEnv,
+      MCP_SERVICE_PORT: servicePorts.mcp,
+      TASKS_AUTHORIZATION_GRPC_TARGET: `127.0.0.1:${servicePorts.tasksGrpc}`,
+    }
+  );
 
   const relayProc = await spawnBackendService(
     backendDir,
@@ -132,10 +157,12 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     await killProcess(frontendProc);
     await gateway.stop();
     await killProcess(relayProc);
+    await killProcess(mcpProc);
     await killProcess(chatProc);
     await killProcess(websocketProc);
     await killProcess(notificationProc);
     await killProcess(backendProc);
+    await killProcess(tasksProc);
     await infra.kafka.stop();
     await infra.postgres.stop();
   };

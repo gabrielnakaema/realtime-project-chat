@@ -115,6 +115,50 @@ services:
       - "traefik.http.routers.chat-service.priority=15"
       - "traefik.http.services.chat-service.loadbalancer.server.port=${CHAT_SERVICE_PORT:-3337}"
 
+  tasks-service:
+    container_name: tasks_service_projectmanagement_${ENV_NAME}
+    image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+    pull_policy: always
+    command: ["./tasks-service"]
+    env_file: .env.prod
+    environment:
+      TASKS_INTERNAL_GRPC_LISTEN_ADDRESS: 0.0.0.0:3340
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: always
+    networks:
+      - project_management_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tasks-service.rule=PathPrefix(`/tasks`)"
+      - "traefik.http.routers.tasks-service.priority=16"
+      - "traefik.http.services.tasks-service.loadbalancer.server.port=${TASKS_SERVICE_PORT:-3339}"
+
+  mcp-service:
+    container_name: mcp_service_projectmanagement_${ENV_NAME}
+    image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+    pull_policy: always
+    command: ["./mcp-service"]
+    env_file: .env.prod
+    environment:
+      TASKS_AUTHORIZATION_GRPC_TARGET: tasks-service:3340
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: always
+    networks:
+      - project_management_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mcp-service.rule=PathPrefix(`/mcp`)"
+      - "traefik.http.routers.mcp-service.priority=12"
+      - "traefik.http.services.mcp-service.loadbalancer.server.port=${MCP_SERVICE_PORT:-3341}"
+
   websocket-service:
     container_name: websocket_service_projectmanagement_${ENV_NAME}
     image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}

@@ -3,7 +3,7 @@
 //   sqlc v1.26.0
 // source: task_comments.sql
 
-package queries
+package taskqueries
 
 import (
 	"context"

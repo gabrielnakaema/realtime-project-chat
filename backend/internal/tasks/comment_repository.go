@@ -1,4 +1,4 @@
-package repository
+package tasks
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/outbox"
-	"github.com/gabrielnakaema/project-chat/internal/queries"
+	taskqueries "github.com/gabrielnakaema/project-chat/internal/tasks/queries"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -38,9 +38,9 @@ func (r *TaskCommentRepository) Create(ctx context.Context, comment *domain.Task
 	}
 	defer tx.Rollback(ctx)
 
-	qtx := queries.New(tx)
+	qtx := taskqueries.New(tx)
 
-	params := queries.CreateTaskCommentParams{
+	params := taskqueries.CreateTaskCommentParams{
 		TaskID:       comment.Task.Id,
 		UserID:       comment.User.Id,
 		Content:      comment.Content,
@@ -81,7 +81,7 @@ func (r *TaskCommentRepository) ListByTaskID(
 	afterID *uuid.UUID,
 	limit int,
 ) (*utils.CursorPaginated[domain.TaskComment], error) {
-	q := queries.New(r.pool)
+	q := taskqueries.New(r.pool)
 
 	if before != nil && after != nil {
 		return nil, errors.New("before and after cannot be used together")
@@ -90,7 +90,7 @@ func (r *TaskCommentRepository) ListByTaskID(
 	paginationMode := "before"
 	if after != nil {
 		paginationMode = "after"
-		afterRows, afterErr := q.ListTaskCommentsAfter(ctx, queries.ListTaskCommentsAfterParams{
+		afterRows, afterErr := q.ListTaskCommentsAfter(ctx, taskqueries.ListTaskCommentsAfterParams{
 			TaskID: taskID,
 			Limit:  int32(limit + 1),
 			Column3: pgtype.Timestamptz{
@@ -111,7 +111,7 @@ func (r *TaskCommentRepository) ListByTaskID(
 		before = &now
 	}
 
-	rows, err := q.ListTaskComments(ctx, queries.ListTaskCommentsParams{
+	rows, err := q.ListTaskComments(ctx, taskqueries.ListTaskCommentsParams{
 		TaskID: taskID,
 		Limit:  int32(limit + 1),
 		Column3: pgtype.Timestamptz{
@@ -250,7 +250,7 @@ type normalizedTaskCommentRow struct {
 
 func normalizeTaskCommentRows(rows interface{}) []normalizedTaskCommentRow {
 	switch typedRows := rows.(type) {
-	case []queries.ListTaskCommentsRow:
+	case []taskqueries.ListTaskCommentsRow:
 		normalized := make([]normalizedTaskCommentRow, 0, len(typedRows))
 		for _, row := range typedRows {
 			normalized = append(normalized, normalizedTaskCommentRow{
@@ -270,7 +270,7 @@ func normalizeTaskCommentRows(rows interface{}) []normalizedTaskCommentRow {
 			})
 		}
 		return normalized
-	case []queries.ListTaskCommentsAfterRow:
+	case []taskqueries.ListTaskCommentsAfterRow:
 		normalized := make([]normalizedTaskCommentRow, 0, len(typedRows))
 		for _, row := range typedRows {
 			normalized = append(normalized, normalizedTaskCommentRow{

@@ -1,4 +1,4 @@
-package service_test
+package tasks_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/outbox"
-	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/tasks"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -72,7 +72,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 
 	type testCase struct {
 		name              string
-		request           service.CreateTaskCommentRequest
+		request           tasks.CreateTaskCommentRequest
 		mockSetup         func(*mockTaskCommentRepository, *mockTaskRepository, *mockProjectRepository, *mockUserRepository)
 		expectedErrorCode string
 		shouldSucceed     bool
@@ -82,7 +82,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 	tests := []testCase{
 		{
 			name: "successful comment creation",
-			request: service.CreateTaskCommentRequest{
+			request: tasks.CreateTaskCommentRequest{
 				TaskID:        validTaskID,
 				RequestUserID: validUserID,
 				Content:       "Test comment",
@@ -109,7 +109,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 		},
 		{
 			name: "successful reply creation",
-			request: service.CreateTaskCommentRequest{
+			request: tasks.CreateTaskCommentRequest{
 				TaskID:          validTaskID,
 				RequestUserID:   validUserID,
 				Content:         "Reply comment",
@@ -132,7 +132,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 		},
 		{
 			name: "unauthorized error",
-			request: service.CreateTaskCommentRequest{
+			request: tasks.CreateTaskCommentRequest{
 				TaskID:        validTaskID,
 				RequestUserID: uuid.Nil,
 				Content:       "Test comment",
@@ -144,7 +144,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 		},
 		{
 			name: "task not found",
-			request: service.CreateTaskCommentRequest{
+			request: tasks.CreateTaskCommentRequest{
 				TaskID:        validTaskID,
 				RequestUserID: validUserID,
 				Content:       "Test comment",
@@ -157,7 +157,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 		},
 		{
 			name: "project not found",
-			request: service.CreateTaskCommentRequest{
+			request: tasks.CreateTaskCommentRequest{
 				TaskID:        validTaskID,
 				RequestUserID: validUserID,
 				Content:       "Test comment",
@@ -171,7 +171,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 		},
 		{
 			name: "forbidden when user is not a project member",
-			request: service.CreateTaskCommentRequest{
+			request: tasks.CreateTaskCommentRequest{
 				TaskID:        validTaskID,
 				RequestUserID: uuid.New(),
 				Content:       "Test comment",
@@ -185,7 +185,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 		},
 		{
 			name: "server error when getting user",
-			request: service.CreateTaskCommentRequest{
+			request: tasks.CreateTaskCommentRequest{
 				TaskID:        validTaskID,
 				RequestUserID: validUserID,
 				Content:       "Test comment",
@@ -200,7 +200,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 		},
 		{
 			name: "server error when creating comment",
-			request: service.CreateTaskCommentRequest{
+			request: tasks.CreateTaskCommentRequest{
 				TaskID:        validTaskID,
 				RequestUserID: validUserID,
 				Content:       "Test comment",
@@ -224,7 +224,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 			tt.mockSetup(mockCommentRepo, mockTaskRepo, mockProjectRepo, mockUserRepo)
 
-			svc := service.NewTaskCommentService(mockCommentRepo, mockTaskRepo, mockProjectRepo, mockUserRepo)
+			svc := tasks.NewTaskCommentService(mockCommentRepo, mockTaskRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			comment, err := svc.Create(ctx, tt.request)
@@ -301,7 +301,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 
 	type testCase struct {
 		name              string
-		request           service.ListTaskCommentsRequest
+		request           tasks.ListTaskCommentsRequest
 		mockSetup         func(*mockTaskCommentRepository, *mockTaskRepository, *mockProjectRepository)
 		expectedErrorCode string
 		shouldSucceed     bool
@@ -311,7 +311,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 	tests := []testCase{
 		{
 			name: "successful comment listing",
-			request: service.ListTaskCommentsRequest{
+			request: tasks.ListTaskCommentsRequest{
 				TaskID:          validTaskID,
 				RequestUserID:   validUserID,
 				Limit:           10,
@@ -335,7 +335,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 		},
 		{
 			name: "unauthorized error",
-			request: service.ListTaskCommentsRequest{
+			request: tasks.ListTaskCommentsRequest{
 				TaskID:        validTaskID,
 				RequestUserID: uuid.Nil,
 				Limit:         10,
@@ -347,7 +347,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 		},
 		{
 			name: "task not found",
-			request: service.ListTaskCommentsRequest{
+			request: tasks.ListTaskCommentsRequest{
 				TaskID:        validTaskID,
 				RequestUserID: validUserID,
 				Limit:         10,
@@ -360,7 +360,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 		},
 		{
 			name: "project not found",
-			request: service.ListTaskCommentsRequest{
+			request: tasks.ListTaskCommentsRequest{
 				TaskID:        validTaskID,
 				RequestUserID: validUserID,
 				Limit:         10,
@@ -374,7 +374,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 		},
 		{
 			name: "forbidden when user is not a project member",
-			request: service.ListTaskCommentsRequest{
+			request: tasks.ListTaskCommentsRequest{
 				TaskID:        validTaskID,
 				RequestUserID: uuid.New(),
 				Limit:         10,
@@ -388,7 +388,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 		},
 		{
 			name: "server error when listing comments",
-			request: service.ListTaskCommentsRequest{
+			request: tasks.ListTaskCommentsRequest{
 				TaskID:          validTaskID,
 				RequestUserID:   validUserID,
 				Limit:           10,
@@ -413,7 +413,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 			mockUserRepo := &mockUserRepository{}
 			tt.mockSetup(mockCommentRepo, mockTaskRepo, mockProjectRepo)
 
-			svc := service.NewTaskCommentService(mockCommentRepo, mockTaskRepo, mockProjectRepo, mockUserRepo)
+			svc := tasks.NewTaskCommentService(mockCommentRepo, mockTaskRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
 			comments, err := svc.ListByTaskID(ctx, tt.request)

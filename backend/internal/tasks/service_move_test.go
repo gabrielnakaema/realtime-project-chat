@@ -1,4 +1,4 @@
-package service_test
+package tasks_test
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/fracindex"
-	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/tasks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -33,7 +33,7 @@ func TestTaskService_Move(t *testing.T) {
 
 	type testCase struct {
 		name          string
-		request       service.MoveTaskRequest
+		request       tasks.MoveTaskRequest
 		mockSetup     func(*mockTaskRepository, *mockProjectRepository)
 		expectedOrder string
 		shouldSucceed bool
@@ -42,7 +42,7 @@ func TestTaskService_Move(t *testing.T) {
 	tests := []testCase{
 		{
 			name: "move to top (no existing tasks)",
-			request: service.MoveTaskRequest{
+			request: tasks.MoveTaskRequest{
 				TaskId:          validTaskId,
 				ProjectId:       validProjectId,
 				RequestUserId:   validUserId,
@@ -61,7 +61,7 @@ func TestTaskService_Move(t *testing.T) {
 		},
 		{
 			name: "move to top (existing tasks)",
-			request: service.MoveTaskRequest{
+			request: tasks.MoveTaskRequest{
 				TaskId:          validTaskId,
 				ProjectId:       validProjectId,
 				RequestUserId:   validUserId,
@@ -80,7 +80,7 @@ func TestTaskService_Move(t *testing.T) {
 		},
 		{
 			name: "move after task A (between A and B)",
-			request: service.MoveTaskRequest{
+			request: tasks.MoveTaskRequest{
 				TaskId:          validTaskId,
 				ProjectId:       validProjectId,
 				RequestUserId:   validUserId,
@@ -100,7 +100,7 @@ func TestTaskService_Move(t *testing.T) {
 		},
 		{
 			name: "move after task B (end of list)",
-			request: service.MoveTaskRequest{
+			request: tasks.MoveTaskRequest{
 				TaskId:          validTaskId,
 				ProjectId:       validProjectId,
 				RequestUserId:   validUserId,
@@ -120,7 +120,7 @@ func TestTaskService_Move(t *testing.T) {
 		},
 		{
 			name: "move after task A skips the moving task when it is returned as the next task",
-			request: service.MoveTaskRequest{
+			request: tasks.MoveTaskRequest{
 				TaskId:          validTaskId,
 				ProjectId:       validProjectId,
 				RequestUserId:   validUserId,
@@ -141,7 +141,7 @@ func TestTaskService_Move(t *testing.T) {
 		},
 		{
 			name: "move after task A falls back to the end when the next task has the same order",
-			request: service.MoveTaskRequest{
+			request: tasks.MoveTaskRequest{
 				TaskId:          validTaskId,
 				ProjectId:       validProjectId,
 				RequestUserId:   validUserId,
@@ -176,10 +176,10 @@ func TestTaskService_Move(t *testing.T) {
 			}, nil)
 
 			tt.mockSetup(mockRepo, mockProjectRepo)
-			service := service.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+			svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
 			ctx := context.Background()
 
-			task, err := service.Move(ctx, tt.request)
+			task, err := svc.Move(ctx, tt.request)
 
 			if tt.shouldSucceed {
 				assert.NoError(t, err)

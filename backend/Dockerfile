@@ -11,6 +11,8 @@ RUN go build -o migrate ./cmd/migrate
 RUN go build -o notification-service ./cmd/notification-service
 RUN go build -o websocket-service ./cmd/websocket-service
 RUN go build -o chat-service ./cmd/chat-service
+RUN go build -o tasks-service ./cmd/tasks-service
+RUN go build -o mcp-service ./cmd/mcp-service
 
 FROM alpine:latest
 
@@ -21,6 +23,8 @@ COPY --from=builder /app/migrate .
 COPY --from=builder /app/notification-service .
 COPY --from=builder /app/websocket-service .
 COPY --from=builder /app/chat-service .
+COPY --from=builder /app/tasks-service .
+COPY --from=builder /app/mcp-service .
 COPY --from=builder /app/migrations ./migrations
 
 CMD ./migrate up && ./api

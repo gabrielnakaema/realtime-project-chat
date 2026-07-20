@@ -1,16 +1,16 @@
-package handlers
+package tasks
 
 import (
 	"github.com/gabrielnakaema/project-chat/internal/validator"
 	"github.com/google/uuid"
 )
 
-type CreateTaskCommentRequest struct {
+type CreateTaskCommentBody struct {
 	Content         string     `json:"content"`
 	ParentCommentID *uuid.UUID `json:"parent_comment_id"`
 }
 
-func (r *CreateTaskCommentRequest) Validate(v *validator.Validator) {
+func (r *CreateTaskCommentBody) Validate(v *validator.Validator) {
 	v.Check("content", "content is required", validator.NotBlank(r.Content))
 
 	if r.ParentCommentID != nil {
