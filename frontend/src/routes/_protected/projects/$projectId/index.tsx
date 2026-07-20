@@ -1,21 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
-import { Link, createFileRoute } from '@tanstack/react-router';
-import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { createFileRoute } from '@tanstack/react-router';
+import { RotateCcw } from 'lucide-react';
+
 import { z } from 'zod';
-import { AddProjectMember } from '@/components/add-project-member';
-import { KanbanBoard } from '@/components/kanban-board';
-import { MembersAvatarList } from '@/components/members-avatar-list';
-import { ProjectDetailsSheet, ProjectDetailsSheetTrigger } from '@/components/project-details-sheet';
-import { ProjectSettings } from '@/components/project-form/project-settings';
-import { ProjectMembersModal } from '@/components/project-members-modal';
-import { TaskDetails } from '@/components/task-details';
-import { EditTask } from '@/components/task-form/edit-task';
-import { UnreadCountBadge } from '@/components/unread-count-badge';
-import { useOnlineUsers } from '@/hooks/use-online-users';
-import { useTaskDetailsRouting } from '@/hooks/use-task-details-routing';
-import { getChatByProjectId } from '@/services/chat';
-import { getProject } from '@/services/projects';
-import { projectChatQueryKeys, projectQueryKeys } from '@/services/query-keys';
+
+import { KanbanBoard } from '@/features/tasks/components/kanban-board';
+
+import { TaskDetails } from '@/features/tasks/components/task-details';
+import { EditTask } from '@/features/tasks/components/task-form/edit-task';
+
+import { useProjectDetails } from '@/features/projects/hooks/use-project-details';
+import { useTaskDetailsRouting } from '@/features/tasks/hooks/use-task-details-routing';
+
+import { ProjectDetailsHeader } from '@/features/projects/components/project-details-page/project-details-header';
+import { Button } from '@/shared/components/button';
 
 export const Route = createFileRoute('/_protected/projects/$projectId/')({
   component: RouteComponent,
@@ -28,6 +25,12 @@ export const Route = createFileRoute('/_protected/projects/$projectId/')({
 
 function RouteComponent() {
   const { projectId } = Route.useParams();
+
+  return <ProjectDetailsPage projectId={projectId} />;
+}
+
+export const ProjectDetailsPage = ({ projectId }: { projectId: string }) => {
+  const { data: project, isError, isLoading, refetch } = useProjectDetails(projectId);
   const {
     selectedTaskId,
     selectedCommentId,
@@ -38,84 +41,25 @@ function RouteComponent() {
     stopEditingTask,
   } = useTaskDetailsRouting();
 
-  const { onlineUserIds } = useOnlineUsers(projectId, 'project');
-
-  const { data: project } = useQuery({
-    queryKey: projectQueryKeys.details(projectId),
-    queryFn: () => getProject(projectId),
-  });
-
-  const { data: chat } = useQuery({
-    queryKey: projectChatQueryKeys.detailsByProjectId(projectId),
-    queryFn: () => getChatByProjectId(projectId),
-  });
-
-  const unreadCount = chat?.unread_count ?? 0;
-  const hasMoreUnread = chat?.has_more_unread ?? false;
-
   return (
-    <div className="h-fit min-h-screen bg-slate-50 dark:bg-slate-900">
-      <header className="border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-        <div className="px-6 py-4">
-          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <div className="flex items-center gap-4">
-              <Link
-                to="/projects"
-                className="inline-flex items-center rounded-md px-3 py-2 font-medium whitespace-nowrap text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Go back
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{project?.name}</h1>
-                {project && (
-                  <ProjectDetailsSheet project={project}>
-                    <div className="flex items-center gap-1">
-                      <ProjectDetailsSheetTrigger asChild>
-                        <button
-                          type="button"
-                          className="shrink-0 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                        >
-                          View details
-                        </button>
-                      </ProjectDetailsSheetTrigger>
-                    </div>
-                  </ProjectDetailsSheet>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <AddProjectMember projectId={projectId} />
-                <ProjectMembersModal project={project} />
+    <div className="bg-muted flex h-fit min-h-screen flex-col">
+      {isLoading && <ProjectDetailsSkeleton />}
 
-                <MembersAvatarList
-                  onlineUserIds={onlineUserIds}
-                  members={
-                    project?.members.map((member) => ({ user_id: member.user_id, name: member.user.name })) || []
-                  }
-                  max={4}
-                />
-              </div>
-              <Link
-                to="/projects/$projectId/chat"
-                className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
-                params={{ projectId }}
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Chat
-                <UnreadCountBadge className="ml-2" count={unreadCount} hasMoreUnread={hasMoreUnread} />
-              </Link>
-              <ProjectSettings projectId={projectId} />
-            </div>
+      {!isLoading && isError && <ProjectDetailsError onRetry={() => void refetch()} />}
+
+      {!isLoading && !isError && !project && (
+        <div className="flex flex-1 items-center justify-center p-6">
+          <p className="text-muted-foreground text-sm">Project not found.</p>
+        </div>
+      )}
+
+      {!isLoading && !isError && project && (
+        <>
+          <ProjectDetailsHeader project={project} />
+          <div className="bg-background flex-1 p-6">
+            <KanbanBoard project={project} />
           </div>
-        </div>
-      </header>
-
-      {project && (
-        <div className="p-6">
-          <KanbanBoard project={project} />
-        </div>
+        </>
       )}
 
       <TaskDetails
@@ -134,4 +78,49 @@ function RouteComponent() {
       <EditTask onOpenChange={stopEditingTask} taskId={selectedTaskId} open={isEditingTask} />
     </div>
   );
-}
+};
+
+const ProjectDetailsError = ({ onRetry }: { onRetry: () => void }) => (
+  <div className="flex flex-1 items-center justify-center p-6">
+    <div className="border-border bg-card flex min-h-48 w-full max-w-lg flex-col items-center justify-center rounded-xl border p-8 text-center">
+      <p className="text-foreground text-sm font-medium">Project could not be loaded.</p>
+      <p className="text-muted-foreground mt-1 text-xs">Check your connection and try again.</p>
+      <Button type="button" variant="outline" size="sm" className="mt-4" onClick={onRetry}>
+        <RotateCcw className="size-3.5" />
+        Try again
+      </Button>
+    </div>
+  </div>
+);
+
+const ProjectDetailsSkeleton = () => (
+  <div className="flex min-h-screen animate-pulse flex-col" aria-label="Loading project">
+    <div className="border-border bg-card flex h-16 shrink-0 items-center justify-between border-b px-4 sm:px-6">
+      <div className="flex items-center gap-3">
+        <div className="bg-muted size-9 rounded-md" />
+        <div className="bg-muted h-9 w-40 rounded-md" />
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="bg-muted h-9 w-28 rounded-md" />
+        <div className="bg-muted size-9 rounded-md" />
+        <div className="bg-muted size-9 rounded-md" />
+      </div>
+    </div>
+
+    <div className="bg-background flex flex-1 gap-6 overflow-hidden p-6">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="bg-muted/40 h-[calc(100vh-100px)] w-80 shrink-0 rounded-lg p-3">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="bg-muted h-4 w-28 rounded" />
+            <div className="bg-muted size-5 rounded" />
+          </div>
+          <div className="space-y-3">
+            {Array.from({ length: index % 2 === 0 ? 3 : 2 }).map((__, cardIndex) => (
+              <div key={cardIndex} className="border-border bg-card h-28 rounded-md border" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);

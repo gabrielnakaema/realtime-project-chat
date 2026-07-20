@@ -9,7 +9,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
   return (
     <div className="w-full space-y-2">
       {props.label && (
-        <label htmlFor={props.id} className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label htmlFor={props.id} className="text-foreground block text-sm font-medium">
           {props.label}
         </label>
       )}
@@ -17,11 +17,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
         id={props.id}
         type={props.type}
         placeholder={props.placeholder}
-        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-500 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder-slate-400"
+        className="border-border bg-card text-foreground placeholder-muted-foreground focus:ring-ring w-full rounded-md border px-3 py-2 focus:border-transparent focus:ring-2 focus:outline-none"
         {...props}
         ref={ref}
       />
-      {props.error && <p className="text-sm text-red-500">{props.error}</p>}
+      {props.error && <p className="text-destructive text-sm">{props.error}</p>}
     </div>
   );
 });

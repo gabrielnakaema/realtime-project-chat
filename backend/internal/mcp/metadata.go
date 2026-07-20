@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
 )
 
 const (
@@ -76,7 +77,7 @@ func readResource(uri string, principal principal) (map[string]any, error) {
 	case scopeGuideURI:
 		text = buildScopeGuide(principal)
 	default:
-		return nil, domain.NotFoundError("resource not found")
+		return nil, apperr.NotFoundError("resource not found")
 	}
 
 	return map[string]any{

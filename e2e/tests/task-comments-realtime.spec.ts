@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import {
+  addProjectMember,
   expect,
   expectToast,
   loginAsUser,
@@ -30,10 +31,7 @@ test("project collaborators receive new task comments in an open task in real ti
   const taskTitle = `E2E Realtime Comments Task ${crypto.randomUUID()}`;
   const commentText = `E2E live comment ${crypto.randomUUID()}`;
 
-  await ownerPage
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await ownerPage.getByRole("button", { name: "New project" }).first().click();
   const createProjectDialog = ownerPage.getByRole("dialog", {
     name: "Create project",
   });
@@ -50,13 +48,7 @@ test("project collaborators receive new task comments in an open task in real ti
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   const projectId = ownerPage.url().split("/projects/")[1];
-  await ownerPage.getByTitle("Add project member").click();
-  const addMemberDialog = ownerPage.getByRole("dialog", {
-    name: "Add project member",
-  });
-  await addMemberDialog.getByLabel("Email").fill(member.email);
-  await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-  await expectToast(ownerPage, "Member added successfully");
+  await addProjectMember(ownerPage, member.email);
 
   await ownerPage.reload();
   await ownerPage
@@ -80,7 +72,7 @@ test("project collaborators receive new task comments in an open task in real ti
   await memberPage.goto(`/projects/${projectId}`);
   await expect(memberPage.getByText(taskTitle, { exact: true })).toBeVisible();
   await expect(
-    ownerPage.locator("div.border-green-500").filter({ hasText: "R" })
+    ownerPage.locator("div.border-success").filter({ hasText: "R" })
   ).toBeVisible({ timeout: 15_000 });
 
   await ownerPage.getByText(taskTitle, { exact: true }).click();

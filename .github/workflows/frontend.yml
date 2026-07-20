@@ -1,17 +1,12 @@
 name: frontend
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "frontend/**"
-      - ".github/workflows/frontend.yml"
+  workflow_call:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
     defaults:
       run:
         working-directory: ./frontend
@@ -28,7 +23,7 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: "frontend/pnpm-lock.yaml"
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm build
         env:
@@ -53,5 +48,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            cd ${{ secrets.FRONTEND_DIR }}
-            ln -sfn releases/${{ github.run_id }} current
+            set -e
+            cd "${{ secrets.FRONTEND_DIR }}"
+            ln -sfn "releases/${{ github.run_id }}" current

@@ -10,38 +10,13 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/logger"
-	"github.com/gabrielnakaema/project-chat/internal/service"
-	"github.com/gabrielnakaema/project-chat/internal/utils"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	platformhttp "github.com/gabrielnakaema/project-chat/internal/platform/http"
+	"github.com/gabrielnakaema/project-chat/internal/platform/logger"
 	"github.com/google/uuid"
 )
 
 const protocolVersion = "2025-06-18"
-
-type authService interface {
-	Authenticate(ctx context.Context, bearerSecret string) (*service.AuthenticateMCPAPIKeyResult, error)
-}
-
-type projectService interface {
-	ListByUserId(ctx context.Context, request service.ListProjectsByUserIdRequest) ([]domain.Project, error)
-	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Project, error)
-}
-
-type taskService interface {
-	Create(ctx context.Context, request service.CreateTaskRequest) (*domain.Task, error)
-	GroupByColumn(ctx context.Context, request service.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error)
-	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error)
-	FindTaskByCode(ctx context.Context, request service.FindTaskByCodeRequest) (*domain.Task, error)
-	Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error)
-	Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error)
-	MarkTaskDone(ctx context.Context, request service.MarkTaskDoneRequest) (*domain.Task, error)
-	AssignTaskToSelf(ctx context.Context, request service.AssignTaskToSelfRequest) (*domain.Task, error)
-}
-
-type taskCommentService interface {
-	Create(ctx context.Context, request service.CreateTaskCommentRequest) (*domain.TaskComment, error)
-	ListByTaskID(ctx context.Context, request service.ListTaskCommentsRequest) (*utils.CursorPaginated[domain.TaskComment], error)
-}
 
 type Handler struct {
 	authService        authService
@@ -122,13 +97,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	principal := principal{
-		APIKeyID: authenticated.Key.ID,
-		UserID:   authenticated.Key.UserID,
-		Scopes:   authenticated.Key.Scopes,
+		APIKeyID: authenticated.ID,
+		UserID:   authenticated.UserID,
+		Scopes:   authenticated.Scopes,
 	}
 
 	var req request
-	if err := utils.ReadJSON(w, r, &req); err != nil {
+	if err := platformhttp.ReadJSON(w, r, &req); err != nil {
 		writeHTTPError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -217,7 +192,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"owner_user_id", principal.UserID,
 	)
 
-	_ = utils.WriteJSON(w, http.StatusOK, resp, nil)
+	_ = platformhttp.WriteJSON(w, http.StatusOK, resp, nil)
 }
 
 func (h *Handler) handleNotification(w http.ResponseWriter, r *http.Request, principal principal, req request) {
@@ -250,8 +225,8 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		if err := requireScope(principal, domain.MCPAPIScopeProjectsRead); err != nil {
 			return nil, err
 		}
-		projects, err := h.projectService.ListByUserId(ctx, service.ListProjectsByUserIdRequest{
-			UserId: principal.UserID,
+		projects, err := h.projectService.ListByUserID(ctx, ListProjectsRequest{
+			UserID: principal.UserID,
 		})
 		if err != nil {
 			return nil, err
@@ -265,7 +240,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		if err != nil {
 			return nil, err
 		}
-		project, err := h.projectService.GetById(ctx, projectID, principal.UserID)
+		project, err := h.projectService.GetByID(ctx, projectID, principal.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -275,9 +250,9 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		}
 		limitPerColumn := optionalIntArg(params.Arguments, "limit_per_column", 15)
 		includeArchived := optionalBoolArg(params.Arguments, "include_archived", false)
-		grouped, err := h.taskService.GroupByColumn(ctx, service.GroupByColumnRequest{
-			ProjectId:        projectID,
-			UserId:           principal.UserID,
+		grouped, err := h.taskService.GroupByColumn(ctx, GroupByColumnRequest{
+			ProjectID:        projectID,
+			UserID:           principal.UserID,
 			ProjectColumnIDs: projectColumnIDs,
 			Archived:         includeArchived,
 			Limit:            limitPerColumn,
@@ -335,18 +310,18 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		task, err := h.taskService.Create(ctx, service.CreateTaskRequest{
-			ProjectId:        projectID,
-			ProjectColumnId:  projectColumnID,
+		task, err := h.taskService.Create(ctx, CreateTaskRequest{
+			ProjectID:        projectID,
+			ProjectColumnID:  projectColumnID,
 			Title:            title,
 			Description:      description,
 			Code:             code,
-			RequestUserId:    principal.UserID,
+			RequestUserID:    principal.UserID,
 			Priority:         string(priority),
-			ResponsibleId:    responsibleID,
+			ResponsibleID:    responsibleID,
 			DueDate:          dueDate,
 			Tags:             tags,
-			DependsOnTaskIds: dependsOnTaskIDs,
+			DependsOnTaskIDs: dependsOnTaskIDs,
 		})
 		if err != nil {
 			return nil, err
@@ -360,7 +335,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		if err != nil {
 			return nil, err
 		}
-		task, err := h.taskService.GetById(ctx, taskID, principal.UserID)
+		task, err := h.taskService.GetByID(ctx, taskID, principal.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -370,7 +345,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 				return nil, err
 			}
 			commentsLimit := optionalIntArg(params.Arguments, "comments_limit", 10)
-			comments, err := h.taskCommentService.ListByTaskID(ctx, service.ListTaskCommentsRequest{
+			comments, err := h.taskCommentService.ListByTaskID(ctx, ListTaskCommentsRequest{
 				TaskID:        taskID,
 				RequestUserID: principal.UserID,
 				Limit:         commentsLimit,
@@ -393,9 +368,9 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 		if err != nil {
 			return nil, err
 		}
-		task, err := h.taskService.FindTaskByCode(ctx, service.FindTaskByCodeRequest{
-			ProjectId: projectID,
-			UserId:    principal.UserID,
+		task, err := h.taskService.FindTaskByCode(ctx, FindTaskByCodeRequest{
+			ProjectID: projectID,
+			UserID:    principal.UserID,
 			Code:      code,
 		})
 		if err != nil {
@@ -407,7 +382,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 				return nil, err
 			}
 			commentsLimit := optionalIntArg(params.Arguments, "comments_limit", 10)
-			comments, err := h.taskCommentService.ListByTaskID(ctx, service.ListTaskCommentsRequest{
+			comments, err := h.taskCommentService.ListByTaskID(ctx, ListTaskCommentsRequest{
 				TaskID:        task.Id,
 				RequestUserID: principal.UserID,
 				Limit:         commentsLimit,
@@ -427,7 +402,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		commentsLimit := optionalIntArg(params.Arguments, "limit", 10)
-		comments, err := h.taskCommentService.ListByTaskID(ctx, service.ListTaskCommentsRequest{
+		comments, err := h.taskCommentService.ListByTaskID(ctx, ListTaskCommentsRequest{
 			TaskID:        taskID,
 			RequestUserID: principal.UserID,
 			Limit:         commentsLimit,
@@ -481,18 +456,18 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		task, err := h.taskService.Update(ctx, service.UpdateTaskRequest{
-			TaskId:           taskID,
+		task, err := h.taskService.Update(ctx, UpdateTaskRequest{
+			TaskID:           taskID,
 			Title:            title,
 			Description:      description,
 			Code:             code,
-			ProjectColumnId:  projectColumnID,
-			RequestUserId:    principal.UserID,
+			ProjectColumnID:  projectColumnID,
+			RequestUserID:    principal.UserID,
 			Priority:         priority,
-			ResponsibleId:    responsibleID,
+			ResponsibleID:    responsibleID,
 			DueDate:          dueDate,
 			Tags:             tags,
-			DependsOnTaskIds: dependsOnTaskIDs,
+			DependsOnTaskIDs: dependsOnTaskIDs,
 		})
 		if err != nil {
 			return nil, err
@@ -519,12 +494,12 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		task, err := h.taskService.Move(ctx, service.MoveTaskRequest{
-			TaskId:          taskID,
-			RequestUserId:   principal.UserID,
-			AfterTaskId:     afterTaskID,
-			ProjectId:       projectID,
-			ProjectColumnId: targetColumnID,
+		task, err := h.taskService.Move(ctx, MoveTaskRequest{
+			TaskID:          taskID,
+			RequestUserID:   principal.UserID,
+			AfterTaskID:     afterTaskID,
+			ProjectID:       projectID,
+			ProjectColumnID: targetColumnID,
 		})
 		if err != nil {
 			return nil, err
@@ -547,7 +522,7 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		comment, err := h.taskCommentService.Create(ctx, service.CreateTaskCommentRequest{
+		comment, err := h.taskCommentService.Create(ctx, CreateTaskCommentRequest{
 			TaskID:          taskID,
 			RequestUserID:   principal.UserID,
 			Content:         content,
@@ -566,9 +541,9 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		task, err := h.taskService.MarkTaskDone(ctx, service.MarkTaskDoneRequest{
-			TaskId:        taskID,
-			RequestUserId: principal.UserID,
+		task, err := h.taskService.MarkTaskDone(ctx, MarkTaskDoneRequest{
+			TaskID:        taskID,
+			RequestUserID: principal.UserID,
 		})
 		if err != nil {
 			return nil, err
@@ -583,16 +558,16 @@ func (h *Handler) callTool(ctx context.Context, principal principal, params tool
 			return nil, err
 		}
 		ctx = domain.WithActionOrigin(ctx, domain.ActionOriginMCPAgent)
-		task, err := h.taskService.AssignTaskToSelf(ctx, service.AssignTaskToSelfRequest{
-			TaskId:        taskID,
-			RequestUserId: principal.UserID,
+		task, err := h.taskService.AssignTaskToSelf(ctx, AssignTaskToSelfRequest{
+			TaskID:        taskID,
+			RequestUserID: principal.UserID,
 		})
 		if err != nil {
 			return nil, err
 		}
 		return map[string]any{"task": task}, nil
 	default:
-		return nil, domain.NotFoundError("tool not found")
+		return nil, apperr.NotFoundError("tool not found")
 	}
 }
 
@@ -601,7 +576,7 @@ func requireScope(principal principal, scope domain.MCPAPIScope) error {
 		return nil
 	}
 
-	return domain.ForbiddenError("missing required scope")
+	return apperr.ForbiddenError("missing required scope")
 }
 
 func bearerSecretFromHeader(header string) (string, bool) {
@@ -618,24 +593,24 @@ func bearerSecretFromHeader(header string) (string, bool) {
 }
 
 func toolErrorResult(err error) map[string]any {
-	var domainErr domain.DomainError
+	var domainErr apperr.DomainError
 	if !errors.As(err, &domainErr) {
 		return buildToolErrorResult("internal server error", "server_error", "internal server error")
 	}
 
 	errorType := "server_error"
 	switch domainErr.Code {
-	case domain.UnauthorizedErrorCode:
+	case apperr.UnauthorizedErrorCode:
 		errorType = "authentication_failed"
-	case domain.ForbiddenErrorCode:
+	case apperr.ForbiddenErrorCode:
 		if domainErr.Message == "missing required scope" {
 			errorType = "missing_scope"
 		} else {
 			errorType = "forbidden"
 		}
-	case domain.NotFoundErrorCode:
+	case apperr.NotFoundErrorCode:
 		errorType = "not_found"
-	case domain.BusinessValidationErrorCode:
+	case apperr.BusinessValidationErrorCode:
 		errorType = "business_validation"
 	}
 
@@ -679,7 +654,7 @@ func requiredUUIDArg(args map[string]any, key string) (uuid.UUID, error) {
 
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, domain.BusinessValidationError(fmt.Sprintf("%s must be a valid uuid", key))
+		return uuid.Nil, apperr.BusinessValidationError(fmt.Sprintf("%s must be a valid uuid", key))
 	}
 
 	return id, nil
@@ -693,12 +668,12 @@ func optionalUUIDArg(args map[string]any, key string) (*uuid.UUID, error) {
 
 	value, ok := raw.(string)
 	if !ok || strings.TrimSpace(value) == "" {
-		return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be a valid uuid", key))
+		return nil, apperr.BusinessValidationError(fmt.Sprintf("%s must be a valid uuid", key))
 	}
 
 	id, err := uuid.Parse(value)
 	if err != nil {
-		return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be a valid uuid", key))
+		return nil, apperr.BusinessValidationError(fmt.Sprintf("%s must be a valid uuid", key))
 	}
 
 	return &id, nil
@@ -712,18 +687,18 @@ func optionalUUIDSliceArg(args map[string]any, key string) ([]uuid.UUID, error) 
 
 	items, ok := raw.([]any)
 	if !ok {
-		return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be an array of uuids", key))
+		return nil, apperr.BusinessValidationError(fmt.Sprintf("%s must be an array of uuids", key))
 	}
 
 	ids := make([]uuid.UUID, 0, len(items))
 	for _, item := range items {
 		value, ok := item.(string)
 		if !ok {
-			return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be an array of uuids", key))
+			return nil, apperr.BusinessValidationError(fmt.Sprintf("%s must be an array of uuids", key))
 		}
 		id, err := uuid.Parse(value)
 		if err != nil {
-			return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be an array of uuids", key))
+			return nil, apperr.BusinessValidationError(fmt.Sprintf("%s must be an array of uuids", key))
 		}
 		ids = append(ids, id)
 	}
@@ -747,12 +722,12 @@ func paramsFromRaw(raw json.RawMessage) map[string]any {
 func requiredStringArg(args map[string]any, key string) (string, error) {
 	raw, ok := args[key]
 	if !ok {
-		return "", domain.BusinessValidationError(fmt.Sprintf("%s is required", key))
+		return "", apperr.BusinessValidationError(fmt.Sprintf("%s is required", key))
 	}
 
 	value, ok := raw.(string)
 	if !ok || strings.TrimSpace(value) == "" {
-		return "", domain.BusinessValidationError(fmt.Sprintf("%s is required", key))
+		return "", apperr.BusinessValidationError(fmt.Sprintf("%s is required", key))
 	}
 
 	return strings.TrimSpace(value), nil
@@ -799,7 +774,7 @@ func requiredTaskPriorityArg(args map[string]any, key string) (domain.TaskPriori
 		}
 	}
 
-	return "", domain.BusinessValidationError(fmt.Sprintf("%s must be one of: low, medium, high", key))
+	return "", apperr.BusinessValidationError(fmt.Sprintf("%s must be one of: low, medium, high", key))
 }
 
 func optionalTimeArg(args map[string]any, key string) (*time.Time, error) {
@@ -810,12 +785,12 @@ func optionalTimeArg(args map[string]any, key string) (*time.Time, error) {
 
 	value, ok := raw.(string)
 	if !ok || strings.TrimSpace(value) == "" {
-		return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be a valid RFC3339 datetime", key))
+		return nil, apperr.BusinessValidationError(fmt.Sprintf("%s must be a valid RFC3339 datetime", key))
 	}
 
 	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(value))
 	if err != nil {
-		return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be a valid RFC3339 datetime", key))
+		return nil, apperr.BusinessValidationError(fmt.Sprintf("%s must be a valid RFC3339 datetime", key))
 	}
 
 	return &parsed, nil
@@ -829,14 +804,14 @@ func optionalStringSliceArg(args map[string]any, key string) ([]string, error) {
 
 	items, ok := raw.([]any)
 	if !ok {
-		return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be an array of strings", key))
+		return nil, apperr.BusinessValidationError(fmt.Sprintf("%s must be an array of strings", key))
 	}
 
 	values := make([]string, 0, len(items))
 	for _, item := range items {
 		value, ok := item.(string)
 		if !ok {
-			return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be an array of strings", key))
+			return nil, apperr.BusinessValidationError(fmt.Sprintf("%s must be an array of strings", key))
 		}
 		values = append(values, strings.TrimSpace(value))
 	}
@@ -852,7 +827,7 @@ func optionalTrimmedStringArg(args map[string]any, key string) (string, error) {
 
 	value, ok := raw.(string)
 	if !ok {
-		return "", domain.BusinessValidationError(fmt.Sprintf("%s must be a string", key))
+		return "", apperr.BusinessValidationError(fmt.Sprintf("%s must be a string", key))
 	}
 
 	return strings.TrimSpace(value), nil
@@ -866,7 +841,7 @@ func optionalTrimmedStringArgPointer(args map[string]any, key string) (*string, 
 
 	value, ok := raw.(string)
 	if !ok {
-		return nil, domain.BusinessValidationError(fmt.Sprintf("%s must be a string", key))
+		return nil, apperr.BusinessValidationError(fmt.Sprintf("%s must be a string", key))
 	}
 
 	trimmed := strings.TrimSpace(value)
@@ -874,27 +849,27 @@ func optionalTrimmedStringArgPointer(args map[string]any, key string) (*string, 
 }
 
 func writeHTTPError(w http.ResponseWriter, status int, message string) {
-	_ = utils.WriteJSON(w, status, map[string]any{
+	_ = platformhttp.WriteJSON(w, status, map[string]any{
 		"status":  status,
 		"message": message,
 	}, nil)
 }
 
 func writeDomainHTTPError(w http.ResponseWriter, err error) {
-	var domainErr domain.DomainError
+	var domainErr apperr.DomainError
 	if !errors.As(err, &domainErr) {
 		writeHTTPError(w, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
 	switch domainErr.Code {
-	case domain.UnauthorizedErrorCode:
+	case apperr.UnauthorizedErrorCode:
 		writeHTTPError(w, http.StatusUnauthorized, domainErr.Message)
-	case domain.ForbiddenErrorCode:
+	case apperr.ForbiddenErrorCode:
 		writeHTTPError(w, http.StatusForbidden, domainErr.Message)
-	case domain.NotFoundErrorCode:
+	case apperr.NotFoundErrorCode:
 		writeHTTPError(w, http.StatusNotFound, domainErr.Message)
-	case domain.BusinessValidationErrorCode, domain.ValidationFailedErrorCode, domain.DuplicateEntryErrorCode:
+	case apperr.BusinessValidationErrorCode, apperr.ValidationFailedErrorCode, apperr.DuplicateEntryErrorCode:
 		writeHTTPError(w, http.StatusUnprocessableEntity, domainErr.Message)
 	default:
 		writeHTTPError(w, http.StatusInternalServerError, "Internal server error")

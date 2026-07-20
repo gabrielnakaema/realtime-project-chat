@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package projectchat.chat.v1;
+
+option go_package = "github.com/gabrielnakaema/project-chat/internal/chat/v1;chatv1";
+
+service ChatService {
+  rpc CheckAccess(CheckAccessRequest) returns (CheckAccessResponse);
+}
+
+message CheckAccessRequest {
+  string user_id = 1;
+  string chat_id = 2;
+}
+
+message CheckAccessResponse {}

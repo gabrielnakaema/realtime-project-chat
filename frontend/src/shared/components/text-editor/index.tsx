@@ -1,0 +1,94 @@
+import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html';
+import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
+import { LexicalComposer } from '@lexical/react/LexicalComposer';
+import { ContentEditable } from '@lexical/react/LexicalContentEditable';
+import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
+import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
+import { ListPlugin } from '@lexical/react/LexicalListPlugin';
+import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin';
+import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
+import { ListItemNode, ListNode } from '@lexical/list';
+import { $getRoot, $insertNodes, ParagraphNode, TextNode } from 'lexical';
+
+import { ToolbarPlugin } from './toolbar-plugin';
+
+import { constructImportMap, exportMap } from './utils';
+import type { EditorState, LexicalEditor } from 'lexical';
+
+const editorConfig = {
+  html: {
+    export: exportMap,
+    import: constructImportMap(),
+  },
+  namespace: 'TextEditor',
+  nodes: [ParagraphNode, TextNode, ListNode, ListItemNode],
+  onError(error: Error) {
+    throw error;
+  },
+};
+
+interface TextEditorProps {
+  initialValue: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  label?: string;
+  id?: string;
+  error?: string;
+}
+
+export const TextEditor = ({ initialValue, onChange, label, id, error, placeholder }: TextEditorProps) => {
+  const handleChange = (_editorState: EditorState, editor: LexicalEditor) => {
+    editor.read(() => {
+      const html = $generateHtmlFromNodes(editor);
+      onChange(html);
+    });
+  };
+
+  const initialConfig = {
+    ...editorConfig,
+    editorState: initialValue
+      ? (editor: LexicalEditor) => {
+          const parser = new DOMParser();
+          const dom = parser.parseFromString(initialValue, 'text/html');
+          const nodes = $generateNodesFromDOM(editor, dom);
+          $getRoot().select();
+          $insertNodes(nodes);
+        }
+      : undefined,
+  };
+
+  return (
+    <LexicalComposer initialConfig={initialConfig}>
+      <div className="w-full space-y-1.5">
+        {label && (
+          <label htmlFor={id} className="text-foreground block text-[11px] font-semibold tracking-wider">
+            {label}
+          </label>
+        )}
+        <div className="flex w-full flex-col">
+          <ToolbarPlugin />
+          <div className="border-border bg-card text-foreground relative w-full rounded-b-md border border-t">
+            <RichTextPlugin
+              contentEditable={
+                <ContentEditable
+                  className="text-foreground relative min-h-40 p-4 font-sans text-base outline-none [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
+                  aria-placeholder={placeholder ?? ''}
+                  placeholder={
+                    <div className="text-muted-foreground absolute top-4 left-4 font-sans text-base">{placeholder}</div>
+                  }
+                  id={id}
+                />
+              }
+              ErrorBoundary={LexicalErrorBoundary}
+            />
+            <OnChangePlugin onChange={handleChange} />
+            <HistoryPlugin />
+            <ListPlugin />
+            <AutoFocusPlugin />
+          </div>
+          {error && <p className="text-destructive text-sm">{error}</p>}
+        </div>
+      </div>
+    </LexicalComposer>
+  );
+};

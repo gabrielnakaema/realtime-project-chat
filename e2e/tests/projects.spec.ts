@@ -1,11 +1,14 @@
 import crypto from "node:crypto";
 import {
+  addProjectMember,
   test,
   expect,
   expectToast,
   loginAsUser,
+  openProjectMembersSettings,
 } from "../src/fixtures/authenticated-page.js";
 import { registerUser } from "../src/fixtures/test-user.js";
+import { fillRichTextList } from "../src/fixtures/rich-text-editor.js";
 import type { Locator, Page } from "@playwright/test";
 
 async function fillRichText(editor: Locator, page: Page, value: string) {
@@ -18,21 +21,32 @@ async function fillRichText(editor: Locator, page: Page, value: string) {
 
 function columnEditor(container: Locator, index: number) {
   return container
-    .locator(`#column-${index}`)
+    .locator(`#column-${index}, #column-name-${index}`)
+    .first()
     .locator(`xpath=ancestor::*[.//*[@id="column-description-${index}"]][1]`);
 }
 
 async function markColumnAsDone(container: Locator, index: number) {
-  await columnEditor(container, index)
-    .getByRole("button", { name: "Mark as done" })
+  const editor = columnEditor(container, index);
+  const settingsControl = editor.getByRole("button", { name: /Done column/ });
+
+  if ((await settingsControl.count()) > 0) {
+    await settingsControl.click();
+    return;
+  }
+
+  await editor.getByRole("button", { name: "Mark as done" }).click();
+}
+
+async function openSettingsColumn(container: Locator, name: string) {
+  await container
+    .locator('[data-slot="accordion-trigger"]')
+    .filter({ hasText: new RegExp(`^${name}`) })
     .click();
 }
 
 async function createProject(page: Page, name: string, description: string) {
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await page.getByRole("button", { name: "New project" }).first().click();
 
   const createDialog = page.getByRole("dialog", { name: "Create project" });
   await createDialog.locator("#name").fill(name);
@@ -50,8 +64,7 @@ function boardColumnHeadings(page: Page, names: string[]) {
 
 function projectListLink(page: Page, name: string) {
   return page
-    .getByRole("heading", { name: "Your Projects" })
-    .locator("..")
+    .getByRole("region", { name: "Projects" })
     .getByRole("link", { name: new RegExp(name) });
 }
 
@@ -77,57 +90,45 @@ test.describe("projects", () => {
 
     await projectListLink(ownerPage, projectName).click();
     await expect(
-      ownerPage.getByRole("heading", { name: projectName })
+      ownerPage.getByRole("button", { name: projectName })
     ).toBeVisible();
 
-    await ownerPage.getByTitle("Add project member").click();
-    const addMemberDialog = ownerPage.getByRole("dialog", {
-      name: "Add project member",
-    });
-    await addMemberDialog.getByLabel("Email").fill(member.email);
-    await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-    await expectToast(ownerPage, "Member added successfully");
-    await expect(addMemberDialog).toHaveCount(0);
+    await addProjectMember(ownerPage, member.email);
 
     await memberPage.reload();
     await projectListLink(memberPage, projectName).click();
     await expect(
-      memberPage.getByRole("heading", { name: projectName })
+      memberPage.getByRole("button", { name: projectName })
     ).toBeVisible();
     await expect(
       boardColumnHeadings(memberPage, ["Pending", "Doing", "Done"])
     ).toHaveText(["Pending", "Doing", "Done"]);
 
-    await ownerPage.getByTitle("View project members").click();
-    let membersDialog = ownerPage.getByRole("dialog", {
-      name: "Project members",
-    });
-    await expect(membersDialog.getByText("2 members")).toBeVisible();
-    const memberRow = membersDialog.locator("article").filter({
+    await openProjectMembersSettings(ownerPage);
+    await expect(ownerPage.getByText("MEMBERS • 2")).toBeVisible();
+    const memberRow = ownerPage.locator("article").filter({
       hasText: member.email,
     });
-    await expect(memberRow.getByText("Member", { exact: true })).toBeVisible();
-    await memberRow.hover();
+    await expect(memberRow.getByText("member", { exact: true })).toBeVisible();
     await memberRow
-      .getByRole("button", { name: "Remove member from project" })
+      .getByRole("button", { name: `Remove ${member.name} from project` })
       .click();
 
     const removeMemberDialog = ownerPage.getByRole("dialog", {
-      name: "Remove member from project",
+      name: "Remove member from project?",
     });
     await expect(
       removeMemberDialog.getByText(
         `Are you sure you want to remove ${member.name} from the project?`
       )
     ).toBeVisible();
-    await removeMemberDialog.getByRole("button", { name: "Remove" }).click();
+    await removeMemberDialog
+      .getByRole("button", { name: "Remove member" })
+      .click();
     await expect(removeMemberDialog).toHaveCount(0);
 
-    membersDialog = ownerPage.getByRole("dialog", {
-      name: "Project members",
-    });
-    await expect(membersDialog.getByText("1 member")).toBeVisible();
-    await expect(membersDialog.getByText(member.email)).toHaveCount(0);
+    await expect(ownerPage.getByText("MEMBERS • 1")).toBeVisible();
+    await expect(ownerPage.getByText(member.email)).toHaveCount(0);
 
     await memberPage.goto("/projects");
     await expect(projectListLink(memberPage, projectName)).toHaveCount(0);
@@ -138,16 +139,41 @@ test.describe("projects", () => {
   test("project creation shows validation errors for a missing name", async ({
     authenticatedPage: page,
   }) => {
-    await page
-      .getByRole("banner")
-      .getByRole("button", { name: "Create project" })
-      .click();
+    await page.getByRole("button", { name: "New project" }).first().click();
 
     const createDialog = page.getByRole("dialog", { name: "Create project" });
     await createDialog.getByRole("button", { name: "Create project" }).click();
 
     await expect(createDialog.getByText("Name is required")).toBeVisible();
     await expect(createDialog).toBeVisible();
+  });
+
+  test("project descriptions preserve numbered lists through settings and reload", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Project List ${crypto.randomUUID()}`;
+    const listItems = ["Create the project", "Review the workflow"];
+
+    await page.getByRole("button", { name: "New project" }).first().click();
+
+    const createDialog = page.getByRole("dialog", { name: "Create project" });
+    await createDialog.locator("#name").fill(projectName);
+    await fillRichTextList(createDialog, "numbered", listItems);
+    await createDialog.getByRole("button", { name: "Create project" }).click();
+
+    await expectToast(page, "Project created successfully");
+    await page.getByRole("link", { name: new RegExp(projectName) }).click();
+    await page.getByRole("link", { name: "Settings" }).click();
+
+    const settingsForm = page.locator("#general-project-settings");
+    await expect(settingsForm.locator("#description ol > li")).toHaveText(
+      listItems
+    );
+
+    await page.reload();
+    await expect(settingsForm.locator("#description ol > li")).toHaveText(
+      listItems
+    );
   });
 
   test("user can find a project through global search and open it", async ({
@@ -181,7 +207,7 @@ test.describe("projects", () => {
 
     await projectResult.click();
     await expect(
-      page.getByRole("heading", { name: projectName, exact: true })
+      page.getByRole("button", { name: projectName, exact: true })
     ).toBeVisible();
   });
 
@@ -200,10 +226,7 @@ test.describe("projects", () => {
     const customColumnName = "Review";
     const customColumnDescription = "Validate work before it is done.";
 
-    await page
-      .getByRole("banner")
-      .getByRole("button", { name: "Create project" })
-      .click();
+    await page.getByRole("button", { name: "New project" }).first().click();
 
     const createDialog = page.getByRole("dialog", { name: "Create project" });
     await createDialog.locator("#name").fill(projectName);
@@ -244,9 +267,7 @@ test.describe("projects", () => {
     await expectToast(page, "Project created successfully");
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
 
-    await expect(
-      page.getByRole("heading", { name: projectName })
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: projectName })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Pending" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Doing" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Done" })).toBeVisible();
@@ -254,43 +275,45 @@ test.describe("projects", () => {
       page.getByRole("heading", { name: customColumnName })
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Settings" }).click();
 
-    const settingsDialog = page.getByRole("dialog", {
-      name: "Project settings",
-    });
-    await expect(settingsDialog.locator("#repository_url")).toHaveValue(
+    const generalSettings = page.locator("#general-project-settings");
+    await expect(generalSettings.locator("#repository_url")).toHaveValue(
       repositoryURL
     );
-    await expect(settingsDialog.locator("#repository_owner")).toHaveValue(
+    await expect(generalSettings.locator("#repository_owner")).toHaveValue(
       repositoryOwner
     );
-    await expect(settingsDialog.locator("#repository_name")).toHaveValue(
+    await expect(generalSettings.locator("#repository_name")).toHaveValue(
       repositoryName
     );
-    await expect(settingsDialog.locator("#default_branch")).toHaveValue(
+    await expect(generalSettings.locator("#default_branch")).toHaveValue(
       defaultBranch
     );
-    await expect(settingsDialog.locator("#branch_name_prefix")).toHaveValue(
+    await expect(generalSettings.locator("#branch_name_prefix")).toHaveValue(
       branchNamePrefix
     );
-    await expect(
-      columnEditor(settingsDialog, 3).getByRole("button", {
-        name: "Done column",
-      })
-    ).toBeVisible();
-    await expect(settingsDialog.locator("#column-description-3")).toHaveValue(
+
+    await page.getByRole("link", { name: "Columns", exact: true }).click();
+    const columnSettings = page.locator("#columns-project-settings");
+    await columnSettings.getByText(customColumnName, { exact: true }).click();
+    await expect(columnSettings.locator("#column-name-3")).toHaveValue(
+      customColumnName
+    );
+    await expect(columnSettings.locator("#column-description-3")).toHaveValue(
       customColumnDescription
     );
+    await expect(
+      columnEditor(columnSettings, 3).getByRole("button", {
+        name: /Done column/,
+      })
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   test("project creation only allows one done column", async ({
     authenticatedPage: page,
   }) => {
-    await page
-      .getByRole("banner")
-      .getByRole("button", { name: "Create project" })
-      .click();
+    await page.getByRole("button", { name: "New project" }).first().click();
 
     const createDialog = page.getByRole("dialog", { name: "Create project" });
 
@@ -331,10 +354,7 @@ test.describe("projects", () => {
     const addedColumnName = "QA";
     const addedColumnDescription = "Quality checks before completion.";
 
-    await page
-      .getByRole("banner")
-      .getByRole("button", { name: "Create project" })
-      .click();
+    await page.getByRole("button", { name: "New project" }).first().click();
 
     const createDialog = page.getByRole("dialog", { name: "Create project" });
     await createDialog.locator("#name").fill(projectName);
@@ -347,43 +367,39 @@ test.describe("projects", () => {
 
     await expectToast(page, "Project created successfully");
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
-    await expect(
-      page.getByRole("heading", { name: projectName })
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: projectName })).toBeVisible();
 
-    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Columns", exact: true }).click();
 
-    const settingsDialog = page.getByRole("dialog", {
-      name: "Project settings",
-    });
-    await settingsDialog.locator("#column-0").fill(renamedColumnName);
+    const settingsDialog = page.locator("#columns-project-settings");
+    await settingsDialog.locator("#column-name-0").fill(renamedColumnName);
     await settingsDialog
       .locator("#column-description-0")
       .fill(renamedColumnDescription);
     await settingsDialog.getByRole("button", { name: "Add column" }).click();
-    await settingsDialog.locator("#column-3").fill(addedColumnName);
+    await settingsDialog.locator("#column-name-3").fill(addedColumnName);
     await settingsDialog
       .locator("#column-description-3")
       .fill(addedColumnDescription);
     await markColumnAsDone(settingsDialog, 3);
 
     await expect(
-      settingsDialog.getByRole("button", { name: "Done column" })
-    ).toHaveCount(1);
-    await expect(
       columnEditor(settingsDialog, 3).getByRole("button", {
-        name: "Done column",
+        name: /Done column/,
       })
-    ).toBeVisible();
+    ).toHaveAttribute("aria-pressed", "true");
+    await openSettingsColumn(settingsDialog, "Done");
     await expect(
       columnEditor(settingsDialog, 2).getByRole("button", {
-        name: "Mark as done",
+        name: /Done column/,
       })
-    ).toBeVisible();
+    ).toHaveAttribute("aria-pressed", "false");
 
     await settingsDialog.getByRole("button", { name: "Save changes" }).click();
 
-    await expectToast(page, "Project saved successfully");
+    await expectToast(page, "Project columns saved successfully");
+    await page.getByRole("link", { name: "Back to board" }).click();
     await expect(
       page.getByRole("heading", { name: renamedColumnName })
     ).toBeVisible();
@@ -391,18 +407,20 @@ test.describe("projects", () => {
       page.getByRole("heading", { name: addedColumnName })
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Columns", exact: true }).click();
 
-    const reopenedSettingsDialog = page.getByRole("dialog", {
-      name: "Project settings",
-    });
-    await expect(reopenedSettingsDialog.locator("#column-0")).toHaveValue(
+    const reopenedSettingsDialog = page.locator("#columns-project-settings");
+    await expect(reopenedSettingsDialog.locator("#column-name-0")).toHaveValue(
       renamedColumnName
     );
     await expect(
       reopenedSettingsDialog.locator("#column-description-0")
     ).toHaveValue(renamedColumnDescription);
-    await expect(reopenedSettingsDialog.locator("#column-3")).toHaveValue(
+    await reopenedSettingsDialog
+      .getByText(addedColumnName, { exact: true })
+      .click();
+    await expect(reopenedSettingsDialog.locator("#column-name-3")).toHaveValue(
       addedColumnName
     );
     await expect(
@@ -410,9 +428,9 @@ test.describe("projects", () => {
     ).toHaveValue(addedColumnDescription);
     await expect(
       columnEditor(reopenedSettingsDialog, 3).getByRole("button", {
-        name: "Done column",
+        name: /Done column/,
       })
-    ).toBeVisible();
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   test("project owner can edit a column from the board and the changes persist", async ({
@@ -430,9 +448,7 @@ test.describe("projects", () => {
       "Created by the direct column editing e2e test"
     );
     await projectListLink(page, projectName).click();
-    await expect(
-      page.getByRole("heading", { name: projectName })
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: projectName })).toBeVisible();
 
     await page
       .getByRole("button", { name: "Open actions for Pending" })
@@ -480,20 +496,20 @@ test.describe("projects", () => {
     await expect(editDialog.getByRole("checkbox")).toBeChecked();
     await editDialog.getByRole("button", { name: "Cancel" }).click();
 
-    await page.getByRole("button", { name: "Settings" }).click();
-    const settingsDialog = page.getByRole("dialog", {
-      name: "Project settings",
-    });
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Columns", exact: true }).click();
+    const settingsDialog = page.locator("#columns-project-settings");
     await expect(
       columnEditor(settingsDialog, 0).getByRole("button", {
-        name: "Done column",
+        name: /Done column/,
       })
-    ).toBeVisible();
+    ).toHaveAttribute("aria-pressed", "true");
+    await openSettingsColumn(settingsDialog, "Done");
     await expect(
       columnEditor(settingsDialog, 2).getByRole("button", {
-        name: "Mark as done",
+        name: /Done column/,
       })
-    ).toBeVisible();
+    ).toHaveAttribute("aria-pressed", "false");
   });
 
   test("user can reorder project columns from settings", async ({
@@ -508,43 +524,35 @@ test.describe("projects", () => {
     );
 
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
-    await expect(
-      page.getByRole("heading", { name: projectName })
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: projectName })).toBeVisible();
     await expect(
       boardColumnHeadings(page, ["Pending", "Doing", "Done"])
     ).toHaveText(["Pending", "Doing", "Done"]);
 
-    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Columns", exact: true }).click();
 
-    const settingsDialog = page.getByRole("dialog", {
-      name: "Project settings",
-    });
+    const settingsDialog = page.locator("#columns-project-settings");
     await settingsDialog.getByRole("button", { name: "Move Done up" }).click();
-    await expect(settingsDialog.locator("#column-1")).toHaveValue("Done");
-    await expect(settingsDialog.locator("#column-2")).toHaveValue("Doing");
+    await expect(
+      settingsDialog.locator('[data-slot="accordion-trigger"]')
+    ).toHaveText([/Pending/, /Done/, /Doing/]);
 
     await settingsDialog.getByRole("button", { name: "Save changes" }).click();
 
-    await expectToast(page, "Project saved successfully");
+    await expectToast(page, "Project columns saved successfully");
+    await page.getByRole("link", { name: "Back to board" }).click();
     await expect(
       boardColumnHeadings(page, ["Pending", "Done", "Doing"])
     ).toHaveText(["Pending", "Done", "Doing"]);
 
-    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Columns", exact: true }).click();
 
-    const reopenedSettingsDialog = page.getByRole("dialog", {
-      name: "Project settings",
-    });
-    await expect(reopenedSettingsDialog.locator("#column-0")).toHaveValue(
-      "Pending"
-    );
-    await expect(reopenedSettingsDialog.locator("#column-1")).toHaveValue(
-      "Done"
-    );
-    await expect(reopenedSettingsDialog.locator("#column-2")).toHaveValue(
-      "Doing"
-    );
+    const reopenedSettingsDialog = page.locator("#columns-project-settings");
+    await expect(
+      reopenedSettingsDialog.locator('[data-slot="accordion-trigger"]')
+    ).toHaveText([/Pending/, /Done/, /Doing/]);
   });
 
   test("user can delete project columns from settings", async ({
@@ -559,44 +567,38 @@ test.describe("projects", () => {
     );
 
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
-    await expect(
-      page.getByRole("heading", { name: projectName })
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: projectName })).toBeVisible();
 
-    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Columns", exact: true }).click();
 
-    const settingsDialog = page.getByRole("dialog", {
-      name: "Project settings",
-    });
+    const settingsDialog = page.locator("#columns-project-settings");
+    await openSettingsColumn(settingsDialog, "Doing");
     await settingsDialog.getByRole("button", { name: "Delete Doing" }).click();
 
-    await expect(settingsDialog.getByText("Pending removals")).toBeVisible();
+    await expect(settingsDialog.getByText(/Pending removals/i)).toBeVisible();
     await expect(settingsDialog.getByText("Doing")).toBeVisible();
-    await expect(settingsDialog.locator("#column-0")).toHaveValue("Pending");
-    await expect(settingsDialog.locator("#column-1")).toHaveValue("Done");
-    await expect(settingsDialog.locator("#column-2")).toHaveCount(0);
+    await expect(
+      settingsDialog.locator('[data-slot="accordion-trigger"]')
+    ).toHaveText([/Pending/, /Done/]);
 
     await settingsDialog.getByRole("button", { name: "Save changes" }).click();
 
-    await expectToast(page, "Project saved successfully");
+    await expectToast(page, "Project columns saved successfully");
+    await page.getByRole("link", { name: "Back to board" }).click();
     await expect(page.getByRole("heading", { name: "Pending" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Done" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Doing" })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Columns", exact: true }).click();
 
-    const reopenedSettingsDialog = page.getByRole("dialog", {
-      name: "Project settings",
-    });
-    await expect(reopenedSettingsDialog.locator("#column-0")).toHaveValue(
-      "Pending"
-    );
-    await expect(reopenedSettingsDialog.locator("#column-1")).toHaveValue(
-      "Done"
-    );
-    await expect(reopenedSettingsDialog.locator("#column-2")).toHaveCount(0);
+    const reopenedSettingsDialog = page.locator("#columns-project-settings");
     await expect(
-      reopenedSettingsDialog.getByText("Pending removals")
+      reopenedSettingsDialog.locator('[data-slot="accordion-trigger"]')
+    ).toHaveText([/Pending/, /Done/]);
+    await expect(
+      reopenedSettingsDialog.getByText(/Pending removals/i)
     ).toHaveCount(0);
   });
 
@@ -613,9 +615,7 @@ test.describe("projects", () => {
     );
 
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
-    await expect(
-      page.getByRole("heading", { name: projectName })
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: projectName })).toBeVisible();
 
     await page.getByRole("button", { name: "Open actions for Doing" }).click();
     await page.getByRole("menuitem", { name: "Add task" }).click();
@@ -634,19 +634,20 @@ test.describe("projects", () => {
     await expectToast(page, "Task created successfully");
     await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
 
-    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Columns", exact: true }).click();
 
-    const settingsDialog = page.getByRole("dialog", {
-      name: "Project settings",
-    });
+    const settingsDialog = page.locator("#columns-project-settings");
+    await openSettingsColumn(settingsDialog, "Doing");
     await settingsDialog.getByRole("button", { name: "Delete Doing" }).click();
-    await expect(settingsDialog.getByText("Pending removals")).toBeVisible();
+    await expect(settingsDialog.getByText(/Pending removals/i)).toBeVisible();
 
     await settingsDialog.getByRole("combobox").click();
     await page.getByRole("option", { name: "Done", exact: true }).click();
     await settingsDialog.getByRole("button", { name: "Save changes" }).click();
 
-    await expectToast(page, "Project saved successfully");
+    await expectToast(page, "Project columns saved successfully");
+    await page.getByRole("link", { name: "Back to board" }).click();
     await expect(page.getByRole("heading", { name: "Doing" })).toHaveCount(0);
     await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
 
@@ -675,10 +676,7 @@ test.describe("projects", () => {
     const defaultBranch = "release";
     const branchNamePrefix = "e2e/settings/";
 
-    await page
-      .getByRole("banner")
-      .getByRole("button", { name: "Create project" })
-      .click();
+    await page.getByRole("button", { name: "New project" }).first().click();
 
     const createDialog = page.getByRole("dialog", { name: "Create project" });
     await createDialog.locator("#name").fill(projectName);
@@ -696,15 +694,11 @@ test.describe("projects", () => {
 
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
     await expect(page).toHaveURL(/\/projects\/[^/]+$/);
-    await expect(
-      page.getByRole("heading", { name: projectName })
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: projectName })).toBeVisible();
 
-    await page.getByRole("button", { name: "Settings" }).click();
+    await page.getByRole("link", { name: "Settings" }).click();
 
-    const settingsDialog = page.getByRole("dialog", {
-      name: "Project settings",
-    });
+    const settingsDialog = page.locator("#general-project-settings");
     await expect(settingsDialog.locator("#name")).toHaveValue(projectName);
     await settingsDialog.locator("#name").fill(updatedProjectName);
     await fillRichText(
@@ -720,28 +714,16 @@ test.describe("projects", () => {
     await settingsDialog.getByRole("button", { name: "Save changes" }).click();
 
     await expectToast(page, "Project saved successfully");
-    await expect(settingsDialog).toHaveCount(0);
     await expect(
-      page.getByRole("heading", { name: updatedProjectName })
+      page.getByRole("link", { name: updatedProjectName, exact: true })
     ).toBeVisible();
-
-    await page.getByRole("button", { name: "View details" }).click();
-
-    const detailsSheet = page.getByRole("dialog", { name: updatedProjectName });
-    await expect(
-      detailsSheet.getByText(updatedProjectDescription)
-    ).toBeVisible();
-    await page.keyboard.press("Escape");
 
     await page.reload();
     await expect(
-      page.getByRole("heading", { name: updatedProjectName, exact: true })
+      page.getByRole("link", { name: updatedProjectName, exact: true })
     ).toBeVisible();
-    await page.getByRole("button", { name: "Settings" }).click();
 
-    const reopenedSettingsDialog = page.getByRole("dialog", {
-      name: "Project settings",
-    });
+    const reopenedSettingsDialog = page.locator("#general-project-settings");
     await expect(reopenedSettingsDialog.locator("#name")).toHaveValue(
       updatedProjectName
     );

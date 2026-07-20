@@ -3,6 +3,30 @@ ifneq (,$(wildcard ./.env))
 	export
 endif
 
+dev:
+	goreman start
+
+dev-api:
+	air -c .air.toml
+
+dev-notification:
+	air -c .air.notification.toml
+
+dev-websocket:
+	air -c .air.websocket.toml
+
+dev-chat:
+	air -c .air.chat.toml
+
+dev-tasks:
+	air -c .air.tasks.toml
+
+dev-mcp:
+	air -c .air.mcp.toml
+
+generate-proto:
+	go run github.com/bufbuild/buf/cmd/buf@v1.57.2 generate
+
 goose-up:
 	goose up
 

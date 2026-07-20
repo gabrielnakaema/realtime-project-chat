@@ -8,9 +8,15 @@ import {
 } from "@playwright/test";
 import { registerUser, type TestUser } from "./test-user.js";
 
-export const backendURL = `http://localhost:${
-  process.env.E2E_BACKEND_PORT ?? "4333"
-}`;
+const gatewayPort = process.env.E2E_RESOLVED_GATEWAY_PORT;
+
+if (!gatewayPort) {
+  throw new Error(
+    "E2E_RESOLVED_GATEWAY_PORT was not set by the global E2E setup"
+  );
+}
+
+export const backendURL = `http://localhost:${gatewayPort}`;
 
 interface AuthFixtures {
   backendURL: string;
@@ -46,7 +52,24 @@ async function makeToastsClickThrough(target: BrowserContext | Page) {
 }
 
 export async function expectToast(page: Page, message: string | RegExp) {
-  await expect(page.getByText(message)).toBeVisible();
+  const toast = page.getByRole("alert").filter({ hasText: message }).last();
+  await expect(toast).toBeVisible();
+}
+
+export async function openProjectMembersSettings(page: Page) {
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: "Members", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true })
+  ).toBeVisible();
+}
+
+export async function addProjectMember(page: Page, email: string) {
+  await openProjectMembersSettings(page);
+  await page.getByLabel("Email address").fill(email);
+  await page.getByRole("button", { name: "Add member" }).click();
+  await expectToast(page, "Member added successfully");
+  await page.getByRole("link", { name: "Back to board" }).click();
 }
 
 export async function loginAsUser(
@@ -63,7 +86,7 @@ export async function loginAsUser(
   const page = await context.newPage();
 
   await page.goto("/projects");
-  await page.getByText(`Welcome back, ${user.name}`).waitFor();
+  await page.getByRole("heading", { name: "Projects", exact: true }).waitFor();
 
   return page;
 }

@@ -1,0 +1,256 @@
+package notification
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/events"
+	notificationqueries "github.com/gabrielnakaema/project-chat/internal/notification/queries"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
+	"github.com/gabrielnakaema/project-chat/internal/utils"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type Repository struct {
+	pool *pgxpool.Pool
+}
+
+type notificationRow notificationqueries.ListNotificationsByUserIdRow
+
+func NewRepository(pool *pgxpool.Pool) *Repository {
+	return &Repository{
+		pool: pool,
+	}
+}
+
+func (nr *Repository) CreateManyAndEnqueue(ctx context.Context, notifications []domain.Notification) error {
+	if len(notifications) == 0 {
+		return nil
+	}
+
+	tx, err := nr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := notificationqueries.New(tx)
+
+	ids := make([]uuid.UUID, 0, len(notifications))
+	for _, notification := range notifications {
+		id, err := qtx.CreateNotification(ctx, notificationqueries.CreateNotificationParams{
+			UserID:        notification.UserId,
+			ActorID:       notification.ActorId,
+			ProjectID:     notification.ProjectId,
+			TaskID:        optionalUUID(notification.TaskId),
+			TaskCommentID: optionalUUID(notification.TaskCommentId),
+			Type:          string(notification.Type),
+			ReadAt:        optionalTime(notification.ReadAt),
+			CreatedAt:     pgtype.Timestamptz{Time: notification.CreatedAt, Valid: true},
+			UpdatedAt:     pgtype.Timestamptz{Time: notification.UpdatedAt, Valid: true},
+		})
+		if err != nil {
+			return err
+		}
+
+		ids = append(ids, id)
+	}
+
+	created, err := nr.listByIDs(ctx, qtx, ids)
+	if err != nil {
+		return err
+	}
+
+	messages := make([]outbox.Message, 0, len(created))
+	for i := range created {
+		messages = append(messages, outbox.Message{
+			Topic:       events.NotificationCreated,
+			AggregateID: created[i].UserId,
+			Payload:     &events.NotificationCreatedPayload{Notification: created[i]},
+		})
+	}
+
+	if err := outbox.Enqueue(ctx, tx, messages...); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (nr *Repository) ListByUserID(ctx context.Context, userId uuid.UUID, beforeCreatedAt time.Time, beforeId uuid.UUID, limit int32) (*utils.CursorPaginated[domain.Notification], error) {
+	q := notificationqueries.New(nr.pool)
+
+	rows, err := q.ListNotificationsByUserId(ctx, notificationqueries.ListNotificationsByUserIdParams{
+		UserID:          userId,
+		BeforeCreatedAt: pgtype.Timestamptz{Time: beforeCreatedAt, Valid: !beforeCreatedAt.IsZero()},
+		BeforeID:        pgtype.UUID{Bytes: beforeId, Valid: beforeId != uuid.Nil},
+		Limit:           pgtype.Int4{Int32: limit, Valid: limit > 0},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	notifications := make([]domain.Notification, 0, len(rows))
+	for _, row := range rows {
+		notification, err := mapNotificationRow(notificationRow(row))
+		if err != nil {
+			return nil, err
+		}
+
+		notifications = append(notifications, notification)
+	}
+
+	hasNext := len(notifications) > int(limit)
+	data := notifications
+	if hasNext {
+		data = notifications[:limit]
+	}
+
+	return &utils.CursorPaginated[domain.Notification]{
+		Data:    data,
+		HasNext: hasNext,
+	}, nil
+}
+
+func (nr *Repository) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]domain.Notification, error) {
+	return nr.listByIDs(ctx, notificationqueries.New(nr.pool), ids)
+}
+
+func (nr *Repository) listByIDs(ctx context.Context, q *notificationqueries.Queries, ids []uuid.UUID) ([]domain.Notification, error) {
+	if len(ids) == 0 {
+		return []domain.Notification{}, nil
+	}
+
+	rows, err := q.ListNotificationsByIds(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	notifications := make([]domain.Notification, 0, len(rows))
+	for _, row := range rows {
+		notification, err := mapNotificationRow(notificationRow(row))
+		if err != nil {
+			return nil, err
+		}
+
+		notifications = append(notifications, notification)
+	}
+
+	return notifications, nil
+}
+
+func (nr *Repository) CountUnreadByUserID(ctx context.Context, userId uuid.UUID) (int, error) {
+	q := notificationqueries.New(nr.pool)
+	count, err := q.CountUnreadNotificationsByUserId(ctx, userId)
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}
+
+func (nr *Repository) MarkRead(ctx context.Context, notificationId uuid.UUID, userId uuid.UUID, updatedAt time.Time) (bool, error) {
+	q := notificationqueries.New(nr.pool)
+	rowsAffected, err := q.MarkNotificationRead(ctx, notificationqueries.MarkNotificationReadParams{
+		ID:        notificationId,
+		UserID:    userId,
+		UpdatedAt: pgtype.Timestamptz{Time: updatedAt, Valid: true},
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return rowsAffected > 0, nil
+}
+
+func (nr *Repository) MarkAllRead(ctx context.Context, userId uuid.UUID, updatedAt time.Time) error {
+	q := notificationqueries.New(nr.pool)
+	return q.MarkAllNotificationsRead(ctx, notificationqueries.MarkAllNotificationsReadParams{
+		UserID:    userId,
+		UpdatedAt: pgtype.Timestamptz{Time: updatedAt, Valid: true},
+	})
+}
+
+func mapNotificationRow(row notificationRow) (domain.Notification, error) {
+	notification := domain.Notification{
+		Id:        row.ID,
+		UserId:    row.UserID,
+		ActorId:   row.ActorID,
+		ProjectId: row.ProjectID,
+		Type:      domain.NotificationType(row.Type),
+		CreatedAt: row.CreatedAt.Time,
+		UpdatedAt: row.UpdatedAt.Time,
+	}
+
+	if row.TaskID.Valid {
+		taskID := uuid.UUID(row.TaskID.Bytes)
+		notification.TaskId = &taskID
+	}
+
+	if row.TaskCommentID.Valid {
+		commentID := uuid.UUID(row.TaskCommentID.Bytes)
+		notification.TaskCommentId = &commentID
+	}
+
+	if row.ReadAt.Valid {
+		notification.ReadAt = &row.ReadAt.Time
+	}
+
+	if err := json.Unmarshal(row.Actor, &notification.Actor); err != nil {
+		return domain.Notification{}, err
+	}
+
+	if err := json.Unmarshal(row.Project, &notification.Project); err != nil {
+		return domain.Notification{}, err
+	}
+
+	if row.Task != nil {
+		bytes, err := json.Marshal(row.Task)
+		if err != nil {
+			return domain.Notification{}, err
+		}
+
+		var task domain.Task
+		if err := json.Unmarshal(bytes, &task); err != nil {
+			return domain.Notification{}, err
+		}
+
+		notification.Task = &task
+	}
+
+	if row.TaskComment != nil {
+		bytes, err := json.Marshal(row.TaskComment)
+		if err != nil {
+			return domain.Notification{}, err
+		}
+
+		var taskComment domain.TaskComment
+		if err := json.Unmarshal(bytes, &taskComment); err != nil {
+			return domain.Notification{}, err
+		}
+
+		notification.TaskComment = &taskComment
+	}
+
+	return notification, nil
+}
+
+func optionalUUID(value *uuid.UUID) pgtype.UUID {
+	if value == nil {
+		return pgtype.UUID{}
+	}
+
+	return pgtype.UUID{Bytes: *value, Valid: true}
+}
+
+func optionalTime(value *time.Time) pgtype.Timestamptz {
+	if value == nil {
+		return pgtype.Timestamptz{}
+	}
+
+	return pgtype.Timestamptz{Time: *value, Valid: true}
+}

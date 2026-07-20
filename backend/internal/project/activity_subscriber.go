@@ -1,0 +1,211 @@
+package project
+
+import (
+	"context"
+	"encoding/json"
+	"log/slog"
+
+	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/config"
+	"github.com/gabrielnakaema/project-chat/internal/platform/messaging"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
+	"github.com/google/uuid"
+)
+
+type activityProjectRepository interface {
+	MarkUpdatedAt(ctx context.Context, projectId uuid.UUID, msgs ...outbox.Message) error
+}
+
+type ProjectActivitySubscriber struct {
+	logger            *slog.Logger
+	subscriber        *messaging.Subscriber
+	repository        *ProjectActivityRepository
+	projectRepository activityProjectRepository
+}
+
+func NewProjectActivitySubscriber(ctx context.Context, config *config.Config, logger *slog.Logger, repository *ProjectActivityRepository, projectRepository activityProjectRepository) (*ProjectActivitySubscriber, error) {
+	subscriber, err := messaging.NewSubscriber(config, "project_activity.subscriber")
+	if err != nil {
+		return nil, err
+	}
+
+	projectActivitySubscriber := &ProjectActivitySubscriber{
+		logger:            logger,
+		subscriber:        subscriber,
+		repository:        repository,
+		projectRepository: projectRepository,
+	}
+
+	topics := []events.Topic{events.ProjectCreated, events.ProjectUpdated, events.ProjectMemberCreated, events.ProjectMemberRemoved, events.TaskCreated, events.TaskUpdated}
+	err = subscriber.Subscribe(ctx, topics, projectActivitySubscriber.handleProjectActivityEvents, projectActivitySubscriber.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return projectActivitySubscriber, nil
+}
+
+func (pas *ProjectActivitySubscriber) Close() error {
+	return pas.subscriber.Close()
+}
+
+func (pas *ProjectActivitySubscriber) handleProjectActivityEvents(ctx context.Context, message messaging.Message) error {
+	switch message.Topic {
+	case events.ProjectCreated:
+		return pas.handleProjectCreated(ctx, message)
+	case events.ProjectUpdated:
+		return pas.handleProjectUpdated(ctx, message)
+	case events.ProjectMemberCreated:
+		return pas.handleProjectMemberCreated(ctx, message)
+	case events.ProjectMemberRemoved:
+		return pas.handleProjectMemberRemoved(ctx, message)
+	case events.TaskCreated:
+		return pas.handleTaskCreated(ctx, message)
+	case events.TaskUpdated:
+		return pas.handleTaskUpdated(ctx, message)
+	default:
+		return nil
+	}
+}
+
+func (pas *ProjectActivitySubscriber) handleProjectCreated(ctx context.Context, message messaging.Message) error {
+	var payload events.ProjectCreatedPayload
+	err := json.Unmarshal(message.Value, &payload)
+	if err != nil {
+		return apperr.ServerError("failed to unmarshal project created payload", err)
+	}
+
+	activity := domain.ProjectCreatedActivity(payload.Project, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
+	err = pas.repository.Create(ctx, &activity)
+	if err != nil {
+		return apperr.ServerError("failed to create project created activity", err)
+	}
+
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.Project.Id)
+	if err != nil {
+		return apperr.ServerError("failed to mark project updated at", err)
+	}
+
+	return nil
+}
+
+func (pas *ProjectActivitySubscriber) handleProjectUpdated(ctx context.Context, message messaging.Message) error {
+	var payload events.ProjectUpdatedPayload
+	err := json.Unmarshal(message.Value, &payload)
+	if err != nil {
+		return apperr.ServerError("failed to unmarshal project updated payload", err)
+	}
+
+	activity := domain.ProjectUpdatedActivity(payload.Project, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
+	err = pas.repository.Create(ctx, &activity)
+	if err != nil {
+		return apperr.ServerError("failed to create project updated activity", err)
+	}
+
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.Project.Id)
+	if err != nil {
+		return apperr.ServerError("failed to mark project updated at", err)
+	}
+
+	return nil
+}
+
+func (pas *ProjectActivitySubscriber) handleProjectMemberCreated(ctx context.Context, message messaging.Message) error {
+	var payload events.ProjectMemberCreatedPayload
+	err := json.Unmarshal(message.Value, &payload)
+	if err != nil {
+		return apperr.ServerError("failed to unmarshal project member created payload", err)
+	}
+
+	activity := domain.ProjectMemberCreatedActivity(domain.Project{
+		Id: payload.ProjectMember.ProjectId,
+	}, payload.ProjectMember, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
+	err = pas.repository.Create(ctx, &activity)
+	if err != nil {
+		return apperr.ServerError("failed to create project member created activity", err)
+	}
+
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.ProjectMember.ProjectId)
+	if err != nil {
+		return apperr.ServerError("failed to mark project updated at", err)
+	}
+
+	return nil
+}
+
+func (pas *ProjectActivitySubscriber) handleProjectMemberRemoved(ctx context.Context, message messaging.Message) error {
+	var payload events.ProjectMemberRemovedPayload
+	err := json.Unmarshal(message.Value, &payload)
+	if err != nil {
+		return apperr.ServerError("failed to unmarshal project member removed payload", err)
+	}
+
+	activity := domain.ProjectMemberDeletedActivity(domain.Project{
+		Id: payload.ProjectMember.ProjectId,
+	}, payload.ProjectMember, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
+	err = pas.repository.Create(ctx, &activity)
+	if err != nil {
+		return apperr.ServerError("failed to create project member deleted activity", err)
+	}
+
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.ProjectMember.ProjectId)
+	if err != nil {
+		return apperr.ServerError("failed to mark project updated at", err)
+	}
+
+	return nil
+}
+
+func (pas *ProjectActivitySubscriber) handleTaskCreated(ctx context.Context, message messaging.Message) error {
+	var payload events.TaskCreatedPayload
+	err := json.Unmarshal(message.Value, &payload)
+	if err != nil {
+		return apperr.ServerError("failed to unmarshal task created payload", err)
+	}
+
+	activity := domain.TaskCreatedActivity(domain.Project{
+		Id: payload.Task.ProjectId,
+	}, payload.Task, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
+	err = pas.repository.Create(ctx, &activity)
+	if err != nil {
+		return apperr.ServerError("failed to create task created activity", err)
+	}
+
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.Task.ProjectId)
+	if err != nil {
+		return apperr.ServerError("failed to mark project updated at", err)
+	}
+
+	return nil
+}
+
+func (pas *ProjectActivitySubscriber) handleTaskUpdated(ctx context.Context, message messaging.Message) error {
+	var payload events.TaskUpdatedPayload
+	err := json.Unmarshal(message.Value, &payload)
+	if err != nil {
+		return apperr.ServerError("failed to unmarshal task updated payload", err)
+	}
+
+	activity := domain.TaskUpdatedActivity(domain.Project{
+		Id: payload.Task.ProjectId,
+	}, payload.Task, payload.User)
+	activity.ActionOrigin = payload.ActionOrigin.OrUser()
+	err = pas.repository.Create(ctx, &activity)
+	if err != nil {
+		return apperr.ServerError("failed to create task updated activity", err)
+	}
+
+	err = pas.projectRepository.MarkUpdatedAt(ctx, payload.Task.ProjectId)
+	if err != nil {
+		return apperr.ServerError("failed to mark project updated at", err)
+	}
+
+	return nil
+}

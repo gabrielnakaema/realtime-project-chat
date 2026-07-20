@@ -7,12 +7,12 @@ import ReactDOM from 'react-dom/client';
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastContainer } from 'react-toastify';
 import { routeTree } from './routeTree.gen';
-import { AuthProvider } from './contexts/auth-context.tsx';
-import { ThemeProvider } from './contexts/theme-context.tsx';
+import { AuthProvider } from './features/auth/components/auth-context.tsx';
 import reportWebVitals from './reportWebVitals.ts';
 import './styles.css';
-import { handleError } from './utils/handle-error.ts';
-import { SocketProvider } from './contexts/socket-context.tsx';
+import { handleError } from './shared/utils/handle-error.ts';
+import { ThemeProvider } from '@/shared/contexts/theme-context';
+import { SocketProvider } from '@/shared/contexts/socket-context';
 
 // Create a new router instance
 const router = createRouter({

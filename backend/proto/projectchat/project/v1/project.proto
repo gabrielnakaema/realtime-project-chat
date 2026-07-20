@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package projectchat.project.v1;
+
+option go_package = "github.com/gabrielnakaema/project-chat/internal/project/v1;projectv1";
+
+service ProjectService {
+  rpc CheckAccess(CheckAccessRequest) returns (CheckAccessResponse);
+  rpc GetProject(GetProjectRequest) returns (GetProjectResponse);
+  rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
+}
+
+message CheckAccessRequest {
+  string user_id = 1;
+  string project_id = 2;
+}
+
+message CheckAccessResponse {}
+
+message GetProjectRequest {
+  string user_id = 1;
+  string project_id = 2;
+}
+
+message ListProjectsRequest {
+  string user_id = 1;
+  string member_role = 2;
+  bool filter_by_role = 3;
+  string search_query = 4;
+}
+
+message GetProjectResponse {
+  bytes project_json = 1;
+}
+
+message ListProjectsResponse {
+  bytes projects_json = 1;
+}

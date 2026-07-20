@@ -3,12 +3,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import type { SubmitHandler } from 'react-hook-form';
-import type { ILoginForm } from '@/schemas/login-schema';
+import type { ILoginForm } from '@/features/auth/schemas/login.schema';
 import { Input } from '@/components/input';
-import { loginSchema } from '@/schemas/login-schema';
-import { login } from '@/services/auth';
-import { LoadingSpinner } from '@/components/loading';
-import { useAuth } from '@/hooks/use-auth';
+import { loginSchema } from '@/features/auth/schemas/login.schema';
+import { login } from '@/features/auth/services/auth';
+import { LoadingSpinner } from '@/shared/components/loading';
+import { useAuth } from '@/features/auth/hooks/use-auth';
 import { Button } from '@/components/button';
 
 export const Route = createFileRoute('/login')({
@@ -41,11 +41,11 @@ function RouteComponent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4 dark:from-slate-900 dark:to-slate-800">
-      <main className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+    <div className="from-muted to-muted flex min-h-screen items-center justify-center bg-gradient-to-br p-4">
+      <main className="border-border bg-card w-full max-w-md rounded-lg border p-6">
         <div className="mb-6 text-center">
-          <h1 className="mb-2 text-2xl font-bold text-slate-900 dark:text-slate-100">Welcome back</h1>
-          <p className="text-slate-600 dark:text-slate-400">Sign in to your account</p>
+          <h1 className="text-foreground mb-2 text-2xl font-bold">Welcome back</h1>
+          <p className="text-muted-foreground">Sign in to your account</p>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input
@@ -70,9 +70,9 @@ function RouteComponent() {
           </Button>
         </form>
         <div className="mt-6 text-center">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
+          <p className="text-muted-foreground text-sm">
             Don't have an account?{' '}
-            <Link to="/sign-up" className="font-medium text-blue-600 hover:text-blue-700">
+            <Link to="/sign-up" className="text-primary hover:text-primary/80 font-medium">
               Sign up
             </Link>
           </p>

@@ -155,6 +155,79 @@ func TestTaskArchiveAndRestoreEndpoints(t *testing.T) {
 	assert.NotEqual(t, archivedTaskID, activeTaskID)
 }
 
+func TestTaskVersionIncrementsOnMove(t *testing.T) {
+	testAPI, cleanup := shared.SetupTestAPI(t)
+	defer cleanup()
+
+	testAPI.TruncateTables(t)
+
+	client := shared.NewHTTPClient(testAPI.GetBaseURL())
+	_, err := client.CreateUserAndLogin("versioning@example.com", "password123")
+	require.NoError(t, err)
+
+	projectResp, err := client.POST("/projects", taskProjectPayload())
+	require.NoError(t, err)
+	defer projectResp.Body.Close()
+	require.Equal(t, http.StatusCreated, projectResp.StatusCode)
+
+	var project map[string]any
+	require.NoError(t, json.NewDecoder(projectResp.Body).Decode(&project))
+
+	projectID := project["id"].(string)
+	columns := project["columns"].([]any)
+	pendingColumnID := columns[0].(map[string]any)["id"].(string)
+	doingColumnID := columns[1].(map[string]any)["id"].(string)
+
+	createResp, err := client.POST("/tasks", map[string]any{
+		"project_id":        projectID,
+		"project_column_id": pendingColumnID,
+		"title":             "Versioned task",
+		"description":       "tracks a monotonic version",
+		"priority":          "low",
+		"tags":              []string{},
+	})
+	require.NoError(t, err)
+	defer createResp.Body.Close()
+	require.Equal(t, http.StatusCreated, createResp.StatusCode)
+
+	var created map[string]any
+	require.NoError(t, json.NewDecoder(createResp.Body).Decode(&created))
+	taskID := created["id"].(string)
+	// A freshly created task starts at version 0.
+	require.Equal(t, float64(0), created["version"])
+
+	moveTo := func(columnID string) float64 {
+		resp, moveErr := client.PATCH(fmt.Sprintf("/tasks/%s/move", taskID), map[string]any{
+			"project_id":        projectID,
+			"project_column_id": columnID,
+			"after_task_id":     nil,
+		})
+		require.NoError(t, moveErr)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var moved map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&moved))
+		require.Equal(t, columnID, moved["project_column_id"])
+		return moved["version"].(float64)
+	}
+
+	firstMove := moveTo(doingColumnID)
+	assert.Equal(t, float64(1), firstMove)
+
+	secondMove := moveTo(pendingColumnID)
+	assert.Equal(t, float64(2), secondMove)
+
+	getResp, err := client.GET(fmt.Sprintf("/tasks/%s", taskID))
+	require.NoError(t, err)
+	defer getResp.Body.Close()
+	require.Equal(t, http.StatusOK, getResp.StatusCode)
+
+	var fetched map[string]any
+	require.NoError(t, json.NewDecoder(getResp.Body).Decode(&fetched))
+	assert.Equal(t, float64(2), fetched["version"])
+}
+
 func TestTaskCodeFieldFlowsThroughTaskEndpoints(t *testing.T) {
 	testAPI, cleanup := shared.SetupTestAPI(t)
 	defer cleanup()

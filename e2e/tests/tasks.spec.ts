@@ -4,6 +4,7 @@ import {
   expectToast,
   test,
 } from "../src/fixtures/authenticated-page.js";
+import { fillRichTextList } from "../src/fixtures/rich-text-editor.js";
 import type { Locator, Page } from "@playwright/test";
 
 async function fillRichText(editor: Locator, page: Page, value: string) {
@@ -15,10 +16,7 @@ async function fillRichText(editor: Locator, page: Page, value: string) {
 }
 
 async function createProject(page: Page, name: string) {
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await page.getByRole("button", { name: "New project" }).first().click();
 
   const createDialog = page.getByRole("dialog", { name: "Create project" });
   await createDialog.locator("#name").fill(name);
@@ -31,7 +29,7 @@ async function createProject(page: Page, name: string) {
 
   await expectToast(page, "Project created successfully");
   await page.getByRole("link", { name: new RegExp(name) }).click();
-  await expect(page.getByRole("heading", { name })).toBeVisible();
+  await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
 }
 
 async function selectOption(
@@ -48,10 +46,16 @@ function taskCard(page: Page, title: string) {
   return page.getByText(title, { exact: true });
 }
 
+function headerCreateTaskButton(page: Page) {
+  return page.locator("header").getByRole("button", { name: "Create task" });
+}
+
 function boardColumn(page: Page, columnName: string) {
   return page
     .getByRole("button", { name: `Open actions for ${columnName}` })
-    .locator("xpath=ancestor::div[contains(@class, 'min-w-84')][1]");
+    .locator(
+      "xpath=ancestor::div[.//div[contains(@class, 'overflow-y-auto')]][1]"
+    );
 }
 
 function taskCardInColumn(page: Page, columnName: string, title: string) {
@@ -180,7 +184,7 @@ test.describe("tasks", () => {
 
     await createProject(page, projectName);
 
-    await page.getByRole("button", { name: "Create task" }).click();
+    await headerCreateTaskButton(page).click();
     let createDialog = page.getByRole("dialog", { name: "Create task" });
     await createDialog.locator("#title").fill(existingTaskTitle);
     await fillRichText(
@@ -193,7 +197,7 @@ test.describe("tasks", () => {
     await createDialog.getByRole("button", { name: "Create task" }).click();
     await expectToast(page, "Task created successfully");
 
-    await page.getByRole("button", { name: "Create task" }).click();
+    await headerCreateTaskButton(page).click();
     createDialog = page.getByRole("dialog", { name: "Create task" });
     await createDialog.locator("#title").fill(taskTitle);
     await fillRichText(
@@ -286,7 +290,7 @@ test.describe("tasks", () => {
     await createProject(page, projectName);
 
     const createTask = async (title: string) => {
-      await page.getByRole("button", { name: "Create task" }).click();
+      await headerCreateTaskButton(page).click();
       const createDialog = page.getByRole("dialog", { name: "Create task" });
       await createDialog.locator("#title").fill(title);
       await fillRichText(
@@ -334,7 +338,7 @@ test.describe("tasks", () => {
 
     await createProject(page, projectName);
 
-    await page.getByRole("button", { name: "Create task" }).click();
+    await headerCreateTaskButton(page).click();
 
     const createDialog = page.getByRole("dialog", { name: "Create task" });
     await createDialog.getByRole("button", { name: "Create task" }).click();
@@ -342,6 +346,66 @@ test.describe("tasks", () => {
     await expect(createDialog.getByText("Title is required")).toBeVisible();
     await expect(createDialog.getByText("Priority is required")).toBeVisible();
     await expect(createDialog).toBeVisible();
+  });
+
+  test("task descriptions preserve bulleted lists through create, edit, and reload", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Task List Project ${crypto.randomUUID()}`;
+    const taskTitle = `E2E Task List ${crypto.randomUUID()}`;
+    const listItems = ["Plan the change", "Verify the result"];
+    const addedItem = "Document the behavior";
+
+    await createProject(page, projectName);
+    await headerCreateTaskButton(page).click();
+
+    const createDialog = page.getByRole("dialog", { name: "Create task" });
+    await createDialog.locator("#title").fill(taskTitle);
+    await fillRichTextList(createDialog, "bulleted", listItems);
+    await selectOption(createDialog, page, "priority", "Medium");
+    await createDialog.getByRole("button", { name: "Create task" }).click();
+
+    await expectToast(page, "Task created successfully");
+
+    let taskDetails = await openTaskDetails(page, taskTitle);
+    let renderedList = taskDetails.locator("ul").filter({
+      hasText: listItems[0],
+    });
+    await expect(renderedList.locator("li")).toHaveText(listItems);
+    await expect(renderedList).toHaveCSS("list-style-type", "disc");
+
+    await taskDetails.getByRole("button", { name: "Edit task" }).click();
+    const editDialog = page.getByRole("dialog", { name: "Edit task" });
+    const editorList = editDialog.locator("#description ul");
+    await expect(editorList.locator("li")).toHaveText(listItems);
+
+    await editorList.locator("li").last().click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type(addedItem);
+    await editDialog.getByRole("button", { name: "Save changes" }).click();
+
+    await expectToast(page, "Task updated successfully");
+    taskDetails = page.getByRole("dialog", { name: taskTitle });
+    renderedList = taskDetails.locator("ul").filter({
+      hasText: listItems[0],
+    });
+    await expect(renderedList.locator("li")).toHaveText([
+      ...listItems,
+      addedItem,
+    ]);
+
+    await page.keyboard.press("Escape");
+    await page.reload();
+    taskDetails = await openTaskDetails(page, taskTitle);
+    renderedList = taskDetails.locator("ul").filter({
+      hasText: listItems[0],
+    });
+    await expect(renderedList.locator("li")).toHaveText([
+      ...listItems,
+      addedItem,
+    ]);
+    await expect(renderedList).toHaveCSS("list-style-type", "disc");
   });
 
   test("project owner can create a task with all optional fields, edit it, and see the activity timeline update", async ({
@@ -354,7 +418,7 @@ test.describe("tasks", () => {
 
     await createProject(page, projectName);
 
-    await page.getByRole("button", { name: "Create task" }).click();
+    await headerCreateTaskButton(page).click();
 
     const createDialog = page.getByRole("dialog", { name: "Create task" });
     await createDialog.locator("#title").fill(taskTitle);
@@ -408,11 +472,18 @@ test.describe("tasks", () => {
         .getByText("Low", { exact: true })
     ).toBeVisible();
 
-    await taskDetails
-      .getByRole("button", { name: "Activity timeline" })
-      .click();
+    await expect(async () => {
+      await page.reload();
+      taskDetails = await openTaskDetails(page, taskTitle);
+      await taskDetails
+        .getByRole("button", { name: "Activity timeline" })
+        .click();
+      await expect(taskDetails.getByText("set priority to")).toBeVisible({
+        timeout: 1_000,
+      });
+    }).toPass({ timeout: 15_000 });
+
     await expect(taskDetails.getByText("created the task")).toBeVisible();
-    await expect(taskDetails.getByText("set priority to")).toBeVisible();
   });
 
   test("project owner can cancel and then confirm archiving a task, and restore it from the archived tasks list", async ({

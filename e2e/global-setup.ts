@@ -5,8 +5,9 @@ import dotenv from "dotenv";
 
 import { startInfra } from "./src/docker/start-infra.js";
 import { runMigrations } from "./src/docker/run-migrations.js";
-import { spawnBackend } from "./src/docker/spawn-backend.js";
+import { spawnBackendService } from "./src/docker/spawn-backend-service.js";
 import { spawnFrontend } from "./src/docker/spawn-frontend.js";
+import { startGateway } from "./src/docker/start-gateway.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -33,8 +34,17 @@ function killProcess(proc: ChildProcess, graceMs = 5_000): Promise<void> {
 }
 
 export default async function globalSetup(): Promise<() => Promise<void>> {
-  const backendPort = process.env.E2E_BACKEND_PORT ?? "4333";
+  const requestedGatewayPort = process.env.E2E_GATEWAY_PORT;
   const frontendPort = process.env.E2E_FRONTEND_PORT ?? "4173";
+  const servicePorts = {
+    api: "4333",
+    notification: "3335",
+    websocket: "3336",
+    grpc: "4334",
+    tasks: "3339",
+    tasksGrpc: "3340",
+    mcp: "3341",
+  } as const;
   const corsOrigin =
     process.env.E2E_CORS_ORIGIN ?? `http://localhost:${frontendPort}`;
   const jwtSecret = process.env.E2E_JWT_SECRET ?? "e2e-test-secret";
@@ -51,25 +61,109 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 
   await runMigrations(backendDir, infra.dbDsn);
 
-  const backendProc = await spawnBackend(backendDir, backendPort, {
-    API_PORT: backendPort,
+  const sharedServiceEnv = {
     DB_DSN: infra.dbDsn,
     PUBSUB_BROKERS: infra.brokers,
     JWT_SECRET: jwtSecret,
     ENV: "test",
-
     CORS_ORIGINS: corsOrigin,
-  });
+    OUTBOX_POLL_INTERVAL: "10ms",
+  };
 
+  const backendProc = await spawnBackendService(
+    backendDir,
+    "api",
+    "./cmd/api",
+    servicePorts.api,
+    {
+      ...sharedServiceEnv,
+      API_PORT: servicePorts.api,
+      INTERNAL_GRPC_LISTEN_ADDRESS: `127.0.0.1:${servicePorts.grpc}`,
+    }
+  );
+
+  const notificationProc = await spawnBackendService(
+    backendDir,
+    "notification-service",
+    "./cmd/notification-service",
+    servicePorts.notification,
+    {
+      ...sharedServiceEnv,
+      NOTIFICATION_SERVICE_PORT: servicePorts.notification,
+    }
+  );
+
+  const websocketProc = await spawnBackendService(
+    backendDir,
+    "websocket-service",
+    "./cmd/websocket-service",
+    servicePorts.websocket,
+    {
+      ...sharedServiceEnv,
+      WEBSOCKET_SERVICE_PORT: servicePorts.websocket,
+      AUTHORIZATION_GRPC_TARGET: `127.0.0.1:${servicePorts.grpc}`,
+    }
+  );
+  const tasksProc = await spawnBackendService(
+    backendDir,
+    "tasks-service",
+    "./cmd/tasks-service",
+    servicePorts.tasks,
+    {
+      ...sharedServiceEnv,
+      TASKS_SERVICE_PORT: servicePorts.tasks,
+      TASKS_INTERNAL_GRPC_LISTEN_ADDRESS: `127.0.0.1:${servicePorts.tasksGrpc}`,
+    }
+  );
+  const mcpProc = await spawnBackendService(
+    backendDir,
+    "mcp-service",
+    "./cmd/mcp-service",
+    servicePorts.mcp,
+    {
+      ...sharedServiceEnv,
+      MCP_SERVICE_PORT: servicePorts.mcp,
+      AUTHORIZATION_GRPC_TARGET: `127.0.0.1:${servicePorts.grpc}`,
+      TASKS_AUTHORIZATION_GRPC_TARGET: `127.0.0.1:${servicePorts.tasksGrpc}`,
+    }
+  );
+
+  const relayProc = await spawnBackendService(
+    backendDir,
+    "outbox-relay",
+    "./cmd/outbox-relay",
+    undefined,
+    sharedServiceEnv
+  );
+
+  const chatProc = await spawnBackendService(
+    backendDir,
+    "chat-service",
+    "./cmd/chat-service",
+    undefined,
+    sharedServiceEnv
+  );
+
+  const gateway = await startGateway(backendDir, requestedGatewayPort);
+  const gatewayPort = String(gateway.getMappedPort(80));
+
+  process.env.E2E_RESOLVED_GATEWAY_PORT = gatewayPort;
   const frontendProc = await spawnFrontend(
     frontendDir,
     frontendPort,
-    `http://localhost:${backendPort}`
+    `http://localhost:${gatewayPort}`
   );
 
   return async () => {
     await killProcess(frontendProc);
+    await gateway.stop();
+    await killProcess(relayProc);
+    await killProcess(mcpProc);
+    await killProcess(chatProc);
+    await killProcess(websocketProc);
+    await killProcess(notificationProc);
     await killProcess(backendProc);
+    await killProcess(tasksProc);
     await infra.kafka.stop();
     await infra.postgres.stop();
   };

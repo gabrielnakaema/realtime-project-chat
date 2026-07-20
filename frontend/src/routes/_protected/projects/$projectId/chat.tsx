@@ -1,9 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { ChatComposer } from '@/components/chat/chat-composer';
-import { ChatMessageList } from '@/components/chat/chat-message-list';
-import { ProjectChatHeader } from '@/components/project-chat-header';
-import { useAuth } from '@/hooks/use-auth';
-import { useProjectChatView } from '@/hooks/use-chat';
+import { ChatComposer } from '@/features/chat/components/chat-composer';
+import { ChatMessageList } from '@/features/chat/components/chat-message-list';
+import { ProjectChatHeader } from '@/features/projects/components/project-chat-header';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useProjectChatView } from '@/features/chat/hooks/use-chat';
 
 export const Route = createFileRoute('/_protected/projects/$projectId/chat')({
   component: RouteComponent,

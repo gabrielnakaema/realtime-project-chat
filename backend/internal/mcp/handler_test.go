@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/service"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -19,23 +19,23 @@ type stubProjectService struct {
 	project  *domain.Project
 }
 
-func (s *stubProjectService) ListByUserId(ctx context.Context, request service.ListProjectsByUserIdRequest) ([]domain.Project, error) {
+func (s *stubProjectService) ListByUserID(ctx context.Context, request ListProjectsRequest) ([]domain.Project, error) {
 	return s.projects, nil
 }
 
-func (s *stubProjectService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Project, error) {
+func (s *stubProjectService) GetByID(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Project, error) {
 	return s.project, nil
 }
 
 type stubTaskService struct {
-	createRequest     *service.CreateTaskRequest
+	createRequest     *CreateTaskRequest
 	task              *domain.Task
 	grouped           map[string]utils.CursorPaginated[domain.Task]
-	findByCodeRequest *service.FindTaskByCodeRequest
-	updateRequest     *service.UpdateTaskRequest
-	moveRequest       *service.MoveTaskRequest
-	markDoneRequest   *service.MarkTaskDoneRequest
-	assignSelfRequest *service.AssignTaskToSelfRequest
+	findByCodeRequest *FindTaskByCodeRequest
+	updateRequest     *UpdateTaskRequest
+	moveRequest       *MoveTaskRequest
+	markDoneRequest   *MarkTaskDoneRequest
+	assignSelfRequest *AssignTaskToSelfRequest
 	createOrigin      domain.ActionOrigin
 	updateOrigin      domain.ActionOrigin
 	moveOrigin        domain.ActionOrigin
@@ -43,44 +43,44 @@ type stubTaskService struct {
 	assignSelfOrigin  domain.ActionOrigin
 }
 
-func (s *stubTaskService) Create(ctx context.Context, request service.CreateTaskRequest) (*domain.Task, error) {
+func (s *stubTaskService) Create(ctx context.Context, request CreateTaskRequest) (*domain.Task, error) {
 	s.createRequest = &request
 	s.createOrigin = domain.ActionOriginFromContext(ctx)
 	return s.task, nil
 }
 
-func (s *stubTaskService) GroupByColumn(ctx context.Context, request service.GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error) {
+func (s *stubTaskService) GroupByColumn(ctx context.Context, request GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error) {
 	return s.grouped, nil
 }
 
-func (s *stubTaskService) GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error) {
+func (s *stubTaskService) GetByID(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error) {
 	return s.task, nil
 }
 
-func (s *stubTaskService) FindTaskByCode(ctx context.Context, request service.FindTaskByCodeRequest) (*domain.Task, error) {
+func (s *stubTaskService) FindTaskByCode(ctx context.Context, request FindTaskByCodeRequest) (*domain.Task, error) {
 	s.findByCodeRequest = &request
 	return s.task, nil
 }
 
-func (s *stubTaskService) Move(ctx context.Context, request service.MoveTaskRequest) (*domain.Task, error) {
+func (s *stubTaskService) Move(ctx context.Context, request MoveTaskRequest) (*domain.Task, error) {
 	s.moveRequest = &request
 	s.moveOrigin = domain.ActionOriginFromContext(ctx)
 	return s.task, nil
 }
 
-func (s *stubTaskService) Update(ctx context.Context, request service.UpdateTaskRequest) (*domain.Task, error) {
+func (s *stubTaskService) Update(ctx context.Context, request UpdateTaskRequest) (*domain.Task, error) {
 	s.updateRequest = &request
 	s.updateOrigin = domain.ActionOriginFromContext(ctx)
 	return s.task, nil
 }
 
-func (s *stubTaskService) MarkTaskDone(ctx context.Context, request service.MarkTaskDoneRequest) (*domain.Task, error) {
+func (s *stubTaskService) MarkTaskDone(ctx context.Context, request MarkTaskDoneRequest) (*domain.Task, error) {
 	s.markDoneRequest = &request
 	s.markDoneOrigin = domain.ActionOriginFromContext(ctx)
 	return s.task, nil
 }
 
-func (s *stubTaskService) AssignTaskToSelf(ctx context.Context, request service.AssignTaskToSelfRequest) (*domain.Task, error) {
+func (s *stubTaskService) AssignTaskToSelf(ctx context.Context, request AssignTaskToSelfRequest) (*domain.Task, error) {
 	s.assignSelfRequest = &request
 	s.assignSelfOrigin = domain.ActionOriginFromContext(ctx)
 	return s.task, nil
@@ -89,18 +89,18 @@ func (s *stubTaskService) AssignTaskToSelf(ctx context.Context, request service.
 type stubTaskCommentService struct {
 	comment       *domain.TaskComment
 	comments      *utils.CursorPaginated[domain.TaskComment]
-	createRequest *service.CreateTaskCommentRequest
+	createRequest *CreateTaskCommentRequest
 	createOrigin  domain.ActionOrigin
-	listRequest   *service.ListTaskCommentsRequest
+	listRequest   *ListTaskCommentsRequest
 }
 
-func (s *stubTaskCommentService) Create(ctx context.Context, request service.CreateTaskCommentRequest) (*domain.TaskComment, error) {
+func (s *stubTaskCommentService) Create(ctx context.Context, request CreateTaskCommentRequest) (*domain.TaskComment, error) {
 	s.createRequest = &request
 	s.createOrigin = domain.ActionOriginFromContext(ctx)
 	return s.comment, nil
 }
 
-func (s *stubTaskCommentService) ListByTaskID(ctx context.Context, request service.ListTaskCommentsRequest) (*utils.CursorPaginated[domain.TaskComment], error) {
+func (s *stubTaskCommentService) ListByTaskID(ctx context.Context, request ListTaskCommentsRequest) (*utils.CursorPaginated[domain.TaskComment], error) {
 	s.listRequest = &request
 	return s.comments, nil
 }
@@ -180,9 +180,9 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, domain.ActionOriginMCPAgent, taskSvc.createOrigin)
 	require.NotNil(t, taskSvc.createRequest)
-	assert.Equal(t, projectID, taskSvc.createRequest.ProjectId)
+	assert.Equal(t, projectID, taskSvc.createRequest.ProjectID)
 	assert.Equal(t, "TASK-123", taskSvc.createRequest.Code)
-	assert.Equal(t, []uuid.UUID{taskID}, taskSvc.createRequest.DependsOnTaskIds)
+	assert.Equal(t, []uuid.UUID{taskID}, taskSvc.createRequest.DependsOnTaskIDs)
 
 	taskResult, err := handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "get_task",
@@ -209,7 +209,7 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, taskID.String(), findTaskResult["task"].(*domain.Task).Id.String())
 	require.NotNil(t, taskSvc.findByCodeRequest)
-	assert.Equal(t, projectID, taskSvc.findByCodeRequest.ProjectId)
+	assert.Equal(t, projectID, taskSvc.findByCodeRequest.ProjectID)
 	assert.Equal(t, "TASK-1", taskSvc.findByCodeRequest.Code)
 	require.NotNil(t, commentSvc.listRequest)
 	assert.Equal(t, 4, commentSvc.listRequest.Limit)
@@ -242,10 +242,10 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, domain.ActionOriginMCPAgent, taskSvc.updateOrigin)
 	require.NotNil(t, taskSvc.updateRequest)
-	assert.Equal(t, taskID, taskSvc.updateRequest.TaskId)
+	assert.Equal(t, taskID, taskSvc.updateRequest.TaskID)
 	require.NotNil(t, taskSvc.updateRequest.Code)
 	assert.Equal(t, "TASK-456", *taskSvc.updateRequest.Code)
-	assert.Equal(t, []uuid.UUID{taskID}, taskSvc.updateRequest.DependsOnTaskIds)
+	assert.Equal(t, []uuid.UUID{taskID}, taskSvc.updateRequest.DependsOnTaskIDs)
 
 	_, err = handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "move_task",
@@ -277,7 +277,7 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, domain.ActionOriginMCPAgent, taskSvc.markDoneOrigin)
 	require.NotNil(t, taskSvc.markDoneRequest)
-	assert.Equal(t, taskID, taskSvc.markDoneRequest.TaskId)
+	assert.Equal(t, taskID, taskSvc.markDoneRequest.TaskID)
 
 	_, err = handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "assign_task_to_self",
@@ -288,7 +288,7 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, domain.ActionOriginMCPAgent, taskSvc.assignSelfOrigin)
 	require.NotNil(t, taskSvc.assignSelfRequest)
-	assert.Equal(t, taskID, taskSvc.assignSelfRequest.TaskId)
+	assert.Equal(t, taskID, taskSvc.assignSelfRequest.TaskID)
 }
 
 func TestUpdateTaskCodeArgHandling(t *testing.T) {
@@ -435,7 +435,7 @@ func TestToolSuccessResultIncludesSummaryAndStructuredJSON(t *testing.T) {
 }
 
 func TestToolErrorResultIncludesSummaryAndStructuredJSON(t *testing.T) {
-	result := toolErrorResult(domain.ForbiddenError("missing required scope"))
+	result := toolErrorResult(apperr.ForbiddenError("missing required scope"))
 
 	content := result["content"].([]map[string]any)
 	require.Len(t, content, 2)

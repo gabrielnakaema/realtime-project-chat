@@ -1,39 +1,36 @@
 name: backend
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "backend/**"
+  workflow_call:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{secrets.GH_ACTOR}}/project-chat:latest
+  IMAGE_NAME: ${{ secrets.GH_ACTOR }}/project-chat
+  IMAGE_TAG: ${{ github.ref == 'refs/heads/main' && 'latest' || 'dev' }}
 
 jobs:
   publish:
     name: Publish Image
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: login
-        run: echo ${{secrets.GH_SECRET}} | docker login ghcr.io -u ${{ secrets.GH_ACTOR }} --password-stdin
+        run: echo ${{ secrets.GH_SECRET }} | docker login ghcr.io -u ${{ secrets.GH_ACTOR }} --password-stdin
       - name: Build and Publish
         run: |
-          docker build backend/. --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          docker build backend/. --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
 
   deploy:
     needs: publish
     name: Deploy Image
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Copy docker-compose to server
         uses: appleboy/scp-action@master
@@ -54,10 +51,16 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
+            set -e
             echo "Connected to VPS"
             cd ${{ secrets.WORK_DIR }}
-            echo ${{secrets.GH_SECRET}} | docker login ghcr.io -u ${{ secrets.GH_ACTOR }} --password-stdin
+            echo ${{ secrets.GH_SECRET }} | docker login ghcr.io -u ${{ secrets.GH_ACTOR }} --password-stdin
             export REGISTRY=${{ env.REGISTRY }}
             export IMAGE_NAME=${{ env.IMAGE_NAME }}
-            docker compose -f docker-compose-prod.yml down api
-            docker compose -f docker-compose-prod.yml up api -d
+            export IMAGE_TAG=${{ env.IMAGE_TAG }}
+            docker compose --env-file .env.prod -f docker-compose-prod.yml config --quiet
+            docker compose --env-file .env.prod -f docker-compose-prod.yml pull api notification-service chat-service tasks-service mcp-service websocket-service
+            if ! docker compose --env-file .env.prod -f docker-compose-prod.yml up -d --remove-orphans; then
+              echo "Normal deployment failed; recreating containers to repair stale network attachments"
+              docker compose --env-file .env.prod -f docker-compose-prod.yml up -d --remove-orphans --force-recreate
+            fi

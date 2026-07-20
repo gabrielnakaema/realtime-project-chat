@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import {
+  addProjectMember,
   expect,
   expectToast,
   loginAsUser,
@@ -20,10 +21,7 @@ test("new project member receives a notification and can open the project", asyn
   const memberPage = await loginAsUser(browser, member);
   const projectName = `E2E Member Notification Project ${crypto.randomUUID()}`;
 
-  await ownerPage
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await ownerPage.getByRole("button", { name: "New project" }).first().click();
   const createProjectDialog = ownerPage.getByRole("dialog", {
     name: "Create project",
   });
@@ -37,13 +35,7 @@ test("new project member receives a notification and can open the project", asyn
   await expectToast(ownerPage, "Project created successfully");
 
   await ownerPage.getByRole("link", { name: projectName }).click();
-  await ownerPage.getByTitle("Add project member").click();
-  const addMemberDialog = ownerPage.getByRole("dialog", {
-    name: "Add project member",
-  });
-  await addMemberDialog.getByLabel("Email").fill(member.email);
-  await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-  await expectToast(ownerPage, "Member added successfully");
+  await addProjectMember(ownerPage, member.email);
 
   await memberPage.getByRole("button", { name: "Notifications" }).click();
   const projectMemberNotification = memberPage
@@ -54,7 +46,7 @@ test("new project member receives a notification and can open the project", asyn
   await projectMemberNotification.click();
   await expect(memberPage).toHaveURL(/\/projects\/[^/?]+$/);
   await expect(
-    memberPage.getByRole("heading", { name: projectName, exact: true })
+    memberPage.getByRole("button", { name: projectName, exact: true })
   ).toBeVisible();
 
   await memberPage.context().close();
@@ -76,8 +68,8 @@ test("user can mark all project notifications as read and the state persists", a
 
   const addMemberToNewProject = async (projectName: string) => {
     await ownerPage
-      .getByRole("banner")
-      .getByRole("button", { name: "Create project" })
+      .getByRole("button", { name: "New project" })
+      .first()
       .click();
     const createProjectDialog = ownerPage.getByRole("dialog", {
       name: "Create project",
@@ -92,13 +84,7 @@ test("user can mark all project notifications as read and the state persists", a
     await expectToast(ownerPage, "Project created successfully");
 
     await ownerPage.getByRole("link", { name: projectName }).click();
-    await ownerPage.getByTitle("Add project member").click();
-    const addMemberDialog = ownerPage.getByRole("dialog", {
-      name: "Add project member",
-    });
-    await addMemberDialog.getByLabel("Email").fill(member.email);
-    await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-    await expectToast(ownerPage, "Member added successfully");
+    await addProjectMember(ownerPage, member.email);
     await ownerPage.goto("/projects");
   };
 
@@ -114,8 +100,8 @@ test("user can mark all project notifications as read and the state persists", a
     .filter({ hasText: `${testUser.name} added you to ${secondProjectName}.` });
   await expect(firstNotification).toBeVisible({ timeout: 15_000 });
   await expect(secondNotification).toBeVisible({ timeout: 15_000 });
-  await expect(firstNotification.locator("span.bg-blue-600")).toHaveCount(1);
-  await expect(secondNotification.locator("span.bg-blue-600")).toHaveCount(1);
+  await expect(firstNotification.locator("span.bg-primary")).toHaveCount(1);
+  await expect(secondNotification.locator("span.bg-primary")).toHaveCount(1);
 
   const markAllReadButton = memberPage.getByRole("button", {
     name: "Mark all read",
@@ -131,8 +117,8 @@ test("user can mark all project notifications as read and the state persists", a
   await markAllReadButton.click();
   expect((await markAllReadResponsePromise).ok()).toBe(true);
   await expect(markAllReadButton).toBeDisabled();
-  await expect(firstNotification.locator("span.bg-blue-600")).toHaveCount(0);
-  await expect(secondNotification.locator("span.bg-blue-600")).toHaveCount(0);
+  await expect(firstNotification.locator("span.bg-primary")).toHaveCount(0);
+  await expect(secondNotification.locator("span.bg-primary")).toHaveCount(0);
 
   await memberPage.reload();
   await memberPage.getByRole("button", { name: "Notifications" }).click();
@@ -143,7 +129,7 @@ test("user can mark all project notifications as read and the state persists", a
     memberPage
       .getByRole("button")
       .filter({ hasText: `${testUser.name} added you to ${firstProjectName}.` })
-      .locator("span.bg-blue-600")
+      .locator("span.bg-primary")
   ).toHaveCount(0);
   await expect(
     memberPage
@@ -151,7 +137,7 @@ test("user can mark all project notifications as read and the state persists", a
       .filter({
         hasText: `${testUser.name} added you to ${secondProjectName}.`,
       })
-      .locator("span.bg-blue-600")
+      .locator("span.bg-primary")
   ).toHaveCount(0);
 
   await memberPage.context().close();
@@ -170,10 +156,7 @@ test("assigned project collaborator receives a notification and can open the tas
   const projectName = `E2E Notification Project ${crypto.randomUUID()}`;
   const taskTitle = `E2E Assigned Task ${crypto.randomUUID()}`;
 
-  await ownerPage
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await ownerPage.getByRole("button", { name: "New project" }).first().click();
 
   const createProjectDialog = ownerPage.getByRole("dialog", {
     name: "Create project",
@@ -188,13 +171,7 @@ test("assigned project collaborator receives a notification and can open the tas
   await expectToast(ownerPage, "Project created successfully");
 
   await ownerPage.getByRole("link", { name: projectName }).click();
-  await ownerPage.getByTitle("Add project member").click();
-  const addMemberDialog = ownerPage.getByRole("dialog", {
-    name: "Add project member",
-  });
-  await addMemberDialog.getByLabel("Email").fill(member.email);
-  await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-  await expectToast(ownerPage, "Member added successfully");
+  await addProjectMember(ownerPage, member.email);
 
   await ownerPage.reload();
   await ownerPage
@@ -247,10 +224,7 @@ test("task author receives a comment notification and opens the commented task",
   const taskTitle = `E2E Commented Task ${crypto.randomUUID()}`;
   const commentText = `E2E notification comment ${crypto.randomUUID()}`;
 
-  await ownerPage
-    .getByRole("banner")
-    .getByRole("button", { name: "Create project" })
-    .click();
+  await ownerPage.getByRole("button", { name: "New project" }).first().click();
   const createProjectDialog = ownerPage.getByRole("dialog", {
     name: "Create project",
   });
@@ -265,13 +239,7 @@ test("task author receives a comment notification and opens the commented task",
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   const projectId = ownerPage.url().split("/projects/")[1];
-  await ownerPage.getByTitle("Add project member").click();
-  const addMemberDialog = ownerPage.getByRole("dialog", {
-    name: "Add project member",
-  });
-  await addMemberDialog.getByLabel("Email").fill(member.email);
-  await addMemberDialog.getByRole("button", { name: "Add member" }).click();
-  await expectToast(ownerPage, "Member added successfully");
+  await addProjectMember(ownerPage, member.email);
 
   await ownerPage.reload();
   await ownerPage

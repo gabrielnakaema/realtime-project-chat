@@ -3,13 +3,13 @@ import { useMutation } from '@tanstack/react-query';
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useForm } from 'react-hook-form';
 import type { SubmitHandler } from 'react-hook-form';
-import type { ISignUpForm } from '@/schemas/sign-up-schema';
+import type { ISignUpForm } from '@/features/auth/schemas/sign-up.schema';
 import { Button } from '@/components/button';
 import { Input } from '@/components/input';
-import { LoadingSpinner } from '@/components/loading';
-import { signUpSchema } from '@/schemas/sign-up-schema';
-import { createUser } from '@/services/users';
-import { handleSuccess } from '@/utils/handle-success';
+import { LoadingSpinner } from '@/shared/components/loading';
+import { signUpSchema } from '@/features/auth/schemas/sign-up.schema';
+import { createUser } from '@/features/auth/services/users';
+import { handleSuccess } from '@/shared/utils/handle-success';
 
 export const Route = createFileRoute('/sign-up')({
   component: RouteComponent,
@@ -39,11 +39,11 @@ function RouteComponent() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4 dark:from-slate-900 dark:to-slate-800">
-      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+    <div className="from-muted to-muted flex min-h-screen items-center justify-center bg-gradient-to-br p-4">
+      <div className="border-border bg-card w-full max-w-md rounded-lg border p-6">
         <div className="mb-6 text-center">
-          <h1 className="mb-2 text-2xl font-bold text-slate-900 dark:text-slate-100">Create Account</h1>
-          <p className="text-slate-600 dark:text-slate-400">Join TaskFlow and start organizing your projects</p>
+          <h1 className="text-foreground mb-2 text-2xl font-bold">Create Account</h1>
+          <p className="text-muted-foreground">Join TaskFlow and start organizing your projects</p>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input
@@ -81,9 +81,9 @@ function RouteComponent() {
           </Button>
         </form>
         <div className="mt-6 text-center">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
+          <p className="text-muted-foreground text-sm">
             Already have an account?{' '}
-            <Link to="/login" className="font-medium text-blue-600 hover:text-blue-700">
+            <Link to="/login" className="text-primary hover:text-primary/80 font-medium">
               Sign in
             </Link>
           </p>

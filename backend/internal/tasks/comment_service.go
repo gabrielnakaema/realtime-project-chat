@@ -1,0 +1,190 @@
+package tasks
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
+	"github.com/gabrielnakaema/project-chat/internal/utils"
+	"github.com/google/uuid"
+)
+
+type taskCommentRepository interface {
+	Create(ctx context.Context, comment *domain.TaskComment, parentCommentID *uuid.UUID, buildEvents func(*domain.TaskComment) []outbox.Message) error
+	ListByTaskID(
+		ctx context.Context,
+		taskID uuid.UUID,
+		before *time.Time,
+		beforeID *uuid.UUID,
+		after *time.Time,
+		afterID *uuid.UUID,
+		limit int,
+	) (*utils.CursorPaginated[domain.TaskComment], error)
+}
+
+type taskCommentTaskRepository interface {
+	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
+}
+
+type taskCommentProjectRepository interface {
+	GetById(ctx context.Context, id uuid.UUID) (*domain.Project, error)
+}
+
+type taskCommentUserRepository interface {
+	GetById(ctx context.Context, id uuid.UUID) (*domain.User, error)
+}
+
+type TaskCommentService struct {
+	taskCommentRepository taskCommentRepository
+	taskRepository        taskCommentTaskRepository
+	projectRepository     taskCommentProjectRepository
+	userRepository        taskCommentUserRepository
+}
+
+func NewTaskCommentService(taskCommentRepository taskCommentRepository, taskRepository taskCommentTaskRepository, projectRepository taskCommentProjectRepository, userRepository taskCommentUserRepository) *TaskCommentService {
+	return &TaskCommentService{
+		taskCommentRepository: taskCommentRepository,
+		taskRepository:        taskRepository,
+		projectRepository:     projectRepository,
+		userRepository:        userRepository,
+	}
+}
+
+type CreateTaskCommentRequest struct {
+	TaskID          uuid.UUID
+	RequestUserID   uuid.UUID
+	Content         string
+	ParentCommentID *uuid.UUID
+}
+
+func (s *TaskCommentService) Create(ctx context.Context, request CreateTaskCommentRequest) (*domain.TaskComment, error) {
+	if request.RequestUserID == uuid.Nil {
+		return nil, apperr.UnauthorizedError("unauthorized")
+	}
+
+	task, err := s.taskRepository.GetById(ctx, request.TaskID)
+	if err != nil {
+		var domainErr apperr.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("task not found")
+			}
+			return nil, domainErr
+		}
+		return nil, apperr.ServerError("failed to get task", err)
+	}
+
+	project, err := s.projectRepository.GetById(ctx, task.ProjectId)
+	if err != nil {
+		var domainErr apperr.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("project not found")
+			}
+			return nil, domainErr
+		}
+		return nil, apperr.ServerError("failed to get project", err)
+	}
+
+	if !project.IsMember(request.RequestUserID) {
+		return nil, apperr.ForbiddenError("forbidden")
+	}
+
+	user, err := s.userRepository.GetById(ctx, request.RequestUserID)
+	if err != nil {
+		return nil, apperr.ServerError("failed to get user", err)
+	}
+
+	now := time.Now()
+	comment := domain.TaskComment{
+		Task:         task,
+		User:         user,
+		Content:      request.Content,
+		ActionOrigin: domain.ActionOriginFromContext(ctx),
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		Replies:      []domain.TaskComment{},
+	}
+
+	err = s.taskCommentRepository.Create(ctx, &comment, request.ParentCommentID, func(c *domain.TaskComment) []outbox.Message {
+		return []outbox.Message{{
+			Topic:       events.TaskCommentCreated,
+			AggregateID: c.Task.Id,
+			Payload: &events.TaskCommentCreatedPayload{
+				TaskComment:  *c,
+				ActionOrigin: domain.ActionOriginFromContext(ctx),
+				User: domain.User{
+					Id: request.RequestUserID,
+				},
+			},
+		}}
+	})
+	if err != nil {
+		return nil, apperr.ServerError("failed to create task comment", err)
+	}
+
+	return &comment, nil
+}
+
+type ListTaskCommentsRequest struct {
+	TaskID          uuid.UUID
+	RequestUserID   uuid.UUID
+	Limit           int
+	Before          *time.Time
+	BeforeCommentID *uuid.UUID
+	After           *time.Time
+	AfterCommentID  *uuid.UUID
+}
+
+func (s *TaskCommentService) ListByTaskID(ctx context.Context, request ListTaskCommentsRequest) (*utils.CursorPaginated[domain.TaskComment], error) {
+	if request.RequestUserID == uuid.Nil {
+		return nil, apperr.UnauthorizedError("unauthorized")
+	}
+
+	task, err := s.taskRepository.GetById(ctx, request.TaskID)
+	if err != nil {
+		var domainErr apperr.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("task not found")
+			}
+			return nil, domainErr
+		}
+		return nil, apperr.ServerError("failed to get task", err)
+	}
+
+	project, err := s.projectRepository.GetById(ctx, task.ProjectId)
+	if err != nil {
+		var domainErr apperr.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("project not found")
+			}
+			return nil, domainErr
+		}
+		return nil, apperr.ServerError("failed to get project", err)
+	}
+
+	if !project.IsMember(request.RequestUserID) {
+		return nil, apperr.ForbiddenError("forbidden")
+	}
+
+	comments, err := s.taskCommentRepository.ListByTaskID(
+		ctx,
+		request.TaskID,
+		request.Before,
+		request.BeforeCommentID,
+		request.After,
+		request.AfterCommentID,
+		request.Limit,
+	)
+	if err != nil {
+		return nil, apperr.ServerError("failed to list task comments", err)
+	}
+
+	return comments, nil
+}
