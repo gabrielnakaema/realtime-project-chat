@@ -15,7 +15,7 @@ export const UpcomingDeadlines = () => {
         Upcoming Deadlines
       </h2>
 
-      <div className="border-border bg-card flex min-h-0 flex-1 flex-col rounded-xl border px-4">
+      <div className="border-border bg-card flex min-h-0 flex-1 flex-col rounded-xl border px-4 pt-1">
         {isLoading && <DeadlinesSkeleton />}
 
         {isError && !isLoading && (
@@ -61,11 +61,11 @@ const DeadlineRow = ({ task }: { task: Task }) => {
       to="/projects/$projectId"
       params={{ projectId }}
       search={{ taskId: task.id }}
-      className="border-border group flex min-h-12 flex-1 items-start justify-between gap-3 border-b py-3 last:border-b-0"
+      className="border-border group flex min-h-12 shrink-0 items-start justify-between gap-3 border-b py-2 last:border-b-0"
     >
       <div className="min-w-0">
         <p className="text-foreground truncate text-[12.5px] leading-[1.4] group-hover:underline">{task.title}</p>
-        <p className="text-primary mt-1 truncate text-[10.5px] font-medium">{task.project?.name ?? 'Project'}</p>
+        <p className="text-primary truncate pt-1 text-[10.5px] font-medium">{task.project?.name ?? 'Project'}</p>
       </div>
       <span
         className={cn(

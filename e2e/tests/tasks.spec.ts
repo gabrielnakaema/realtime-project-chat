@@ -474,7 +474,8 @@ test.describe("tasks", () => {
 
     await expect(async () => {
       await page.reload();
-      taskDetails = await openTaskDetails(page, taskTitle);
+      taskDetails = page.getByRole("dialog", { name: taskTitle });
+      await expect(taskDetails).toBeVisible();
       await taskDetails
         .getByRole("button", { name: "Activity timeline" })
         .click();

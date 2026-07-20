@@ -95,6 +95,7 @@ export const ProjectDetailsHeader = ({ project }: { project: Project }) => {
             onlineUserIds={onlineUserIds}
             members={project.members.map((member) => ({ user_id: member.user_id, name: member.user.name }))}
             max={4}
+            variant="compactMuted"
           />
         </div>
 

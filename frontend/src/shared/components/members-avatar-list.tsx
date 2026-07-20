@@ -7,24 +7,55 @@ interface Member {
   name: string;
 }
 
+type AvatarVariant = 'default' | 'compactMuted';
+
 interface MembersAvatarListProps {
   members: Member[];
   max?: number;
   onlineUserIds?: string[];
+  variant?: AvatarVariant;
 }
 
-export const MembersAvatarList = ({ members = [], max = 4, onlineUserIds = [] }: MembersAvatarListProps) => {
+const variantStyles: Record<AvatarVariant, { list: string; avatar: string; badge: string; badgeText: string }> = {
+  default: {
+    list: '-space-x-2',
+    avatar: 'bg-primary text-primary-foreground h-8 w-8 text-xs font-medium',
+    badge: 'h-8 w-8',
+    badgeText: 'text-xs',
+  },
+  compactMuted: {
+    list: '-space-x-1.5',
+    avatar: 'bg-muted text-muted-foreground size-7 text-[9px] font-semibold',
+    badge: 'size-7',
+    badgeText: 'text-[9px] font-semibold',
+  },
+};
+
+const getInitials = (name: string, maxLetters: number) => {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+
+  return words
+    .slice(0, maxLetters)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join('');
+};
+
+export const MembersAvatarList = ({
+  members = [],
+  max = 4,
+  onlineUserIds = [],
+  variant = 'default',
+}: MembersAvatarListProps) => {
+  const styles = variantStyles[variant];
+  const initialLetters = variant === 'compactMuted' ? 2 : 1;
+
   const sortedMembers = useMemo(() => {
     const membersCopy = members.map((member) => ({
       ...member,
       online: onlineUserIds.includes(member.user_id),
     }));
 
-    const sorted = membersCopy.sort((a, b) => {
-      return Number(b.online) - Number(a.online);
-    });
-
-    return sorted;
+    return membersCopy.sort((a, b) => Number(b.online) - Number(a.online));
   }, [members, onlineUserIds]);
 
   const membersToShow = sortedMembers.slice(0, max);
@@ -32,17 +63,18 @@ export const MembersAvatarList = ({ members = [], max = 4, onlineUserIds = [] }:
   const remaining = sortedMembers.length - max;
 
   return (
-    <div className="flex -space-x-2">
+    <div className={cn('flex', styles.list)} aria-label={`${members.length} project members`}>
       {membersToShow.map((member) => (
         <Tooltip key={member.user_id}>
           <TooltipTrigger>
             <div
               className={cn(
-                'border-card bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-medium',
+                'border-card flex items-center justify-center rounded-full border-2',
+                styles.avatar,
                 member.online && 'border-success',
               )}
             >
-              {member.name.charAt(0).toUpperCase()}
+              {getInitials(member.name, initialLetters)}
             </div>
           </TooltipTrigger>
           <TooltipContent>{member.name}</TooltipContent>
@@ -51,8 +83,8 @@ export const MembersAvatarList = ({ members = [], max = 4, onlineUserIds = [] }:
       {remaining > 0 && (
         <Tooltip>
           <TooltipTrigger>
-            <div className="border-card bg-muted flex h-8 w-8 items-center justify-center rounded-full border-2">
-              <span className="text-muted-foreground text-xs font-medium">+{remaining}</span>
+            <div className={cn('border-card bg-muted flex items-center justify-center rounded-full border-2', styles.badge)}>
+              <span className={cn('text-muted-foreground font-medium', styles.badgeText)}>+{remaining}</span>
             </div>
           </TooltipTrigger>
           <TooltipContent>
