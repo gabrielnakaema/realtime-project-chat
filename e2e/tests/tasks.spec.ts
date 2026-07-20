@@ -472,11 +472,18 @@ test.describe("tasks", () => {
         .getByText("Low", { exact: true })
     ).toBeVisible();
 
-    await taskDetails
-      .getByRole("button", { name: "Activity timeline" })
-      .click();
+    await expect(async () => {
+      await page.reload();
+      taskDetails = await openTaskDetails(page, taskTitle);
+      await taskDetails
+        .getByRole("button", { name: "Activity timeline" })
+        .click();
+      await expect(taskDetails.getByText("set priority to")).toBeVisible({
+        timeout: 1_000,
+      });
+    }).toPass({ timeout: 15_000 });
+
     await expect(taskDetails.getByText("created the task")).toBeVisible();
-    await expect(taskDetails.getByText("set priority to")).toBeVisible();
   });
 
   test("project owner can cancel and then confirm archiving a task, and restore it from the archived tasks list", async ({

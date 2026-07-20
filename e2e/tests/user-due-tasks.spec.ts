@@ -164,9 +164,15 @@ test("assigned user can complete an upcoming task and remove it from the dashboa
   await expect(doneColumn.getByText(taskTitle, { exact: true })).toBeVisible();
 
   await memberPage.goto("/projects");
+  const updatedDueTasks = memberPage.getByRole("region", {
+    name: "Upcoming Deadlines",
+  });
   await expect(
-    memberPage.getByRole("region", { name: "Upcoming Deadlines" })
+    updatedDueTasks.getByRole("link", { name: new RegExp(taskTitle) })
   ).toHaveCount(0);
+  await expect(
+    updatedDueTasks.getByText("Nothing due soon", { exact: true })
+  ).toBeVisible();
 
   await memberPage.context().close();
 });
