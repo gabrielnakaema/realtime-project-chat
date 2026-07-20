@@ -37,6 +37,7 @@ export const TaskStatusBadge = ({
           borderColor: surface.borderColor,
           color: surface.accentColor,
         }}
+        className="overflow-hidden whitespace-nowrap"
       >
         {label}
       </TaskBadge>

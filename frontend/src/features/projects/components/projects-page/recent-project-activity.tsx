@@ -36,17 +36,11 @@ export const RecentProjectActivity = () => {
 
         {!isLoading && !isError && !!data.length && (
           <div className="max-h-[315px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {data.map((activity, index) => (
+            {data.map((activity) => (
               <article
                 key={activity.id}
                 className="border-border flex items-start gap-2.5 border-b py-3 last:border-b-0"
               >
-                <span
-                  className={
-                    index < 2 ? 'bg-primary mt-1.5 size-1.5 shrink-0 rounded-full' : 'mt-1.5 size-1.5 shrink-0'
-                  }
-                  aria-hidden="true"
-                />
                 <div className="min-w-0 flex-1 [&_p]:text-[12.5px] [&_p]:leading-[1.45]">
                   <ProjectActivityText activity={activity} />
                   <div className="mt-1 flex flex-wrap items-center gap-2">

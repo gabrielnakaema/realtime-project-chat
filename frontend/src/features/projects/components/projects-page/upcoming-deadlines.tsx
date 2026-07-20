@@ -10,12 +10,12 @@ export const UpcomingDeadlines = () => {
   const { data, isError, isFetchingNextPage, isLoading, refetch, sentinelRef } = useUserDueTasks();
 
   return (
-    <section aria-labelledby="upcoming-deadlines-heading">
+    <section className="flex h-full flex-col" aria-labelledby="upcoming-deadlines-heading">
       <h2 id="upcoming-deadlines-heading" className="text-foreground mb-3 text-[13px] font-semibold">
         Upcoming Deadlines
       </h2>
 
-      <div className="border-border bg-card rounded-xl border px-4">
+      <div className="border-border bg-card flex min-h-0 flex-1 flex-col rounded-xl border px-4">
         {isLoading && <DeadlinesSkeleton />}
 
         {isError && !isLoading && (
@@ -35,7 +35,7 @@ export const UpcomingDeadlines = () => {
         )}
 
         {!isLoading && !isError && !!data.length && (
-          <div className="max-h-[192px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex max-h-[315px] min-h-0 flex-1 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {data.map((task) => (
               <DeadlineRow key={task.id} task={task} />
             ))}
@@ -61,7 +61,7 @@ const DeadlineRow = ({ task }: { task: Task }) => {
       to="/projects/$projectId"
       params={{ projectId }}
       search={{ taskId: task.id }}
-      className="border-border group flex items-start justify-between gap-3 border-b py-3 last:border-b-0"
+      className="border-border group flex min-h-12 flex-1 items-start justify-between gap-3 border-b py-3 last:border-b-0"
     >
       <div className="min-w-0">
         <p className="text-foreground truncate text-[12.5px] leading-[1.4] group-hover:underline">{task.title}</p>
