@@ -6,9 +6,10 @@ import (
 	"errors"
 	"time"
 
+	chatqueries "github.com/gabrielnakaema/project-chat/internal/chat/queries"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/outbox"
-	"github.com/gabrielnakaema/project-chat/internal/queries"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -33,7 +34,7 @@ func (cr *Repository) Create(ctx context.Context, chat *domain.Chat) error {
 	}
 	defer tx.Rollback(ctx)
 
-	q := queries.New(cr.pool)
+	q := chatqueries.New(cr.pool)
 	qtx := q.WithTx(tx)
 
 	pgTypeUuid := pgtype.UUID{Bytes: *chat.ProjectId, Valid: true}
@@ -46,7 +47,7 @@ func (cr *Repository) Create(ctx context.Context, chat *domain.Chat) error {
 	chat.Id = id
 
 	for _, member := range chat.Members {
-		params := queries.CreateChatMemberParams{
+		params := chatqueries.CreateChatMemberParams{
 			UserID:     member.UserId,
 			ChatID:     chat.Id,
 			LastSeenAt: pgtype.Timestamptz{Time: member.LastSeenAt, Valid: true},
@@ -69,9 +70,9 @@ func (cr *Repository) CreateMember(ctx context.Context, member *domain.ChatMembe
 	}
 	defer tx.Rollback(ctx)
 
-	qtx := queries.New(tx)
+	qtx := chatqueries.New(tx)
 
-	if err := qtx.CreateChatMember(ctx, queries.CreateChatMemberParams{
+	if err := qtx.CreateChatMember(ctx, chatqueries.CreateChatMemberParams{
 		UserID:     member.UserId,
 		ChatID:     member.ChatId,
 		LastSeenAt: pgtype.Timestamptz{Time: member.LastSeenAt, Valid: true},
@@ -96,9 +97,9 @@ func (cr *Repository) DeleteMember(ctx context.Context, member *domain.ChatMembe
 	}
 	defer tx.Rollback(ctx)
 
-	qtx := queries.New(tx)
+	qtx := chatqueries.New(tx)
 
-	if err := qtx.DeleteChatMember(ctx, queries.DeleteChatMemberParams{
+	if err := qtx.DeleteChatMember(ctx, chatqueries.DeleteChatMemberParams{
 		UserID: member.UserId,
 		ChatID: member.ChatId,
 	}); err != nil {
@@ -115,8 +116,8 @@ func (cr *Repository) DeleteMember(ctx context.Context, member *domain.ChatMembe
 }
 
 func (cr *Repository) UpdateMemberLastSeenAt(ctx context.Context, member *domain.ChatMember) error {
-	q := queries.New(cr.pool)
-	return q.UpdateChatMemberLastSeenAt(ctx, queries.UpdateChatMemberLastSeenAtParams{
+	q := chatqueries.New(cr.pool)
+	return q.UpdateChatMemberLastSeenAt(ctx, chatqueries.UpdateChatMemberLastSeenAtParams{
 		LastSeenAt: pgtype.Timestamptz{Time: member.LastSeenAt, Valid: true},
 		UserID:     member.UserId,
 		ChatID:     member.ChatId,
@@ -130,10 +131,10 @@ func (cr *Repository) CreateMessage(ctx context.Context, message *domain.ChatMes
 	}
 	defer tx.Rollback(ctx)
 
-	q := queries.New(cr.pool)
+	q := chatqueries.New(cr.pool)
 	qtx := q.WithTx(tx)
 
-	params := queries.CreateChatMessageParams{
+	params := chatqueries.CreateChatMessageParams{
 		ChatID:      message.ChatId,
 		MessageType: string(message.MessageType),
 		Content:     message.Content,
@@ -152,7 +153,7 @@ func (cr *Repository) CreateMessage(ctx context.Context, message *domain.ChatMes
 
 	message.Id = id
 
-	err = qtx.UpdateChatUpdatedAt(ctx, queries.UpdateChatUpdatedAtParams{
+	err = qtx.UpdateChatUpdatedAt(ctx, chatqueries.UpdateChatUpdatedAtParams{
 		UpdatedAt: pgtype.Timestamptz{Time: message.UpdatedAt, Valid: true},
 		ID:        message.ChatId,
 	})
@@ -170,11 +171,11 @@ func (cr *Repository) CreateMessage(ctx context.Context, message *domain.ChatMes
 }
 
 func (cr *Repository) GetByProjectId(ctx context.Context, projectId uuid.UUID) (*domain.Chat, error) {
-	q := queries.New(cr.pool)
+	q := chatqueries.New(cr.pool)
 	chatResult, err := q.GetChatByProjectId(ctx, pgtype.UUID{Bytes: projectId, Valid: true})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.NotFoundError("chat not found")
+			return nil, apperr.NotFoundError("chat not found")
 		}
 		return nil, err
 	}
@@ -196,11 +197,11 @@ func (cr *Repository) GetByProjectId(ctx context.Context, projectId uuid.UUID) (
 }
 
 func (cr *Repository) GetById(ctx context.Context, id uuid.UUID) (*domain.Chat, error) {
-	q := queries.New(cr.pool)
+	q := chatqueries.New(cr.pool)
 	chatResult, err := q.GetChatById(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.NotFoundError("chat not found")
+			return nil, apperr.NotFoundError("chat not found")
 		}
 		return nil, err
 	}
@@ -221,7 +222,7 @@ func (cr *Repository) GetById(ctx context.Context, id uuid.UUID) (*domain.Chat, 
 }
 
 func (cr *Repository) GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, memberIds []uuid.UUID) (*domain.Chat, error) {
-	q := queries.New(cr.pool)
+	q := chatqueries.New(cr.pool)
 
 	existingId, err := q.FindGeneralChatByExactMembers(ctx, memberIds)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -246,7 +247,7 @@ func (cr *Repository) GetOrCreateGeneralChat(ctx context.Context, currentUserId 
 
 	now := time.Now()
 	for _, userId := range memberIds {
-		err = qtx.CreateChatMember(ctx, queries.CreateChatMemberParams{
+		err = qtx.CreateChatMember(ctx, chatqueries.CreateChatMemberParams{
 			UserID:     userId,
 			ChatID:     chatId,
 			LastSeenAt: pgtype.Timestamptz{Time: now, Valid: true},
@@ -282,8 +283,8 @@ func (cr *Repository) GetOrCreateGeneralChat(ctx context.Context, currentUserId 
 }
 
 func (cr *Repository) ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error) {
-	q := queries.New(cr.pool)
-	rows, err := q.ListGeneralChatsByUserId(ctx, queries.ListGeneralChatsByUserIdParams{
+	q := chatqueries.New(cr.pool)
+	rows, err := q.ListGeneralChatsByUserId(ctx, chatqueries.ListGeneralChatsByUserIdParams{
 		UserID:  userId,
 		Column2: domain.ChatUnreadCountFetchLimit,
 	})
@@ -314,9 +315,9 @@ func (cr *Repository) ListGeneralChats(ctx context.Context, userId uuid.UUID) ([
 }
 
 func (cr *Repository) ListMessages(ctx context.Context, chatId uuid.UUID, params utils.PaginationBeforeParams) ([]domain.ChatMessage, error) {
-	q := queries.New(cr.pool)
+	q := chatqueries.New(cr.pool)
 
-	queriesParams := queries.ListChatMessagesParams{
+	queriesParams := chatqueries.ListChatMessagesParams{
 		ChatID:    chatId,
 		Limit:     params.Limit,
 		CreatedAt: pgtype.Timestamptz{Time: params.Before, Valid: true},
@@ -362,8 +363,8 @@ func (cr *Repository) ListMessages(ctx context.Context, chatId uuid.UUID, params
 }
 
 func (cr *Repository) GetUnreadSummary(ctx context.Context, chatId uuid.UUID, userId uuid.UUID) (*domain.ChatUnreadSummary, error) {
-	q := queries.New(cr.pool)
-	row, err := q.GetUnreadCountByChatId(ctx, queries.GetUnreadCountByChatIdParams{
+	q := chatqueries.New(cr.pool)
+	row, err := q.GetUnreadCountByChatId(ctx, chatqueries.GetUnreadCountByChatIdParams{
 		ChatID:  chatId,
 		UserID:  userId,
 		Column3: domain.ChatUnreadCountFetchLimit,
@@ -379,11 +380,11 @@ func (cr *Repository) GetUnreadSummary(ctx context.Context, chatId uuid.UUID, us
 }
 
 func (cr *Repository) GetMessageById(ctx context.Context, id uuid.UUID) (*domain.ChatMessage, error) {
-	q := queries.New(cr.pool)
+	q := chatqueries.New(cr.pool)
 	message, err := q.GetChatMessageById(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.NotFoundError("chat message not found")
+			return nil, apperr.NotFoundError("chat message not found")
 		}
 		return nil, err
 	}
@@ -412,10 +413,10 @@ func (cr *Repository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId
 	}
 	defer tx.Rollback(ctx)
 
-	q := queries.New(cr.pool)
+	q := chatqueries.New(cr.pool)
 	qtx := q.WithTx(tx)
 
-	err = qtx.UpdateChatMemberLastSeenAt(ctx, queries.UpdateChatMemberLastSeenAtParams{
+	err = qtx.UpdateChatMemberLastSeenAt(ctx, chatqueries.UpdateChatMemberLastSeenAtParams{
 		LastSeenAt: pgtype.Timestamptz{Time: readAt, Valid: true},
 		UserID:     userId,
 		ChatID:     chatId,
@@ -425,7 +426,7 @@ func (cr *Repository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId
 	}
 
 	if message != nil {
-		err = qtx.UpsertChatMessageReadsUpTo(ctx, queries.UpsertChatMessageReadsUpToParams{
+		err = qtx.UpsertChatMessageReadsUpTo(ctx, chatqueries.UpsertChatMessageReadsUpToParams{
 			ChatID:    chatId,
 			UserID:    userId,
 			ReadAt:    pgtype.Timestamptz{Time: readAt, Valid: true},
@@ -447,7 +448,7 @@ func (cr *Repository) MarkReadUpTo(ctx context.Context, chatId uuid.UUID, userId
 }
 
 func (cr *Repository) ListMessageReads(ctx context.Context, messageId uuid.UUID) ([]domain.ChatMessageRead, error) {
-	q := queries.New(cr.pool)
+	q := chatqueries.New(cr.pool)
 	rows, err := q.ListChatMessageReads(ctx, messageId)
 	if err != nil {
 		return nil, err

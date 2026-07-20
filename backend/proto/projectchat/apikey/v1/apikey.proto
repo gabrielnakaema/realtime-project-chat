@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package projectchat.apikey.v1;
+
+option go_package = "github.com/gabrielnakaema/project-chat/internal/apikey/v1;apikeyv1";
+
+service APIKeyService {
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse);
+}
+
+message AuthenticateRequest {
+  string bearer_secret = 1;
+}
+
+message AuthenticateResponse {
+  string key_id = 1;
+  string user_id = 2;
+  repeated string scopes = 3;
+}

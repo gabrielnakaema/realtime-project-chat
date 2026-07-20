@@ -8,6 +8,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/notification"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -49,9 +50,9 @@ func TestNotificationService_ListUnauthorized(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, result)
-	var domainErr domain.DomainError
+	var domainErr apperr.DomainError
 	require.ErrorAs(t, err, &domainErr)
-	assert.Equal(t, domain.UnauthorizedErrorCode, domainErr.Code)
+	assert.Equal(t, apperr.UnauthorizedErrorCode, domainErr.Code)
 }
 
 func TestNotificationService_CountUnreadSuccess(t *testing.T) {
@@ -76,9 +77,9 @@ func TestNotificationService_MarkReadReturnsNotFoundWhenMissing(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	var domainErr domain.DomainError
+	var domainErr apperr.DomainError
 	require.ErrorAs(t, err, &domainErr)
-	assert.Equal(t, domain.NotFoundErrorCode, domainErr.Code)
+	assert.Equal(t, apperr.NotFoundErrorCode, domainErr.Code)
 }
 
 func TestNotificationService_MarkAllReadWrapsRepositoryError(t *testing.T) {
@@ -89,7 +90,7 @@ func TestNotificationService_MarkAllReadWrapsRepositoryError(t *testing.T) {
 	err := svc.MarkAllRead(context.Background(), uuid.New())
 
 	require.Error(t, err)
-	var domainErr domain.DomainError
+	var domainErr apperr.DomainError
 	require.ErrorAs(t, err, &domainErr)
-	assert.Equal(t, domain.ServerErrorCode, domainErr.Code)
+	assert.Equal(t, apperr.ServerErrorCode, domainErr.Code)
 }

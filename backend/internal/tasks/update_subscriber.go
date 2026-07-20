@@ -6,10 +6,11 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
-	"github.com/gabrielnakaema/project-chat/internal/subscriber"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/config"
+	"github.com/gabrielnakaema/project-chat/internal/platform/messaging"
 )
 
 type TaskUpdateRepository interface {
@@ -18,12 +19,12 @@ type TaskUpdateRepository interface {
 
 type TaskUpdateSubscriber struct {
 	logger     *slog.Logger
-	subscriber *subscriber.Subscriber
+	subscriber *messaging.Subscriber
 	repository TaskUpdateRepository
 }
 
 func NewTaskUpdateSubscriber(ctx context.Context, config *config.Config, logger *slog.Logger, repository TaskUpdateRepository) (*TaskUpdateSubscriber, error) {
-	sub, err := subscriber.NewSubscriber(config, "task_update.subscriber")
+	sub, err := messaging.NewSubscriber(config, "task_update.subscriber")
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func (s *TaskUpdateSubscriber) Close() error {
 	return s.subscriber.Close()
 }
 
-func (s *TaskUpdateSubscriber) handleTaskUpdateEvents(ctx context.Context, message subscriber.Message) error {
+func (s *TaskUpdateSubscriber) handleTaskUpdateEvents(ctx context.Context, message messaging.Message) error {
 	switch message.Topic {
 	case events.TaskCreated:
 		if err := s.handleTaskCreated(ctx, message); err != nil {
@@ -64,10 +65,10 @@ func (s *TaskUpdateSubscriber) handleTaskUpdateEvents(ctx context.Context, messa
 	}
 }
 
-func (s *TaskUpdateSubscriber) handleTaskCreated(ctx context.Context, message subscriber.Message) error {
+func (s *TaskUpdateSubscriber) handleTaskCreated(ctx context.Context, message messaging.Message) error {
 	var payload events.TaskCreatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
-		return domain.ServerError("failed to unmarshal task created payload", err)
+		return apperr.ServerError("failed to unmarshal task created payload", err)
 	}
 
 	update := domain.NewTaskCreatedUpdate(&payload.Task, &payload.User)
@@ -75,21 +76,21 @@ func (s *TaskUpdateSubscriber) handleTaskCreated(ctx context.Context, message su
 
 	ctx = domain.WithActionOrigin(ctx, payload.ActionOrigin)
 	if err := s.repository.CreateUpdates(ctx, &payload.Task, []domain.TaskUpdate{update}); err != nil {
-		return domain.ServerError("failed to create task update for created task", err)
+		return apperr.ServerError("failed to create task update for created task", err)
 	}
 
 	return nil
 }
 
-func (s *TaskUpdateSubscriber) handleTaskUpdated(ctx context.Context, message subscriber.Message) error {
+func (s *TaskUpdateSubscriber) handleTaskUpdated(ctx context.Context, message messaging.Message) error {
 	var payload events.TaskUpdatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
-		return domain.ServerError("failed to unmarshal task updated payload", err)
+		return apperr.ServerError("failed to unmarshal task updated payload", err)
 	}
 
 	if payload.PreviousTask == nil {
 		s.logger.Warn("task updated payload missing previous task", "task_id", payload.Task.Id, "topic", message.Topic)
-		return domain.ServerError("failed to create task update", errors.New("task updated payload missing previous_task"))
+		return apperr.ServerError("failed to create task update", errors.New("task updated payload missing previous_task"))
 	}
 
 	update := domain.NewTaskUpdate(payload.PreviousTask, &payload.Task, &payload.User)
@@ -100,7 +101,7 @@ func (s *TaskUpdateSubscriber) handleTaskUpdated(ctx context.Context, message su
 
 	ctx = domain.WithActionOrigin(ctx, payload.ActionOrigin)
 	if err := s.repository.CreateUpdates(ctx, &payload.Task, []domain.TaskUpdate{update}); err != nil {
-		return domain.ServerError("failed to create task update", err)
+		return apperr.ServerError("failed to create task update", err)
 	}
 
 	return nil

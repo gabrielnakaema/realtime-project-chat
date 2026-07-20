@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
 	projectv1 "github.com/gabrielnakaema/project-chat/internal/project/v1"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -23,12 +24,24 @@ func (s rpcClientStub) CheckAccess(context.Context, *projectv1.CheckAccessReques
 	return s.response, s.err
 }
 
+func (s rpcClientStub) GetProject(context.Context, *projectv1.GetProjectRequest, ...grpc.CallOption) (*projectv1.GetProjectResponse, error) {
+	return nil, s.err
+}
+
+func (s rpcClientStub) ListProjects(context.Context, *projectv1.ListProjectsRequest, ...grpc.CallOption) (*projectv1.ListProjectsResponse, error) {
+	return nil, s.err
+}
+
 type projectServiceStub struct {
 	err error
 }
 
 func (s projectServiceStub) GetById(context.Context, uuid.UUID, uuid.UUID) (*domain.Project, error) {
 	return &domain.Project{}, s.err
+}
+
+func (s projectServiceStub) ListByUserId(context.Context, ListProjectsByUserIdRequest) ([]domain.Project, error) {
+	return nil, s.err
 }
 
 func TestServerAllowsAccessibleProject(t *testing.T) {
@@ -46,10 +59,10 @@ func TestServerMapsDomainErrorsDeterministically(t *testing.T) {
 		err  error
 		code codes.Code
 	}{
-		{name: "forbidden", err: domain.ForbiddenError("forbidden"), code: codes.PermissionDenied},
-		{name: "not found", err: domain.NotFoundError("not found"), code: codes.NotFound},
-		{name: "validation", err: domain.BusinessValidationError("invalid"), code: codes.InvalidArgument},
-		{name: "server", err: domain.ServerError("failed", errors.New("database")), code: codes.Internal},
+		{name: "forbidden", err: apperr.ForbiddenError("forbidden"), code: codes.PermissionDenied},
+		{name: "not found", err: apperr.NotFoundError("not found"), code: codes.NotFound},
+		{name: "validation", err: apperr.BusinessValidationError("invalid"), code: codes.InvalidArgument},
+		{name: "server", err: apperr.ServerError("failed", errors.New("database")), code: codes.Internal},
 		{name: "unknown", err: errors.New("unknown"), code: codes.Internal},
 	} {
 		t.Run(test.name, func(t *testing.T) {

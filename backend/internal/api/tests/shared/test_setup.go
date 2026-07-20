@@ -12,13 +12,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gabrielnakaema/project-chat/internal/api"
-	"github.com/gabrielnakaema/project-chat/internal/mcpapi"
-	"github.com/gabrielnakaema/project-chat/internal/notificationapi"
-	"github.com/gabrielnakaema/project-chat/internal/repository"
+	"github.com/gabrielnakaema/project-chat/internal/api/app"
+	"github.com/gabrielnakaema/project-chat/internal/apikey"
+	apikeyv1 "github.com/gabrielnakaema/project-chat/internal/apikey/v1"
+	mcpapp "github.com/gabrielnakaema/project-chat/internal/mcp/app"
+	notificationapp "github.com/gabrielnakaema/project-chat/internal/notification/app"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apphost"
+	"github.com/gabrielnakaema/project-chat/internal/platform/auth"
+	"github.com/gabrielnakaema/project-chat/internal/platform/token"
+	"github.com/gabrielnakaema/project-chat/internal/project"
+	projectv1 "github.com/gabrielnakaema/project-chat/internal/project/v1"
 	"github.com/gabrielnakaema/project-chat/internal/tasks"
+	tasksapp "github.com/gabrielnakaema/project-chat/internal/tasks/app"
 	tasksv1 "github.com/gabrielnakaema/project-chat/internal/tasks/v1"
-	"github.com/gabrielnakaema/project-chat/internal/tasksapi"
+	"github.com/gabrielnakaema/project-chat/internal/user"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -91,8 +98,8 @@ func SetupTestAPI(t *testing.T) (*TestAPI, func()) {
 	os.Setenv("TASKS_SERVICE_PORT", "0")
 	taskRepo := tasks.NewTaskRepository(pool)
 	taskCommentRepo := tasks.NewTaskCommentRepository(pool)
-	projectRepo := repository.NewProjectRepository(pool)
-	userRepo := repository.NewUserRepository(pool)
+	projectRepo := project.NewProjectRepository(pool)
+	userRepo := user.NewUserRepository(pool)
 	grpcTaskService := tasks.NewTaskService(taskRepo, projectRepo, userRepo)
 	grpcTaskCommentService := tasks.NewTaskCommentService(taskCommentRepo, taskRepo, projectRepo, userRepo)
 
@@ -103,13 +110,19 @@ func SetupTestAPI(t *testing.T) (*TestAPI, func()) {
 	go grpcServer.Serve(grpcListener)
 	os.Setenv("TASKS_AUTHORIZATION_GRPC_TARGET", grpcListener.Addr().String())
 
-	apiInstance, err := api.NewApi()
-	require.NoError(t, err, "Failed to create API instance")
+	apiInstance, projectService, apiKeyService := newAPI(t, pool)
+	apiGRPCListener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err, "Failed to listen for API gRPC server")
+	apiGRPCServer := grpc.NewServer()
+	projectv1.RegisterProjectServiceServer(apiGRPCServer, project.NewServer(projectService))
+	apikeyv1.RegisterAPIKeyServiceServer(apiGRPCServer, apikey.NewServer(apiKeyService))
+	go apiGRPCServer.Serve(apiGRPCListener)
+	os.Setenv("AUTHORIZATION_GRPC_TARGET", apiGRPCListener.Addr().String())
 
-	tasksInstance, err := tasksapi.New()
+	tasksInstance, err := tasksapp.New()
 	require.NoError(t, err, "Failed to create tasks API instance")
 
-	mcpInstance, err := mcpapi.New()
+	mcpInstance, err := mcpapp.New()
 	require.NoError(t, err, "Failed to create mcp API instance")
 
 	apiRouter := apiInstance.Router()
@@ -136,9 +149,11 @@ func SetupTestAPI(t *testing.T) (*TestAPI, func()) {
 
 	cleanup := func() {
 		server.Close()
+		apiGRPCServer.Stop()
 		grpcServer.Stop()
 		mcpInstance.Close()
 		tasksInstance.Close()
+		apiInstance.Close()
 		pool.Close()
 		if err := postgresContainer.Terminate(ctx); err != nil {
 			t.Errorf("Failed to terminate postgres container: %v", err)
@@ -208,11 +223,10 @@ func SetupTestSplitAPI(t *testing.T) (*TestSplitAPI, func()) {
 	err = goose.Up(sqlDB, migrationsPath)
 	require.NoError(t, err, "Failed to run migrations")
 
-	apiInstance, err := api.NewApi()
-	require.NoError(t, err, "Failed to create API instance")
+	apiInstance, _, _ := newAPI(t, pool)
 	monolithServer := httptest.NewServer(apiInstance.Router())
 
-	notificationAPIInstance, err := notificationapi.New()
+	notificationAPIInstance, err := notificationapp.New()
 	require.NoError(t, err, "Failed to create notification API instance")
 	notificationServer := httptest.NewServer(notificationAPIInstance.Router())
 
@@ -226,6 +240,8 @@ func SetupTestSplitAPI(t *testing.T) (*TestSplitAPI, func()) {
 	cleanup := func() {
 		monolithServer.Close()
 		notificationServer.Close()
+		notificationAPIInstance.Close()
+		apiInstance.Close()
 		pool.Close()
 		if err := postgresContainer.Terminate(ctx); err != nil {
 			t.Errorf("Failed to terminate postgres container: %v", err)
@@ -233,6 +249,36 @@ func SetupTestSplitAPI(t *testing.T) (*TestSplitAPI, func()) {
 	}
 
 	return testAPI, cleanup
+}
+
+func newAPI(t *testing.T, pool *pgxpool.Pool) (*app.App, *project.ProjectService, *apikey.MCPAPIKeyService) {
+	t.Helper()
+
+	rt, err := apphost.New("api-test", "", "")
+	require.NoError(t, err)
+
+	jwtProvider := token.NewTokenProvider(rt.Config)
+	projectRepo := project.NewProjectRepository(pool)
+	userRepo := user.NewUserRepository(pool)
+	activityRepo := project.NewProjectActivityRepository(pool)
+	apiKeyRepo := apikey.NewMCPAPIKeyRepository(pool)
+	projectService := project.NewProjectService(projectRepo, userRepo, activityRepo)
+	apiKeyService := apikey.NewMCPAPIKeyService(apiKeyRepo)
+
+	activitySub, err := project.NewProjectActivitySubscriber(rt.Ctx, rt.Config, rt.Logger, activityRepo, projectRepo)
+	require.NoError(t, err)
+	rt.Track(activitySub)
+
+	grpcServer := grpc.NewServer()
+	projectv1.RegisterProjectServiceServer(grpcServer, project.NewServer(projectService))
+	apikeyv1.RegisterAPIKeyServiceServer(grpcServer, apikey.NewServer(apiKeyService))
+
+	return app.New(rt, &app.Handlers{
+		AuthMiddleware: auth.NewMiddleware(jwtProvider),
+		MCPAPIKey:      apikey.NewMCPAPIKeyHandler(apiKeyService),
+		Project:        project.NewProjectHandler(projectService),
+		User:           user.NewUserHandler(user.NewUserService(jwtProvider, userRepo), rt.Config),
+	}, grpcServer), projectService, apiKeyService
 }
 
 func (ta *TestSplitAPI) TruncateTables(t *testing.T) {

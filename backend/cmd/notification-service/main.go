@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 
-	"github.com/gabrielnakaema/project-chat/internal/notificationapi"
+	notificationapp "github.com/gabrielnakaema/project-chat/internal/notification/app"
 )
 
 func main() {
-	a, err := notificationapi.New()
+	a, err := notificationapp.New()
 	if err != nil {
 		log.Fatal("error while starting notification-service", "error", err.Error())
 		return

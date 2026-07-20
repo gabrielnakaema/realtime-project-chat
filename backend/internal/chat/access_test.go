@@ -7,6 +7,7 @@ import (
 
 	chatv1 "github.com/gabrielnakaema/project-chat/internal/chat/v1"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -46,10 +47,10 @@ func TestServerMapsDomainErrorsDeterministically(t *testing.T) {
 		err  error
 		code codes.Code
 	}{
-		{name: "forbidden", err: domain.ForbiddenError("forbidden"), code: codes.PermissionDenied},
-		{name: "not found", err: domain.NotFoundError("not found"), code: codes.NotFound},
-		{name: "validation", err: domain.BusinessValidationError("invalid"), code: codes.InvalidArgument},
-		{name: "server", err: domain.ServerError("failed", errors.New("database")), code: codes.Internal},
+		{name: "forbidden", err: apperr.ForbiddenError("forbidden"), code: codes.PermissionDenied},
+		{name: "not found", err: apperr.NotFoundError("not found"), code: codes.NotFound},
+		{name: "validation", err: apperr.BusinessValidationError("invalid"), code: codes.InvalidArgument},
+		{name: "server", err: apperr.ServerError("failed", errors.New("database")), code: codes.Internal},
 		{name: "unknown", err: errors.New("unknown"), code: codes.Internal},
 	} {
 		t.Run(test.name, func(t *testing.T) {

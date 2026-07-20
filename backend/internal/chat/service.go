@@ -9,7 +9,8 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
-	"github.com/gabrielnakaema/project-chat/internal/outbox"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 )
@@ -68,7 +69,7 @@ func (cs *Service) CreateChatFromProject(ctx context.Context, project *domain.Pr
 
 	err := cs.chatRepository.Create(ctx, &chat)
 	if err != nil {
-		return domain.ServerError("failed to create chat", err)
+		return apperr.ServerError("failed to create chat", err)
 	}
 
 	return nil
@@ -77,11 +78,11 @@ func (cs *Service) CreateChatFromProject(ctx context.Context, project *domain.Pr
 func (cs *Service) CreateMemberFromProjectMember(ctx context.Context, projectMember *domain.ProjectMember) error {
 	chat, err := cs.chatRepository.GetByProjectId(ctx, projectMember.ProjectId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
 			return err
 		}
-		return domain.ServerError("failed to get chat", err)
+		return apperr.ServerError("failed to get chat", err)
 	}
 
 	member := domain.ChatMember{
@@ -105,7 +106,7 @@ func (cs *Service) CreateMemberFromProjectMember(ctx context.Context, projectMem
 		}}
 	})
 	if err != nil {
-		return domain.ServerError("failed to create member", err)
+		return apperr.ServerError("failed to create member", err)
 	}
 
 	return nil
@@ -114,7 +115,7 @@ func (cs *Service) CreateMemberFromProjectMember(ctx context.Context, projectMem
 func (cs *Service) RemoveMemberFromProjectMember(ctx context.Context, projectMember *domain.ProjectMember) (*domain.ChatMember, error) {
 	chat, err := cs.chatRepository.GetByProjectId(ctx, projectMember.ProjectId)
 	if err != nil {
-		return nil, domain.ServerError("failed to get project chat", err)
+		return nil, apperr.ServerError("failed to get project chat", err)
 	}
 
 	member := &domain.ChatMember{
@@ -130,7 +131,7 @@ func (cs *Service) RemoveMemberFromProjectMember(ctx context.Context, projectMem
 			User:          domain.User{Id: projectMember.UserId},
 		},
 	}); err != nil {
-		return nil, domain.ServerError("failed to remove project chat member", err)
+		return nil, apperr.ServerError("failed to remove project chat member", err)
 	}
 
 	return member, nil
@@ -139,7 +140,7 @@ func (cs *Service) RemoveMemberFromProjectMember(ctx context.Context, projectMem
 func (cs *Service) CreateJoinedMessage(ctx context.Context, chatMember *domain.ChatMember) error {
 	user, err := cs.userRepository.GetById(ctx, chatMember.UserId)
 	if err != nil {
-		return domain.ServerError("failed to get user", err)
+		return apperr.ServerError("failed to get user", err)
 	}
 
 	message := domain.ChatMessage{
@@ -164,7 +165,7 @@ func (cs *Service) CreateJoinedMessage(ctx context.Context, chatMember *domain.C
 		}}
 	})
 	if err != nil {
-		return domain.ServerError("failed to create joined message", err)
+		return apperr.ServerError("failed to create joined message", err)
 	}
 
 	return nil
@@ -178,19 +179,19 @@ type CreateChatMessageRequest struct {
 
 func (cs *Service) CreateMessage(ctx context.Context, request CreateChatMessageRequest) (*domain.ChatMessage, error) {
 	if request.UserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	chat, err := cs.chatRepository.GetById(ctx, request.ChatId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("chat not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("chat not found")
 			}
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to get chat", err)
+		return nil, apperr.ServerError("failed to get chat", err)
 	}
 
 	var foundMember *domain.ChatMember
@@ -203,7 +204,7 @@ func (cs *Service) CreateMessage(ctx context.Context, request CreateChatMessageR
 		}
 	}
 	if !hasPermission {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	message := domain.ChatMessage{
@@ -229,7 +230,7 @@ func (cs *Service) CreateMessage(ctx context.Context, request CreateChatMessageR
 		}}
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to create message", err)
+		return nil, apperr.ServerError("failed to create message", err)
 	}
 
 	return &message, nil
@@ -237,19 +238,19 @@ func (cs *Service) CreateMessage(ctx context.Context, request CreateChatMessageR
 
 func (cs *Service) GetByProjectId(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) (*domain.Chat, error) {
 	if userId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	chat, err := cs.chatRepository.GetByProjectId(ctx, projectId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("chat not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("chat not found")
 			}
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to get chat", err)
+		return nil, apperr.ServerError("failed to get chat", err)
 	}
 
 	hasPermission := false
@@ -260,12 +261,12 @@ func (cs *Service) GetByProjectId(ctx context.Context, projectId uuid.UUID, user
 		}
 	}
 	if !hasPermission {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	unreadSummary, err := cs.chatRepository.GetUnreadSummary(ctx, chat.Id, userId)
 	if err != nil {
-		return nil, domain.ServerError("failed to count unread messages", err)
+		return nil, apperr.ServerError("failed to count unread messages", err)
 	}
 	chat.UnreadCount = unreadSummary.UnreadCount
 	chat.HasMoreUnread = unreadSummary.HasMoreUnread
@@ -281,12 +282,12 @@ type ListMessagesByProjectIdRequest struct {
 
 func (cs *Service) ListMessagesByProjectId(ctx context.Context, request ListMessagesByProjectIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error) {
 	if request.UserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	chat, err := cs.chatRepository.GetByProjectId(ctx, request.ProjectId)
 	if err != nil {
-		return nil, domain.ServerError("failed to get chat", err)
+		return nil, apperr.ServerError("failed to get chat", err)
 	}
 
 	hasPermission := false
@@ -297,12 +298,12 @@ func (cs *Service) ListMessagesByProjectId(ctx context.Context, request ListMess
 		}
 	}
 	if !hasPermission {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	chat.Messages, err = cs.chatRepository.ListMessages(ctx, chat.Id, request.Params)
 	if err != nil {
-		return nil, domain.ServerError("failed to list messages", err)
+		return nil, apperr.ServerError("failed to list messages", err)
 	}
 
 	slices.Reverse(chat.Messages)
@@ -317,19 +318,19 @@ func (cs *Service) ListMessagesByProjectId(ctx context.Context, request ListMess
 
 func (cs *Service) GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Chat, error) {
 	if userId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	chat, err := cs.chatRepository.GetById(ctx, id)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("chat not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("chat not found")
 			}
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to get chat", err)
+		return nil, apperr.ServerError("failed to get chat", err)
 	}
 
 	hasPermission := false
@@ -340,12 +341,12 @@ func (cs *Service) GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) 
 		}
 	}
 	if !hasPermission {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	unreadSummary, err := cs.chatRepository.GetUnreadSummary(ctx, chat.Id, userId)
 	if err != nil {
-		return nil, domain.ServerError("failed to count unread messages", err)
+		return nil, apperr.ServerError("failed to count unread messages", err)
 	}
 	chat.UnreadCount = unreadSummary.UnreadCount
 	chat.HasMoreUnread = unreadSummary.HasMoreUnread
@@ -355,7 +356,7 @@ func (cs *Service) GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) 
 
 func (cs *Service) UpdateMemberLastSeenAt(ctx context.Context, userId uuid.UUID, chatId uuid.UUID) error {
 	if userId == uuid.Nil {
-		return domain.UnauthorizedError("unauthorized")
+		return apperr.UnauthorizedError("unauthorized")
 	}
 
 	chatMember := &domain.ChatMember{
@@ -395,31 +396,31 @@ func SanitizeGeneralChatMemberIDs(currentUserId uuid.UUID, targetUserIds []uuid.
 
 func (cs *Service) GetOrCreateGeneralChat(ctx context.Context, currentUserId uuid.UUID, targetUserIds []uuid.UUID) (*domain.Chat, error) {
 	if currentUserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	memberIds := SanitizeGeneralChatMemberIDs(currentUserId, targetUserIds)
 	if len(memberIds) <= 1 {
-		return nil, domain.BusinessValidationError("at least one other user is required")
+		return nil, apperr.BusinessValidationError("at least one other user is required")
 	}
 
 	for _, memberId := range memberIds[1:] {
 		_, err := cs.userRepository.GetById(ctx, memberId)
 		if err != nil {
-			var domainErr domain.DomainError
+			var domainErr apperr.DomainError
 			if errors.As(err, &domainErr) {
-				if domainErr.Code == domain.NotFoundErrorCode {
-					return nil, domain.NotFoundError("user not found")
+				if domainErr.Code == apperr.NotFoundErrorCode {
+					return nil, apperr.NotFoundError("user not found")
 				}
 				return nil, domainErr
 			}
-			return nil, domain.ServerError("failed to get user", err)
+			return nil, apperr.ServerError("failed to get user", err)
 		}
 	}
 
 	chat, err := cs.chatRepository.GetOrCreateGeneralChat(ctx, currentUserId, memberIds)
 	if err != nil {
-		return nil, domain.ServerError("failed to get or create general chat", err)
+		return nil, apperr.ServerError("failed to get or create general chat", err)
 	}
 
 	return chat, nil
@@ -427,12 +428,12 @@ func (cs *Service) GetOrCreateGeneralChat(ctx context.Context, currentUserId uui
 
 func (cs *Service) ListGeneralChats(ctx context.Context, userId uuid.UUID) ([]domain.Chat, error) {
 	if userId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	chats, err := cs.chatRepository.ListGeneralChats(ctx, userId)
 	if err != nil {
-		return nil, domain.ServerError("failed to list general chats", err)
+		return nil, apperr.ServerError("failed to list general chats", err)
 	}
 
 	return chats, nil
@@ -446,19 +447,19 @@ type ListMessagesByChatIdRequest struct {
 
 func (cs *Service) ListMessagesByChatId(ctx context.Context, request ListMessagesByChatIdRequest) (*utils.CursorPaginated[domain.ChatMessage], error) {
 	if request.UserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	chat, err := cs.chatRepository.GetById(ctx, request.ChatId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("chat not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("chat not found")
 			}
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to get chat", err)
+		return nil, apperr.ServerError("failed to get chat", err)
 	}
 
 	hasPermission := false
@@ -469,12 +470,12 @@ func (cs *Service) ListMessagesByChatId(ctx context.Context, request ListMessage
 		}
 	}
 	if !hasPermission {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	messages, err := cs.chatRepository.ListMessages(ctx, chat.Id, request.Params)
 	if err != nil {
-		return nil, domain.ServerError("failed to list messages", err)
+		return nil, apperr.ServerError("failed to list messages", err)
 	}
 
 	slices.Reverse(messages)
@@ -493,16 +494,16 @@ type MarkChatReadRequest struct {
 
 func (cs *Service) MarkChatRead(ctx context.Context, request MarkChatReadRequest) error {
 	if request.UserId == uuid.Nil {
-		return domain.UnauthorizedError("unauthorized")
+		return apperr.UnauthorizedError("unauthorized")
 	}
 
 	chat, err := cs.chatRepository.GetById(ctx, request.ChatId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
 			return domainErr
 		}
-		return domain.ServerError("failed to get chat", err)
+		return apperr.ServerError("failed to get chat", err)
 	}
 
 	hasPermission := false
@@ -513,22 +514,22 @@ func (cs *Service) MarkChatRead(ctx context.Context, request MarkChatReadRequest
 		}
 	}
 	if !hasPermission {
-		return domain.ForbiddenError("forbidden")
+		return apperr.ForbiddenError("forbidden")
 	}
 
 	var message *domain.ChatMessage
 	if request.MessageId != nil {
 		message, err = cs.chatRepository.GetMessageById(ctx, *request.MessageId)
 		if err != nil {
-			var domainErr domain.DomainError
+			var domainErr apperr.DomainError
 			if errors.As(err, &domainErr) {
 				return domainErr
 			}
-			return domain.ServerError("failed to get chat message", err)
+			return apperr.ServerError("failed to get chat message", err)
 		}
 
 		if message.ChatId != request.ChatId {
-			return domain.ForbiddenError("forbidden")
+			return apperr.ForbiddenError("forbidden")
 		}
 	}
 
@@ -553,7 +554,7 @@ func (cs *Service) MarkChatRead(ctx context.Context, request MarkChatReadRequest
 
 	err = cs.chatRepository.MarkReadUpTo(ctx, request.ChatId, request.UserId, readAt, message, msgs...)
 	if err != nil {
-		return domain.ServerError("failed to mark chat as read", err)
+		return apperr.ServerError("failed to mark chat as read", err)
 	}
 
 	return nil
@@ -567,16 +568,16 @@ type ListMessageReadsRequest struct {
 
 func (cs *Service) ListMessageReads(ctx context.Context, request ListMessageReadsRequest) ([]domain.ChatMessageRead, error) {
 	if request.UserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	chat, err := cs.chatRepository.GetById(ctx, request.ChatId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to get chat", err)
+		return nil, apperr.ServerError("failed to get chat", err)
 	}
 
 	hasPermission := false
@@ -587,24 +588,24 @@ func (cs *Service) ListMessageReads(ctx context.Context, request ListMessageRead
 		}
 	}
 	if !hasPermission {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	message, err := cs.chatRepository.GetMessageById(ctx, request.MessageId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to get chat message", err)
+		return nil, apperr.ServerError("failed to get chat message", err)
 	}
 	if message.ChatId != request.ChatId {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	reads, err := cs.chatRepository.ListMessageReads(ctx, request.MessageId)
 	if err != nil {
-		return nil, domain.ServerError("failed to list message reads", err)
+		return nil, apperr.ServerError("failed to list message reads", err)
 	}
 
 	return reads, nil

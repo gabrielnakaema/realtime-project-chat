@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 
-	"github.com/gabrielnakaema/project-chat/internal/websocketapi"
+	realtimeapp "github.com/gabrielnakaema/project-chat/internal/realtime/app"
 )
 
 func main() {
-	app, err := websocketapi.New()
+	app, err := realtimeapp.New()
 	if err != nil {
 		log.Fatal("error while starting websocket-service", "error", err.Error())
 	}

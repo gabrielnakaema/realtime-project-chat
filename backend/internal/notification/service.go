@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 )
@@ -35,12 +36,12 @@ type ListRequest struct {
 
 func (ns *Service) List(ctx context.Context, request ListRequest) (*utils.CursorPaginated[domain.Notification], error) {
 	if request.UserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	notifications, err := ns.repository.ListByUserID(ctx, request.UserId, request.BeforeCreatedAt, request.BeforeId, request.Limit)
 	if err != nil {
-		return nil, domain.ServerError("failed to list notifications", err)
+		return nil, apperr.ServerError("failed to list notifications", err)
 	}
 
 	return notifications, nil
@@ -48,12 +49,12 @@ func (ns *Service) List(ctx context.Context, request ListRequest) (*utils.Cursor
 
 func (ns *Service) CountUnread(ctx context.Context, userId uuid.UUID) (int, error) {
 	if userId == uuid.Nil {
-		return 0, domain.UnauthorizedError("unauthorized")
+		return 0, apperr.UnauthorizedError("unauthorized")
 	}
 
 	count, err := ns.repository.CountUnreadByUserID(ctx, userId)
 	if err != nil {
-		return 0, domain.ServerError("failed to count unread notifications", err)
+		return 0, apperr.ServerError("failed to count unread notifications", err)
 	}
 
 	return count, nil
@@ -66,16 +67,16 @@ type MarkReadRequest struct {
 
 func (ns *Service) MarkRead(ctx context.Context, request MarkReadRequest) error {
 	if request.UserId == uuid.Nil {
-		return domain.UnauthorizedError("unauthorized")
+		return apperr.UnauthorizedError("unauthorized")
 	}
 
 	found, err := ns.repository.MarkRead(ctx, request.NotificationId, request.UserId, time.Now())
 	if err != nil {
-		return domain.ServerError("failed to mark notification read", err)
+		return apperr.ServerError("failed to mark notification read", err)
 	}
 
 	if !found {
-		return domain.NotFoundError("notification not found")
+		return apperr.NotFoundError("notification not found")
 	}
 
 	return nil
@@ -83,11 +84,11 @@ func (ns *Service) MarkRead(ctx context.Context, request MarkReadRequest) error 
 
 func (ns *Service) MarkAllRead(ctx context.Context, userId uuid.UUID) error {
 	if userId == uuid.Nil {
-		return domain.UnauthorizedError("unauthorized")
+		return apperr.UnauthorizedError("unauthorized")
 	}
 
 	if err := ns.repository.MarkAllRead(ctx, userId, time.Now()); err != nil {
-		return domain.ServerError("failed to mark all notifications read", err)
+		return apperr.ServerError("failed to mark all notifications read", err)
 	}
 
 	return nil

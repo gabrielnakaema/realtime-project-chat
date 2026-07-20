@@ -7,11 +7,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/gabrielnakaema/project-chat/internal/config"
-	"github.com/gabrielnakaema/project-chat/internal/db"
-	"github.com/gabrielnakaema/project-chat/internal/logger"
-	"github.com/gabrielnakaema/project-chat/internal/outbox"
-	"github.com/gabrielnakaema/project-chat/internal/publisher"
+	"github.com/gabrielnakaema/project-chat/internal/platform/config"
+	"github.com/gabrielnakaema/project-chat/internal/platform/kafka"
+	"github.com/gabrielnakaema/project-chat/internal/platform/logger"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
+	"github.com/gabrielnakaema/project-chat/internal/platform/postgres"
 )
 
 func main() {
@@ -22,14 +22,14 @@ func main() {
 
 	log := logger.Init(cfg)
 
-	pool, err := db.NewPool(cfg)
+	pool, err := postgres.NewPool(cfg)
 	if err != nil {
 		log.Error("outbox-relay: create db pool", "error", err.Error())
 		os.Exit(1)
 	}
 	defer pool.Close()
 
-	producer, err := publisher.NewSyncPublisher(cfg)
+	producer, err := kafka.NewSyncPublisher(cfg)
 	if err != nil {
 		log.Error("outbox-relay: create sync producer", "error", err.Error())
 		os.Exit(1)

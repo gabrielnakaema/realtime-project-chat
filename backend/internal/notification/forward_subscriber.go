@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"log/slog"
 
-	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
-	"github.com/gabrielnakaema/project-chat/internal/subscriber"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/config"
+	"github.com/gabrielnakaema/project-chat/internal/platform/messaging"
 )
 
 type Notifier interface {
@@ -17,12 +18,12 @@ type Notifier interface {
 
 type ForwardSubscriber struct {
 	logger     *slog.Logger
-	subscriber *subscriber.Subscriber
+	subscriber *messaging.Subscriber
 	notifier   Notifier
 }
 
 func NewForwardSubscriber(ctx context.Context, cfg *config.Config, logger *slog.Logger, notifier Notifier) (*ForwardSubscriber, error) {
-	sub, err := subscriber.NewSubscriber(cfg, "notification-forwarder.subscriber")
+	sub, err := messaging.NewSubscriber(cfg, "notification-forwarder.subscriber")
 	if err != nil {
 		return nil, err
 	}
@@ -45,10 +46,10 @@ func (fs *ForwardSubscriber) Close() error {
 	return fs.subscriber.Close()
 }
 
-func (fs *ForwardSubscriber) handleNotificationCreated(ctx context.Context, message subscriber.Message) error {
+func (fs *ForwardSubscriber) handleNotificationCreated(ctx context.Context, message messaging.Message) error {
 	var payload events.NotificationCreatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
-		return domain.ServerError("failed to unmarshal notification created payload", err)
+		return apperr.ServerError("failed to unmarshal notification created payload", err)
 	}
 
 	return fs.notifier.SendNotification(ctx, &payload.Notification)

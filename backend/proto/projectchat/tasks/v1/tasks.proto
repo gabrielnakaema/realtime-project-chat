@@ -4,13 +4,6 @@ package projectchat.tasks.v1;
 
 option go_package = "github.com/gabrielnakaema/project-chat/internal/tasks/v1;tasksv1";
 
-// TaskService exposes task and task-comment operations over gRPC so the api
-// service (which hosts the MCP agent endpoint) can invoke them without
-// instantiating the tasks slice in-process.
-//
-// Responses carry the shared domain object marshaled as JSON so the gRPC
-// contract mirrors the HTTP/WebSocket contract exactly, rather than duplicating
-// the rich Task/TaskComment shape in protobuf.
 service TaskService {
   rpc CreateTask(CreateTaskRequest) returns (TaskResponse);
   rpc GetTaskById(GetTaskByIdRequest) returns (TaskResponse);

@@ -6,6 +6,7 @@ import (
 
 	chatv1 "github.com/gabrielnakaema/project-chat/internal/chat/v1"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -46,17 +47,17 @@ func (s *Server) CheckAccess(ctx context.Context, request *chatv1.CheckAccessReq
 }
 
 func mapDomainError(err error) error {
-	var domainError domain.DomainError
+	var domainError apperr.DomainError
 	if !errors.As(err, &domainError) {
 		return status.Error(codes.Internal, "chat access check failed")
 	}
 
 	switch domainError.Code {
-	case domain.NotFoundErrorCode:
+	case apperr.NotFoundErrorCode:
 		return status.Error(codes.NotFound, "chat not found")
-	case domain.ForbiddenErrorCode, domain.UnauthorizedErrorCode:
+	case apperr.ForbiddenErrorCode, apperr.UnauthorizedErrorCode:
 		return status.Error(codes.PermissionDenied, "chat access forbidden")
-	case domain.ValidationFailedErrorCode, domain.BusinessValidationErrorCode:
+	case apperr.ValidationFailedErrorCode, apperr.BusinessValidationErrorCode:
 		return status.Error(codes.InvalidArgument, "chat access check request is invalid")
 	default:
 		return status.Error(codes.Internal, "chat access check failed")

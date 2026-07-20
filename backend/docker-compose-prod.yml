@@ -144,12 +144,13 @@ services:
     command: ["./mcp-service"]
     env_file: .env.prod
     environment:
+      AUTHORIZATION_GRPC_TARGET: api:3334
       TASKS_AUTHORIZATION_GRPC_TARGET: tasks-service:3340
     depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
+      api:
+        condition: service_started
+      tasks-service:
+        condition: service_started
     restart: always
     networks:
       - project_management_network

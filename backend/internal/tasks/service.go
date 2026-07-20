@@ -9,7 +9,8 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/gabrielnakaema/project-chat/internal/fracindex"
-	"github.com/gabrielnakaema/project-chat/internal/outbox"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 )
@@ -73,28 +74,28 @@ type CreateTaskRequest struct {
 
 func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*domain.Task, error) {
 	if request.RequestUserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("project not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("project not found")
 			}
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to get project", err)
+		return nil, apperr.ServerError("failed to get project", err)
 	}
 
 	if !project.IsMember(request.RequestUserId) {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	if request.ResponsibleId != nil && *request.ResponsibleId != uuid.Nil {
 		if !project.IsMember(*request.ResponsibleId) {
-			return nil, domain.BusinessValidationError("responsible is not a member of the project")
+			return nil, apperr.BusinessValidationError("responsible is not a member of the project")
 		}
 	}
 
@@ -105,26 +106,26 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 
 	user, err := ts.userRepository.GetById(ctx, request.RequestUserId)
 	if err != nil {
-		return nil, domain.ServerError("failed to get user", err)
+		return nil, apperr.ServerError("failed to get user", err)
 	}
 
 	var responsible *domain.User
 	if request.ResponsibleId != nil && *request.ResponsibleId != uuid.Nil {
 		responsible, err = ts.userRepository.GetById(ctx, *request.ResponsibleId)
 		if err != nil {
-			return nil, domain.ServerError("failed to get responsible user", err)
+			return nil, apperr.ServerError("failed to get responsible user", err)
 		}
 	}
 
 	firstTask, err := ts.taskRepository.GetFirstTaskInColumn(ctx, request.ProjectId, request.ProjectColumnId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code != domain.NotFoundErrorCode {
-				return nil, domain.ServerError("failed to get first task in column", err)
+			if domainErr.Code != apperr.NotFoundErrorCode {
+				return nil, apperr.ServerError("failed to get first task in column", err)
 			}
 		} else {
-			return nil, domain.ServerError("failed to get first task in column", err)
+			return nil, apperr.ServerError("failed to get first task in column", err)
 		}
 	}
 
@@ -135,7 +136,7 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 
 	order, err := fracindex.GenerateKeyBetween("", nextOrder)
 	if err != nil {
-		return nil, domain.ServerError("failed to generate task order", err)
+		return nil, apperr.ServerError("failed to generate task order", err)
 	}
 
 	formattedTags := []string{}
@@ -194,7 +195,7 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		}}
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to create task", err)
+		return nil, apperr.ServerError("failed to create task", err)
 	}
 
 	return &task, nil
@@ -235,20 +236,20 @@ type ListTasksRequest struct {
 
 func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
 	if request.RequestUserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	if request.ProjectId == uuid.Nil {
-		return nil, domain.BusinessValidationError("project_id is required")
+		return nil, apperr.BusinessValidationError("project_id is required")
 	}
 
 	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
 	if err != nil {
-		return nil, domain.ServerError("failed to get project", err)
+		return nil, apperr.ServerError("failed to get project", err)
 	}
 
 	if !project.IsMember(request.RequestUserId) {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	if err := validateProjectColumnIDs(project, request.ProjectColumnIDs); err != nil {
@@ -257,7 +258,7 @@ func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) (*uti
 
 	tasks, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, request.ProjectColumnIDs, request.Archived, request.TaskOrder, request.CursorUpdatedAt, request.Limit)
 	if err != nil {
-		return nil, domain.ServerError("failed to list tasks", err)
+		return nil, apperr.ServerError("failed to list tasks", err)
 	}
 
 	return tasks, nil
@@ -283,16 +284,16 @@ type GroupByColumnRequest struct {
 
 func (ts *TaskService) GroupByColumn(ctx context.Context, request GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error) {
 	if request.UserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
 	if err != nil {
-		return nil, domain.ServerError("failed to get project", err)
+		return nil, apperr.ServerError("failed to get project", err)
 	}
 
 	if !project.IsMember(request.UserId) {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	statusIDs := request.ProjectColumnIDs
@@ -311,7 +312,7 @@ func (ts *TaskService) GroupByColumn(ctx context.Context, request GroupByColumnR
 	for _, statusID := range statusIDs {
 		result, err := ts.taskRepository.ListByProjectId(ctx, request.ProjectId, []uuid.UUID{statusID}, request.Archived, request.TaskOrder, request.CursorUpdatedAt, request.Limit)
 		if err != nil {
-			return nil, domain.ServerError("failed to list tasks", err)
+			return nil, apperr.ServerError("failed to list tasks", err)
 		}
 		results[statusID.String()] = *result
 	}
@@ -321,16 +322,16 @@ func (ts *TaskService) GroupByColumn(ctx context.Context, request GroupByColumnR
 
 func (ts *TaskService) CountByColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, requestUserId uuid.UUID) (map[string]int, error) {
 	if requestUserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	project, err := ts.projectRepository.GetById(ctx, projectId)
 	if err != nil {
-		return nil, domain.ServerError("failed to get project", err)
+		return nil, apperr.ServerError("failed to get project", err)
 	}
 
 	if !project.IsMember(requestUserId) {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	if err := validateProjectColumnIDs(project, projectColumnIDs); err != nil {
@@ -338,7 +339,7 @@ func (ts *TaskService) CountByColumn(ctx context.Context, projectId uuid.UUID, p
 	}
 	results, err := ts.taskRepository.CountTasksByProjectIdAndColumn(ctx, projectId, projectColumnIDs)
 	if err != nil {
-		return nil, domain.ServerError("failed to count tasks", err)
+		return nil, apperr.ServerError("failed to count tasks", err)
 	}
 	return results, nil
 }
@@ -350,35 +351,35 @@ type ArchiveTaskRequest struct {
 
 func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) (*domain.Task, error) {
 	if request.RequestUserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	task, err := ts.taskRepository.GetById(ctx, request.TaskId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("task not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("task not found")
 			}
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to get task", err)
+		return nil, apperr.ServerError("failed to get task", err)
 	}
 
 	project, err := ts.projectRepository.GetById(ctx, task.ProjectId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("project not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("project not found")
 			}
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to get project", err)
+		return nil, apperr.ServerError("failed to get project", err)
 	}
 
 	if !project.IsMember(request.RequestUserId) {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	archivedTask := *task
@@ -404,7 +405,7 @@ func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) 
 		}}
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to archive task", err)
+		return nil, apperr.ServerError("failed to archive task", err)
 	}
 
 	return &archivedTask, nil
@@ -418,39 +419,39 @@ type RestoreTaskRequest struct {
 
 func (ts *TaskService) Restore(ctx context.Context, request RestoreTaskRequest) (*domain.Task, error) {
 	if request.RequestUserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	task, err := ts.taskRepository.GetById(ctx, request.TaskId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("task not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("task not found")
 			}
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to get task", err)
+		return nil, apperr.ServerError("failed to get task", err)
 	}
 
 	project, err := ts.projectRepository.GetById(ctx, task.ProjectId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("project not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("project not found")
 			}
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to get project", err)
+		return nil, apperr.ServerError("failed to get project", err)
 	}
 
 	if !project.IsMember(request.RequestUserId) {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	if task.ArchivedAt == nil {
-		return nil, domain.BusinessValidationError("task is not archived")
+		return nil, apperr.BusinessValidationError("task is not archived")
 	}
 
 	projectColumn, err := findProjectColumn(project, request.ProjectColumnId)
@@ -489,7 +490,7 @@ func (ts *TaskService) Restore(ctx context.Context, request RestoreTaskRequest) 
 		}}
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to restore task", err)
+		return nil, apperr.ServerError("failed to restore task", err)
 	}
 
 	return &restoredTask, nil
@@ -504,12 +505,12 @@ type ListUserDueTasksRequest struct {
 
 func (ts *TaskService) ListUserDueTasks(ctx context.Context, request ListUserDueTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
 	if request.UserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	result, err := ts.taskRepository.ListUserDueTasks(ctx, request.UserId, request.CursorDueDate, request.CursorUpdatedAt, request.Limit)
 	if err != nil {
-		return nil, domain.ServerError("failed to list user due tasks", err)
+		return nil, apperr.ServerError("failed to list user due tasks", err)
 	}
 
 	return result, nil
@@ -530,7 +531,7 @@ func (ts *TaskService) Move(ctx context.Context, request MoveTaskRequest) (*doma
 	}
 
 	if oldTask.ProjectId != request.ProjectId {
-		return nil, domain.BusinessValidationError("task does not belong to the provided project_id")
+		return nil, apperr.BusinessValidationError("task does not belong to the provided project_id")
 	}
 
 	return ts.moveLoadedTask(ctx, oldTask, project, request)
@@ -649,14 +650,14 @@ func (ts *TaskService) moveLoadedTask(ctx context.Context, oldTask *domain.Task,
 		return nil
 	})
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, domain.NotFoundError("task not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, apperr.NotFoundError("task not found")
 			}
 			return nil, domainErr
 		}
-		return nil, domain.ServerError("failed to move task", err)
+		return nil, apperr.ServerError("failed to move task", err)
 	}
 
 	return updatedTask, nil
@@ -665,7 +666,7 @@ func (ts *TaskService) moveLoadedTask(ctx context.Context, oldTask *domain.Task,
 func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, project *domain.Project, request UpdateTaskRequest) (*domain.Task, error) {
 	if request.ResponsibleId != nil && *request.ResponsibleId != uuid.Nil {
 		if !project.IsMember(*request.ResponsibleId) {
-			return nil, domain.BusinessValidationError("responsible is not a member of the project")
+			return nil, apperr.BusinessValidationError("responsible is not a member of the project")
 		}
 	}
 
@@ -680,7 +681,7 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 	} else if task.ResponsibleId == nil || *task.ResponsibleId != *request.ResponsibleId || task.Responsible == nil {
 		responsible, err = ts.userRepository.GetById(ctx, *request.ResponsibleId)
 		if err != nil {
-			return nil, domain.ServerError("failed to get responsible user", err)
+			return nil, apperr.ServerError("failed to get responsible user", err)
 		}
 	}
 
@@ -755,7 +756,7 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 		}}
 	})
 	if err != nil {
-		return nil, domain.ServerError("failed to update task", err)
+		return nil, apperr.ServerError("failed to update task", err)
 	}
 
 	return &updatedTask, nil
@@ -763,35 +764,35 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 
 func (ts *TaskService) getTaskAndProjectForUser(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (*domain.Task, *domain.Project, error) {
 	if userID == uuid.Nil {
-		return nil, nil, domain.UnauthorizedError("unauthorized")
+		return nil, nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	task, err := ts.taskRepository.GetById(ctx, taskID)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, nil, domain.NotFoundError("task not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, nil, apperr.NotFoundError("task not found")
 			}
 			return nil, nil, domainErr
 		}
-		return nil, nil, domain.ServerError("failed to get task", err)
+		return nil, nil, apperr.ServerError("failed to get task", err)
 	}
 
 	project, err := ts.projectRepository.GetById(ctx, task.ProjectId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
-				return nil, nil, domain.NotFoundError("project not found")
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return nil, nil, apperr.NotFoundError("project not found")
 			}
 			return nil, nil, domainErr
 		}
-		return nil, nil, domain.ServerError("failed to get project", err)
+		return nil, nil, apperr.ServerError("failed to get project", err)
 	}
 
 	if !project.IsMember(userID) {
-		return nil, nil, domain.ForbiddenError("forbidden")
+		return nil, nil, apperr.ForbiddenError("forbidden")
 	}
 
 	return task, project, nil
@@ -801,8 +802,8 @@ func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskReque
 	if request.AfterTaskId == nil {
 		firstTask, err := ts.taskRepository.GetFirstTaskInColumn(ctx, request.ProjectId, request.ProjectColumnId)
 		if err != nil {
-			var domainErr domain.DomainError
-			if errors.As(err, &domainErr) && domainErr.Code == domain.NotFoundErrorCode {
+			var domainErr apperr.DomainError
+			if errors.As(err, &domainErr) && domainErr.Code == apperr.NotFoundErrorCode {
 				return fracindex.GenerateKeyBetween("", "")
 			}
 			return "", err
@@ -811,8 +812,8 @@ func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskReque
 		if firstTask.Id == request.TaskId {
 			nextTask, err := ts.taskRepository.GetProjectTaskAfterId(ctx, request.TaskId, request.ProjectId)
 			if err != nil {
-				var domainErr domain.DomainError
-				if errors.As(err, &domainErr) && domainErr.Code == domain.NotFoundErrorCode {
+				var domainErr apperr.DomainError
+				if errors.As(err, &domainErr) && domainErr.Code == apperr.NotFoundErrorCode {
 					return fracindex.GenerateKeyBetween("", "")
 				}
 				return "", err
@@ -830,14 +831,14 @@ func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskReque
 	}
 
 	if prevTask.ProjectId != request.ProjectId || prevTask.ProjectColumnId != request.ProjectColumnId {
-		return "", domain.BusinessValidationError("after_task_id must belong to the target column")
+		return "", apperr.BusinessValidationError("after_task_id must belong to the target column")
 	}
 
 	nextTask, err := ts.taskRepository.GetProjectTaskAfterId(ctx, *request.AfterTaskId, request.ProjectId)
 	if err != nil {
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		if errors.As(err, &domainErr) {
-			if domainErr.Code == domain.NotFoundErrorCode {
+			if domainErr.Code == apperr.NotFoundErrorCode {
 				return fracindex.GenerateKeyBetween(prevTask.Order, "")
 			}
 		}
@@ -847,9 +848,9 @@ func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskReque
 	if nextTask.Id == request.TaskId {
 		nextTask, err = ts.taskRepository.GetProjectTaskAfterId(ctx, request.TaskId, request.ProjectId)
 		if err != nil {
-			var domainErr domain.DomainError
+			var domainErr apperr.DomainError
 			if errors.As(err, &domainErr) {
-				if domainErr.Code == domain.NotFoundErrorCode {
+				if domainErr.Code == apperr.NotFoundErrorCode {
 					return fracindex.GenerateKeyBetween(prevTask.Order, "")
 				}
 			}
@@ -874,12 +875,12 @@ type SearchTasksForUserRequest struct {
 
 func (ts *TaskService) SearchTasksForUser(ctx context.Context, request SearchTasksForUserRequest) (*utils.CursorPaginated[domain.Task], error) {
 	if request.UserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	result, err := ts.taskRepository.SearchTasksForUser(ctx, request.UserId, request.SearchQuery, request.CursorDueDate, request.CursorUpdatedAt, request.Limit)
 	if err != nil {
-		return nil, domain.ServerError("failed to search tasks for user", err)
+		return nil, apperr.ServerError("failed to search tasks for user", err)
 	}
 
 	return result, nil
@@ -893,47 +894,47 @@ type FindTaskByCodeRequest struct {
 
 func (ts *TaskService) FindTaskByCode(ctx context.Context, request FindTaskByCodeRequest) (*domain.Task, error) {
 	if request.UserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	if request.ProjectId == uuid.Nil {
-		return nil, domain.BusinessValidationError("project_id is required")
+		return nil, apperr.BusinessValidationError("project_id is required")
 	}
 
 	code := strings.TrimSpace(request.Code)
 	if code == "" {
-		return nil, domain.BusinessValidationError("code is required")
+		return nil, apperr.BusinessValidationError("code is required")
 	}
 
 	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
 	if err != nil {
-		return nil, domain.ServerError("failed to get project", err)
+		return nil, apperr.ServerError("failed to get project", err)
 	}
 
 	if !project.IsMember(request.UserId) {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	matches, err := ts.taskRepository.FindTaskRefsByProjectAndCode(ctx, request.ProjectId, code)
 	if err != nil {
-		return nil, domain.ServerError("failed to find task by code", err)
+		return nil, apperr.ServerError("failed to find task by code", err)
 	}
 
 	switch len(matches) {
 	case 0:
-		return nil, domain.NotFoundError("task not found")
+		return nil, apperr.NotFoundError("task not found")
 	case 1:
 		task, err := ts.taskRepository.GetById(ctx, matches[0].Id)
 		if err != nil {
-			var domainErr domain.DomainError
+			var domainErr apperr.DomainError
 			if errors.As(err, &domainErr) {
 				return nil, domainErr
 			}
-			return nil, domain.ServerError("failed to get task", err)
+			return nil, apperr.ServerError("failed to get task", err)
 		}
 		return task, nil
 	default:
-		return nil, domain.BusinessValidationError("task code matches multiple tasks in this project")
+		return nil, apperr.BusinessValidationError("task code matches multiple tasks in this project")
 	}
 }
 
@@ -954,30 +955,30 @@ type SuggestTaskCodesRequest struct {
 
 func (ts *TaskService) SuggestTaskCodes(ctx context.Context, request SuggestTaskCodesRequest) ([]domain.TaskCodeSuggestion, error) {
 	if request.UserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	if request.ProjectId == uuid.Nil {
-		return nil, domain.BusinessValidationError("project_id is required")
+		return nil, apperr.BusinessValidationError("project_id is required")
 	}
 
 	prefix := strings.TrimSpace(request.Prefix)
 	if len(prefix) < 2 {
-		return nil, domain.BusinessValidationError("prefix must be at least 2 characters")
+		return nil, apperr.BusinessValidationError("prefix must be at least 2 characters")
 	}
 
 	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
 	if err != nil {
-		return nil, domain.ServerError("failed to get project", err)
+		return nil, apperr.ServerError("failed to get project", err)
 	}
 
 	if !project.IsMember(request.UserId) {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	results, err := ts.taskRepository.SuggestTaskCodesByProjectPrefix(ctx, request.ProjectId, prefix, request.Limit)
 	if err != nil {
-		return nil, domain.ServerError("failed to suggest task codes", err)
+		return nil, apperr.ServerError("failed to suggest task codes", err)
 	}
 
 	return results, nil
@@ -985,30 +986,30 @@ func (ts *TaskService) SuggestTaskCodes(ctx context.Context, request SuggestTask
 
 func (ts *TaskService) SearchProjectTasksForDependencies(ctx context.Context, request SearchProjectTasksForDependenciesRequest) ([]domain.TaskDependencyRef, error) {
 	if request.UserId == uuid.Nil {
-		return nil, domain.UnauthorizedError("unauthorized")
+		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
 	if request.ProjectId == uuid.Nil {
-		return nil, domain.BusinessValidationError("project_id is required")
+		return nil, apperr.BusinessValidationError("project_id is required")
 	}
 
 	query := strings.TrimSpace(request.Query)
 	if query == "" {
-		return nil, domain.BusinessValidationError("query is required")
+		return nil, apperr.BusinessValidationError("query is required")
 	}
 
 	project, err := ts.projectRepository.GetById(ctx, request.ProjectId)
 	if err != nil {
-		return nil, domain.ServerError("failed to get project", err)
+		return nil, apperr.ServerError("failed to get project", err)
 	}
 
 	if !project.IsMember(request.UserId) {
-		return nil, domain.ForbiddenError("forbidden")
+		return nil, apperr.ForbiddenError("forbidden")
 	}
 
 	results, err := ts.taskRepository.SearchProjectTasksForDependencies(ctx, request.ProjectId, query, request.ExcludeTaskId, request.Limit)
 	if err != nil {
-		return nil, domain.ServerError("failed to search project tasks for dependencies", err)
+		return nil, apperr.ServerError("failed to search project tasks for dependencies", err)
 	}
 
 	return results, nil
@@ -1022,7 +1023,7 @@ func findProjectColumn(project *domain.Project, statusID uuid.UUID) (*domain.Pro
 		}
 	}
 
-	return nil, domain.BusinessValidationError("invalid project_column_id")
+	return nil, apperr.BusinessValidationError("invalid project_column_id")
 }
 
 func validateProjectColumnIDs(project *domain.Project, statusIDs []uuid.UUID) error {
@@ -1037,7 +1038,7 @@ func validateProjectColumnIDs(project *domain.Project, statusIDs []uuid.UUID) er
 
 	for _, statusID := range statusIDs {
 		if _, ok := valid[statusID]; !ok {
-			return domain.BusinessValidationError("invalid project_column_id")
+			return apperr.BusinessValidationError("invalid project_column_id")
 		}
 	}
 
@@ -1052,16 +1053,16 @@ func (ts *TaskService) validateDependsOnTaskIds(ctx context.Context, projectId u
 
 	for _, dependsOnTaskID := range uniqueIDs {
 		if dependsOnTaskID == uuid.Nil {
-			return nil, domain.BusinessValidationError("depends_on_task_ids contains an invalid task id")
+			return nil, apperr.BusinessValidationError("depends_on_task_ids contains an invalid task id")
 		}
 		if taskId != uuid.Nil && dependsOnTaskID == taskId {
-			return nil, domain.BusinessValidationError("task cannot depend on itself")
+			return nil, apperr.BusinessValidationError("task cannot depend on itself")
 		}
 	}
 
 	refs, err := ts.taskRepository.GetTaskDependencyRefsByProjectAndIds(ctx, projectId, uniqueIDs)
 	if err != nil {
-		return nil, domain.ServerError("failed to validate task dependencies", err)
+		return nil, apperr.ServerError("failed to validate task dependencies", err)
 	}
 
 	refByID := make(map[uuid.UUID]domain.TaskDependencyRef, len(refs))
@@ -1073,7 +1074,7 @@ func (ts *TaskService) validateDependsOnTaskIds(ctx context.Context, projectId u
 	for _, id := range uniqueIDs {
 		ref, ok := refByID[id]
 		if !ok {
-			return nil, domain.BusinessValidationError("depends_on_task_ids contains unknown tasks")
+			return nil, apperr.BusinessValidationError("depends_on_task_ids contains unknown tasks")
 		}
 		orderedRefs = append(orderedRefs, ref)
 	}
@@ -1084,11 +1085,11 @@ func (ts *TaskService) validateDependsOnTaskIds(ctx context.Context, projectId u
 
 	edges, err := ts.taskRepository.ListTaskDependenciesByProjectId(ctx, projectId)
 	if err != nil {
-		return nil, domain.ServerError("failed to validate task dependencies", err)
+		return nil, apperr.ServerError("failed to validate task dependencies", err)
 	}
 
 	if hasDependencyCycle(taskId, uniqueIDs, edges) {
-		return nil, domain.BusinessValidationError("depends_on_task_ids would create a dependency cycle")
+		return nil, apperr.BusinessValidationError("depends_on_task_ids would create a dependency cycle")
 	}
 
 	return orderedRefs, nil
@@ -1158,7 +1159,7 @@ func resolveDoneColumn(project *domain.Project) (*domain.ProjectColumn, error) {
 	}
 
 	if len(doneColumns) != 1 {
-		return nil, domain.BusinessValidationError("project must have exactly one done column")
+		return nil, apperr.BusinessValidationError("project must have exactly one done column")
 	}
 
 	column := doneColumns[0]

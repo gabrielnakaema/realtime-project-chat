@@ -1,12 +1,12 @@
 version: "2"
 sql:
   - engine: "postgresql"
-    queries: "internal/queries/"
+    queries: "internal/tasks/queries/"
     schema: "migrations/"
     gen:
       go:
-        package: "queries"
-        out: "internal/queries"
+        package: "taskqueries"
+        out: "internal/tasks/queries"
         sql_package: "pgx/v5"
         overrides:
           - db_type: "uuid"
@@ -14,12 +14,77 @@ sql:
               import: "github.com/google/uuid"
               type: "UUID"
   - engine: "postgresql"
-    queries: "internal/tasks/queries/"
+    queries: "internal/platform/outbox/queries/"
     schema: "migrations/"
     gen:
       go:
-        package: "taskqueries"
-        out: "internal/tasks/queries"
+        package: "outboxqueries"
+        out: "internal/platform/outbox/queries"
+        sql_package: "pgx/v5"
+        overrides:
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+  - engine: "postgresql"
+    queries: "internal/project/queries/"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "projectqueries"
+        out: "internal/project/queries"
+        sql_package: "pgx/v5"
+        overrides:
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+  - engine: "postgresql"
+    queries: "internal/user/queries/"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "userqueries"
+        out: "internal/user/queries"
+        sql_package: "pgx/v5"
+        overrides:
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+  - engine: "postgresql"
+    queries: "internal/apikey/queries/"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "apikeyqueries"
+        out: "internal/apikey/queries"
+        sql_package: "pgx/v5"
+        overrides:
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+  - engine: "postgresql"
+    queries: "internal/chat/queries/"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "chatqueries"
+        out: "internal/chat/queries"
+        sql_package: "pgx/v5"
+        overrides:
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+  - engine: "postgresql"
+    queries: "internal/notification/queries/"
+    schema: "migrations/"
+    gen:
+      go:
+        package: "notificationqueries"
+        out: "internal/notification/queries"
         sql_package: "pgx/v5"
         overrides:
           - db_type: "uuid"

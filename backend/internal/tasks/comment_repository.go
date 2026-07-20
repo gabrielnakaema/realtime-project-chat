@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/outbox"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
 	taskqueries "github.com/gabrielnakaema/project-chat/internal/tasks/queries"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"

@@ -4,11 +4,7 @@ package projectchat.chat.v1;
 
 option go_package = "github.com/gabrielnakaema/project-chat/internal/chat/v1;chatv1";
 
-// ChatService exposes chat business rules over gRPC so other services can
-// enforce them without instantiating the core application.
 service ChatService {
-  // CheckAccess reports whether a user may access a chat. A successful response
-  // means access is granted; denial is returned as a gRPC status error.
   rpc CheckAccess(CheckAccessRequest) returns (CheckAccessResponse);
 }
 

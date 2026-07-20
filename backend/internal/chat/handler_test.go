@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/chat"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/auth"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -170,7 +171,7 @@ func TestChatHandler_GetOrCreateGeneralChat(t *testing.T) {
 			userId:      userId,
 			mockSetup: func(m *mockChatService) {
 				m.On("GetOrCreateGeneralChat", mock.Anything, userId, []uuid.UUID{otherUserId}).
-					Return(nil, domain.NotFoundError("user not found"))
+					Return(nil, apperr.NotFoundError("user not found"))
 			},
 			expectedStatus: http.StatusNotFound,
 		},
@@ -256,7 +257,7 @@ func TestChatHandler_GetChatById(t *testing.T) {
 			chatId: chatId.String(),
 			userId: userId,
 			mockSetup: func(m *mockChatService) {
-				m.On("GetById", mock.Anything, chatId, userId).Return(nil, domain.NotFoundError("chat not found"))
+				m.On("GetById", mock.Anything, chatId, userId).Return(nil, apperr.NotFoundError("chat not found"))
 			},
 			expectedStatus: http.StatusNotFound,
 		},
@@ -369,7 +370,7 @@ func TestChatHandler_ListChatMessages(t *testing.T) {
 			userId:      userId,
 			mockSetup: func(m *mockChatService) {
 				m.On("ListMessagesByChatId", mock.Anything, mock.Anything).
-					Return(nil, domain.ForbiddenError("forbidden"))
+					Return(nil, apperr.ForbiddenError("forbidden"))
 			},
 			expectedStatus: http.StatusForbidden,
 		},

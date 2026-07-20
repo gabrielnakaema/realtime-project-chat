@@ -1,0 +1,91 @@
+package realtime
+
+import (
+	"context"
+	"encoding/json"
+	"log/slog"
+
+	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/events"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/config"
+	"github.com/gabrielnakaema/project-chat/internal/platform/messaging"
+	"github.com/google/uuid"
+)
+
+type RealtimeNotifier interface {
+	SendMessages(context.Context, *domain.ChatMessage) error
+	SendReadUpdate(context.Context, uuid.UUID, *domain.ChatMessageRead) error
+	SendChatProjectMemberCreated(context.Context, *domain.ProjectMember, uuid.UUID) error
+	SendChatProjectMemberRemoved(context.Context, *domain.ProjectMember, uuid.UUID) error
+}
+
+// RealtimeSubscriber owns chat-related fan-out for the standalone websocket
+// process. Its consumer group is intentionally separate from chat.subscriber:
+// the API consumer persists chat state, while this consumer only delivers it.
+type RealtimeSubscriber struct {
+	logger     *slog.Logger
+	subscriber *messaging.Subscriber
+	notifier   RealtimeNotifier
+}
+
+func NewRealtimeSubscriber(ctx context.Context, cfg *config.Config, logger *slog.Logger, notifier RealtimeNotifier) (*RealtimeSubscriber, error) {
+	sub, err := messaging.NewSubscriber(cfg, "websocket.realtime.subscriber")
+	if err != nil {
+		return nil, apperr.ServerError("failed to create realtime subscriber", err)
+	}
+
+	realtimeSubscriber := &RealtimeSubscriber{
+		logger:     logger,
+		subscriber: sub,
+		notifier:   notifier,
+	}
+
+	topics := []events.Topic{
+		events.ChatMessageCreated,
+		events.ChatMessageRead,
+		events.ChatMemberCreated,
+		events.ChatMemberRemoved,
+	}
+	if err := sub.Subscribe(ctx, topics, realtimeSubscriber.handleEvents, logger); err != nil {
+		_ = sub.Close()
+		return nil, apperr.ServerError("failed to subscribe to realtime events", err)
+	}
+
+	return realtimeSubscriber, nil
+}
+
+func (s *RealtimeSubscriber) Close() error {
+	return s.subscriber.Close()
+}
+
+func (s *RealtimeSubscriber) handleEvents(ctx context.Context, message messaging.Message) error {
+	switch message.Topic {
+	case events.ChatMessageCreated:
+		var payload events.ChatMessageCreatedPayload
+		if err := json.Unmarshal(message.Value, &payload); err != nil {
+			return apperr.ServerError("failed to unmarshal chat message", err)
+		}
+		return s.notifier.SendMessages(ctx, &payload.ChatMessage)
+	case events.ChatMessageRead:
+		var payload events.ChatMessageReadPayload
+		if err := json.Unmarshal(message.Value, &payload); err != nil {
+			return apperr.ServerError("failed to unmarshal chat message read", err)
+		}
+		return s.notifier.SendReadUpdate(ctx, payload.ChatID, &payload.Read)
+	case events.ChatMemberCreated:
+		var payload events.ChatMemberCreatedPayload
+		if err := json.Unmarshal(message.Value, &payload); err != nil {
+			return apperr.ServerError("failed to unmarshal chat member created", err)
+		}
+		return s.notifier.SendChatProjectMemberCreated(ctx, &payload.ProjectMember, payload.ChatMember.ChatId)
+	case events.ChatMemberRemoved:
+		var payload events.ChatMemberRemovedPayload
+		if err := json.Unmarshal(message.Value, &payload); err != nil {
+			return apperr.ServerError("failed to unmarshal chat member removed", err)
+		}
+		return s.notifier.SendChatProjectMemberRemoved(ctx, &payload.ProjectMember, payload.ChatMember.ChatId)
+	default:
+		return nil
+	}
+}

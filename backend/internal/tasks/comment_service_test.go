@@ -7,7 +7,8 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/outbox"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/tasks"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -140,7 +141,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 			mockSetup: func(commentRepo *mockTaskCommentRepository, taskRepo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.UnauthorizedErrorCode),
+			expectedErrorCode: string(apperr.UnauthorizedErrorCode),
 		},
 		{
 			name: "task not found",
@@ -150,10 +151,10 @@ func TestTaskCommentService_Create(t *testing.T) {
 				Content:       "Test comment",
 			},
 			mockSetup: func(commentRepo *mockTaskCommentRepository, taskRepo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
-				taskRepo.On("GetById", mock.Anything, validTaskID).Return(nil, domain.NotFoundError("task not found"))
+				taskRepo.On("GetById", mock.Anything, validTaskID).Return(nil, apperr.NotFoundError("task not found"))
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.NotFoundErrorCode),
+			expectedErrorCode: string(apperr.NotFoundErrorCode),
 		},
 		{
 			name: "project not found",
@@ -164,10 +165,10 @@ func TestTaskCommentService_Create(t *testing.T) {
 			},
 			mockSetup: func(commentRepo *mockTaskCommentRepository, taskRepo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				taskRepo.On("GetById", mock.Anything, validTaskID).Return(validTask, nil)
-				projectRepo.On("GetById", mock.Anything, validProjectID).Return(nil, domain.NotFoundError("project not found"))
+				projectRepo.On("GetById", mock.Anything, validProjectID).Return(nil, apperr.NotFoundError("project not found"))
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.NotFoundErrorCode),
+			expectedErrorCode: string(apperr.NotFoundErrorCode),
 		},
 		{
 			name: "forbidden when user is not a project member",
@@ -181,7 +182,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 				projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ForbiddenErrorCode),
+			expectedErrorCode: string(apperr.ForbiddenErrorCode),
 		},
 		{
 			name: "server error when getting user",
@@ -196,7 +197,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 				userRepo.On("GetById", mock.Anything, validUserID).Return(&domain.User{}, errors.New("database error"))
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ServerErrorCode),
+			expectedErrorCode: string(apperr.ServerErrorCode),
 		},
 		{
 			name: "server error when creating comment",
@@ -212,7 +213,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 				commentRepo.On("Create", mock.Anything, mock.AnythingOfType("*domain.TaskComment"), (*uuid.UUID)(nil)).Return(errors.New("database error"))
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ServerErrorCode),
+			expectedErrorCode: string(apperr.ServerErrorCode),
 		},
 	}
 
@@ -239,7 +240,7 @@ func TestTaskCommentService_Create(t *testing.T) {
 				require.Error(t, err)
 				require.Nil(t, comment)
 
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if assert.ErrorAs(t, err, &domainErr) {
 					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
 				}
@@ -343,7 +344,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 			mockSetup: func(commentRepo *mockTaskCommentRepository, taskRepo *mockTaskRepository, projectRepo *mockProjectRepository) {
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.UnauthorizedErrorCode),
+			expectedErrorCode: string(apperr.UnauthorizedErrorCode),
 		},
 		{
 			name: "task not found",
@@ -353,10 +354,10 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 				Limit:         10,
 			},
 			mockSetup: func(commentRepo *mockTaskCommentRepository, taskRepo *mockTaskRepository, projectRepo *mockProjectRepository) {
-				taskRepo.On("GetById", mock.Anything, validTaskID).Return(nil, domain.NotFoundError("task not found"))
+				taskRepo.On("GetById", mock.Anything, validTaskID).Return(nil, apperr.NotFoundError("task not found"))
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.NotFoundErrorCode),
+			expectedErrorCode: string(apperr.NotFoundErrorCode),
 		},
 		{
 			name: "project not found",
@@ -367,10 +368,10 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 			},
 			mockSetup: func(commentRepo *mockTaskCommentRepository, taskRepo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				taskRepo.On("GetById", mock.Anything, validTaskID).Return(validTask, nil)
-				projectRepo.On("GetById", mock.Anything, validProjectID).Return(nil, domain.NotFoundError("project not found"))
+				projectRepo.On("GetById", mock.Anything, validProjectID).Return(nil, apperr.NotFoundError("project not found"))
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.NotFoundErrorCode),
+			expectedErrorCode: string(apperr.NotFoundErrorCode),
 		},
 		{
 			name: "forbidden when user is not a project member",
@@ -384,7 +385,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 				projectRepo.On("GetById", mock.Anything, validProjectID).Return(validProject, nil)
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ForbiddenErrorCode),
+			expectedErrorCode: string(apperr.ForbiddenErrorCode),
 		},
 		{
 			name: "server error when listing comments",
@@ -401,7 +402,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 				commentRepo.On("ListByTaskID", mock.Anything, validTaskID, &beforeTime, &beforeCommentID, (*time.Time)(nil), (*uuid.UUID)(nil), 10).Return(nil, errors.New("database error"))
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ServerErrorCode),
+			expectedErrorCode: string(apperr.ServerErrorCode),
 		},
 	}
 
@@ -428,7 +429,7 @@ func TestTaskCommentService_ListByTaskID(t *testing.T) {
 				require.Error(t, err)
 				require.Nil(t, comments)
 
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if assert.ErrorAs(t, err, &domainErr) {
 					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
 				}

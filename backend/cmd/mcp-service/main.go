@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 
-	"github.com/gabrielnakaema/project-chat/internal/mcpapi"
+	mcpapp "github.com/gabrielnakaema/project-chat/internal/mcp/app"
 )
 
 func main() {
-	a, err := mcpapi.New()
+	a, err := mcpapp.New()
 	if err != nil {
 		log.Fatal("error while starting mcp-service", "error", err.Error())
 		return

@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/handlers"
+	"github.com/gabrielnakaema/project-chat/internal/platform/auth"
+	platformhttp "github.com/gabrielnakaema/project-chat/internal/platform/http"
+	"github.com/gabrielnakaema/project-chat/internal/platform/httperr"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/gabrielnakaema/project-chat/internal/validator"
 	"github.com/go-chi/chi/v5"
@@ -35,9 +36,9 @@ func NewHandler(notificationService notificationService) *Handler {
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	userId := auth.UserIdFromContext(r.Context())
 
-	limit := utils.GetQueryInt(r, "limit", 10)
-	before := utils.GetQueryString(r, "before", "")
-	beforeId := utils.GetQueryString(r, "id", "")
+	limit := platformhttp.GetQueryInt(r, "limit", 10)
+	before := platformhttp.GetQueryString(r, "before", "")
+	beforeId := platformhttp.GetQueryString(r, "id", "")
 
 	v := validator.New()
 	v.Check("limit", "limit must be greater than 0", limit > 0)
@@ -64,7 +65,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !v.Valid() {
-		handlers.ValidationFailedResponse(w, v)
+		httperr.ValidationFailedResponse(w, v)
 		return
 	}
 
@@ -75,12 +76,12 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		Limit:           limit,
 	})
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	if err := utils.WriteJSON(w, http.StatusOK, notifications, nil); err != nil {
-		handlers.ErrorResponse(w, r, err)
+	if err := platformhttp.WriteJSON(w, http.StatusOK, notifications, nil); err != nil {
+		httperr.ErrorResponse(w, r, err)
 	}
 }
 
@@ -89,12 +90,12 @@ func (h *Handler) CountUnread(w http.ResponseWriter, r *http.Request) {
 
 	count, err := h.notificationService.CountUnread(r.Context(), userId)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	if err := utils.WriteJSON(w, http.StatusOK, map[string]int{"count": count}, nil); err != nil {
-		handlers.ErrorResponse(w, r, err)
+	if err := platformhttp.WriteJSON(w, http.StatusOK, map[string]int{"count": count}, nil); err != nil {
+		httperr.ErrorResponse(w, r, err)
 	}
 }
 
@@ -104,7 +105,7 @@ func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	notificationId, err := uuid.Parse(id)
 	if err != nil {
-		handlers.BadRequestResponse(w, errors.New("invalid notification id"))
+		httperr.BadRequestResponse(w, errors.New("invalid notification id"))
 		return
 	}
 
@@ -113,12 +114,12 @@ func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 		UserId:         userId,
 	})
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	if err := utils.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true}, nil); err != nil {
-		handlers.ErrorResponse(w, r, err)
+	if err := platformhttp.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true}, nil); err != nil {
+		httperr.ErrorResponse(w, r, err)
 	}
 }
 
@@ -126,11 +127,11 @@ func (h *Handler) MarkAllRead(w http.ResponseWriter, r *http.Request) {
 	userId := auth.UserIdFromContext(r.Context())
 
 	if err := h.notificationService.MarkAllRead(r.Context(), userId); err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	if err := utils.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true}, nil); err != nil {
-		handlers.ErrorResponse(w, r, err)
+	if err := platformhttp.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true}, nil); err != nil {
+		httperr.ErrorResponse(w, r, err)
 	}
 }

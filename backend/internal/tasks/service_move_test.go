@@ -6,6 +6,7 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/fracindex"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
 	"github.com/gabrielnakaema/project-chat/internal/tasks"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -51,7 +52,7 @@ func TestTaskService_Move(t *testing.T) {
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Status: domain.TaskStatusPending}, nil)
-				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
+				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, apperr.NotFoundError("not found"))
 				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
 					return t.Order == topOrder
 				}), validUserId).Return(&domain.Task{Order: topOrder}, nil)
@@ -110,7 +111,7 @@ func TestTaskService_Move(t *testing.T) {
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetById", mock.Anything, taskIdB).Return(&taskB, nil)
-				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdB, validProjectId).Return(nil, domain.NotFoundError("not found"))
+				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdB, validProjectId).Return(nil, apperr.NotFoundError("not found"))
 				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
 					return t.Order == afterLastOrder
 				}), validUserId).Return(&domain.Task{Order: afterLastOrder}, nil)

@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 
-	"github.com/gabrielnakaema/project-chat/internal/tasksapi"
+	tasksapp "github.com/gabrielnakaema/project-chat/internal/tasks/app"
 )
 
 func main() {
-	a, err := tasksapi.New()
+	a, err := tasksapp.New()
 	if err != nil {
 		log.Fatal("error while starting tasks-service", "error", err.Error())
 		return

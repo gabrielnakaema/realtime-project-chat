@@ -12,6 +12,23 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const clearTasksResponsibleForProjectMember = `-- name: ClearTasksResponsibleForProjectMember :exec
+UPDATE tasks
+  SET responsible_id = NULL
+  WHERE responsible_id = $1
+  AND project_id = $2
+`
+
+type ClearTasksResponsibleForProjectMemberParams struct {
+	ResponsibleID pgtype.UUID
+	ProjectID     uuid.UUID
+}
+
+func (q *Queries) ClearTasksResponsibleForProjectMember(ctx context.Context, arg ClearTasksResponsibleForProjectMemberParams) error {
+	_, err := q.db.Exec(ctx, clearTasksResponsibleForProjectMember, arg.ResponsibleID, arg.ProjectID)
+	return err
+}
+
 const countTasksByProjectIdAndColumn = `-- name: CountTasksByProjectIdAndColumn :many
 SELECT t.project_column_id, COUNT(*) AS count
 FROM tasks t

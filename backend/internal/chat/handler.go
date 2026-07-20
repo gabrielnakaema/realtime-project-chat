@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gabrielnakaema/project-chat/internal/auth"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/handlers"
+	"github.com/gabrielnakaema/project-chat/internal/platform/auth"
+	platformhttp "github.com/gabrielnakaema/project-chat/internal/platform/http"
+	"github.com/gabrielnakaema/project-chat/internal/platform/httperr"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/gabrielnakaema/project-chat/internal/validator"
 	"github.com/go-chi/chi/v5"
@@ -40,31 +41,31 @@ func NewHandler(chatService chatService) *Handler {
 func (ch *Handler) GetChatByProjectId(w http.ResponseWriter, r *http.Request) {
 	projectId := chi.URLParam(r, "id")
 	if projectId == "" {
-		handlers.BadRequestResponse(w, errors.New("project_id is required"))
+		httperr.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
 	parsedProjectId, err := uuid.Parse(projectId)
 	if err != nil {
-		handlers.BadRequestResponse(w, err)
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
-		handlers.UnauthorizedResponse(w, "unauthorized")
+		httperr.UnauthorizedResponse(w, "unauthorized")
 		return
 	}
 
 	chat, err := ch.chatService.GetByProjectId(r.Context(), parsedProjectId, userId)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	err = utils.WriteJSON(w, http.StatusOK, chat, nil)
+	err = platformhttp.WriteJSON(w, http.StatusOK, chat, nil)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -72,53 +73,53 @@ func (ch *Handler) GetChatByProjectId(w http.ResponseWriter, r *http.Request) {
 func (ch *Handler) GetChatById(w http.ResponseWriter, r *http.Request) {
 	chatId := chi.URLParam(r, "chatId")
 	if chatId == "" {
-		handlers.BadRequestResponse(w, errors.New("chatId is required"))
+		httperr.BadRequestResponse(w, errors.New("chatId is required"))
 		return
 	}
 
 	parsedChatId, err := uuid.Parse(chatId)
 	if err != nil {
-		handlers.BadRequestResponse(w, err)
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
-		handlers.UnauthorizedResponse(w, "unauthorized")
+		httperr.UnauthorizedResponse(w, "unauthorized")
 		return
 	}
 
 	chat, err := ch.chatService.GetById(r.Context(), parsedChatId, userId)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	err = utils.WriteJSON(w, http.StatusOK, chat, nil)
+	err = platformhttp.WriteJSON(w, http.StatusOK, chat, nil)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 }
 
 func (ch *Handler) CreateMessage(w http.ResponseWriter, r *http.Request) {
 	var request CreateMessageRequest
-	err := utils.ReadJSON(w, r, &request)
+	err := platformhttp.ReadJSON(w, r, &request)
 	if err != nil {
-		handlers.BadRequestResponse(w, err)
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	v := validator.New()
 	request.Validate(v)
 	if !v.Valid() {
-		handlers.ValidationFailedResponse(w, v)
+		httperr.ValidationFailedResponse(w, v)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
-		handlers.UnauthorizedResponse(w, "unauthorized")
+		httperr.UnauthorizedResponse(w, "unauthorized")
 		return
 	}
 
@@ -130,47 +131,47 @@ func (ch *Handler) CreateMessage(w http.ResponseWriter, r *http.Request) {
 
 	message, err := ch.chatService.CreateMessage(r.Context(), serviceRequest)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	err = utils.WriteJSON(w, http.StatusCreated, message, nil)
+	err = platformhttp.WriteJSON(w, http.StatusCreated, message, nil)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 }
 
 func (ch *Handler) GetOrCreateGeneralChat(w http.ResponseWriter, r *http.Request) {
 	var request GetOrCreateGeneralChatRequest
-	err := utils.ReadJSON(w, r, &request)
+	err := platformhttp.ReadJSON(w, r, &request)
 	if err != nil {
-		handlers.BadRequestResponse(w, err)
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	v := validator.New()
 	request.Validate(v)
 	if !v.Valid() {
-		handlers.ValidationFailedResponse(w, v)
+		httperr.ValidationFailedResponse(w, v)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
-		handlers.UnauthorizedResponse(w, "unauthorized")
+		httperr.UnauthorizedResponse(w, "unauthorized")
 		return
 	}
 
 	chat, err := ch.chatService.GetOrCreateGeneralChat(r.Context(), userId, request.UserIds)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	err = utils.WriteJSON(w, http.StatusOK, chat, nil)
+	err = platformhttp.WriteJSON(w, http.StatusOK, chat, nil)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -178,19 +179,19 @@ func (ch *Handler) GetOrCreateGeneralChat(w http.ResponseWriter, r *http.Request
 func (ch *Handler) ListGeneralChats(w http.ResponseWriter, r *http.Request) {
 	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
-		handlers.UnauthorizedResponse(w, "unauthorized")
+		httperr.UnauthorizedResponse(w, "unauthorized")
 		return
 	}
 
 	chats, err := ch.chatService.ListGeneralChats(r.Context(), userId)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	err = utils.WriteJSON(w, http.StatusOK, chats, nil)
+	err = platformhttp.WriteJSON(w, http.StatusOK, chats, nil)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -198,38 +199,38 @@ func (ch *Handler) ListGeneralChats(w http.ResponseWriter, r *http.Request) {
 func (ch *Handler) ListChatMessages(w http.ResponseWriter, r *http.Request) {
 	chatId := chi.URLParam(r, "chatId")
 	if chatId == "" {
-		handlers.BadRequestResponse(w, errors.New("chatId is required"))
+		httperr.BadRequestResponse(w, errors.New("chatId is required"))
 		return
 	}
 
-	limit := utils.GetQueryInt(r, "limit", 10)
+	limit := platformhttp.GetQueryInt(r, "limit", 10)
 	if limit <= 0 {
-		handlers.BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		httperr.BadRequestResponse(w, errors.New("limit must be greater than 0"))
 		return
 	}
 
 	if limit > 50 {
-		handlers.BadRequestResponse(w, errors.New("limit must be less than 50"))
+		httperr.BadRequestResponse(w, errors.New("limit must be less than 50"))
 		return
 	}
 
-	before := utils.GetQueryString(r, "before", "")
+	before := platformhttp.GetQueryString(r, "before", "")
 	beforeTime := time.Now()
 	if before != "" {
 		date, err := time.Parse(time.RFC3339, before)
 		if err != nil {
-			handlers.BadRequestResponse(w, errors.New("invalid before date"))
+			httperr.BadRequestResponse(w, errors.New("invalid before date"))
 			return
 		}
 		beforeTime = date
 	}
 
-	beforeId := utils.GetQueryString(r, "id", "")
+	beforeId := platformhttp.GetQueryString(r, "id", "")
 	beforeIdUUID := uuid.Nil
 	if beforeId != "" {
 		parsedBeforeId, err := uuid.Parse(beforeId)
 		if err != nil {
-			handlers.BadRequestResponse(w, err)
+			httperr.BadRequestResponse(w, err)
 			return
 		}
 		beforeIdUUID = parsedBeforeId
@@ -237,13 +238,13 @@ func (ch *Handler) ListChatMessages(w http.ResponseWriter, r *http.Request) {
 
 	parsedChatId, err := uuid.Parse(chatId)
 	if err != nil {
-		handlers.BadRequestResponse(w, err)
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
-		handlers.UnauthorizedResponse(w, "unauthorized")
+		httperr.UnauthorizedResponse(w, "unauthorized")
 		return
 	}
 
@@ -261,13 +262,13 @@ func (ch *Handler) ListChatMessages(w http.ResponseWriter, r *http.Request) {
 
 	messages, err := ch.chatService.ListMessagesByChatId(r.Context(), serviceRequest)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	err = utils.WriteJSON(w, http.StatusOK, messages, nil)
+	err = platformhttp.WriteJSON(w, http.StatusOK, messages, nil)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -275,33 +276,33 @@ func (ch *Handler) ListChatMessages(w http.ResponseWriter, r *http.Request) {
 func (ch *Handler) MarkChatRead(w http.ResponseWriter, r *http.Request) {
 	chatId := chi.URLParam(r, "chatId")
 	if chatId == "" {
-		handlers.BadRequestResponse(w, errors.New("chatId is required"))
+		httperr.BadRequestResponse(w, errors.New("chatId is required"))
 		return
 	}
 
 	parsedChatId, err := uuid.Parse(chatId)
 	if err != nil {
-		handlers.BadRequestResponse(w, err)
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	var request MarkChatReadBody
-	err = utils.ReadJSON(w, r, &request)
+	err = platformhttp.ReadJSON(w, r, &request)
 	if err != nil && !errors.Is(err, http.ErrBodyNotAllowed) && err.Error() != "EOF" {
-		handlers.BadRequestResponse(w, err)
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	v := validator.New()
 	request.Validate(v)
 	if !v.Valid() {
-		handlers.ValidationFailedResponse(w, v)
+		httperr.ValidationFailedResponse(w, v)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
-		handlers.UnauthorizedResponse(w, "unauthorized")
+		httperr.UnauthorizedResponse(w, "unauthorized")
 		return
 	}
 
@@ -311,7 +312,7 @@ func (ch *Handler) MarkChatRead(w http.ResponseWriter, r *http.Request) {
 		MessageId: request.MessageId,
 	})
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
@@ -322,25 +323,25 @@ func (ch *Handler) ListMessageReads(w http.ResponseWriter, r *http.Request) {
 	chatId := chi.URLParam(r, "chatId")
 	messageId := chi.URLParam(r, "messageId")
 	if chatId == "" || messageId == "" {
-		handlers.BadRequestResponse(w, errors.New("chatId and messageId are required"))
+		httperr.BadRequestResponse(w, errors.New("chatId and messageId are required"))
 		return
 	}
 
 	parsedChatId, err := uuid.Parse(chatId)
 	if err != nil {
-		handlers.BadRequestResponse(w, err)
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	parsedMessageId, err := uuid.Parse(messageId)
 	if err != nil {
-		handlers.BadRequestResponse(w, err)
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
-		handlers.UnauthorizedResponse(w, "unauthorized")
+		httperr.UnauthorizedResponse(w, "unauthorized")
 		return
 	}
 
@@ -350,13 +351,13 @@ func (ch *Handler) ListMessageReads(w http.ResponseWriter, r *http.Request) {
 		UserId:    userId,
 	})
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	err = utils.WriteJSON(w, http.StatusOK, reads, nil)
+	err = platformhttp.WriteJSON(w, http.StatusOK, reads, nil)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 }
@@ -364,38 +365,38 @@ func (ch *Handler) ListMessageReads(w http.ResponseWriter, r *http.Request) {
 func (ch *Handler) ListMessagesByProjectId(w http.ResponseWriter, r *http.Request) {
 	projectId := chi.URLParam(r, "id")
 	if projectId == "" {
-		handlers.BadRequestResponse(w, errors.New("project_id is required"))
+		httperr.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
-	limit := utils.GetQueryInt(r, "limit", 10)
+	limit := platformhttp.GetQueryInt(r, "limit", 10)
 	if limit <= 0 {
-		handlers.BadRequestResponse(w, errors.New("limit must be greater than 0"))
+		httperr.BadRequestResponse(w, errors.New("limit must be greater than 0"))
 		return
 	}
 
 	if limit > 50 {
-		handlers.BadRequestResponse(w, errors.New("limit must be less than 50"))
+		httperr.BadRequestResponse(w, errors.New("limit must be less than 50"))
 		return
 	}
 
-	before := utils.GetQueryString(r, "before", "")
+	before := platformhttp.GetQueryString(r, "before", "")
 	beforeTime := time.Now()
 	if before != "" {
 		date, err := time.Parse(time.RFC3339, before)
 		if err != nil {
-			handlers.BadRequestResponse(w, errors.New("invalid before date"))
+			httperr.BadRequestResponse(w, errors.New("invalid before date"))
 			return
 		}
 		beforeTime = date
 	}
 
-	beforeId := utils.GetQueryString(r, "id", "")
+	beforeId := platformhttp.GetQueryString(r, "id", "")
 	beforeIdUUID := uuid.Nil
 	if beforeId != "" {
 		parsedBeforeId, err := uuid.Parse(beforeId)
 		if err != nil {
-			handlers.BadRequestResponse(w, err)
+			httperr.BadRequestResponse(w, err)
 			return
 		}
 		beforeIdUUID = parsedBeforeId
@@ -403,13 +404,13 @@ func (ch *Handler) ListMessagesByProjectId(w http.ResponseWriter, r *http.Reques
 
 	parsedProjectId, err := uuid.Parse(projectId)
 	if err != nil {
-		handlers.BadRequestResponse(w, err)
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 	if userId == uuid.Nil {
-		handlers.UnauthorizedResponse(w, "unauthorized")
+		httperr.UnauthorizedResponse(w, "unauthorized")
 		return
 	}
 
@@ -427,13 +428,13 @@ func (ch *Handler) ListMessagesByProjectId(w http.ResponseWriter, r *http.Reques
 
 	messages, err := ch.chatService.ListMessagesByProjectId(r.Context(), serviceRequest)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 
-	err = utils.WriteJSON(w, http.StatusOK, messages, nil)
+	err = platformhttp.WriteJSON(w, http.StatusOK, messages, nil)
 	if err != nil {
-		handlers.ErrorResponse(w, r, err)
+		httperr.ErrorResponse(w, r, err)
 		return
 	}
 }

@@ -6,10 +6,11 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/gabrielnakaema/project-chat/internal/config"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
-	"github.com/gabrielnakaema/project-chat/internal/subscriber"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/config"
+	"github.com/gabrielnakaema/project-chat/internal/platform/messaging"
 	"github.com/google/uuid"
 )
 
@@ -19,13 +20,13 @@ type eventRepository interface {
 
 type EventSubscriber struct {
 	logger     *slog.Logger
-	subscriber *subscriber.Subscriber
+	subscriber *messaging.Subscriber
 	repository eventRepository
 	now        func() time.Time
 }
 
 func NewEventSubscriber(ctx context.Context, cfg *config.Config, logger *slog.Logger, repository eventRepository) (*EventSubscriber, error) {
-	sub, err := subscriber.NewSubscriber(cfg, "notification.subscriber")
+	sub, err := messaging.NewSubscriber(cfg, "notification.subscriber")
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +50,7 @@ func (es *EventSubscriber) Close() error {
 	return es.subscriber.Close()
 }
 
-func (es *EventSubscriber) handleNotificationEvents(ctx context.Context, message subscriber.Message) error {
+func (es *EventSubscriber) handleNotificationEvents(ctx context.Context, message messaging.Message) error {
 	switch message.Topic {
 	case events.ProjectMemberCreated:
 		return es.handleProjectMemberCreated(ctx, message)
@@ -64,10 +65,10 @@ func (es *EventSubscriber) handleNotificationEvents(ctx context.Context, message
 	}
 }
 
-func (es *EventSubscriber) handleProjectMemberCreated(ctx context.Context, message subscriber.Message) error {
+func (es *EventSubscriber) handleProjectMemberCreated(ctx context.Context, message messaging.Message) error {
 	var payload events.ProjectMemberCreatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
-		return domain.ServerError("failed to unmarshal project member created payload", err)
+		return apperr.ServerError("failed to unmarshal project member created payload", err)
 	}
 
 	if payload.ProjectMember.UserId == payload.User.Id {
@@ -88,10 +89,10 @@ func (es *EventSubscriber) handleProjectMemberCreated(ctx context.Context, messa
 	return es.persistAndNotify(ctx, notifications)
 }
 
-func (es *EventSubscriber) handleTaskCreated(ctx context.Context, message subscriber.Message) error {
+func (es *EventSubscriber) handleTaskCreated(ctx context.Context, message messaging.Message) error {
 	var payload events.TaskCreatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
-		return domain.ServerError("failed to unmarshal task created payload", err)
+		return apperr.ServerError("failed to unmarshal task created payload", err)
 	}
 
 	if payload.Task.ResponsibleId == nil || *payload.Task.ResponsibleId == payload.User.Id {
@@ -113,10 +114,10 @@ func (es *EventSubscriber) handleTaskCreated(ctx context.Context, message subscr
 	return es.persistAndNotify(ctx, notifications)
 }
 
-func (es *EventSubscriber) handleTaskUpdated(ctx context.Context, message subscriber.Message) error {
+func (es *EventSubscriber) handleTaskUpdated(ctx context.Context, message messaging.Message) error {
 	var payload events.TaskUpdatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
-		return domain.ServerError("failed to unmarshal task updated payload", err)
+		return apperr.ServerError("failed to unmarshal task updated payload", err)
 	}
 
 	if payload.PreviousTask == nil || payload.Task.ResponsibleId == nil {
@@ -146,10 +147,10 @@ func (es *EventSubscriber) handleTaskUpdated(ctx context.Context, message subscr
 	return es.persistAndNotify(ctx, notifications)
 }
 
-func (es *EventSubscriber) handleTaskCommentCreated(ctx context.Context, message subscriber.Message) error {
+func (es *EventSubscriber) handleTaskCommentCreated(ctx context.Context, message messaging.Message) error {
 	var payload events.TaskCommentCreatedPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
-		return domain.ServerError("failed to unmarshal task comment created payload", err)
+		return apperr.ServerError("failed to unmarshal task comment created payload", err)
 	}
 
 	if payload.TaskComment.Task == nil || payload.TaskComment.User == nil {
@@ -189,7 +190,7 @@ func (es *EventSubscriber) handleTaskCommentCreated(ctx context.Context, message
 
 func (es *EventSubscriber) persistAndNotify(ctx context.Context, notifications []domain.Notification) error {
 	if err := es.repository.CreateManyAndEnqueue(ctx, notifications); err != nil {
-		return domain.ServerError("failed to create notifications", err)
+		return apperr.ServerError("failed to create notifications", err)
 	}
 
 	return nil

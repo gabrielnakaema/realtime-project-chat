@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
 	tasksv1 "github.com/gabrielnakaema/project-chat/internal/tasks/v1"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -444,26 +445,26 @@ func parseOptionalGRPCTime(value *string, field string) (*time.Time, error) {
 }
 
 func domainErrorToStatus(err error) error {
-	var domainErr domain.DomainError
+	var domainErr apperr.DomainError
 	if !errors.As(err, &domainErr) {
 		return status.Error(codes.Internal, "task operation failed")
 	}
 	return status.Error(grpcCodeForDomainCode(domainErr.Code), domainErr.Message)
 }
 
-func grpcCodeForDomainCode(code domain.ErrorCode) codes.Code {
+func grpcCodeForDomainCode(code apperr.ErrorCode) codes.Code {
 	switch code {
-	case domain.NotFoundErrorCode:
+	case apperr.NotFoundErrorCode:
 		return codes.NotFound
-	case domain.UnauthorizedErrorCode:
+	case apperr.UnauthorizedErrorCode:
 		return codes.Unauthenticated
-	case domain.ForbiddenErrorCode:
+	case apperr.ForbiddenErrorCode:
 		return codes.PermissionDenied
-	case domain.ValidationFailedErrorCode:
+	case apperr.ValidationFailedErrorCode:
 		return codes.InvalidArgument
-	case domain.BusinessValidationErrorCode:
+	case apperr.BusinessValidationErrorCode:
 		return codes.FailedPrecondition
-	case domain.DuplicateEntryErrorCode:
+	case apperr.DuplicateEntryErrorCode:
 		return codes.AlreadyExists
 	default:
 		return codes.Internal

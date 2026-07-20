@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 
-	"github.com/gabrielnakaema/project-chat/internal/chatapi"
+	chatapp "github.com/gabrielnakaema/project-chat/internal/chat/app"
 )
 
 func main() {
-	a, err := chatapi.New()
+	a, err := chatapp.New()
 	if err != nil {
 		log.Fatal("error while starting chat-service", "error", err.Error())
 		return

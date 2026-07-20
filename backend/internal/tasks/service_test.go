@@ -8,7 +8,8 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
 	"github.com/gabrielnakaema/project-chat/internal/fracindex"
-	"github.com/gabrielnakaema/project-chat/internal/outbox"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/tasks"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -249,7 +250,7 @@ func TestTaskService_Create(t *testing.T) {
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
+				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, apperr.NotFoundError("not found"))
 				repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 			},
@@ -271,8 +272,8 @@ func TestTaskService_Create(t *testing.T) {
 			},
 			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.UnauthorizedErrorCode),
-			expectedError:     domain.UnauthorizedError("unauthorized"),
+			expectedErrorCode: string(apperr.UnauthorizedErrorCode),
+			expectedError:     apperr.UnauthorizedError("unauthorized"),
 		},
 		{
 			name: "project not found",
@@ -284,11 +285,11 @@ func TestTaskService_Create(t *testing.T) {
 				RequestUserId:   validUserId,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
-				projectRepo.On("GetById", mock.Anything, validProjectId).Return(nil, domain.NotFoundError("project not found"))
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(nil, apperr.NotFoundError("project not found"))
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.NotFoundErrorCode),
-			expectedError:     domain.NotFoundError("project not found"),
+			expectedErrorCode: string(apperr.NotFoundErrorCode),
+			expectedError:     apperr.NotFoundError("project not found"),
 		},
 		{
 			name: "forbidden error",
@@ -303,8 +304,8 @@ func TestTaskService_Create(t *testing.T) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ForbiddenErrorCode),
-			expectedError:     domain.ForbiddenError("forbidden"),
+			expectedErrorCode: string(apperr.ForbiddenErrorCode),
+			expectedError:     apperr.ForbiddenError("forbidden"),
 		},
 		{
 			name: "remove empty tags",
@@ -318,7 +319,7 @@ func TestTaskService_Create(t *testing.T) {
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
-				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
+				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, apperr.NotFoundError("not found"))
 				repo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 				userRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
 			},
@@ -346,8 +347,8 @@ func TestTaskService_Create(t *testing.T) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.BusinessValidationErrorCode),
-			expectedError:     domain.BusinessValidationError("responsible is not a member of the project"),
+			expectedErrorCode: string(apperr.BusinessValidationErrorCode),
+			expectedError:     apperr.BusinessValidationError("responsible is not a member of the project"),
 		},
 	}
 
@@ -374,7 +375,7 @@ func TestTaskService_Create(t *testing.T) {
 				require.Error(t, err)
 				require.Nil(t, task)
 
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if assert.ErrorAs(t, err, &domainErr) {
 					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
 				}
@@ -454,7 +455,7 @@ func TestTaskService_FindTaskByCode(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Nil(t, task)
-		assert.Equal(t, domain.NotFoundErrorCode, err.(domain.DomainError).Code)
+		assert.Equal(t, apperr.NotFoundErrorCode, err.(apperr.DomainError).Code)
 	})
 
 	t.Run("returns ambiguity error when duplicates exist", func(t *testing.T) {
@@ -477,8 +478,8 @@ func TestTaskService_FindTaskByCode(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Nil(t, task)
-		domainErr := err.(domain.DomainError)
-		assert.Equal(t, domain.BusinessValidationErrorCode, domainErr.Code)
+		domainErr := err.(apperr.DomainError)
+		assert.Equal(t, apperr.BusinessValidationErrorCode, domainErr.Code)
 		assert.Equal(t, "task code matches multiple tasks in this project", domainErr.Message)
 	})
 }
@@ -532,7 +533,7 @@ func TestTaskService_SuggestTaskCodes(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Nil(t, result)
-		assert.Equal(t, domain.BusinessValidationErrorCode, err.(domain.DomainError).Code)
+		assert.Equal(t, apperr.BusinessValidationErrorCode, err.(apperr.DomainError).Code)
 	})
 
 	t.Run("rejects non-member", func(t *testing.T) {
@@ -552,7 +553,7 @@ func TestTaskService_SuggestTaskCodes(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Nil(t, result)
-		assert.Equal(t, domain.ForbiddenErrorCode, err.(domain.DomainError).Code)
+		assert.Equal(t, apperr.ForbiddenErrorCode, err.(apperr.DomainError).Code)
 		projectRepo.AssertExpectations(t)
 	})
 }
@@ -704,8 +705,8 @@ func TestTaskService_Update(t *testing.T) {
 			},
 			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.UnauthorizedErrorCode),
-			expectedError:     domain.UnauthorizedError("unauthorized"),
+			expectedErrorCode: string(apperr.UnauthorizedErrorCode),
+			expectedError:     apperr.UnauthorizedError("unauthorized"),
 		},
 		{
 			name: "project not found",
@@ -718,11 +719,11 @@ func TestTaskService_Update(t *testing.T) {
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
-				projectRepo.On("GetById", mock.Anything, validProjectId).Return(nil, domain.NotFoundError("project not found"))
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(nil, apperr.NotFoundError("project not found"))
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.NotFoundErrorCode),
-			expectedError:     domain.NotFoundError("project not found"),
+			expectedErrorCode: string(apperr.NotFoundErrorCode),
+			expectedError:     apperr.NotFoundError("project not found"),
 		},
 		{
 			name: "forbidden error",
@@ -739,8 +740,8 @@ func TestTaskService_Update(t *testing.T) {
 
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ForbiddenErrorCode),
-			expectedError:     domain.ForbiddenError("forbidden"),
+			expectedErrorCode: string(apperr.ForbiddenErrorCode),
+			expectedError:     apperr.ForbiddenError("forbidden"),
 		},
 		{
 			name: "task not found",
@@ -752,12 +753,12 @@ func TestTaskService_Update(t *testing.T) {
 				RequestUserId:   validUserId,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
-				repo.On("GetById", mock.Anything, validTaskId).Return(nil, domain.NotFoundError("task not found"))
+				repo.On("GetById", mock.Anything, validTaskId).Return(nil, apperr.NotFoundError("task not found"))
 			},
 			expectedTask:      &validTask,
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.NotFoundErrorCode),
-			expectedError:     domain.NotFoundError("task not found"),
+			expectedErrorCode: string(apperr.NotFoundErrorCode),
+			expectedError:     apperr.NotFoundError("task not found"),
 		},
 		{
 			name: "remove empty tags",
@@ -807,7 +808,7 @@ func TestTaskService_Update(t *testing.T) {
 				require.Error(t, err)
 				require.Nil(t, task)
 
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if assert.ErrorAs(t, err, &domainErr) {
 					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
 				}
@@ -1001,7 +1002,7 @@ func TestTaskService_Archive(t *testing.T) {
 			},
 			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.UnauthorizedErrorCode),
+			expectedErrorCode: string(apperr.UnauthorizedErrorCode),
 		},
 		{
 			name: "task not found",
@@ -1010,10 +1011,10 @@ func TestTaskService_Archive(t *testing.T) {
 				RequestUserId: validUserId,
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
-				repo.On("GetById", mock.Anything, validTaskId).Return(nil, domain.NotFoundError("task not found"))
+				repo.On("GetById", mock.Anything, validTaskId).Return(nil, apperr.NotFoundError("task not found"))
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.NotFoundErrorCode),
+			expectedErrorCode: string(apperr.NotFoundErrorCode),
 		},
 		{
 			name: "project not found",
@@ -1023,10 +1024,10 @@ func TestTaskService_Archive(t *testing.T) {
 			},
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&validTask, nil)
-				projectRepo.On("GetById", mock.Anything, validProjectId).Return(nil, domain.NotFoundError("project not found"))
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(nil, apperr.NotFoundError("project not found"))
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.NotFoundErrorCode),
+			expectedErrorCode: string(apperr.NotFoundErrorCode),
 		},
 		{
 			name: "forbidden - not a project member",
@@ -1039,7 +1040,7 @@ func TestTaskService_Archive(t *testing.T) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ForbiddenErrorCode),
+			expectedErrorCode: string(apperr.ForbiddenErrorCode),
 		},
 	}
 
@@ -1063,7 +1064,7 @@ func TestTaskService_Archive(t *testing.T) {
 				require.Error(t, err)
 				require.Nil(t, task)
 
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if assert.ErrorAs(t, err, &domainErr) {
 					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
 				}
@@ -1366,7 +1367,7 @@ func TestTaskService_List(t *testing.T) {
 			},
 			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.UnauthorizedErrorCode),
+			expectedErrorCode: string(apperr.UnauthorizedErrorCode),
 		},
 		{
 			name: "forbidden - not a member",
@@ -1380,7 +1381,7 @@ func TestTaskService_List(t *testing.T) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ForbiddenErrorCode),
+			expectedErrorCode: string(apperr.ForbiddenErrorCode),
 		},
 		{
 			name: "creator can list archived tasks",
@@ -1435,7 +1436,7 @@ func TestTaskService_List(t *testing.T) {
 				require.Error(t, err)
 				require.Nil(t, result)
 
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if assert.ErrorAs(t, err, &domainErr) {
 					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
 				}
@@ -1509,7 +1510,7 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 			},
 			mockSetup:         func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.UnauthorizedErrorCode),
+			expectedErrorCode: string(apperr.UnauthorizedErrorCode),
 		},
 		{
 			name: "non-creator can group by non-archived statuses",
@@ -1538,7 +1539,7 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 			},
 			shouldSucceed:     false,
-			expectedErrorCode: string(domain.ForbiddenErrorCode),
+			expectedErrorCode: string(apperr.ForbiddenErrorCode),
 		},
 	}
 
@@ -1561,7 +1562,7 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 				require.Error(t, err)
 				require.Nil(t, result)
 
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if assert.ErrorAs(t, err, &domainErr) {
 					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
 				}
@@ -1604,7 +1605,7 @@ func TestTaskService_MarkTaskDone(t *testing.T) {
 
 		mockRepo.On("GetById", mock.Anything, taskID).Return(task, nil)
 		mockProjectRepo.On("GetById", mock.Anything, projectID).Return(project, nil)
-		mockRepo.On("GetFirstTaskInColumn", mock.Anything, projectID, doneColumnID).Return(nil, domain.NotFoundError("not found"))
+		mockRepo.On("GetFirstTaskInColumn", mock.Anything, projectID, doneColumnID).Return(nil, apperr.NotFoundError("not found"))
 		mockRepo.On("MoveTask", mock.Anything, mock.MatchedBy(func(updated *domain.Task) bool {
 			return updated.ProjectColumnId == doneColumnID && updated.DoneAt != nil
 		}), requestUserID).Return(&domain.Task{
@@ -1659,9 +1660,9 @@ func TestTaskService_MarkTaskDone(t *testing.T) {
 		require.Error(t, err)
 		require.Nil(t, result)
 
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		require.ErrorAs(t, err, &domainErr)
-		assert.Equal(t, string(domain.BusinessValidationErrorCode), string(domainErr.Code))
+		assert.Equal(t, string(apperr.BusinessValidationErrorCode), string(domainErr.Code))
 		assert.Equal(t, "project must have exactly one done column", domainErr.Message)
 
 		mockRepo.AssertExpectations(t)
@@ -1804,7 +1805,7 @@ func TestTaskService_Dependencies(t *testing.T) {
 
 		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 		mockUserRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
-		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
+		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, apperr.NotFoundError("not found"))
 		mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
 		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
@@ -1829,7 +1830,7 @@ func TestTaskService_Dependencies(t *testing.T) {
 
 		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 		mockUserRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
-		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
+		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, apperr.NotFoundError("not found"))
 		mockRepo.On("GetTaskDependencyRefsByProjectAndIds", mock.Anything, validProjectId, []uuid.UUID{dependencyTaskId}).Return([]domain.TaskDependencyRef{{Id: dependencyTaskId, Title: "Dependency Task", Code: "DEP-1"}}, nil)
 		mockRepo.On("Create", mock.Anything, mock.AnythingOfType("*domain.Task")).Return(nil)
 
@@ -1856,7 +1857,7 @@ func TestTaskService_Dependencies(t *testing.T) {
 
 		mockProjectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
 		mockUserRepo.On("GetById", mock.Anything, validUserId).Return(&validUser, nil)
-		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, domain.NotFoundError("not found"))
+		mockRepo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, apperr.NotFoundError("not found"))
 		mockRepo.On("GetTaskDependencyRefsByProjectAndIds", mock.Anything, validProjectId, []uuid.UUID{dependencyTaskId}).Return([]domain.TaskDependencyRef{}, nil)
 
 		svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
@@ -1871,9 +1872,9 @@ func TestTaskService_Dependencies(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		require.ErrorAs(t, err, &domainErr)
-		assert.Equal(t, domain.BusinessValidationErrorCode, domainErr.Code)
+		assert.Equal(t, apperr.BusinessValidationErrorCode, domainErr.Code)
 	})
 
 	t.Run("update rejects self dependency", func(t *testing.T) {
@@ -1896,9 +1897,9 @@ func TestTaskService_Dependencies(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		require.ErrorAs(t, err, &domainErr)
-		assert.Equal(t, domain.BusinessValidationErrorCode, domainErr.Code)
+		assert.Equal(t, apperr.BusinessValidationErrorCode, domainErr.Code)
 	})
 
 	t.Run("update rejects dependency cycle", func(t *testing.T) {
@@ -1925,9 +1926,9 @@ func TestTaskService_Dependencies(t *testing.T) {
 		})
 
 		require.Error(t, err)
-		var domainErr domain.DomainError
+		var domainErr apperr.DomainError
 		require.ErrorAs(t, err, &domainErr)
-		assert.Equal(t, domain.BusinessValidationErrorCode, domainErr.Code)
+		assert.Equal(t, apperr.BusinessValidationErrorCode, domainErr.Code)
 	})
 
 	t.Run("update accepts valid dependencies", func(t *testing.T) {

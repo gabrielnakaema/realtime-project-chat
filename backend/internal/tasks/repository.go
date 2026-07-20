@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
-	"github.com/gabrielnakaema/project-chat/internal/outbox"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
 	taskqueries "github.com/gabrielnakaema/project-chat/internal/tasks/queries"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -160,11 +161,22 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 	return tr.getByID(ctx, taskqueries.New(tr.pool), id)
 }
 
+// ClearResponsibleForProjectMember unassigns every task in the given project
+// that was assigned to the given user. Invoked asynchronously when a project
+// member is removed.
+func (tr *TaskRepository) ClearResponsibleForProjectMember(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) error {
+	q := taskqueries.New(tr.pool)
+	return q.ClearTasksResponsibleForProjectMember(ctx, taskqueries.ClearTasksResponsibleForProjectMemberParams{
+		ResponsibleID: pgtype.UUID{Bytes: userID, Valid: true},
+		ProjectID:     projectID,
+	})
+}
+
 func (tr *TaskRepository) getByID(ctx context.Context, q *taskqueries.Queries, id uuid.UUID) (*domain.Task, error) {
 	result, err := q.GetTaskById(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.NotFoundError("task not found")
+			return nil, apperr.NotFoundError("task not found")
 		}
 		return nil, err
 	}
@@ -583,7 +595,7 @@ func (tr *TaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uu
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.NotFoundError("no tasks found for column")
+			return nil, apperr.NotFoundError("no tasks found for column")
 		}
 		return nil, err
 	}
@@ -621,7 +633,7 @@ func (tr *TaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.UUI
 	result, err := q.GetProjectTaskAfterId(ctx, params)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.NotFoundError("task not found")
+			return nil, apperr.NotFoundError("task not found")
 		}
 		return nil, err
 	}
@@ -693,7 +705,7 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 	result, err := qtx.MoveTask(ctx, params)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.NotFoundError("task not found")
+			return nil, apperr.NotFoundError("task not found")
 		}
 		return nil, err
 	}
@@ -703,7 +715,7 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 	movedTask, err := tr.getByID(ctx, qtx, result.ID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.NotFoundError("task not found")
+			return nil, apperr.NotFoundError("task not found")
 		}
 		return nil, err
 	}

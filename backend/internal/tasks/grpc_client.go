@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
 	tasksv1 "github.com/gabrielnakaema/project-chat/internal/tasks/v1"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
@@ -72,7 +73,7 @@ func (c *TaskServiceClient) GroupByColumn(ctx context.Context, request GroupByCo
 
 	var grouped map[string]utils.CursorPaginated[domain.Task]
 	if err := json.Unmarshal(resp.GetTasksByColumnJson(), &grouped); err != nil {
-		return nil, domain.ServerError("failed to decode tasks", err)
+		return nil, apperr.ServerError("failed to decode tasks", err)
 	}
 	return grouped, nil
 }
@@ -168,7 +169,7 @@ func (c *TaskCommentServiceClient) Create(ctx context.Context, request CreateTas
 
 	var comment domain.TaskComment
 	if err := json.Unmarshal(resp.GetCommentJson(), &comment); err != nil {
-		return nil, domain.ServerError("failed to decode task comment", err)
+		return nil, apperr.ServerError("failed to decode task comment", err)
 	}
 	return &comment, nil
 }
@@ -189,7 +190,7 @@ func (c *TaskCommentServiceClient) ListByTaskID(ctx context.Context, request Lis
 
 	var comments utils.CursorPaginated[domain.TaskComment]
 	if err := json.Unmarshal(resp.GetCommentsJson(), &comments); err != nil {
-		return nil, domain.ServerError("failed to decode task comments", err)
+		return nil, apperr.ServerError("failed to decode task comments", err)
 	}
 	return &comments, nil
 }
@@ -197,7 +198,7 @@ func (c *TaskCommentServiceClient) ListByTaskID(ctx context.Context, request Lis
 func decodeTask(payload []byte) (*domain.Task, error) {
 	var task domain.Task
 	if err := json.Unmarshal(payload, &task); err != nil {
-		return nil, domain.ServerError("failed to decode task", err)
+		return nil, apperr.ServerError("failed to decode task", err)
 	}
 	return &task, nil
 }
@@ -234,23 +235,23 @@ func uuidStrings(ids []uuid.UUID) []string {
 func statusToDomainError(err error) error {
 	st, ok := status.FromError(err)
 	if !ok {
-		return domain.ServerError("task service call failed", err)
+		return apperr.ServerError("task service call failed", err)
 	}
 	message := st.Message()
 	switch st.Code() {
 	case codes.NotFound:
-		return domain.NotFoundError(message)
+		return apperr.NotFoundError(message)
 	case codes.Unauthenticated:
-		return domain.UnauthorizedError(message)
+		return apperr.UnauthorizedError(message)
 	case codes.PermissionDenied:
-		return domain.ForbiddenError(message)
+		return apperr.ForbiddenError(message)
 	case codes.InvalidArgument:
-		return domain.BusinessValidationError(message)
+		return apperr.BusinessValidationError(message)
 	case codes.FailedPrecondition:
-		return domain.BusinessValidationError(message)
+		return apperr.BusinessValidationError(message)
 	case codes.AlreadyExists:
-		return domain.DuplicateEntryError(message)
+		return apperr.DuplicateEntryError(message)
 	default:
-		return domain.ServerError(message, err)
+		return apperr.ServerError(message, err)
 	}
 }

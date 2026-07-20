@@ -9,7 +9,8 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/chat"
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
-	"github.com/gabrielnakaema/project-chat/internal/outbox"
+	"github.com/gabrielnakaema/project-chat/internal/platform/apperr"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -167,7 +168,7 @@ func TestChatService_GetOrCreateGeneralChat(t *testing.T) {
 		chatRepoSetup func(*mockChatRepository)
 		userRepoSetup func(*mockChatUserRepository)
 		shouldSucceed bool
-		expectedCode  domain.ErrorCode
+		expectedCode  apperr.ErrorCode
 	}{
 		{
 			name:          "unauthorized when currentUserId is nil",
@@ -176,7 +177,7 @@ func TestChatService_GetOrCreateGeneralChat(t *testing.T) {
 			chatRepoSetup: func(r *mockChatRepository) {},
 			userRepoSetup: func(r *mockChatUserRepository) {},
 			shouldSucceed: false,
-			expectedCode:  domain.UnauthorizedErrorCode,
+			expectedCode:  apperr.UnauthorizedErrorCode,
 		},
 		{
 			name:          "business validation error when only current user after sanitization",
@@ -185,7 +186,7 @@ func TestChatService_GetOrCreateGeneralChat(t *testing.T) {
 			chatRepoSetup: func(r *mockChatRepository) {},
 			userRepoSetup: func(r *mockChatUserRepository) {},
 			shouldSucceed: false,
-			expectedCode:  domain.BusinessValidationErrorCode,
+			expectedCode:  apperr.BusinessValidationErrorCode,
 		},
 		{
 			name:          "business validation error when target list is empty",
@@ -194,7 +195,7 @@ func TestChatService_GetOrCreateGeneralChat(t *testing.T) {
 			chatRepoSetup: func(r *mockChatRepository) {},
 			userRepoSetup: func(r *mockChatUserRepository) {},
 			shouldSucceed: false,
-			expectedCode:  domain.BusinessValidationErrorCode,
+			expectedCode:  apperr.BusinessValidationErrorCode,
 		},
 		{
 			name:          "not found error when target user does not exist",
@@ -202,10 +203,10 @@ func TestChatService_GetOrCreateGeneralChat(t *testing.T) {
 			targetUserIds: []uuid.UUID{otherUserId},
 			chatRepoSetup: func(r *mockChatRepository) {},
 			userRepoSetup: func(r *mockChatUserRepository) {
-				r.On("GetById", mock.Anything, otherUserId).Return(nil, domain.NotFoundError("user not found"))
+				r.On("GetById", mock.Anything, otherUserId).Return(nil, apperr.NotFoundError("user not found"))
 			},
 			shouldSucceed: false,
-			expectedCode:  domain.NotFoundErrorCode,
+			expectedCode:  apperr.NotFoundErrorCode,
 		},
 		{
 			name:          "server error when user lookup fails unexpectedly",
@@ -216,7 +217,7 @@ func TestChatService_GetOrCreateGeneralChat(t *testing.T) {
 				r.On("GetById", mock.Anything, otherUserId).Return(nil, errors.New("db failure"))
 			},
 			shouldSucceed: false,
-			expectedCode:  domain.ServerErrorCode,
+			expectedCode:  apperr.ServerErrorCode,
 		},
 		{
 			name:          "server error when repository GetOrCreateGeneralChat fails",
@@ -229,7 +230,7 @@ func TestChatService_GetOrCreateGeneralChat(t *testing.T) {
 				r.On("GetById", mock.Anything, otherUserId).Return(&domain.User{Id: otherUserId}, nil)
 			},
 			shouldSucceed: false,
-			expectedCode:  domain.ServerErrorCode,
+			expectedCode:  apperr.ServerErrorCode,
 		},
 		{
 			name:          "success returns existing chat",
@@ -275,7 +276,7 @@ func TestChatService_GetOrCreateGeneralChat(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 				assert.Nil(t, chat)
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if errors.As(err, &domainErr) {
 					assert.Equal(t, tt.expectedCode, domainErr.Code)
 				}
@@ -295,7 +296,7 @@ func TestChatService_ListGeneralChats(t *testing.T) {
 		userId        uuid.UUID
 		chatRepoSetup func(*mockChatRepository)
 		shouldSucceed bool
-		expectedCode  domain.ErrorCode
+		expectedCode  apperr.ErrorCode
 		expectedLen   int
 	}{
 		{
@@ -303,7 +304,7 @@ func TestChatService_ListGeneralChats(t *testing.T) {
 			userId:        uuid.Nil,
 			chatRepoSetup: func(r *mockChatRepository) {},
 			shouldSucceed: false,
-			expectedCode:  domain.UnauthorizedErrorCode,
+			expectedCode:  apperr.UnauthorizedErrorCode,
 		},
 		{
 			name:   "server error when repository fails",
@@ -312,7 +313,7 @@ func TestChatService_ListGeneralChats(t *testing.T) {
 				r.On("ListGeneralChats", mock.Anything, userId).Return(nil, errors.New("db failure"))
 			},
 			shouldSucceed: false,
-			expectedCode:  domain.ServerErrorCode,
+			expectedCode:  apperr.ServerErrorCode,
 		},
 		{
 			name:   "success returns empty list",
@@ -353,7 +354,7 @@ func TestChatService_ListGeneralChats(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 				assert.Nil(t, chats)
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if errors.As(err, &domainErr) {
 					assert.Equal(t, tt.expectedCode, domainErr.Code)
 				}
@@ -389,7 +390,7 @@ func TestChatService_GetByProjectId(t *testing.T) {
 		projectId     uuid.UUID
 		chatRepoSetup func(*mockChatRepository)
 		shouldSucceed bool
-		expectedCode  domain.ErrorCode
+		expectedCode  apperr.ErrorCode
 		assertChat    func(*testing.T, *domain.Chat)
 	}{
 		{
@@ -398,16 +399,16 @@ func TestChatService_GetByProjectId(t *testing.T) {
 			projectId: projectId,
 			chatRepoSetup: func(r *mockChatRepository) {
 			},
-			expectedCode: domain.UnauthorizedErrorCode,
+			expectedCode: apperr.UnauthorizedErrorCode,
 		},
 		{
 			name:      "not found when project chat does not exist",
 			userId:    userId,
 			projectId: projectId,
 			chatRepoSetup: func(r *mockChatRepository) {
-				r.On("GetByProjectId", mock.Anything, projectId).Return(nil, domain.NotFoundError("chat not found"))
+				r.On("GetByProjectId", mock.Anything, projectId).Return(nil, apperr.NotFoundError("chat not found"))
 			},
-			expectedCode: domain.NotFoundErrorCode,
+			expectedCode: apperr.NotFoundErrorCode,
 		},
 		{
 			name:      "forbidden when user is not a member",
@@ -416,7 +417,7 @@ func TestChatService_GetByProjectId(t *testing.T) {
 			chatRepoSetup: func(r *mockChatRepository) {
 				r.On("GetByProjectId", mock.Anything, projectId).Return(chatWithoutUser, nil)
 			},
-			expectedCode: domain.ForbiddenErrorCode,
+			expectedCode: apperr.ForbiddenErrorCode,
 		},
 		{
 			name:      "success returns unread summary fields",
@@ -453,7 +454,7 @@ func TestChatService_GetByProjectId(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 				assert.Nil(t, chat)
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if errors.As(err, &domainErr) {
 					assert.Equal(t, tt.expectedCode, domainErr.Code)
 				}
@@ -486,7 +487,7 @@ func TestChatService_GetById(t *testing.T) {
 		chatId        uuid.UUID
 		chatRepoSetup func(*mockChatRepository)
 		shouldSucceed bool
-		expectedCode  domain.ErrorCode
+		expectedCode  apperr.ErrorCode
 	}{
 		{
 			name:          "unauthorized when userId is nil",
@@ -494,17 +495,17 @@ func TestChatService_GetById(t *testing.T) {
 			chatId:        chatId,
 			chatRepoSetup: func(r *mockChatRepository) {},
 			shouldSucceed: false,
-			expectedCode:  domain.UnauthorizedErrorCode,
+			expectedCode:  apperr.UnauthorizedErrorCode,
 		},
 		{
 			name:   "not found when chat does not exist",
 			userId: userId,
 			chatId: chatId,
 			chatRepoSetup: func(r *mockChatRepository) {
-				r.On("GetById", mock.Anything, chatId).Return(nil, domain.NotFoundError("chat not found"))
+				r.On("GetById", mock.Anything, chatId).Return(nil, apperr.NotFoundError("chat not found"))
 			},
 			shouldSucceed: false,
-			expectedCode:  domain.NotFoundErrorCode,
+			expectedCode:  apperr.NotFoundErrorCode,
 		},
 		{
 			name:   "forbidden when user is not a member",
@@ -514,7 +515,7 @@ func TestChatService_GetById(t *testing.T) {
 				r.On("GetById", mock.Anything, chatId).Return(chatWithoutUser, nil)
 			},
 			shouldSucceed: false,
-			expectedCode:  domain.ForbiddenErrorCode,
+			expectedCode:  apperr.ForbiddenErrorCode,
 		},
 		{
 			name:   "server error when repository fails",
@@ -524,7 +525,7 @@ func TestChatService_GetById(t *testing.T) {
 				r.On("GetById", mock.Anything, chatId).Return(nil, errors.New("db failure"))
 			},
 			shouldSucceed: false,
-			expectedCode:  domain.ServerErrorCode,
+			expectedCode:  apperr.ServerErrorCode,
 		},
 		{
 			name:   "success returns chat details",
@@ -553,7 +554,7 @@ func TestChatService_GetById(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 				assert.Nil(t, chat)
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if errors.As(err, &domainErr) {
 					assert.Equal(t, tt.expectedCode, domainErr.Code)
 				}
@@ -594,7 +595,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 		request       chat.ListMessagesByChatIdRequest
 		chatRepoSetup func(*mockChatRepository)
 		shouldSucceed bool
-		expectedCode  domain.ErrorCode
+		expectedCode  apperr.ErrorCode
 		expectedLen   int
 		checkOrder    bool
 	}{
@@ -607,7 +608,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 			},
 			chatRepoSetup: func(r *mockChatRepository) {},
 			shouldSucceed: false,
-			expectedCode:  domain.UnauthorizedErrorCode,
+			expectedCode:  apperr.UnauthorizedErrorCode,
 		},
 		{
 			name: "not found when chat does not exist",
@@ -617,10 +618,10 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 				Params: paginationParams,
 			},
 			chatRepoSetup: func(r *mockChatRepository) {
-				r.On("GetById", mock.Anything, chatId).Return(nil, domain.NotFoundError("chat not found"))
+				r.On("GetById", mock.Anything, chatId).Return(nil, apperr.NotFoundError("chat not found"))
 			},
 			shouldSucceed: false,
-			expectedCode:  domain.NotFoundErrorCode,
+			expectedCode:  apperr.NotFoundErrorCode,
 		},
 		{
 			name: "forbidden when user is not a member",
@@ -633,7 +634,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 				r.On("GetById", mock.Anything, chatId).Return(chatWithoutUser, nil)
 			},
 			shouldSucceed: false,
-			expectedCode:  domain.ForbiddenErrorCode,
+			expectedCode:  apperr.ForbiddenErrorCode,
 		},
 		{
 			name: "server error when list messages fails",
@@ -647,7 +648,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 				r.On("ListMessages", mock.Anything, chatId, paginationParams).Return(nil, errors.New("db failure"))
 			},
 			shouldSucceed: false,
-			expectedCode:  domain.ServerErrorCode,
+			expectedCode:  apperr.ServerErrorCode,
 		},
 		{
 			name: "success returns messages in ascending order",
@@ -700,7 +701,7 @@ func TestChatService_ListMessagesByChatId(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 				assert.Nil(t, result)
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if errors.As(err, &domainErr) {
 					assert.Equal(t, tt.expectedCode, domainErr.Code)
 				}
@@ -816,7 +817,7 @@ func TestChatService_MarkChatRead(t *testing.T) {
 		request       chat.MarkChatReadRequest
 		chatRepoSetup func(*mockChatRepository)
 		shouldSucceed bool
-		expectedCode  domain.ErrorCode
+		expectedCode  apperr.ErrorCode
 		expectPublish bool
 	}{
 		{
@@ -826,7 +827,7 @@ func TestChatService_MarkChatRead(t *testing.T) {
 				UserId: uuid.Nil,
 			},
 			chatRepoSetup: func(r *mockChatRepository) {},
-			expectedCode:  domain.UnauthorizedErrorCode,
+			expectedCode:  apperr.UnauthorizedErrorCode,
 		},
 		{
 			name: "forbidden when user is not a member",
@@ -837,7 +838,7 @@ func TestChatService_MarkChatRead(t *testing.T) {
 			chatRepoSetup: func(r *mockChatRepository) {
 				r.On("GetById", mock.Anything, chatId).Return(chatWithoutUser, nil)
 			},
-			expectedCode: domain.ForbiddenErrorCode,
+			expectedCode: apperr.ForbiddenErrorCode,
 		},
 		{
 			name: "forbidden when message belongs to another chat",
@@ -850,7 +851,7 @@ func TestChatService_MarkChatRead(t *testing.T) {
 				r.On("GetById", mock.Anything, chatId).Return(chatWithUser, nil)
 				r.On("GetMessageById", mock.Anything, messageId).Return(messageFromAnotherChat, nil)
 			},
-			expectedCode: domain.ForbiddenErrorCode,
+			expectedCode: apperr.ForbiddenErrorCode,
 		},
 		{
 			name: "success without message id does not publish message read event",
@@ -895,7 +896,7 @@ func TestChatService_MarkChatRead(t *testing.T) {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if errors.As(err, &domainErr) {
 					assert.Equal(t, tt.expectedCode, domainErr.Code)
 				}
@@ -952,7 +953,7 @@ func TestChatService_ListMessageReads(t *testing.T) {
 		request       chat.ListMessageReadsRequest
 		chatRepoSetup func(*mockChatRepository)
 		shouldSucceed bool
-		expectedCode  domain.ErrorCode
+		expectedCode  apperr.ErrorCode
 		expectedLen   int
 	}{
 		{
@@ -963,7 +964,7 @@ func TestChatService_ListMessageReads(t *testing.T) {
 				UserId:    uuid.Nil,
 			},
 			chatRepoSetup: func(r *mockChatRepository) {},
-			expectedCode:  domain.UnauthorizedErrorCode,
+			expectedCode:  apperr.UnauthorizedErrorCode,
 		},
 		{
 			name: "forbidden when user is not member",
@@ -975,7 +976,7 @@ func TestChatService_ListMessageReads(t *testing.T) {
 			chatRepoSetup: func(r *mockChatRepository) {
 				r.On("GetById", mock.Anything, chatId).Return(chatWithoutUser, nil)
 			},
-			expectedCode: domain.ForbiddenErrorCode,
+			expectedCode: apperr.ForbiddenErrorCode,
 		},
 		{
 			name: "forbidden when message belongs to another chat",
@@ -988,7 +989,7 @@ func TestChatService_ListMessageReads(t *testing.T) {
 				r.On("GetById", mock.Anything, chatId).Return(chatWithUser, nil)
 				r.On("GetMessageById", mock.Anything, messageId).Return(messageFromAnotherChat, nil)
 			},
-			expectedCode: domain.ForbiddenErrorCode,
+			expectedCode: apperr.ForbiddenErrorCode,
 		},
 		{
 			name: "success returns reads",
@@ -1022,7 +1023,7 @@ func TestChatService_ListMessageReads(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 				assert.Nil(t, result)
-				var domainErr domain.DomainError
+				var domainErr apperr.DomainError
 				if errors.As(err, &domainErr) {
 					assert.Equal(t, tt.expectedCode, domainErr.Code)
 				}

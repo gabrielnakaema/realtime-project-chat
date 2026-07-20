@@ -470,3 +470,9 @@ WHERE t.project_id = sqlc.arg('project_id')
   AND t.archived_at IS NULL
   AND lower(btrim(coalesce(t.code, ''))) = lower(btrim(sqlc.arg('code')::text))
 ORDER BY t.updated_at DESC, t.created_at DESC, t.id DESC;
+
+-- name: ClearTasksResponsibleForProjectMember :exec
+UPDATE tasks
+  SET responsible_id = NULL
+  WHERE responsible_id = $1
+  AND project_id = $2;

@@ -7,8 +7,8 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/events"
-	"github.com/gabrielnakaema/project-chat/internal/outbox"
-	"github.com/gabrielnakaema/project-chat/internal/queries"
+	notificationqueries "github.com/gabrielnakaema/project-chat/internal/notification/queries"
+	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -19,7 +19,7 @@ type Repository struct {
 	pool *pgxpool.Pool
 }
 
-type notificationRow queries.ListNotificationsByUserIdRow
+type notificationRow notificationqueries.ListNotificationsByUserIdRow
 
 func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{
@@ -38,11 +38,11 @@ func (nr *Repository) CreateManyAndEnqueue(ctx context.Context, notifications []
 	}
 	defer tx.Rollback(ctx)
 
-	qtx := queries.New(tx)
+	qtx := notificationqueries.New(tx)
 
 	ids := make([]uuid.UUID, 0, len(notifications))
 	for _, notification := range notifications {
-		id, err := qtx.CreateNotification(ctx, queries.CreateNotificationParams{
+		id, err := qtx.CreateNotification(ctx, notificationqueries.CreateNotificationParams{
 			UserID:        notification.UserId,
 			ActorID:       notification.ActorId,
 			ProjectID:     notification.ProjectId,
@@ -82,9 +82,9 @@ func (nr *Repository) CreateManyAndEnqueue(ctx context.Context, notifications []
 }
 
 func (nr *Repository) ListByUserID(ctx context.Context, userId uuid.UUID, beforeCreatedAt time.Time, beforeId uuid.UUID, limit int32) (*utils.CursorPaginated[domain.Notification], error) {
-	q := queries.New(nr.pool)
+	q := notificationqueries.New(nr.pool)
 
-	rows, err := q.ListNotificationsByUserId(ctx, queries.ListNotificationsByUserIdParams{
+	rows, err := q.ListNotificationsByUserId(ctx, notificationqueries.ListNotificationsByUserIdParams{
 		UserID:          userId,
 		BeforeCreatedAt: pgtype.Timestamptz{Time: beforeCreatedAt, Valid: !beforeCreatedAt.IsZero()},
 		BeforeID:        pgtype.UUID{Bytes: beforeId, Valid: beforeId != uuid.Nil},
@@ -117,10 +117,10 @@ func (nr *Repository) ListByUserID(ctx context.Context, userId uuid.UUID, before
 }
 
 func (nr *Repository) ListByIDs(ctx context.Context, ids []uuid.UUID) ([]domain.Notification, error) {
-	return nr.listByIDs(ctx, queries.New(nr.pool), ids)
+	return nr.listByIDs(ctx, notificationqueries.New(nr.pool), ids)
 }
 
-func (nr *Repository) listByIDs(ctx context.Context, q *queries.Queries, ids []uuid.UUID) ([]domain.Notification, error) {
+func (nr *Repository) listByIDs(ctx context.Context, q *notificationqueries.Queries, ids []uuid.UUID) ([]domain.Notification, error) {
 	if len(ids) == 0 {
 		return []domain.Notification{}, nil
 	}
@@ -144,7 +144,7 @@ func (nr *Repository) listByIDs(ctx context.Context, q *queries.Queries, ids []u
 }
 
 func (nr *Repository) CountUnreadByUserID(ctx context.Context, userId uuid.UUID) (int, error) {
-	q := queries.New(nr.pool)
+	q := notificationqueries.New(nr.pool)
 	count, err := q.CountUnreadNotificationsByUserId(ctx, userId)
 	if err != nil {
 		return 0, err
@@ -154,8 +154,8 @@ func (nr *Repository) CountUnreadByUserID(ctx context.Context, userId uuid.UUID)
 }
 
 func (nr *Repository) MarkRead(ctx context.Context, notificationId uuid.UUID, userId uuid.UUID, updatedAt time.Time) (bool, error) {
-	q := queries.New(nr.pool)
-	rowsAffected, err := q.MarkNotificationRead(ctx, queries.MarkNotificationReadParams{
+	q := notificationqueries.New(nr.pool)
+	rowsAffected, err := q.MarkNotificationRead(ctx, notificationqueries.MarkNotificationReadParams{
 		ID:        notificationId,
 		UserID:    userId,
 		UpdatedAt: pgtype.Timestamptz{Time: updatedAt, Valid: true},
@@ -168,8 +168,8 @@ func (nr *Repository) MarkRead(ctx context.Context, notificationId uuid.UUID, us
 }
 
 func (nr *Repository) MarkAllRead(ctx context.Context, userId uuid.UUID, updatedAt time.Time) error {
-	q := queries.New(nr.pool)
-	return q.MarkAllNotificationsRead(ctx, queries.MarkAllNotificationsReadParams{
+	q := notificationqueries.New(nr.pool)
+	return q.MarkAllNotificationsRead(ctx, notificationqueries.MarkAllNotificationsReadParams{
 		UserID:    userId,
 		UpdatedAt: pgtype.Timestamptz{Time: updatedAt, Valid: true},
 	})

@@ -123,6 +123,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     {
       ...sharedServiceEnv,
       MCP_SERVICE_PORT: servicePorts.mcp,
+      AUTHORIZATION_GRPC_TARGET: `127.0.0.1:${servicePorts.grpc}`,
       TASKS_AUTHORIZATION_GRPC_TARGET: `127.0.0.1:${servicePorts.tasksGrpc}`,
     }
   );
