@@ -50,6 +50,12 @@ export type ProjectUpdatedEvent = {
   data: Project;
 };
 
+export type ProjectDeletedEvent = {
+  type: 'project_deleted';
+  room_id: string;
+  data: Project;
+};
+
 export type ProjectMemberCreatedEvent = {
   type: 'project_member_created';
   room_id: string;
@@ -106,6 +112,7 @@ export type SocketEvent =
   | TaskUpdatedEvent
   | TaskCommentCreatedEvent
   | ProjectUpdatedEvent
+  | ProjectDeletedEvent
   | ProjectMemberCreatedEvent
   | ProjectMemberRemovedEvent
   | UsersOnlineEvent
@@ -118,3 +125,6 @@ export type ProjectMembershipEvent = ProjectMemberCreatedEvent | ProjectMemberRe
 
 export const isProjectMembershipEvent = (event: SocketEvent): event is ProjectMembershipEvent =>
   event.type === 'project_member_created' || event.type === 'project_member_removed';
+
+export const isProjectDeletedEvent = (event: SocketEvent): event is ProjectDeletedEvent =>
+  event.type === 'project_deleted';

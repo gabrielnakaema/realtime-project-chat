@@ -6,10 +6,16 @@ import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GeneralProjectSettingsForm } from './general-project-settings-form';
 import type { Project } from '@/features/projects/types/project';
-import { getProject, updateProject } from '@/features/projects/services/projects';
+import { deleteProject, getProject, updateProject } from '@/features/projects/services/projects';
 import { projectQueryKeys } from '@/shared/services/query-keys';
 import { handleError } from '@/shared/utils/handle-error';
 import { handleSuccess } from '@/shared/utils/handle-success';
+
+const mockNavigate = vi.fn();
+
+vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => mockNavigate,
+}));
 
 vi.mock('@/shared/components/text-editor', () => ({
   TextEditor: ({
@@ -47,6 +53,7 @@ vi.mock('@/shared/components/text-editor', () => ({
 vi.mock('@/features/projects/services/projects', () => ({
   getProject: vi.fn(),
   updateProject: vi.fn(),
+  deleteProject: vi.fn(),
 }));
 
 vi.mock('@/shared/utils/handle-error', () => ({
@@ -59,6 +66,7 @@ vi.mock('@/shared/utils/handle-success', () => ({
 
 const mockGetProject = vi.mocked(getProject);
 const mockUpdateProject = vi.mocked(updateProject);
+const mockDeleteProject = vi.mocked(deleteProject);
 const mockHandleError = vi.mocked(handleError);
 const mockHandleSuccess = vi.mocked(handleSuccess);
 
@@ -216,5 +224,55 @@ describe('GeneralProjectSettingsForm', () => {
     expect(nameInput.value).toBe('Unsaved project name');
     expect(screen.getByText('You have unsaved changes.')).toBeTruthy();
     expect(mockHandleSuccess).not.toHaveBeenCalled();
+  });
+
+  it('deletes the project and navigates away after confirming', async () => {
+    renderSettings();
+    mockDeleteProject.mockResolvedValue(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete project' }));
+
+    await waitFor(() => {
+      expect(mockDeleteProject).toHaveBeenCalledWith(project.id);
+    });
+    expect(mockHandleSuccess).toHaveBeenCalledWith('Project deleted successfully');
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/projects' });
+  });
+
+  it('shows a pending state on the confirm button while deleting', async () => {
+    renderSettings();
+    let resolveDelete: (value: boolean) => void = () => {};
+    mockDeleteProject.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveDelete = resolve;
+        }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete project' }));
+
+    expect(await screen.findByRole('button', { name: 'Deleting...' })).toBeTruthy();
+
+    resolveDelete(true);
+    await waitFor(() => {
+      expect(mockHandleSuccess).toHaveBeenCalledWith('Project deleted successfully');
+    });
+  });
+
+  it('shows an error toast and keeps the dialog usable when deletion fails', async () => {
+    renderSettings();
+    const error = new Error('Unable to delete project');
+    mockDeleteProject.mockRejectedValue(error);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete project' }));
+
+    await waitFor(() => {
+      expect(mockHandleError).toHaveBeenCalledWith(error);
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Delete project' })).toBeTruthy();
   });
 });

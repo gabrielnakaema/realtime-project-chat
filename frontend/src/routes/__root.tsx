@@ -1,7 +1,7 @@
 import { Outlet, createRootRoute } from '@tanstack/react-router';
 import { Suspense, lazy } from 'react';
 import { MessagesSheet } from '@/features/chat/components';
-import { ProjectMembershipSync } from '@/features/projects/components/project-membership-sync';
+import { ProjectSync } from '@/features/projects/components/project-sync';
 import { MessagesSheetProvider } from '@/features/chat/components/messages-sheet-context';
 import { NotificationProvider } from '@/features/notifications/components/notification-context';
 
@@ -24,7 +24,7 @@ const devComponents = isDev
 export const Route = createRootRoute({
   component: () => (
     <>
-      <ProjectMembershipSync />
+      <ProjectSync />
       <NotificationProvider>
         <MessagesSheetProvider>
           <Outlet />
