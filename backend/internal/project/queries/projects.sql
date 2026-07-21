@@ -277,6 +277,10 @@ UPDATE projects
 SET updated_at = CURRENT_TIMESTAMP
 WHERE id = $1;
 
+-- name: DeleteProject :exec
+DELETE FROM projects
+WHERE id = $1;
+
 -- name: ListProjectMembersByProjectId :many
 SELECT
   pm.id,

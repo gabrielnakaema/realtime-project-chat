@@ -101,6 +101,11 @@ func (m *mockProjectRepository) RemoveMember(ctx context.Context, projectId uuid
 	return args.Error(0)
 }
 
+func (m *mockProjectRepository) Delete(ctx context.Context, projectId uuid.UUID, msgs ...outbox.Message) error {
+	args := m.Called(ctx, projectId)
+	return args.Error(0)
+}
+
 func (m *mockProjectRepository) GetMemberByUserIdAndProjectId(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) (*domain.ProjectMember, error) {
 	args := m.Called(ctx, projectId, userId)
 	if args.Get(0) == nil {
@@ -1217,6 +1222,136 @@ func TestProjectService_RemoveMember(t *testing.T) {
 			ctx := context.Background()
 
 			err := service.RemoveMember(ctx, tt.request)
+
+			if tt.shouldSucceed {
+				assert.NoError(t, err)
+			} else {
+				require.Error(t, err)
+
+				var domainErr apperr.DomainError
+				if assert.ErrorAs(t, err, &domainErr) {
+					assert.Equal(t, tt.expectedErrorCode, string(domainErr.Code))
+				}
+			}
+
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestProjectService_Delete(t *testing.T) {
+	creatorUserId := uuid.New()
+	memberUserId := uuid.New()
+	validProjectId := uuid.New()
+
+	validProject := &domain.Project{
+		Id:          validProjectId,
+		Name:        "Test Project",
+		Description: "Test Description",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		UserId:      creatorUserId,
+		Members: []domain.ProjectMember{
+			{
+				UserId: creatorUserId,
+				Role:   domain.ProjectMemberRoleCreator,
+			},
+			{
+				UserId: memberUserId,
+				Role:   domain.ProjectMemberRoleMember,
+			},
+		},
+	}
+
+	type testCase struct {
+		name              string
+		request           DeleteProjectRequest
+		mockSetup         func(*mockProjectRepository)
+		expectedErrorCode string
+		shouldSucceed     bool
+	}
+
+	tests := []testCase{
+		{
+			name: "creator deletes own project",
+			request: DeleteProjectRequest{
+				ProjectId:     validProjectId,
+				RequestUserId: creatorUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(validProject, nil)
+				repo.On("Delete", mock.Anything, validProjectId).Return(nil)
+			},
+			shouldSucceed: true,
+		},
+		{
+			name: "unauthorized error",
+			request: DeleteProjectRequest{
+				ProjectId:     validProjectId,
+				RequestUserId: uuid.Nil,
+			},
+			mockSetup:         func(repo *mockProjectRepository) {},
+			shouldSucceed:     false,
+			expectedErrorCode: string(apperr.UnauthorizedErrorCode),
+		},
+		{
+			name: "project not found",
+			request: DeleteProjectRequest{
+				ProjectId:     uuid.New(),
+				RequestUserId: creatorUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, mock.Anything).Return(nil, apperr.NotFoundError("project not found"))
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(apperr.NotFoundErrorCode),
+		},
+		{
+			name: "forbidden - non-creator member",
+			request: DeleteProjectRequest{
+				ProjectId:     validProjectId,
+				RequestUserId: memberUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(apperr.ForbiddenErrorCode),
+		},
+		{
+			name: "server error on get project",
+			request: DeleteProjectRequest{
+				ProjectId:     validProjectId,
+				RequestUserId: creatorUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(nil, errors.New("database error"))
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(apperr.ServerErrorCode),
+		},
+		{
+			name: "server error on delete",
+			request: DeleteProjectRequest{
+				ProjectId:     validProjectId,
+				RequestUserId: creatorUserId,
+			},
+			mockSetup: func(repo *mockProjectRepository) {
+				repo.On("GetById", mock.Anything, validProjectId).Return(validProject, nil)
+				repo.On("Delete", mock.Anything, validProjectId).Return(errors.New("database error"))
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(apperr.ServerErrorCode),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := &mockProjectRepository{}
+			tt.mockSetup(mockRepo)
+
+			service := NewProjectService(mockRepo, &mockUserRepository{}, &mockActivityRepository{})
+			err := service.Delete(context.Background(), tt.request)
 
 			if tt.shouldSucceed {
 				assert.NoError(t, err)

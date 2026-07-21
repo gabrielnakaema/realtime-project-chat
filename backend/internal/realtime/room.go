@@ -68,6 +68,27 @@ func (ws *Server) disconnectUserFromRoom(userId uuid.UUID, roomId uuid.UUID) {
 	}
 }
 
+func (ws *Server) disconnectAllFromRoom(roomId uuid.UUID) {
+	ws.mutex.Lock()
+	defer ws.mutex.Unlock()
+
+	room, ok := ws.rooms[roomId]
+	if !ok {
+		return
+	}
+
+	for userId := range room.users {
+		user, ok := ws.users[userId]
+		if !ok {
+			continue
+		}
+
+		delete(user.rooms, roomId)
+	}
+
+	delete(ws.rooms, roomId)
+}
+
 func (ws *Server) disconnectUser(userId uuid.UUID) {
 	ws.mutex.Lock()
 	defer ws.mutex.Unlock()

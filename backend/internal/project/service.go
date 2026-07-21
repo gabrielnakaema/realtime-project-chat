@@ -37,6 +37,7 @@ type projectRepository interface {
 	RemoveMember(ctx context.Context, projectId uuid.UUID, userId uuid.UUID, msgs ...outbox.Message) error
 	GetMemberByUserIdAndProjectId(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) (*domain.ProjectMember, error)
 	ListMembersByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.ProjectMember, error)
+	Delete(ctx context.Context, projectId uuid.UUID, msgs ...outbox.Message) error
 }
 
 type projectServiceActivityRepository interface {
@@ -754,6 +755,51 @@ func (ps *ProjectService) RemoveMember(ctx context.Context, request RemoveMember
 	})
 	if err != nil {
 		return apperr.ServerError("failed to remove member", err)
+	}
+
+	return nil
+}
+
+type DeleteProjectRequest struct {
+	ProjectId     uuid.UUID
+	RequestUserId uuid.UUID
+}
+
+func (ps *ProjectService) Delete(ctx context.Context, request DeleteProjectRequest) error {
+	if request.RequestUserId == uuid.Nil {
+		return apperr.UnauthorizedError("unauthorized")
+	}
+
+	project, err := ps.projectRepository.GetById(ctx, request.ProjectId)
+	if err != nil {
+		var domainErr apperr.DomainError
+		if errors.As(err, &domainErr) {
+			if domainErr.Code == apperr.NotFoundErrorCode {
+				return apperr.NotFoundError("project not found")
+			}
+			return domainErr
+		}
+
+		return apperr.ServerError("failed to get project", err)
+	}
+
+	if project.UserId != request.RequestUserId {
+		return apperr.ForbiddenError("forbidden")
+	}
+
+	err = ps.projectRepository.Delete(ctx, request.ProjectId, outbox.Message{
+		Topic:       events.ProjectDeleted,
+		AggregateID: project.Id,
+		Payload: &events.ProjectDeletedPayload{
+			Project:      *project,
+			ActionOrigin: domain.ActionOriginFromContext(ctx),
+			User: domain.User{
+				Id: request.RequestUserId,
+			},
+		},
+	})
+	if err != nil {
+		return apperr.ServerError("failed to delete project", err)
 	}
 
 	return nil

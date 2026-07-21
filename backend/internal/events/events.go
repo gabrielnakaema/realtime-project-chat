@@ -7,6 +7,7 @@ type Topic string
 const (
 	ProjectCreated       Topic = "project.created"
 	ProjectUpdated       Topic = "project.updated"
+	ProjectDeleted       Topic = "project.deleted"
 	ProjectMemberCreated Topic = "project.member.created"
 	ProjectMemberRemoved Topic = "project.member.removed"
 
@@ -31,6 +32,7 @@ func (t Topic) Valid() bool {
 	var allowedTopics = []Topic{
 		ProjectCreated,
 		ProjectUpdated,
+		ProjectDeleted,
 		ProjectMemberCreated,
 		ProjectMemberRemoved,
 		ChatMemberCreated,

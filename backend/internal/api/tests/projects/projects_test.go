@@ -3,6 +3,7 @@ package projects_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -171,6 +172,11 @@ func TestProjectsEndpoints(t *testing.T) {
 		resp, err = client.POST("/projects/123e4567-e89b-12d3-a456-426614174000/members", map[string]string{
 			"email": "member@example.com",
 		})
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+
+		resp, err = client.DELETE("/projects/123e4567-e89b-12d3-a456-426614174000")
 		require.NoError(t, err)
 		defer resp.Body.Close()
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
@@ -943,6 +949,164 @@ func TestProjectsEndpoints(t *testing.T) {
 		assert.Equal(t, "QA Review", projectColumn["name"])
 		assert.Equal(t, "#F59E0B", projectColumn["color"])
 	})
+
+	t.Run("DELETE /projects/{id} - creator deletes project and cascades to dependents", func(t *testing.T) {
+		testAPI.TruncateTables(t)
+
+		client := shared.NewHTTPClient(testAPI.GetBaseURL())
+		client.CreateUserAndLogin("delete-owner@example.com", "password123")
+
+		resp, err := client.POST("/projects", validProjectPayload("Doomed Project", "Doomed Description"))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var createResponse map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&createResponse))
+		projectID := createResponse["id"].(string)
+		projectUUID := uuid.MustParse(projectID)
+		columns := createResponse["columns"].([]any)
+		columnID := uuid.MustParse(columns[0].(map[string]any)["id"].(string))
+
+		memberID := createProjectTestUser(t, testAPI, "delete-member@example.com")
+		resp, err = client.POST("/projects/"+projectID+"/members", map[string]string{"email": "delete-member@example.com"})
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		ownerID := getProjectTestCurrentUserID(t, client)
+		ctx := context.Background()
+		now := time.Now().UTC()
+
+		taskID := uuid.New()
+		_, err = testAPI.DB.Exec(ctx, `
+			INSERT INTO tasks (id, project_id, title, description, project_column_id, author_id, priority, task_order, created_at, updated_at)
+			VALUES ($1, $2, 'Doomed task', 'Doomed task description', $3, $4, 'medium', '500000000000', $5, $5)
+		`, taskID, projectUUID, columnID, ownerID, now)
+		require.NoError(t, err)
+
+		commentID := uuid.New()
+		_, err = testAPI.DB.Exec(ctx, `
+			INSERT INTO task_comments (id, task_id, user_id, content, created_at, updated_at)
+			VALUES ($1, $2, $3, 'Doomed comment', $4, $4)
+		`, commentID, taskID, ownerID, now)
+		require.NoError(t, err)
+
+		_, err = testAPI.DB.Exec(ctx, `
+			INSERT INTO task_tags (task_id, name, created_at) VALUES ($1, 'urgent', $2)
+		`, taskID, now)
+		require.NoError(t, err)
+
+		activityID := uuid.New()
+		_, err = testAPI.DB.Exec(ctx, `
+			INSERT INTO project_activity_logs (id, project_id, actor_id, activity_type, activity_data, entity_type, entity_id, created_at, updated_at)
+			VALUES ($1, $2, $3, 'task.created', '{}'::jsonb, 'task', $4, $5, $5)
+		`, activityID, projectUUID, ownerID, taskID, now)
+		require.NoError(t, err)
+
+		notificationID := uuid.New()
+		_, err = testAPI.DB.Exec(ctx, `
+			INSERT INTO notifications (id, user_id, actor_id, project_id, task_id, task_comment_id, type, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, 'task.comment.created', $7, $7)
+		`, notificationID, memberID, ownerID, projectUUID, taskID, commentID, now)
+		require.NoError(t, err)
+
+		chatID := uuid.New()
+		_, err = testAPI.DB.Exec(ctx, `
+			INSERT INTO chats (id, project_id, created_at, updated_at) VALUES ($1, $2, $3, $3)
+		`, chatID, projectUUID, now)
+		require.NoError(t, err)
+
+		_, err = testAPI.DB.Exec(ctx, `
+			INSERT INTO chat_members (user_id, chat_id, last_seen_at, joined_at) VALUES ($1, $2, $3, $3)
+		`, ownerID, chatID, now)
+		require.NoError(t, err)
+
+		messageID := uuid.New()
+		_, err = testAPI.DB.Exec(ctx, `
+			INSERT INTO chat_messages (id, chat_id, user_id, content, created_at, updated_at)
+			VALUES ($1, $2, $3, 'Doomed message', $4, $4)
+		`, messageID, chatID, ownerID, now)
+		require.NoError(t, err)
+
+		resp, err = client.DELETE("/projects/" + projectID)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusNoContent, resp.StatusCode)
+
+		resp, err = client.GET("/projects/" + projectID)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+		assertProjectTestRowCount(t, testAPI, "projects", "id", projectUUID, 0)
+		assertProjectTestRowCount(t, testAPI, "project_members", "project_id", projectUUID, 0)
+		assertProjectTestRowCount(t, testAPI, "project_columns", "project_id", projectUUID, 0)
+		assertProjectTestRowCount(t, testAPI, "project_activity_logs", "project_id", projectUUID, 0)
+		assertProjectTestRowCount(t, testAPI, "tasks", "project_id", projectUUID, 0)
+		assertProjectTestRowCount(t, testAPI, "task_comments", "task_id", taskID, 0)
+		assertProjectTestRowCount(t, testAPI, "task_tags", "task_id", taskID, 0)
+		assertProjectTestRowCount(t, testAPI, "notifications", "project_id", projectUUID, 0)
+		assertProjectTestRowCount(t, testAPI, "chats", "project_id", projectUUID, 0)
+		assertProjectTestRowCount(t, testAPI, "chat_members", "chat_id", chatID, 0)
+		assertProjectTestRowCount(t, testAPI, "chat_messages", "chat_id", chatID, 0)
+	})
+
+	t.Run("DELETE /projects/{id} - forbidden for non-creator", func(t *testing.T) {
+		testAPI.TruncateTables(t)
+
+		ownerClient := shared.NewHTTPClient(testAPI.GetBaseURL())
+		ownerClient.CreateUserAndLogin("delete-forbidden-owner@example.com", "password123")
+
+		resp, err := ownerClient.POST("/projects", validProjectPayload("Test Project", "Test Description"))
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var createResponse map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&createResponse))
+		projectID := createResponse["id"].(string)
+
+		memberClient := shared.NewHTTPClient(testAPI.GetBaseURL())
+		memberClient.CreateUserAndLogin("delete-forbidden-member@example.com", "password123")
+
+		resp, err = ownerClient.POST("/projects/"+projectID+"/members", map[string]string{"email": "delete-forbidden-member@example.com"})
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		resp, err = memberClient.DELETE("/projects/" + projectID)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+
+		resp, err = ownerClient.GET("/projects/" + projectID)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("DELETE /projects/{id} - not found for missing project", func(t *testing.T) {
+		testAPI.TruncateTables(t)
+
+		client := shared.NewHTTPClient(testAPI.GetBaseURL())
+		client.CreateUserAndLogin("delete-missing@example.com", "password123")
+
+		resp, err := client.DELETE("/projects/" + uuid.New().String())
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+	})
+}
+
+func assertProjectTestRowCount(t *testing.T, testAPI *shared.TestAPI, table string, column string, id uuid.UUID, expected int) {
+	t.Helper()
+
+	var count int
+	query := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s = $1", table, column)
+	err := testAPI.DB.QueryRow(context.Background(), query, id).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, expected, count, "expected table %s to have no rows referencing %s", table, column)
 }
 
 func createProjectTestUser(t *testing.T, testAPI *shared.TestAPI, email string) uuid.UUID {

@@ -41,6 +41,12 @@ type ProjectUpdatedPayload struct {
 	ActionOrigin domain.ActionOrigin `json:"action_origin,omitempty"`
 }
 
+type ProjectDeletedPayload struct {
+	Project      domain.Project      `json:"project"`
+	User         domain.User         `json:"user"`
+	ActionOrigin domain.ActionOrigin `json:"action_origin,omitempty"`
+}
+
 type ProjectMemberCreatedPayload struct {
 	ProjectMember domain.ProjectMember `json:"project_member"`
 	User          domain.User          `json:"user"`

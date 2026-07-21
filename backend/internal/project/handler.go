@@ -27,6 +27,7 @@ type projectService interface {
 	ListUsersProjectActivities(ctx context.Context, request ListUsersProjectActivitiesRequest) (*utils.CursorPaginated[domain.ProjectActivity], error)
 	ListMembersByProjectId(ctx context.Context, projectId uuid.UUID, requestUserId uuid.UUID) ([]domain.ProjectMember, error)
 	RemoveMember(ctx context.Context, request RemoveMemberRequest) error
+	Delete(ctx context.Context, request DeleteProjectRequest) error
 }
 
 type ProjectHandler struct {
@@ -342,6 +343,34 @@ func (h *ProjectHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.projectService.RemoveMember(r.Context(), serviceRequest)
+	if err != nil {
+		httperr.ErrorResponse(w, r, err)
+		return
+	}
+
+	err = platformhttp.WriteJSON(w, http.StatusNoContent, nil, nil)
+	if err != nil {
+		httperr.ErrorResponse(w, r, err)
+		return
+	}
+}
+
+func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userId := auth.UserIdFromContext(r.Context())
+
+	id := chi.URLParam(r, "id")
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		httperr.BadRequestResponse(w, errors.New("invalid project id"))
+		return
+	}
+
+	serviceRequest := DeleteProjectRequest{
+		ProjectId:     parsed,
+		RequestUserId: userId,
+	}
+
+	err = h.projectService.Delete(r.Context(), serviceRequest)
 	if err != nil {
 		httperr.ErrorResponse(w, r, err)
 		return
