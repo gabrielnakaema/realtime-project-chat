@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { SubmitHandler } from 'react-hook-form';
@@ -10,7 +11,7 @@ import { TextEditor } from '@/shared/components/text-editor';
 import { generalProjectSettingsSchema } from '@/features/projects/schemas/general-project-settings.schema';
 import { useProjectDetails } from '@/features/projects/hooks/use-project-details';
 import { invalidateProjectBoardData } from '@/features/projects/services/project-board-invalidation';
-import { updateProject } from '@/features/projects/services/projects';
+import { deleteProject, updateProject } from '@/features/projects/services/projects';
 import { projectQueryKeys } from '@/shared/services/query-keys';
 import { ConfirmationDialog } from '@/shared/components/confirmation-dialog';
 import { Input } from '@/shared/components/input';
@@ -30,6 +31,7 @@ const getGeneralProjectSettingsFormValues = (project?: Project): GeneralProjectS
 
 export const GeneralProjectSettingsForm = ({ projectId }: { projectId: string }) => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
 
@@ -54,6 +56,20 @@ export const GeneralProjectSettingsForm = ({ projectId }: { projectId: string })
       setEditorKey((current) => current + 1);
       await invalidateProjectBoardData(queryClient);
       handleSuccess('Project saved successfully');
+    },
+    onError: (error) => {
+      void handleError(error);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteProject(projectId),
+    onSuccess: async () => {
+      setIsDeletingProject(false);
+      queryClient.removeQueries({ queryKey: projectQueryKeys.details(projectId) });
+      await invalidateProjectBoardData(queryClient);
+      handleSuccess('Project deleted successfully');
+      void navigate({ to: '/projects' });
     },
     onError: (error) => {
       void handleError(error);
@@ -189,13 +205,19 @@ export const GeneralProjectSettingsForm = ({ projectId }: { projectId: string })
 
       <ConfirmationDialog
         open={isDeletingProject}
-        onOpenChange={setIsDeletingProject}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) {
+            setIsDeletingProject(false);
+          }
+        }}
         variant="destructive"
         title={`Delete ${project.name}?`}
         description="This permanently deletes the project, tasks, comments and history. This action cannot be undone."
-        confirmLabel="Delete project"
+        confirmLabel={deleteMutation.isPending ? 'Deleting...' : 'Delete project'}
+        isConfirming={deleteMutation.isPending}
         onConfirm={() => {
-          setIsDeletingProject(false);
+          if (deleteMutation.isPending) return;
+          deleteMutation.mutate();
         }}
       />
     </form>

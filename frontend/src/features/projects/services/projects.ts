@@ -129,3 +129,9 @@ export const removeProjectMember = async (request: RemoveProjectMemberRequest) =
 
   return response.ok;
 };
+
+export const deleteProject = async (projectId: string) => {
+  const response = await api.delete(`projects/${projectId}`);
+
+  return response.ok;
+};
