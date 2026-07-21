@@ -746,4 +746,37 @@ test.describe("projects", () => {
       reopenedSettingsDialog.locator("#branch_name_prefix")
     ).toHaveValue(branchNamePrefix);
   });
+
+  test("project owner can delete a project from the danger zone", async ({
+    authenticatedPage: page,
+  }) => {
+    const projectName = `E2E Project Delete ${crypto.randomUUID()}`;
+
+    await createProject(
+      page,
+      projectName,
+      "Created by the project deletion e2e test"
+    );
+
+    await page.getByRole("link", { name: new RegExp(projectName) }).click();
+    await expect(page.getByRole("button", { name: projectName })).toBeVisible();
+
+    await page.getByRole("link", { name: "Settings" }).click();
+    await expect(page.locator("#general-project-settings")).toBeVisible();
+    await page.getByRole("button", { name: "Delete" }).click();
+
+    const confirmDialog = page.getByRole("dialog", {
+      name: `Delete ${projectName}?`,
+    });
+    await expect(confirmDialog).toBeVisible();
+    await confirmDialog
+      .getByRole("button", { name: "Delete project" })
+      .click();
+
+    await expectToast(page, "Project deleted successfully");
+    await expect(page).toHaveURL(/\/projects\/?$/);
+    await expect(
+      page.getByRole("link", { name: new RegExp(projectName) })
+    ).toHaveCount(0);
+  });
 });

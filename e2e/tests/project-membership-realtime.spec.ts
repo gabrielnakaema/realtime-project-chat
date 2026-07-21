@@ -247,3 +247,49 @@ test("member removal revokes open UI, chat, task, and websocket access without r
 
   await memberPage.context().close();
 });
+
+test("project deletion redirects an open collaborator and revokes access without reload", async ({
+  authenticatedPage: ownerPage,
+  backendURL,
+  browser,
+  request,
+}) => {
+  const member = await registerUser(request, backendURL, {
+    name: "Realtime Deletion Collaborator",
+  });
+  const memberPage = await loginAsUser(browser, member);
+  const projectName = `E2E Realtime Deletion ${crypto.randomUUID()}`;
+  const projectId = await createProject(ownerPage, projectName);
+  await addMember(ownerPage, member.email);
+
+  await expect(projectListLink(memberPage, projectName)).toBeVisible({
+    timeout: 15_000,
+  });
+  await projectListLink(memberPage, projectName).click();
+  await memberPage.getByRole("link", { name: "Settings" }).click();
+  await expect(
+    memberPage.locator("#general-project-settings")
+  ).toBeVisible();
+
+  await ownerPage.getByRole("link", { name: "Settings" }).click();
+  await ownerPage.getByRole("button", { name: "Delete" }).click();
+  const confirmDialog = ownerPage.getByRole("dialog", {
+    name: `Delete ${projectName}?`,
+  });
+  await confirmDialog.getByRole("button", { name: "Delete project" }).click();
+  await expectToast(ownerPage, "Project deleted successfully");
+
+  await expect(memberPage).toHaveURL(/\/projects\/?$/, { timeout: 15_000 });
+  await expectToast(memberPage, "This project was deleted.");
+  await expect(projectListLink(memberPage, projectName)).toHaveCount(0);
+
+  const projectResponsePromise = memberPage.waitForResponse(
+    (response) =>
+      response.url().startsWith(backendURL) &&
+      new URL(response.url()).pathname === `/projects/${projectId}`
+  );
+  await memberPage.goto(`/projects/${projectId}`);
+  expect((await projectResponsePromise).status()).toBe(404);
+
+  await memberPage.context().close();
+});
