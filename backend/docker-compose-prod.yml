@@ -36,6 +36,7 @@ services:
       - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
       - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
       - KAFKA_LOG_RETENTION_HOURS=168
+      - KAFKA_LOG_DIRS=/var/lib/kafka/data
     healthcheck:
       test:
         [
@@ -72,6 +73,21 @@ services:
       - "traefik.http.routers.api.rule=PathPrefix(`/`)"
       - "traefik.http.routers.api.priority=1"
       - "traefik.http.services.api.loadbalancer.server.port=${API_PORT}"
+
+  outbox-relay:
+    container_name: outbox_relay_projectmanagement_${ENV_NAME:?ENV_NAME must be set in .env.prod}
+    image: ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+    pull_policy: always
+    command: ["./outbox-relay"]
+    env_file: .env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: always
+    networks:
+      - project_management_network
 
   notification-service:
     container_name: notification_service_projectmanagement_${ENV_NAME:?ENV_NAME must be set in .env.prod}

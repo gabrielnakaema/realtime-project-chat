@@ -59,7 +59,7 @@ jobs:
             export IMAGE_NAME=${{ env.IMAGE_NAME }}
             export IMAGE_TAG=${{ env.IMAGE_TAG }}
             docker compose --env-file .env.prod -f docker-compose-prod.yml config --quiet
-            docker compose --env-file .env.prod -f docker-compose-prod.yml pull api notification-service chat-service tasks-service mcp-service websocket-service
+            docker compose --env-file .env.prod -f docker-compose-prod.yml pull api outbox-relay notification-service chat-service tasks-service mcp-service websocket-service
             if ! docker compose --env-file .env.prod -f docker-compose-prod.yml up -d --remove-orphans; then
               echo "Normal deployment failed; recreating containers to repair stale network attachments"
               docker compose --env-file .env.prod -f docker-compose-prod.yml up -d --remove-orphans --force-recreate
