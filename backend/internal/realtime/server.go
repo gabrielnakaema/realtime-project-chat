@@ -135,6 +135,15 @@ func (ws *Server) SendUpdatedProject(ctx context.Context, project *domain.Projec
 	return ws.SendEvent(ctx, MapProjectUpdated(project))
 }
 
+func (ws *Server) SendProjectDeleted(ctx context.Context, project *domain.Project) error {
+	if err := ws.SendEvent(ctx, MapProjectDeleted(project)); err != nil {
+		return err
+	}
+
+	ws.disconnectAllFromRoom(project.Id)
+	return nil
+}
+
 func (ws *Server) SendProjectMemberCreated(ctx context.Context, member *domain.ProjectMember) error {
 	if err := ws.SendEvent(ctx, MapProjectMemberCreated(member, member.UserId)); err != nil {
 		return err

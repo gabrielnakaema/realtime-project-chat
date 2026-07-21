@@ -430,6 +430,29 @@ func (pr *ProjectRepository) RemoveMember(ctx context.Context, projectId uuid.UU
 	return tx.Commit(ctx)
 }
 
+func (pr *ProjectRepository) Delete(ctx context.Context, projectId uuid.UUID, msgs ...outbox.Message) error {
+	tx, err := pr.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	q := projectqueries.New(pr.pool)
+	qtx := q.WithTx(tx)
+
+	if err := qtx.DeleteProject(ctx, projectId); err != nil {
+		return err
+	}
+
+	if len(msgs) > 0 {
+		if err := outbox.Enqueue(ctx, tx, msgs...); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
 func (pr *ProjectRepository) GetMemberByUserIdAndProjectId(ctx context.Context, projectId uuid.UUID, userId uuid.UUID) (*domain.ProjectMember, error) {
 	q := projectqueries.New(pr.pool)
 

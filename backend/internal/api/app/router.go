@@ -48,6 +48,7 @@ func (a *App) Router() http.Handler {
 			r.Get("/activities", a.handlers.Project.ListUsersProjectActivities)
 			r.Get("/{id}", a.handlers.Project.Get)
 			r.Put("/{id}", a.handlers.Project.Update)
+			r.Delete("/{id}", a.handlers.Project.Delete)
 			r.Patch("/{id}/columns/{column_id}", a.handlers.Project.UpdateColumn)
 			r.Get("/{id}/activities", a.handlers.Project.ListActivitiesByProject)
 			r.Post("/{id}/members", a.handlers.Project.CreateMember)

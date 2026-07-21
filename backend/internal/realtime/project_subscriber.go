@@ -14,6 +14,7 @@ import (
 
 type ProjectNotifier interface {
 	SendUpdatedProject(context.Context, *domain.Project) error
+	SendProjectDeleted(context.Context, *domain.Project) error
 	SendProjectMemberCreated(context.Context, *domain.ProjectMember) error
 	SendProjectMemberRemoved(context.Context, *domain.ProjectMember) error
 }
@@ -36,7 +37,7 @@ func NewProjectSubscriber(ctx context.Context, config *config.Config, logger *sl
 		notifier:   notifier,
 	}
 
-	topics := []events.Topic{events.ProjectUpdated, events.ProjectMemberCreated, events.ProjectMemberRemoved}
+	topics := []events.Topic{events.ProjectUpdated, events.ProjectDeleted, events.ProjectMemberCreated, events.ProjectMemberRemoved}
 
 	err = subscriber.Subscribe(ctx, topics, projectSubscriber.handleProjectEvents, projectSubscriber.logger)
 	if err != nil {
@@ -54,6 +55,8 @@ func (ps *ProjectSubscriber) handleProjectEvents(ctx context.Context, message me
 	switch message.Topic {
 	case events.ProjectUpdated:
 		return ps.handleProjectUpdated(ctx, message)
+	case events.ProjectDeleted:
+		return ps.handleProjectDeleted(ctx, message)
 	case events.ProjectMemberCreated:
 		return ps.handleProjectMemberCreated(ctx, message)
 	case events.ProjectMemberRemoved:
@@ -84,6 +87,19 @@ func (ps *ProjectSubscriber) handleProjectMemberRemoved(ctx context.Context, mes
 
 	if err := ps.notifier.SendProjectMemberRemoved(ctx, &payload.ProjectMember); err != nil {
 		return apperr.ServerError("failed to send removed project member to ws server", err)
+	}
+
+	return nil
+}
+
+func (ps *ProjectSubscriber) handleProjectDeleted(ctx context.Context, message messaging.Message) error {
+	var payload events.ProjectDeletedPayload
+	if err := json.Unmarshal(message.Value, &payload); err != nil {
+		return apperr.ServerError("failed to unmarshal project deleted payload", err)
+	}
+
+	if err := ps.notifier.SendProjectDeleted(ctx, &payload.Project); err != nil {
+		return apperr.ServerError("failed to send deleted project to ws server", err)
 	}
 
 	return nil
