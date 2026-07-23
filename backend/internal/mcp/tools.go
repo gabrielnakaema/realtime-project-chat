@@ -78,6 +78,82 @@ func (h *Handler) handleListProjectBoard(ctx context.Context, principal principa
 	}, nil
 }
 
+func (h *Handler) handleSearchTasks(ctx context.Context, principal principal, args map[string]any) (map[string]any, error) {
+	projectID, err := requiredUUIDArg(args, "project_id")
+	if err != nil {
+		return nil, err
+	}
+	projectColumnIDs, err := optionalUUIDSliceArg(args, "project_column_ids")
+	if err != nil {
+		return nil, err
+	}
+	if len(projectColumnIDs) == 0 {
+		return nil, apperr.BusinessValidationError("project_column_ids is required")
+	}
+	query, err := requiredStringArg(args, "query")
+	if err != nil {
+		return nil, err
+	}
+	includeArchived, err := optionalBoolArg(args, "include_archived", false)
+	if err != nil {
+		return nil, err
+	}
+	limit, err := optionalLimitArg(args, "limit", 25)
+	if err != nil {
+		return nil, err
+	}
+
+	var cursor *searchTasksCursor
+	rawCursor, err := optionalTrimmedStringArg(args, "cursor")
+	if err != nil {
+		return nil, err
+	}
+	if rawCursor != "" {
+		cursor, err = decodeSearchTasksCursor(rawCursor)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	request := SearchTasksRequest{
+		ProjectID:        projectID,
+		UserID:           principal.UserID,
+		ProjectColumnIDs: projectColumnIDs,
+		Query:            query,
+		IncludeArchived:  includeArchived,
+		Limit:            limit,
+	}
+	if cursor != nil {
+		request.CursorDueDate = cursor.DueDate
+		request.CursorUpdatedAt = &cursor.UpdatedAt
+		request.CursorTaskID = &cursor.TaskID
+	}
+
+	result, err := h.taskService.SearchTasks(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	var nextCursor any
+	if result.HasNext && len(result.Data) > 0 {
+		last := result.Data[len(result.Data)-1]
+		nextCursor, err = encodeSearchTasksCursor(searchTasksCursor{
+			DueDate:   last.DueDate,
+			UpdatedAt: last.UpdatedAt,
+			TaskID:    last.Id,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return map[string]any{
+		"tasks":       result.Data,
+		"has_next":    result.HasNext,
+		"next_cursor": nextCursor,
+	}, nil
+}
+
 func (h *Handler) handleCreateTask(ctx context.Context, principal principal, args map[string]any) (map[string]any, error) {
 	projectID, err := requiredUUIDArg(args, "project_id")
 	if err != nil {

@@ -78,6 +78,21 @@ func (s *taskService) GroupByColumn(ctx context.Context, request mcp.GroupByColu
 	})
 }
 
+func (s *taskService) SearchTasks(ctx context.Context, request mcp.SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
+	return s.client.SearchTasks(ctx, tasks.SearchTasksRequest{
+		UserId:           request.UserID,
+		ProjectId:        &request.ProjectID,
+		ProjectColumnIDs: request.ProjectColumnIDs,
+		SearchQuery:      request.Query,
+		IncludeArchived:  request.IncludeArchived,
+		IncludeDone:      true,
+		Limit:            request.Limit,
+		CursorDueDate:    request.CursorDueDate,
+		CursorUpdatedAt:  request.CursorUpdatedAt,
+		CursorTaskId:     request.CursorTaskID,
+	})
+}
+
 func (s *taskService) GetByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*domain.Task, error) {
 	return s.client.GetById(ctx, id, userID)
 }

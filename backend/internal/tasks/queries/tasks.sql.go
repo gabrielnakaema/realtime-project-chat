@@ -1066,25 +1066,56 @@ JOIN project_ids_cte pi ON pi.project_id = t.project_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
 LEFT JOIN task_dependencies td ON td.task_id = t.id
 WHERE ($3::text IS NULL OR (t.title ILIKE '%' || $3::text || '%' OR t.description ILIKE '%' || $3::text || '%' OR t.code ILIKE '%' || $3::text || '%'))
-AND t.archived_at IS NULL
-AND ps.is_done_column = false
+AND ($4::uuid IS NULL OR t.project_id = $4::uuid)
 AND (
-  $4::timestamptz IS NULL
-  OR $5::timestamptz IS NULL
-  OR t.due_date > $4::timestamptz
-  OR (t.due_date = $4::timestamptz AND t.updated_at < $5::timestamptz)
+  $5::uuid[] IS NULL
+  OR cardinality($5::uuid[]) = 0
+  OR t.project_column_id = ANY($5::uuid[])
+)
+AND ($6::boolean OR t.archived_at IS NULL)
+AND ($7::boolean OR ps.is_done_column = false)
+AND (
+  $8::timestamptz IS NULL
+  OR $9::uuid IS NULL
+  OR (
+    $10::timestamptz IS NOT NULL
+    AND (
+      t.due_date > $10::timestamptz
+      OR t.due_date IS NULL
+      OR (
+        t.due_date = $10::timestamptz
+        AND (
+          t.updated_at < $8::timestamptz
+          OR (t.updated_at = $8::timestamptz AND t.id > $9::uuid)
+        )
+      )
+    )
+  )
+  OR (
+    $10::timestamptz IS NULL
+    AND t.due_date IS NULL
+    AND (
+      t.updated_at < $8::timestamptz
+      OR (t.updated_at = $8::timestamptz AND t.id > $9::uuid)
+    )
+  )
 )
 GROUP BY t.id, ps.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id, r.id, r.name, r.email, r.created_at, a.id, a.name, a.email, a.created_at
-ORDER BY t.due_date ASC, t.updated_at DESC
+ORDER BY t.due_date ASC NULLS LAST, t.updated_at DESC, t.id ASC
 LIMIT $2
 `
 
 type SearchTasksForUserParams struct {
-	UserID          uuid.UUID
-	Limit           int32
-	Query           pgtype.Text
-	CursorDueDate   pgtype.Timestamptz
-	CursorUpdatedAt pgtype.Timestamptz
+	UserID           uuid.UUID
+	Limit            int32
+	Query            pgtype.Text
+	ProjectID        pgtype.UUID
+	ProjectColumnIds []uuid.UUID
+	IncludeArchived  bool
+	IncludeDone      bool
+	CursorUpdatedAt  pgtype.Timestamptz
+	CursorTaskID     pgtype.UUID
+	CursorDueDate    pgtype.Timestamptz
 }
 
 type SearchTasksForUserRow struct {
@@ -1135,8 +1166,13 @@ func (q *Queries) SearchTasksForUser(ctx context.Context, arg SearchTasksForUser
 		arg.UserID,
 		arg.Limit,
 		arg.Query,
-		arg.CursorDueDate,
+		arg.ProjectID,
+		arg.ProjectColumnIds,
+		arg.IncludeArchived,
+		arg.IncludeDone,
 		arg.CursorUpdatedAt,
+		arg.CursorTaskID,
+		arg.CursorDueDate,
 	)
 	if err != nil {
 		return nil, err

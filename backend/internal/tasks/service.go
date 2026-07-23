@@ -29,7 +29,7 @@ type taskRepository interface {
 	WithProjectColumnMoveLock(ctx context.Context, projectColumnID uuid.UUID, fn func(context.Context) error) error
 	CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error)
 	ListUserDueTasks(ctx context.Context, userId uuid.UUID, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
-	SearchTasksForUser(ctx context.Context, userId uuid.UUID, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
+	SearchTasks(ctx context.Context, request SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error)
 	SearchProjectTasksForDependencies(ctx context.Context, projectId uuid.UUID, query string, excludeTaskId *uuid.UUID, limit int) ([]domain.TaskDependencyRef, error)
 	GetTaskDependencyRefsByProjectAndIds(ctx context.Context, projectId uuid.UUID, taskIds []uuid.UUID) ([]domain.TaskDependencyRef, error)
 	ListTaskDependenciesByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.TaskDependencyEdge, error)
@@ -252,6 +252,10 @@ func (ts *TaskService) List(ctx context.Context, request ListTasksRequest) (*uti
 		return nil, apperr.ForbiddenError("forbidden")
 	}
 
+	if request.Archived && !project.IsCreator(request.RequestUserId) {
+		return nil, apperr.ForbiddenError("only the project creator can view archived tasks")
+	}
+
 	if err := validateProjectColumnIDs(project, request.ProjectColumnIDs); err != nil {
 		return nil, err
 	}
@@ -294,6 +298,10 @@ func (ts *TaskService) GroupByColumn(ctx context.Context, request GroupByColumnR
 
 	if !project.IsMember(request.UserId) {
 		return nil, apperr.ForbiddenError("forbidden")
+	}
+
+	if request.Archived && !project.IsCreator(request.UserId) {
+		return nil, apperr.ForbiddenError("only the project creator can view archived tasks")
 	}
 
 	statusIDs := request.ProjectColumnIDs
@@ -865,22 +873,67 @@ func (ts *TaskService) calculateOrder(ctx context.Context, request MoveTaskReque
 	return fracindex.GenerateKeyBetween(prevTask.Order, nextTask.Order)
 }
 
-type SearchTasksForUserRequest struct {
-	UserId          uuid.UUID
-	Limit           int
-	CursorDueDate   *time.Time
-	CursorUpdatedAt *time.Time
-	SearchQuery     string
+type SearchTasksRequest struct {
+	UserId           uuid.UUID
+	ProjectId        *uuid.UUID
+	ProjectColumnIDs []uuid.UUID
+	SearchQuery      string
+	IncludeArchived  bool
+	IncludeDone      bool
+	Limit            int
+	CursorDueDate    *time.Time
+	CursorUpdatedAt  *time.Time
+	CursorTaskId     *uuid.UUID
 }
 
-func (ts *TaskService) SearchTasksForUser(ctx context.Context, request SearchTasksForUserRequest) (*utils.CursorPaginated[domain.Task], error) {
+func (ts *TaskService) SearchTasks(ctx context.Context, request SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
 	if request.UserId == uuid.Nil {
 		return nil, apperr.UnauthorizedError("unauthorized")
 	}
 
-	result, err := ts.taskRepository.SearchTasksForUser(ctx, request.UserId, request.SearchQuery, request.CursorDueDate, request.CursorUpdatedAt, request.Limit)
+	request.SearchQuery = strings.TrimSpace(request.SearchQuery)
+	if request.SearchQuery == "" {
+		return nil, apperr.BusinessValidationError("query is required")
+	}
+
+	if request.Limit < 1 || request.Limit > 100 {
+		return nil, apperr.BusinessValidationError("limit must be between 1 and 100")
+	}
+
+	if (request.CursorUpdatedAt == nil) != (request.CursorTaskId == nil) {
+		return nil, apperr.BusinessValidationError("cursor_updated_at and cursor_task_id must be provided together")
+	}
+
+	if request.ProjectId == nil {
+		if len(request.ProjectColumnIDs) > 0 {
+			return nil, apperr.BusinessValidationError("project_id is required when project_column_ids are provided")
+		}
+		if request.IncludeArchived {
+			return nil, apperr.BusinessValidationError("project_id is required when archived tasks are included")
+		}
+	} else {
+		if *request.ProjectId == uuid.Nil {
+			return nil, apperr.BusinessValidationError("project_id is required")
+		}
+
+		project, err := ts.projectRepository.GetById(ctx, *request.ProjectId)
+		if err != nil {
+			return nil, apperr.ServerError("failed to get project", err)
+		}
+		if !project.IsMember(request.UserId) {
+			return nil, apperr.ForbiddenError("forbidden")
+		}
+		if err := validateProjectColumnIDs(project, request.ProjectColumnIDs); err != nil {
+			return nil, err
+		}
+		if request.IncludeArchived && !project.IsCreator(request.UserId) {
+			return nil, apperr.ForbiddenError("only the project creator can view archived tasks")
+		}
+	}
+
+	result, err := ts.taskRepository.SearchTasks(ctx, request)
 	if err != nil {
-		return nil, apperr.ServerError("failed to search tasks for user", err)
+		return nil, apperr.ServerError("failed to search tasks", err)
 	}
 
 	return result, nil

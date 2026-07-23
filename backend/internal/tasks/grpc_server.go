@@ -22,6 +22,7 @@ type grpcTaskService interface {
 	Create(ctx context.Context, request CreateTaskRequest) (*domain.Task, error)
 	GetById(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error)
 	GroupByColumn(ctx context.Context, request GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error)
+	SearchTasks(ctx context.Context, request SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error)
 	FindTaskByCode(ctx context.Context, request FindTaskByCodeRequest) (*domain.Task, error)
 	Move(ctx context.Context, request MoveTaskRequest) (*domain.Task, error)
 	Update(ctx context.Context, request UpdateTaskRequest) (*domain.Task, error)
@@ -148,6 +149,57 @@ func (s *GRPCServer) GroupTasksByColumn(ctx context.Context, req *tasksv1.GroupT
 		return nil, status.Error(codes.Internal, "failed to encode tasks")
 	}
 	return &tasksv1.TasksByColumnResponse{TasksByColumnJson: payload}, nil
+}
+
+func (s *GRPCServer) SearchTasks(ctx context.Context, req *tasksv1.SearchTasksRequest) (*tasksv1.SearchTasksResponse, error) {
+	ctx = withActionOriginFromMetadata(ctx)
+
+	userID, err := parseGRPCUUID(req.GetUserId(), "user_id")
+	if err != nil {
+		return nil, err
+	}
+	projectID, err := parseOptionalGRPCUUID(req.ProjectId, "project_id")
+	if err != nil {
+		return nil, err
+	}
+	columnIDs, err := parseGRPCUUIDs(req.GetProjectColumnIds(), "project_column_ids")
+	if err != nil {
+		return nil, err
+	}
+	cursorDueDate, err := parseOptionalGRPCTime(req.CursorDueDate, "cursor_due_date")
+	if err != nil {
+		return nil, err
+	}
+	cursorUpdatedAt, err := parseOptionalGRPCTime(req.CursorUpdatedAt, "cursor_updated_at")
+	if err != nil {
+		return nil, err
+	}
+	cursorTaskID, err := parseOptionalGRPCUUID(req.CursorTaskId, "cursor_task_id")
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.taskService.SearchTasks(ctx, SearchTasksRequest{
+		UserId:           userID,
+		ProjectId:        projectID,
+		ProjectColumnIDs: columnIDs,
+		SearchQuery:      req.GetQuery(),
+		IncludeArchived:  req.GetIncludeArchived(),
+		IncludeDone:      req.GetIncludeDone(),
+		Limit:            int(req.GetLimit()),
+		CursorDueDate:    cursorDueDate,
+		CursorUpdatedAt:  cursorUpdatedAt,
+		CursorTaskId:     cursorTaskID,
+	})
+	if err != nil {
+		return nil, domainErrorToStatus(err)
+	}
+
+	payload, err := json.Marshal(result)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to encode task search results")
+	}
+	return &tasksv1.SearchTasksResponse{ResultJson: payload}, nil
 }
 
 func (s *GRPCServer) FindTaskByCode(ctx context.Context, req *tasksv1.FindTaskByCodeRequest) (*tasksv1.TaskResponse, error) {

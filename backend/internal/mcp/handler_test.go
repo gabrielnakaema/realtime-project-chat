@@ -31,6 +31,8 @@ type stubTaskService struct {
 	createRequest     *CreateTaskRequest
 	task              *domain.Task
 	grouped           map[string]utils.CursorPaginated[domain.Task]
+	searchRequest     *SearchTasksRequest
+	searchResult      *utils.CursorPaginated[domain.Task]
 	findByCodeRequest *FindTaskByCodeRequest
 	updateRequest     *UpdateTaskRequest
 	moveRequest       *MoveTaskRequest
@@ -51,6 +53,11 @@ func (s *stubTaskService) Create(ctx context.Context, request CreateTaskRequest)
 
 func (s *stubTaskService) GroupByColumn(ctx context.Context, request GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error) {
 	return s.grouped, nil
+}
+
+func (s *stubTaskService) SearchTasks(ctx context.Context, request SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
+	s.searchRequest = &request
+	return s.searchResult, nil
 }
 
 func (s *stubTaskService) GetByID(ctx context.Context, id uuid.UUID, userId uuid.UUID) (*domain.Task, error) {
@@ -136,6 +143,9 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	}
 	taskSvc := &stubTaskService{
 		task: task,
+		searchResult: &utils.CursorPaginated[domain.Task]{
+			Data: []domain.Task{*task},
+		},
 		grouped: map[string]utils.CursorPaginated[domain.Task]{
 			columnID.String(): {Data: []domain.Task{*task}},
 		},
@@ -196,6 +206,23 @@ func TestCallToolSuccessPaths(t *testing.T) {
 	assert.Len(t, taskResult["task"].(*domain.Task).Comments, 1)
 	require.NotNil(t, commentSvc.listRequest)
 	assert.Equal(t, 5, commentSvc.listRequest.Limit)
+
+	searchResult, err := handler.callTool(context.Background(), principal, toolCallParams{
+		Name: "search_tasks",
+		Arguments: map[string]any{
+			"project_id":         projectID.String(),
+			"project_column_ids": []any{columnID.String()},
+			"query":              " task ",
+		},
+	})
+	require.NoError(t, err)
+	assert.Len(t, searchResult["tasks"], 1)
+	assert.Equal(t, "Task", searchResult["tasks"].([]domain.Task)[0].Title)
+	require.NotNil(t, taskSvc.searchRequest)
+	assert.Equal(t, projectID, taskSvc.searchRequest.ProjectID)
+	assert.Equal(t, []uuid.UUID{columnID}, taskSvc.searchRequest.ProjectColumnIDs)
+	assert.Equal(t, "task", taskSvc.searchRequest.Query)
+	assert.Equal(t, 25, taskSvc.searchRequest.Limit)
 
 	findTaskResult, err := handler.callTool(context.Background(), principal, toolCallParams{
 		Name: "find_task_by_code",
@@ -464,6 +491,7 @@ func TestToolDefinitionsForPrincipalFiltersScopes(t *testing.T) {
 
 	assert.Contains(t, toolNames, "list_projects")
 	assert.Contains(t, toolNames, "find_task_by_code")
+	assert.Contains(t, toolNames, "search_tasks")
 	assert.Contains(t, toolNames, "get_task")
 	assert.NotContains(t, toolNames, "create_task")
 	assert.NotContains(t, toolNames, "list_task_comments")
@@ -487,5 +515,6 @@ func TestReadResourceBuildsScopeAwareGuide(t *testing.T) {
 	assert.Contains(t, text, "Recommended workflow")
 	assert.Contains(t, text, "list_projects")
 	assert.Contains(t, text, "find_task_by_code")
+	assert.Contains(t, text, "search_tasks")
 	assert.NotContains(t, text, "create_task")
 }

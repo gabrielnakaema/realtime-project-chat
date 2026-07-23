@@ -28,7 +28,7 @@ type taskService interface {
 	Archive(ctx context.Context, request ArchiveTaskRequest) (*domain.Task, error)
 	Restore(ctx context.Context, request RestoreTaskRequest) (*domain.Task, error)
 	ListUserDueTasks(ctx context.Context, request ListUserDueTasksRequest) (*utils.CursorPaginated[domain.Task], error)
-	SearchTasksForUser(ctx context.Context, request SearchTasksForUserRequest) (*utils.CursorPaginated[domain.Task], error)
+	SearchTasks(ctx context.Context, request SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error)
 	SuggestTaskCodes(ctx context.Context, request SuggestTaskCodesRequest) ([]domain.TaskCodeSuggestion, error)
 	SearchProjectTasksForDependencies(ctx context.Context, request SearchProjectTasksForDependenciesRequest) ([]domain.TaskDependencyRef, error)
 }
@@ -685,15 +685,27 @@ func (h *TaskHandler) SearchTasksForUser(w http.ResponseWriter, r *http.Request)
 		updatedAt = &parsedTime
 	}
 
-	serviceRequest := SearchTasksForUserRequest{
+	cursorTaskId := platformhttp.GetQueryString(r, "task_id", "")
+	var taskId *uuid.UUID
+	if cursorTaskId != "" {
+		parsedId, err := uuid.Parse(cursorTaskId)
+		if err != nil {
+			httperr.BadRequestResponse(w, err)
+			return
+		}
+		taskId = &parsedId
+	}
+
+	serviceRequest := SearchTasksRequest{
 		UserId:          userId,
 		Limit:           int(limit),
 		SearchQuery:     searchQuery,
 		CursorDueDate:   dueDate,
 		CursorUpdatedAt: updatedAt,
+		CursorTaskId:    taskId,
 	}
 
-	result, err := h.taskService.SearchTasksForUser(r.Context(), serviceRequest)
+	result, err := h.taskService.SearchTasks(r.Context(), serviceRequest)
 	if err != nil {
 		httperr.ErrorResponse(w, r, err)
 		return

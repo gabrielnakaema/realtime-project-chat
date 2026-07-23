@@ -148,8 +148,8 @@ func (m *mockTaskRepository) SearchProjectTasksForDependencies(ctx context.Conte
 	return args.Get(0).([]domain.TaskDependencyRef), args.Error(1)
 }
 
-func (m *mockTaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UUID, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
-	args := m.Called(ctx, userId, searchQuery, cursorDueDate, cursorUpdatedAt, limit)
+func (m *mockTaskRepository) SearchTasks(ctx context.Context, request tasks.SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
+	args := m.Called(ctx, request)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -1400,6 +1400,21 @@ func TestTaskService_List(t *testing.T) {
 			expectedLen:   0,
 		},
 		{
+			name: "non-creator cannot list archived tasks",
+			request: tasks.ListTasksRequest{
+				ProjectId:        validProjectId,
+				RequestUserId:    memberUserId,
+				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
+				Archived:         true,
+				Limit:            15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(apperr.ForbiddenErrorCode),
+		},
+		{
 			name: "non-creator can list non-archived tasks",
 			request: tasks.ListTasksRequest{
 				ProjectId:        validProjectId,
@@ -1526,6 +1541,21 @@ func TestTaskService_GroupByColumn(t *testing.T) {
 				repo.On("ListByProjectId", mock.Anything, validProjectId, []uuid.UUID{doneStatusID}, false, "", (*time.Time)(nil), 15).Return(emptyPage, nil)
 			},
 			shouldSucceed: true,
+		},
+		{
+			name: "non-creator cannot group archived tasks",
+			request: tasks.GroupByColumnRequest{
+				ProjectId:        validProjectId,
+				UserId:           memberUserId,
+				ProjectColumnIDs: []uuid.UUID{pendingStatusID},
+				Archived:         true,
+				Limit:            15,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(apperr.ForbiddenErrorCode),
 		},
 		{
 			name: "forbidden - not a project member",

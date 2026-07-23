@@ -355,16 +355,42 @@ JOIN project_ids_cte pi ON pi.project_id = t.project_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
 LEFT JOIN task_dependencies td ON td.task_id = t.id
 WHERE (sqlc.narg('query')::text IS NULL OR (t.title ILIKE '%' || sqlc.narg('query')::text || '%' OR t.description ILIKE '%' || sqlc.narg('query')::text || '%' OR t.code ILIKE '%' || sqlc.narg('query')::text || '%'))
-AND t.archived_at IS NULL
-AND ps.is_done_column = false
+AND (sqlc.narg('project_id')::uuid IS NULL OR t.project_id = sqlc.narg('project_id')::uuid)
 AND (
-  sqlc.narg('cursor_due_date')::timestamptz IS NULL
-  OR sqlc.narg('cursor_updated_at')::timestamptz IS NULL
-  OR t.due_date > sqlc.narg('cursor_due_date')::timestamptz
-  OR (t.due_date = sqlc.narg('cursor_due_date')::timestamptz AND t.updated_at < sqlc.narg('cursor_updated_at')::timestamptz)
+  sqlc.arg('project_column_ids')::uuid[] IS NULL
+  OR cardinality(sqlc.arg('project_column_ids')::uuid[]) = 0
+  OR t.project_column_id = ANY(sqlc.arg('project_column_ids')::uuid[])
+)
+AND (sqlc.arg('include_archived')::boolean OR t.archived_at IS NULL)
+AND (sqlc.arg('include_done')::boolean OR ps.is_done_column = false)
+AND (
+  sqlc.narg('cursor_updated_at')::timestamptz IS NULL
+  OR sqlc.narg('cursor_task_id')::uuid IS NULL
+  OR (
+    sqlc.narg('cursor_due_date')::timestamptz IS NOT NULL
+    AND (
+      t.due_date > sqlc.narg('cursor_due_date')::timestamptz
+      OR t.due_date IS NULL
+      OR (
+        t.due_date = sqlc.narg('cursor_due_date')::timestamptz
+        AND (
+          t.updated_at < sqlc.narg('cursor_updated_at')::timestamptz
+          OR (t.updated_at = sqlc.narg('cursor_updated_at')::timestamptz AND t.id > sqlc.narg('cursor_task_id')::uuid)
+        )
+      )
+    )
+  )
+  OR (
+    sqlc.narg('cursor_due_date')::timestamptz IS NULL
+    AND t.due_date IS NULL
+    AND (
+      t.updated_at < sqlc.narg('cursor_updated_at')::timestamptz
+      OR (t.updated_at = sqlc.narg('cursor_updated_at')::timestamptz AND t.id > sqlc.narg('cursor_task_id')::uuid)
+    )
+  )
 )
 GROUP BY t.id, ps.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id, r.id, r.name, r.email, r.created_at, a.id, a.name, a.email, a.created_at
-ORDER BY t.due_date ASC, t.updated_at DESC
+ORDER BY t.due_date ASC NULLS LAST, t.updated_at DESC, t.id ASC
 LIMIT $2;
 
 -- name: SearchProjectTasksForDependencies :many

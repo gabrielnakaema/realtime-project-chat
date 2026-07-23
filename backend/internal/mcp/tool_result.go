@@ -91,6 +91,14 @@ func projectBoardSuccessText(result map[string]any) string {
 	return fmt.Sprintf("Loaded board for project %q with %d column(s).", project.Name, len(project.Columns))
 }
 
+func searchTasksSuccessText(result map[string]any) string {
+	tasks, ok := result["tasks"].([]domain.Task)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("Found %d matching task(s).", len(tasks))
+}
+
 func listTaskCommentsSuccessText(result map[string]any) string {
 	comments, ok := result["comments"].([]domain.TaskComment)
 	if !ok {

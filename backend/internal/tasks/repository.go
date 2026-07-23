@@ -876,32 +876,36 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 	return &paginated, nil
 }
 
-func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UUID, searchQuery string, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error) {
+func (tr *TaskRepository) SearchTasks(ctx context.Context, request SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
 	q := taskqueries.New(tr.pool)
 
 	params := taskqueries.SearchTasksForUserParams{
-		UserID:          userId,
-		Limit:           int32(limit + 1),
-		Query:           pgtype.Text{String: searchQuery, Valid: true},
-		CursorDueDate:   pgtype.Timestamptz{Valid: cursorDueDate != nil},
-		CursorUpdatedAt: pgtype.Timestamptz{Valid: cursorUpdatedAt != nil},
+		UserID:           request.UserId,
+		Limit:            int32(request.Limit + 1),
+		Query:            pgtype.Text{String: request.SearchQuery, Valid: true},
+		ProjectColumnIds: request.ProjectColumnIDs,
+		IncludeArchived:  request.IncludeArchived,
+		IncludeDone:      request.IncludeDone,
 	}
 
-	if cursorUpdatedAt != nil {
+	if request.ProjectId != nil {
+		params.ProjectID = pgtype.UUID{Bytes: *request.ProjectId, Valid: true}
+	}
+
+	if request.CursorUpdatedAt != nil {
 		params.CursorUpdatedAt = pgtype.Timestamptz{
-			Time:  *cursorUpdatedAt,
+			Time:  *request.CursorUpdatedAt,
 			Valid: true,
-		}
-	} else {
-		params.CursorUpdatedAt = pgtype.Timestamptz{
-			Valid: true,
-			Time:  time.Now().Add(1 * time.Hour),
 		}
 	}
 
-	if cursorDueDate != nil {
+	if request.CursorTaskId != nil {
+		params.CursorTaskID = pgtype.UUID{Bytes: *request.CursorTaskId, Valid: true}
+	}
+
+	if request.CursorDueDate != nil {
 		params.CursorDueDate = pgtype.Timestamptz{
-			Time:  *cursorDueDate,
+			Time:  *request.CursorDueDate,
 			Valid: true,
 		}
 	}
@@ -1004,11 +1008,11 @@ func (tr *TaskRepository) SearchTasksForUser(ctx context.Context, userId uuid.UU
 		tasks = append(tasks, task)
 	}
 
-	minLen := min(len(tasks), int(limit))
+	minLen := min(len(tasks), request.Limit)
 
 	paginated := utils.CursorPaginated[domain.Task]{
 		Data:    tasks[:minLen],
-		HasNext: len(tasks) > int(limit),
+		HasNext: len(tasks) > request.Limit,
 	}
 
 	return &paginated, nil

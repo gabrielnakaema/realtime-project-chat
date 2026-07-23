@@ -22,6 +22,7 @@ const (
 	TaskService_CreateTask_FullMethodName         = "/projectchat.tasks.v1.TaskService/CreateTask"
 	TaskService_GetTaskById_FullMethodName        = "/projectchat.tasks.v1.TaskService/GetTaskById"
 	TaskService_GroupTasksByColumn_FullMethodName = "/projectchat.tasks.v1.TaskService/GroupTasksByColumn"
+	TaskService_SearchTasks_FullMethodName        = "/projectchat.tasks.v1.TaskService/SearchTasks"
 	TaskService_FindTaskByCode_FullMethodName     = "/projectchat.tasks.v1.TaskService/FindTaskByCode"
 	TaskService_MoveTask_FullMethodName           = "/projectchat.tasks.v1.TaskService/MoveTask"
 	TaskService_UpdateTask_FullMethodName         = "/projectchat.tasks.v1.TaskService/UpdateTask"
@@ -46,6 +47,7 @@ type TaskServiceClient interface {
 	CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*TaskResponse, error)
 	GetTaskById(ctx context.Context, in *GetTaskByIdRequest, opts ...grpc.CallOption) (*TaskResponse, error)
 	GroupTasksByColumn(ctx context.Context, in *GroupTasksByColumnRequest, opts ...grpc.CallOption) (*TasksByColumnResponse, error)
+	SearchTasks(ctx context.Context, in *SearchTasksRequest, opts ...grpc.CallOption) (*SearchTasksResponse, error)
 	FindTaskByCode(ctx context.Context, in *FindTaskByCodeRequest, opts ...grpc.CallOption) (*TaskResponse, error)
 	MoveTask(ctx context.Context, in *MoveTaskRequest, opts ...grpc.CallOption) (*TaskResponse, error)
 	UpdateTask(ctx context.Context, in *UpdateTaskRequest, opts ...grpc.CallOption) (*TaskResponse, error)
@@ -87,6 +89,16 @@ func (c *taskServiceClient) GroupTasksByColumn(ctx context.Context, in *GroupTas
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(TasksByColumnResponse)
 	err := c.cc.Invoke(ctx, TaskService_GroupTasksByColumn_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) SearchTasks(ctx context.Context, in *SearchTasksRequest, opts ...grpc.CallOption) (*SearchTasksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchTasksResponse)
+	err := c.cc.Invoke(ctx, TaskService_SearchTasks_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -178,6 +190,7 @@ type TaskServiceServer interface {
 	CreateTask(context.Context, *CreateTaskRequest) (*TaskResponse, error)
 	GetTaskById(context.Context, *GetTaskByIdRequest) (*TaskResponse, error)
 	GroupTasksByColumn(context.Context, *GroupTasksByColumnRequest) (*TasksByColumnResponse, error)
+	SearchTasks(context.Context, *SearchTasksRequest) (*SearchTasksResponse, error)
 	FindTaskByCode(context.Context, *FindTaskByCodeRequest) (*TaskResponse, error)
 	MoveTask(context.Context, *MoveTaskRequest) (*TaskResponse, error)
 	UpdateTask(context.Context, *UpdateTaskRequest) (*TaskResponse, error)
@@ -203,6 +216,9 @@ func (UnimplementedTaskServiceServer) GetTaskById(context.Context, *GetTaskByIdR
 }
 func (UnimplementedTaskServiceServer) GroupTasksByColumn(context.Context, *GroupTasksByColumnRequest) (*TasksByColumnResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GroupTasksByColumn not implemented")
+}
+func (UnimplementedTaskServiceServer) SearchTasks(context.Context, *SearchTasksRequest) (*SearchTasksResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SearchTasks not implemented")
 }
 func (UnimplementedTaskServiceServer) FindTaskByCode(context.Context, *FindTaskByCodeRequest) (*TaskResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FindTaskByCode not implemented")
@@ -296,6 +312,24 @@ func _TaskService_GroupTasksByColumn_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TaskServiceServer).GroupTasksByColumn(ctx, req.(*GroupTasksByColumnRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_SearchTasks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchTasksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).SearchTasks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_SearchTasks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).SearchTasks(ctx, req.(*SearchTasksRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -444,6 +478,10 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GroupTasksByColumn",
 			Handler:    _TaskService_GroupTasksByColumn_Handler,
+		},
+		{
+			MethodName: "SearchTasks",
+			Handler:    _TaskService_SearchTasks_Handler,
 		},
 		{
 			MethodName: "FindTaskByCode",

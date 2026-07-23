@@ -15,9 +15,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// TaskServiceClient adapts the tasks gRPC client to the task-service interface
-// the MCP handler depends on, so api can call tasks-service without
-// instantiating the tasks slice in-process.
 type TaskServiceClient struct {
 	client tasksv1.TaskServiceClient
 }
@@ -76,6 +73,30 @@ func (c *TaskServiceClient) GroupByColumn(ctx context.Context, request GroupByCo
 		return nil, apperr.ServerError("failed to decode tasks", err)
 	}
 	return grouped, nil
+}
+
+func (c *TaskServiceClient) SearchTasks(ctx context.Context, request SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error) {
+	resp, err := c.client.SearchTasks(withOutgoingActionOrigin(ctx), &tasksv1.SearchTasksRequest{
+		UserId:           request.UserId.String(),
+		ProjectId:        optionalUUIDString(request.ProjectId),
+		ProjectColumnIds: uuidStrings(request.ProjectColumnIDs),
+		Query:            request.SearchQuery,
+		IncludeArchived:  request.IncludeArchived,
+		IncludeDone:      request.IncludeDone,
+		Limit:            int32(request.Limit),
+		CursorDueDate:    optionalTimeString(request.CursorDueDate),
+		CursorUpdatedAt:  optionalTimeString(request.CursorUpdatedAt),
+		CursorTaskId:     optionalUUIDString(request.CursorTaskId),
+	})
+	if err != nil {
+		return nil, statusToDomainError(err)
+	}
+
+	var result utils.CursorPaginated[domain.Task]
+	if err := json.Unmarshal(resp.GetResultJson(), &result); err != nil {
+		return nil, apperr.ServerError("failed to decode task search results", err)
+	}
+	return &result, nil
 }
 
 func (c *TaskServiceClient) FindTaskByCode(ctx context.Context, request FindTaskByCodeRequest) (*domain.Task, error) {
@@ -146,8 +167,6 @@ func (c *TaskServiceClient) AssignTaskToSelf(ctx context.Context, request Assign
 	return decodeTask(resp.GetTaskJson())
 }
 
-// TaskCommentServiceClient adapts the tasks gRPC client to the task-comment
-// service interface the MCP handler depends on.
 type TaskCommentServiceClient struct {
 	client tasksv1.TaskServiceClient
 }
@@ -220,7 +239,7 @@ func optionalTimeString(t *time.Time) *string {
 	if t == nil {
 		return nil
 	}
-	value := t.Format(time.RFC3339)
+	value := t.Format(time.RFC3339Nano)
 	return &value
 }
 

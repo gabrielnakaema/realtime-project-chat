@@ -105,6 +105,36 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	err = json.NewDecoder(taskResp.Body).Decode(&task)
 	require.NoError(t, err)
 
+	secondTaskResp, err := client.POST("/tasks", map[string]any{
+		"project_id":        projectID,
+		"project_column_id": pendingColumnID,
+		"title":             "Second MCP Task",
+		"description":       "Another searchable MCP task",
+		"code":              "MCP-SEARCH-2",
+		"priority":          "medium",
+		"tags":              []string{"mcp"},
+	})
+	require.NoError(t, err)
+	defer secondTaskResp.Body.Close()
+	require.Equal(t, http.StatusCreated, secondTaskResp.StatusCode)
+
+	var secondTask map[string]any
+	err = json.NewDecoder(secondTaskResp.Body).Decode(&secondTask)
+	require.NoError(t, err)
+
+	doneTaskResp, err := client.POST("/tasks", map[string]any{
+		"project_id":        projectID,
+		"project_column_id": doneColumnID,
+		"title":             "Completed task",
+		"description":       "Searchable task in a done column",
+		"code":              "DONE-SEARCH",
+		"priority":          "medium",
+		"tags":              []string{"mcp"},
+	})
+	require.NoError(t, err)
+	defer doneTaskResp.Body.Close()
+	require.Equal(t, http.StatusCreated, doneTaskResp.StatusCode)
+
 	scopeResp, err := client.GET("/users/me/mcp-api-keys/scopes")
 	require.NoError(t, err)
 	defer scopeResp.Body.Close()
@@ -296,6 +326,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	assert.Contains(t, guideText, "Recommended workflow")
 	assert.Contains(t, guideText, "list_projects")
 	assert.Contains(t, guideText, "find_task_by_code")
+	assert.Contains(t, guideText, "search_tasks")
 	assert.NotContains(t, guideText, "create_task")
 
 	toolsResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
@@ -314,6 +345,7 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	}
 	assert.Contains(t, toolNames, "list_projects")
 	assert.Contains(t, toolNames, "find_task_by_code")
+	assert.Contains(t, toolNames, "search_tasks")
 	assert.Contains(t, toolNames, "get_task")
 	assert.NotContains(t, toolNames, "create_task")
 	assert.NotContains(t, toolNames, "list_task_comments")
@@ -414,6 +446,73 @@ func TestMCPAPIKeyLifecycleAndToolAuth(t *testing.T) {
 	foundTask := findTaskResp["result"].(map[string]any)["structuredContent"].(map[string]any)["task"].(map[string]any)
 	assert.Equal(t, task["id"].(string), foundTask["id"])
 	assert.Equal(t, "MCP-1", foundTask["code"])
+
+	searchTasksResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.65",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "search_tasks",
+			"arguments": map[string]any{
+				"project_id":         projectID,
+				"project_column_ids": []string{pendingColumnID, doneColumnID},
+				"query":              "mCp TaSk",
+				"limit":              1,
+			},
+		},
+	})
+	searchStructured := searchTasksResp["result"].(map[string]any)["structuredContent"].(map[string]any)
+	firstSearchPage := searchStructured["tasks"].([]any)
+	require.Len(t, firstSearchPage, 1)
+	assert.True(t, searchStructured["has_next"].(bool), "search result: %#v", searchStructured)
+	nextCursor, ok := searchStructured["next_cursor"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, nextCursor)
+
+	searchNextResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.7",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "search_tasks",
+			"arguments": map[string]any{
+				"project_id":         projectID,
+				"project_column_ids": []string{pendingColumnID, doneColumnID},
+				"query":              "mCp TaSk",
+				"limit":              1,
+				"cursor":             nextCursor,
+			},
+		},
+	})
+	searchNextStructured := searchNextResp["result"].(map[string]any)["structuredContent"].(map[string]any)
+	secondSearchPage := searchNextStructured["tasks"].([]any)
+	require.Len(t, secondSearchPage, 1, "first page: %#v, cursor: %s, second result: %#v", firstSearchPage, nextCursor, searchNextStructured)
+	assert.NotEqual(t,
+		firstSearchPage[0].(map[string]any)["id"],
+		secondSearchPage[0].(map[string]any)["id"],
+	)
+	assert.False(t, searchNextStructured["has_next"].(bool))
+	assert.Nil(t, searchNextStructured["next_cursor"])
+	assert.ElementsMatch(t,
+		[]any{task["id"], secondTask["id"]},
+		[]any{firstSearchPage[0].(map[string]any)["id"], secondSearchPage[0].(map[string]any)["id"]},
+	)
+
+	searchDoneResp := createMCPRequest(t, testAPI.GetBaseURL(), rawSecret, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "3.72",
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "search_tasks",
+			"arguments": map[string]any{
+				"project_id":         projectID,
+				"project_column_ids": []string{doneColumnID},
+				"query":              "done-search",
+			},
+		},
+	})
+	searchDoneStructured := searchDoneResp["result"].(map[string]any)["structuredContent"].(map[string]any)
+	require.Len(t, searchDoneStructured["tasks"].([]any), 1)
 
 	boardResp := createMCPRequest(t, testAPI.GetBaseURL(), editorRawSecret, map[string]any{
 		"jsonrpc": "2.0",

@@ -8,6 +8,7 @@ service TaskService {
   rpc CreateTask(CreateTaskRequest) returns (TaskResponse);
   rpc GetTaskById(GetTaskByIdRequest) returns (TaskResponse);
   rpc GroupTasksByColumn(GroupTasksByColumnRequest) returns (TasksByColumnResponse);
+  rpc SearchTasks(SearchTasksRequest) returns (SearchTasksResponse);
   rpc FindTaskByCode(FindTaskByCodeRequest) returns (TaskResponse);
   rpc MoveTask(MoveTaskRequest) returns (TaskResponse);
   rpc UpdateTask(UpdateTaskRequest) returns (TaskResponse);
@@ -115,4 +116,21 @@ message ListTaskCommentsRequest {
   optional string before_comment_id = 5;
   optional string after = 6; // RFC3339
   optional string after_comment_id = 7;
+}
+
+message SearchTasksRequest {
+  string user_id = 1;
+  optional string project_id = 2;
+  repeated string project_column_ids = 3;
+  string query = 4;
+  bool include_archived = 5;
+  bool include_done = 6;
+  int32 limit = 7;
+  optional string cursor_due_date = 8; // RFC3339
+  optional string cursor_updated_at = 9; // RFC3339
+  optional string cursor_task_id = 10;
+}
+
+message SearchTasksResponse {
+  bytes result_json = 1;
 }

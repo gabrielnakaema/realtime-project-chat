@@ -144,6 +144,78 @@ func buildToolCatalog() []toolSpec {
 			},
 		},
 		{
+			Name:          "search_tasks",
+			Title:         "Search Tasks In Project Columns",
+			Description:   "Search for case-insensitive partial matches in task titles, descriptions, and codes within selected project columns. Discover project and column ids with list_project_board first.",
+			RequiredScope: domain.MCPAPIScopeTasksRead,
+			Handle:        (*Handler).handleSearchTasks,
+			SuccessText:   searchTasksSuccessText,
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"project_id": map[string]any{
+						"type":        "string",
+						"format":      "uuid",
+						"description": "Project id that owns every selected column.",
+					},
+					"project_column_ids": map[string]any{
+						"type":        "array",
+						"minItems":    1,
+						"uniqueItems": true,
+						"description": "One or more project column ids in which to search. Done columns are searchable when selected.",
+						"items": map[string]any{
+							"type":   "string",
+							"format": "uuid",
+						},
+					},
+					"query": map[string]any{
+						"type":        "string",
+						"minLength":   1,
+						"description": "Text matched as a case-insensitive substring against task title, description, or code.",
+					},
+					"include_archived": map[string]any{
+						"type":        "boolean",
+						"description": "Include archived matches in addition to active matches. Only the project creator may enable this. Defaults to false.",
+					},
+					"limit": map[string]any{
+						"type":        "integer",
+						"minimum":     1,
+						"maximum":     maxToolResultLimit,
+						"description": "Maximum number of matching tasks to return. Defaults to 25.",
+					},
+					"cursor": map[string]any{
+						"type":        "string",
+						"minLength":   1,
+						"description": "Opaque continuation cursor returned by a previous search_tasks call with the same filters.",
+					},
+				},
+				"required":             []string{"project_id", "project_column_ids", "query"},
+				"additionalProperties": false,
+			},
+			OutputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"tasks": map[string]any{
+						"type":        "array",
+						"description": "Matching tasks in stable due-date order.",
+						"items":       taskSchema,
+					},
+					"has_next": map[string]any{
+						"type":        "boolean",
+						"description": "Whether another result page is available.",
+					},
+					"next_cursor": map[string]any{
+						"description": "Opaque continuation cursor, or null on the final page.",
+						"anyOf": []map[string]any{
+							{"type": "string"},
+							{"type": "null"},
+						},
+					},
+				},
+				"required": []string{"tasks", "has_next", "next_cursor"},
+			},
+		},
+		{
 			Name:          "create_task",
 			Title:         "Create Task",
 			Description:   "Create a new task in a specific project column.",

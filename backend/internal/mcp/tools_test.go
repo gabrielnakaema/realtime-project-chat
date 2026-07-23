@@ -43,6 +43,14 @@ func TestCallToolMissingRequiredArgs(t *testing.T) {
 			},
 		},
 		{
+			name:     "search_tasks missing project_column_ids",
+			toolName: "search_tasks",
+			args: map[string]any{
+				"project_id": uuid.NewString(),
+				"query":      "task",
+			},
+		},
+		{
 			name:     "get_task missing task_id",
 			toolName: "get_task",
 			args:     map[string]any{},
@@ -133,5 +141,5 @@ func TestRegisteredToolsHaveUniqueCompleteExecutionMetadata(t *testing.T) {
 		seenNames[spec.Name] = struct{}{}
 	}
 
-	assert.Len(t, registeredTools, 11)
+	assert.Len(t, registeredTools, 12)
 }

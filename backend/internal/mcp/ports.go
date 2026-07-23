@@ -61,6 +61,18 @@ type FindTaskByCodeRequest struct {
 	Code      string
 }
 
+type SearchTasksRequest struct {
+	ProjectID        uuid.UUID
+	UserID           uuid.UUID
+	ProjectColumnIDs []uuid.UUID
+	Query            string
+	IncludeArchived  bool
+	Limit            int
+	CursorDueDate    *time.Time
+	CursorUpdatedAt  *time.Time
+	CursorTaskID     *uuid.UUID
+}
+
 type MoveTaskRequest struct {
 	TaskID          uuid.UUID
 	RequestUserID   uuid.UUID
@@ -113,6 +125,7 @@ type ListTaskCommentsRequest struct {
 type taskService interface {
 	Create(ctx context.Context, request CreateTaskRequest) (*domain.Task, error)
 	GroupByColumn(ctx context.Context, request GroupByColumnRequest) (map[string]utils.CursorPaginated[domain.Task], error)
+	SearchTasks(ctx context.Context, request SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error)
 	GetByID(ctx context.Context, id uuid.UUID, userID uuid.UUID) (*domain.Task, error)
 	FindTaskByCode(ctx context.Context, request FindTaskByCodeRequest) (*domain.Task, error)
 	Move(ctx context.Context, request MoveTaskRequest) (*domain.Task, error)

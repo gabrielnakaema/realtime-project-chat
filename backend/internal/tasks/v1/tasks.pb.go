@@ -990,6 +990,166 @@ func (x *ListTaskCommentsRequest) GetAfterCommentId() string {
 	return ""
 }
 
+type SearchTasksRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	UserId           string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProjectId        *string                `protobuf:"bytes,2,opt,name=project_id,json=projectId,proto3,oneof" json:"project_id,omitempty"`
+	ProjectColumnIds []string               `protobuf:"bytes,3,rep,name=project_column_ids,json=projectColumnIds,proto3" json:"project_column_ids,omitempty"`
+	Query            string                 `protobuf:"bytes,4,opt,name=query,proto3" json:"query,omitempty"`
+	IncludeArchived  bool                   `protobuf:"varint,5,opt,name=include_archived,json=includeArchived,proto3" json:"include_archived,omitempty"`
+	IncludeDone      bool                   `protobuf:"varint,6,opt,name=include_done,json=includeDone,proto3" json:"include_done,omitempty"`
+	Limit            int32                  `protobuf:"varint,7,opt,name=limit,proto3" json:"limit,omitempty"`
+	CursorDueDate    *string                `protobuf:"bytes,8,opt,name=cursor_due_date,json=cursorDueDate,proto3,oneof" json:"cursor_due_date,omitempty"`       // RFC3339; omitted both before the first page and when the cursor task has no due date
+	CursorUpdatedAt  *string                `protobuf:"bytes,9,opt,name=cursor_updated_at,json=cursorUpdatedAt,proto3,oneof" json:"cursor_updated_at,omitempty"` // RFC3339
+	CursorTaskId     *string                `protobuf:"bytes,10,opt,name=cursor_task_id,json=cursorTaskId,proto3,oneof" json:"cursor_task_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *SearchTasksRequest) Reset() {
+	*x = SearchTasksRequest{}
+	mi := &file_projectchat_tasks_v1_tasks_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchTasksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchTasksRequest) ProtoMessage() {}
+
+func (x *SearchTasksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_projectchat_tasks_v1_tasks_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchTasksRequest.ProtoReflect.Descriptor instead.
+func (*SearchTasksRequest) Descriptor() ([]byte, []int) {
+	return file_projectchat_tasks_v1_tasks_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *SearchTasksRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *SearchTasksRequest) GetProjectId() string {
+	if x != nil && x.ProjectId != nil {
+		return *x.ProjectId
+	}
+	return ""
+}
+
+func (x *SearchTasksRequest) GetProjectColumnIds() []string {
+	if x != nil {
+		return x.ProjectColumnIds
+	}
+	return nil
+}
+
+func (x *SearchTasksRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *SearchTasksRequest) GetIncludeArchived() bool {
+	if x != nil {
+		return x.IncludeArchived
+	}
+	return false
+}
+
+func (x *SearchTasksRequest) GetIncludeDone() bool {
+	if x != nil {
+		return x.IncludeDone
+	}
+	return false
+}
+
+func (x *SearchTasksRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *SearchTasksRequest) GetCursorDueDate() string {
+	if x != nil && x.CursorDueDate != nil {
+		return *x.CursorDueDate
+	}
+	return ""
+}
+
+func (x *SearchTasksRequest) GetCursorUpdatedAt() string {
+	if x != nil && x.CursorUpdatedAt != nil {
+		return *x.CursorUpdatedAt
+	}
+	return ""
+}
+
+func (x *SearchTasksRequest) GetCursorTaskId() string {
+	if x != nil && x.CursorTaskId != nil {
+		return *x.CursorTaskId
+	}
+	return ""
+}
+
+type SearchTasksResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ResultJson    []byte                 `protobuf:"bytes,1,opt,name=result_json,json=resultJson,proto3" json:"result_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchTasksResponse) Reset() {
+	*x = SearchTasksResponse{}
+	mi := &file_projectchat_tasks_v1_tasks_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchTasksResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchTasksResponse) ProtoMessage() {}
+
+func (x *SearchTasksResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_projectchat_tasks_v1_tasks_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchTasksResponse.ProtoReflect.Descriptor instead.
+func (*SearchTasksResponse) Descriptor() ([]byte, []int) {
+	return file_projectchat_tasks_v1_tasks_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *SearchTasksResponse) GetResultJson() []byte {
+	if x != nil {
+		return x.ResultJson
+	}
+	return nil
+}
+
 var File_projectchat_tasks_v1_tasks_proto protoreflect.FileDescriptor
 
 const file_projectchat_tasks_v1_tasks_proto_rawDesc = "" +
@@ -1085,12 +1245,33 @@ const file_projectchat_tasks_v1_tasks_proto_rawDesc = "" +
 	"\a_beforeB\x14\n" +
 	"\x12_before_comment_idB\b\n" +
 	"\x06_afterB\x13\n" +
-	"\x11_after_comment_id2\xf3\a\n" +
+	"\x11_after_comment_id\"\xce\x03\n" +
+	"\x12SearchTasksRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\"\n" +
+	"\n" +
+	"project_id\x18\x02 \x01(\tH\x00R\tprojectId\x88\x01\x01\x12,\n" +
+	"\x12project_column_ids\x18\x03 \x03(\tR\x10projectColumnIds\x12\x14\n" +
+	"\x05query\x18\x04 \x01(\tR\x05query\x12)\n" +
+	"\x10include_archived\x18\x05 \x01(\bR\x0fincludeArchived\x12!\n" +
+	"\finclude_done\x18\x06 \x01(\bR\vincludeDone\x12\x14\n" +
+	"\x05limit\x18\a \x01(\x05R\x05limit\x12+\n" +
+	"\x0fcursor_due_date\x18\b \x01(\tH\x01R\rcursorDueDate\x88\x01\x01\x12/\n" +
+	"\x11cursor_updated_at\x18\t \x01(\tH\x02R\x0fcursorUpdatedAt\x88\x01\x01\x12)\n" +
+	"\x0ecursor_task_id\x18\n" +
+	" \x01(\tH\x03R\fcursorTaskId\x88\x01\x01B\r\n" +
+	"\v_project_idB\x12\n" +
+	"\x10_cursor_due_dateB\x14\n" +
+	"\x12_cursor_updated_atB\x11\n" +
+	"\x0f_cursor_task_id\"6\n" +
+	"\x13SearchTasksResponse\x12\x1f\n" +
+	"\vresult_json\x18\x01 \x01(\fR\n" +
+	"resultJson2\xd7\b\n" +
 	"\vTaskService\x12Y\n" +
 	"\n" +
 	"CreateTask\x12'.projectchat.tasks.v1.CreateTaskRequest\x1a\".projectchat.tasks.v1.TaskResponse\x12[\n" +
 	"\vGetTaskById\x12(.projectchat.tasks.v1.GetTaskByIdRequest\x1a\".projectchat.tasks.v1.TaskResponse\x12r\n" +
-	"\x12GroupTasksByColumn\x12/.projectchat.tasks.v1.GroupTasksByColumnRequest\x1a+.projectchat.tasks.v1.TasksByColumnResponse\x12a\n" +
+	"\x12GroupTasksByColumn\x12/.projectchat.tasks.v1.GroupTasksByColumnRequest\x1a+.projectchat.tasks.v1.TasksByColumnResponse\x12b\n" +
+	"\vSearchTasks\x12(.projectchat.tasks.v1.SearchTasksRequest\x1a).projectchat.tasks.v1.SearchTasksResponse\x12a\n" +
 	"\x0eFindTaskByCode\x12+.projectchat.tasks.v1.FindTaskByCodeRequest\x1a\".projectchat.tasks.v1.TaskResponse\x12U\n" +
 	"\bMoveTask\x12%.projectchat.tasks.v1.MoveTaskRequest\x1a\".projectchat.tasks.v1.TaskResponse\x12Y\n" +
 	"\n" +
@@ -1112,7 +1293,7 @@ func file_projectchat_tasks_v1_tasks_proto_rawDescGZIP() []byte {
 	return file_projectchat_tasks_v1_tasks_proto_rawDescData
 }
 
-var file_projectchat_tasks_v1_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_projectchat_tasks_v1_tasks_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_projectchat_tasks_v1_tasks_proto_goTypes = []any{
 	(*TaskResponse)(nil),              // 0: projectchat.tasks.v1.TaskResponse
 	(*TasksByColumnResponse)(nil),     // 1: projectchat.tasks.v1.TasksByColumnResponse
@@ -1128,30 +1309,34 @@ var file_projectchat_tasks_v1_tasks_proto_goTypes = []any{
 	(*AssignTaskToSelfRequest)(nil),   // 11: projectchat.tasks.v1.AssignTaskToSelfRequest
 	(*CreateTaskCommentRequest)(nil),  // 12: projectchat.tasks.v1.CreateTaskCommentRequest
 	(*ListTaskCommentsRequest)(nil),   // 13: projectchat.tasks.v1.ListTaskCommentsRequest
+	(*SearchTasksRequest)(nil),        // 14: projectchat.tasks.v1.SearchTasksRequest
+	(*SearchTasksResponse)(nil),       // 15: projectchat.tasks.v1.SearchTasksResponse
 }
 var file_projectchat_tasks_v1_tasks_proto_depIdxs = []int32{
 	4,  // 0: projectchat.tasks.v1.TaskService.CreateTask:input_type -> projectchat.tasks.v1.CreateTaskRequest
 	5,  // 1: projectchat.tasks.v1.TaskService.GetTaskById:input_type -> projectchat.tasks.v1.GetTaskByIdRequest
 	6,  // 2: projectchat.tasks.v1.TaskService.GroupTasksByColumn:input_type -> projectchat.tasks.v1.GroupTasksByColumnRequest
-	7,  // 3: projectchat.tasks.v1.TaskService.FindTaskByCode:input_type -> projectchat.tasks.v1.FindTaskByCodeRequest
-	8,  // 4: projectchat.tasks.v1.TaskService.MoveTask:input_type -> projectchat.tasks.v1.MoveTaskRequest
-	9,  // 5: projectchat.tasks.v1.TaskService.UpdateTask:input_type -> projectchat.tasks.v1.UpdateTaskRequest
-	10, // 6: projectchat.tasks.v1.TaskService.MarkTaskDone:input_type -> projectchat.tasks.v1.MarkTaskDoneRequest
-	11, // 7: projectchat.tasks.v1.TaskService.AssignTaskToSelf:input_type -> projectchat.tasks.v1.AssignTaskToSelfRequest
-	12, // 8: projectchat.tasks.v1.TaskService.CreateTaskComment:input_type -> projectchat.tasks.v1.CreateTaskCommentRequest
-	13, // 9: projectchat.tasks.v1.TaskService.ListTaskComments:input_type -> projectchat.tasks.v1.ListTaskCommentsRequest
-	0,  // 10: projectchat.tasks.v1.TaskService.CreateTask:output_type -> projectchat.tasks.v1.TaskResponse
-	0,  // 11: projectchat.tasks.v1.TaskService.GetTaskById:output_type -> projectchat.tasks.v1.TaskResponse
-	1,  // 12: projectchat.tasks.v1.TaskService.GroupTasksByColumn:output_type -> projectchat.tasks.v1.TasksByColumnResponse
-	0,  // 13: projectchat.tasks.v1.TaskService.FindTaskByCode:output_type -> projectchat.tasks.v1.TaskResponse
-	0,  // 14: projectchat.tasks.v1.TaskService.MoveTask:output_type -> projectchat.tasks.v1.TaskResponse
-	0,  // 15: projectchat.tasks.v1.TaskService.UpdateTask:output_type -> projectchat.tasks.v1.TaskResponse
-	0,  // 16: projectchat.tasks.v1.TaskService.MarkTaskDone:output_type -> projectchat.tasks.v1.TaskResponse
-	0,  // 17: projectchat.tasks.v1.TaskService.AssignTaskToSelf:output_type -> projectchat.tasks.v1.TaskResponse
-	2,  // 18: projectchat.tasks.v1.TaskService.CreateTaskComment:output_type -> projectchat.tasks.v1.TaskCommentResponse
-	3,  // 19: projectchat.tasks.v1.TaskService.ListTaskComments:output_type -> projectchat.tasks.v1.TaskCommentsResponse
-	10, // [10:20] is the sub-list for method output_type
-	0,  // [0:10] is the sub-list for method input_type
+	14, // 3: projectchat.tasks.v1.TaskService.SearchTasks:input_type -> projectchat.tasks.v1.SearchTasksRequest
+	7,  // 4: projectchat.tasks.v1.TaskService.FindTaskByCode:input_type -> projectchat.tasks.v1.FindTaskByCodeRequest
+	8,  // 5: projectchat.tasks.v1.TaskService.MoveTask:input_type -> projectchat.tasks.v1.MoveTaskRequest
+	9,  // 6: projectchat.tasks.v1.TaskService.UpdateTask:input_type -> projectchat.tasks.v1.UpdateTaskRequest
+	10, // 7: projectchat.tasks.v1.TaskService.MarkTaskDone:input_type -> projectchat.tasks.v1.MarkTaskDoneRequest
+	11, // 8: projectchat.tasks.v1.TaskService.AssignTaskToSelf:input_type -> projectchat.tasks.v1.AssignTaskToSelfRequest
+	12, // 9: projectchat.tasks.v1.TaskService.CreateTaskComment:input_type -> projectchat.tasks.v1.CreateTaskCommentRequest
+	13, // 10: projectchat.tasks.v1.TaskService.ListTaskComments:input_type -> projectchat.tasks.v1.ListTaskCommentsRequest
+	0,  // 11: projectchat.tasks.v1.TaskService.CreateTask:output_type -> projectchat.tasks.v1.TaskResponse
+	0,  // 12: projectchat.tasks.v1.TaskService.GetTaskById:output_type -> projectchat.tasks.v1.TaskResponse
+	1,  // 13: projectchat.tasks.v1.TaskService.GroupTasksByColumn:output_type -> projectchat.tasks.v1.TasksByColumnResponse
+	15, // 14: projectchat.tasks.v1.TaskService.SearchTasks:output_type -> projectchat.tasks.v1.SearchTasksResponse
+	0,  // 15: projectchat.tasks.v1.TaskService.FindTaskByCode:output_type -> projectchat.tasks.v1.TaskResponse
+	0,  // 16: projectchat.tasks.v1.TaskService.MoveTask:output_type -> projectchat.tasks.v1.TaskResponse
+	0,  // 17: projectchat.tasks.v1.TaskService.UpdateTask:output_type -> projectchat.tasks.v1.TaskResponse
+	0,  // 18: projectchat.tasks.v1.TaskService.MarkTaskDone:output_type -> projectchat.tasks.v1.TaskResponse
+	0,  // 19: projectchat.tasks.v1.TaskService.AssignTaskToSelf:output_type -> projectchat.tasks.v1.TaskResponse
+	2,  // 20: projectchat.tasks.v1.TaskService.CreateTaskComment:output_type -> projectchat.tasks.v1.TaskCommentResponse
+	3,  // 21: projectchat.tasks.v1.TaskService.ListTaskComments:output_type -> projectchat.tasks.v1.TaskCommentsResponse
+	11, // [11:22] is the sub-list for method output_type
+	0,  // [0:11] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
@@ -1168,13 +1353,14 @@ func file_projectchat_tasks_v1_tasks_proto_init() {
 	file_projectchat_tasks_v1_tasks_proto_msgTypes[9].OneofWrappers = []any{}
 	file_projectchat_tasks_v1_tasks_proto_msgTypes[12].OneofWrappers = []any{}
 	file_projectchat_tasks_v1_tasks_proto_msgTypes[13].OneofWrappers = []any{}
+	file_projectchat_tasks_v1_tasks_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_projectchat_tasks_v1_tasks_proto_rawDesc), len(file_projectchat_tasks_v1_tasks_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
