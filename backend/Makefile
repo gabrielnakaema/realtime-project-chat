@@ -3,6 +3,9 @@ ifneq (,$(wildcard ./.env))
 	export
 endif
 
+.PHONY: dev dev-api dev-notification dev-websocket dev-chat dev-tasks dev-mcp dev-relay
+.PHONY: generate-proto goose-up goose-down goose-create
+
 AIR_CONFIG_DIR := dev/air
 
 dev:
