@@ -17,6 +17,7 @@ export const useSearchTasks = (query?: string) => {
       searchQuery: normalizedQuery,
       limit: PAGE_SIZE,
       cursorDueDate: null,
+      cursorTaskId: null,
       cursorUpdatedAt: null,
     }),
     queryFn: ({ pageParam }) =>
@@ -24,19 +25,22 @@ export const useSearchTasks = (query?: string) => {
         searchQuery: normalizedQuery,
         limit: PAGE_SIZE,
         cursorDueDate: pageParam.cursorDueDate,
+        cursorTaskId: pageParam.cursorTaskId,
         cursorUpdatedAt: pageParam.cursorUpdatedAt,
       }),
     enabled: normalizedQuery.length > 0,
     getNextPageParam: (lastPage: CursorPaginated<Task>) => {
       if (!lastPage.has_next) return undefined;
       const last = lastPage.data[lastPage.data.length - 1];
-      return { cursorDueDate: last.due_date, cursorUpdatedAt: last.updated_at };
+      return { cursorDueDate: last.due_date, cursorTaskId: last.id, cursorUpdatedAt: last.updated_at };
     },
     initialPageParam: {
       cursorDueDate: null,
+      cursorTaskId: null,
       cursorUpdatedAt: '',
     } as {
       cursorDueDate: null | string;
+      cursorTaskId: null | string;
       cursorUpdatedAt: string;
     },
   });

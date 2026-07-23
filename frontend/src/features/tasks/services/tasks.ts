@@ -262,6 +262,7 @@ export const listUserDueTasks = async (request: ListUserDueTasksRequest) => {
 
 export interface SearchTasksForUserRequest {
   cursorDueDate: null | string;
+  cursorTaskId: null | string;
   cursorUpdatedAt: null | string;
   limit: number;
   searchQuery: string;
@@ -322,6 +323,9 @@ export const searchTasksForUser = async (request: SearchTasksForUserRequest) => 
   const searchParams = new URLSearchParams();
   if (request.cursorDueDate) {
     searchParams.set('due_date', request.cursorDueDate);
+  }
+  if (request.cursorTaskId) {
+    searchParams.set('task_id', request.cursorTaskId);
   }
   if (request.cursorUpdatedAt) {
     searchParams.set('updated_at', request.cursorUpdatedAt);
