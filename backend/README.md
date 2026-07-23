@@ -59,9 +59,7 @@ This backend demonstrates:
 
 5. **Start development server**
    ```bash
-   air  # Hot reload
-   # or
-   go run ./cmd/api
+   make dev
    ```
 
 ## 🛠️ Available Commands
@@ -79,7 +77,8 @@ sqlc generate              # Generate Go code from SQL
 
 ```bash
 go build -o ./tmp/main ./cmd/api  # Build application
-air                               # Start with hot reload
+make dev-api                      # Start API with hot reload
+make dev                          # Start all services with hot reload
 go run ./cmd/api                  # Run directly
 go mod tidy                       # Clean dependencies
 ```

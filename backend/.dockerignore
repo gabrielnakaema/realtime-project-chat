@@ -1,6 +1,6 @@
 .env
 .env.*
-.air.toml
+dev/air/
 tmp/
 docker-compose.yml
 docker-compose-prod.yml

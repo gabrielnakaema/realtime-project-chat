@@ -3,26 +3,31 @@ ifneq (,$(wildcard ./.env))
 	export
 endif
 
+AIR_CONFIG_DIR := dev/air
+
 dev:
 	goreman start
 
 dev-api:
-	air -c .air.toml
+	air -c $(AIR_CONFIG_DIR)/api.toml
 
 dev-notification:
-	air -c .air.notification.toml
+	air -c $(AIR_CONFIG_DIR)/notification.toml
 
 dev-websocket:
-	air -c .air.websocket.toml
+	air -c $(AIR_CONFIG_DIR)/websocket.toml
 
 dev-chat:
-	air -c .air.chat.toml
+	air -c $(AIR_CONFIG_DIR)/chat.toml
 
 dev-tasks:
-	air -c .air.tasks.toml
+	air -c $(AIR_CONFIG_DIR)/tasks.toml
 
 dev-mcp:
-	air -c .air.mcp.toml
+	air -c $(AIR_CONFIG_DIR)/mcp.toml
+
+dev-relay:
+	air -c $(AIR_CONFIG_DIR)/relay.toml
 
 generate-proto:
 	go run github.com/bufbuild/buf/cmd/buf@v1.57.2 generate
