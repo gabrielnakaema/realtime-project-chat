@@ -70,15 +70,11 @@ export const api = ky.create({
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             failedRequests.push({ resolve, reject });
-          })
-            .then((token) => {
-              request.headers.set('Authorization', `Bearer ${token}`);
-              (options as any).isRetry = true;
-              return ky(request, options);
-            })
-            .catch((err) => {
-              Promise.reject(err);
-            });
+          }).then((token) => {
+            request.headers.set('Authorization', `Bearer ${token}`);
+            (options as any).isRetry = true;
+            return ky(request, options);
+          });
         }
 
         isRefreshing = true;
@@ -96,9 +92,8 @@ export const api = ky.create({
         } catch (error) {
           attemptLogout();
           tokenService.setToken('');
-          failedRequests = [];
-          window.location.reload();
           processQueue(error);
+          window.location.reload();
           throw error;
         } finally {
           isRefreshing = false;
