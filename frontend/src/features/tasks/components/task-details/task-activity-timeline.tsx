@@ -7,7 +7,7 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 import { cn } from '@/lib/utils';
 
 interface TaskActivityTimelineProps {
-  updates: TaskUpdate[];
+  updates?: TaskUpdate[];
 }
 
 export const TaskActivityTimeline = ({ updates = [] }: TaskActivityTimelineProps) => {

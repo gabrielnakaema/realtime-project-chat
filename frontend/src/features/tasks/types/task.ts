@@ -41,7 +41,7 @@ export interface Task {
   author_id: string;
   author: User;
   responsible: User | null;
-  updates: TaskUpdate[];
+  updates?: TaskUpdate[];
   project: Project | null;
 }
 

@@ -228,6 +228,59 @@ describe('reconcileTask', () => {
     expect(archivedInvalidated(queryClient, 'project-1')).toBe(false);
   });
 
+  it('updates an existing task details cache entry', () => {
+    const queryClient = new QueryClient();
+    const currentTask = makeTask('task-1', 'column-pending', {
+      version: 1,
+      title: 'current title',
+      updates: [{ id: 'existing-update' } as NonNullable<Task['updates']>[number]],
+    });
+    seedBoard(queryClient, [currentTask], [], {
+      'column-pending': 1,
+      'column-doing': 0,
+    });
+    queryClient.setQueryData(taskQueryKeys.details(currentTask.id), currentTask);
+
+    reconcileTask(
+      queryClient,
+      makeTask('task-1', 'column-pending', {
+        version: 2,
+        title: 'updated by collaborator',
+        updates: undefined,
+      }),
+    );
+
+    const updatedDetails = queryClient.getQueryData<Task>(taskQueryKeys.details(currentTask.id));
+    expect(updatedDetails?.title).toBe('updated by collaborator');
+    expect(updatedDetails?.updates?.map((update) => update.id)).toEqual(['existing-update']);
+  });
+
+  it('does not create a details cache entry for a task that has not been opened', () => {
+    const queryClient = new QueryClient();
+    seedBoard(queryClient, [], [], {
+      'column-pending': 0,
+      'column-doing': 0,
+    });
+
+    reconcileTask(queryClient, makeTask('task-1', 'column-pending', { version: 1 }));
+
+    expect(queryClient.getQueryData(taskQueryKeys.details('task-1'))).toBeUndefined();
+  });
+
+  it('does not roll task details back when a stale event arrives', () => {
+    const queryClient = new QueryClient();
+    const currentTask = makeTask('task-1', 'column-pending', { version: 3, title: 'current title' });
+    seedBoard(queryClient, [currentTask], [], {
+      'column-pending': 1,
+      'column-doing': 0,
+    });
+    queryClient.setQueryData(taskQueryKeys.details(currentTask.id), currentTask);
+
+    reconcileTask(queryClient, makeTask('task-1', 'column-pending', { version: 2, title: 'stale title' }));
+
+    expect(queryClient.getQueryData<Task>(taskQueryKeys.details(currentTask.id))?.title).toBe('current title');
+  });
+
   it('moves a task across columns and invalidates counts', () => {
     const queryClient = new QueryClient();
     seedBoard(queryClient, [makeTask('task-1', 'column-pending', { version: 1 })], [], {

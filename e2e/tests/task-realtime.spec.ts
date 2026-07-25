@@ -105,3 +105,89 @@ test("project collaborators see task creation and movement on their board in rea
 
   await memberPage.context().close();
 });
+
+test("an open task details dialog updates when a collaborator edits the task", async ({
+  authenticatedPage: ownerPage,
+  backendURL,
+  browser,
+  request,
+}) => {
+  const member = await registerUser(request, backendURL, {
+    name: "Realtime Task Editor",
+  });
+  const memberPage = await loginAsUser(browser, member);
+  const projectName = `E2E Realtime Task Details Project ${crypto.randomUUID()}`;
+  const taskTitle = `E2E Realtime Task Details ${crypto.randomUUID()}`;
+  const updatedTaskTitle = `${taskTitle} updated`;
+
+  await ownerPage.getByRole("button", { name: "New project" }).first().click();
+  const createProjectDialog = ownerPage.getByRole("dialog", {
+    name: "Create project",
+  });
+  await createProjectDialog.locator("#name").fill(projectName);
+  await createProjectDialog
+    .locator("#description")
+    .pressSequentially("Created by the real-time task details e2e test.");
+  await createProjectDialog
+    .getByRole("button", { name: "Create project" })
+    .click();
+  await expectToast(ownerPage, "Project created successfully");
+
+  await ownerPage.getByRole("link", { name: projectName }).click();
+  const projectId = ownerPage.url().split("/projects/")[1];
+  await addProjectMember(ownerPage, member.email);
+
+  await ownerPage.reload();
+  await memberPage.goto(`/projects/${projectId}`);
+  await expect(
+    memberPage.getByRole("button", { name: projectName, exact: true }),
+  ).toBeVisible();
+
+  await ownerPage
+    .getByRole("button", { name: "Open actions for Doing" })
+    .click();
+  await ownerPage.getByRole("menuitem", { name: "Add task" }).click();
+  const createTaskDialog = ownerPage.getByRole("dialog", {
+    name: "Create task",
+  });
+  await createTaskDialog.locator("#title").fill(taskTitle);
+  await createTaskDialog
+    .locator("#description")
+    .pressSequentially("A task whose open details should update in real time.");
+  await createTaskDialog.locator("#priority").click();
+  await ownerPage.getByRole("option", { name: "Medium", exact: true }).click();
+  await createTaskDialog.getByRole("button", { name: "Create task" }).click();
+  await expectToast(ownerPage, "Task created successfully");
+
+  await expect(
+    boardColumn(memberPage, "Doing").getByText(taskTitle, { exact: true }),
+  ).toBeVisible({ timeout: 15_000 });
+
+  await ownerPage.getByText(taskTitle, { exact: true }).click();
+  const ownerTaskDetails = ownerPage.getByRole("dialog", { name: taskTitle });
+  await expect(ownerTaskDetails).toBeVisible();
+
+  await memberPage.getByText(taskTitle, { exact: true }).click();
+  const memberTaskDetails = memberPage.getByRole("dialog", { name: taskTitle });
+  await memberTaskDetails.getByRole("button", { name: "Edit task" }).click();
+
+  const editTaskDialog = memberPage.getByRole("dialog", { name: "Edit task" });
+  await editTaskDialog.locator("#title").fill(updatedTaskTitle);
+  await editTaskDialog.locator("#priority").click();
+  await memberPage.getByRole("option", { name: "High", exact: true }).click();
+  await editTaskDialog.getByRole("button", { name: "Save changes" }).click();
+  await expectToast(memberPage, "Task updated successfully");
+
+  const updatedOwnerTaskDetails = ownerPage.getByRole("dialog", {
+    name: updatedTaskTitle,
+  });
+  await expect(updatedOwnerTaskDetails).toBeVisible({ timeout: 15_000 });
+  await expect(
+    updatedOwnerTaskDetails
+      .getByText("Priority", { exact: true })
+      .locator("..")
+      .getByText("High", { exact: true }),
+  ).toBeVisible();
+
+  await memberPage.context().close();
+});
