@@ -1,32 +1,13 @@
 import crypto from "node:crypto";
 import {
+  createProjectThroughUI,
   expect,
-  expectToast,
   test,
 } from "../src/fixtures/authenticated-page.js";
-import type { Locator, Page } from "@playwright/test";
-
-async function fillRichText(editor: Locator, page: Page, value: string) {
-  await editor.click();
-  await page.keyboard.press(
-    process.platform === "darwin" ? "Meta+A" : "Control+A"
-  );
-  await editor.pressSequentially(value);
-}
+import type { Page } from "@playwright/test";
 
 async function createProject(page: Page, name: string) {
-  await page.getByRole("button", { name: "New project" }).first().click();
-
-  const createDialog = page.getByRole("dialog", { name: "Create project" });
-  await createDialog.locator("#name").fill(name);
-  await fillRichText(
-    createDialog.locator("#description"),
-    page,
-    "Project created by the task pagination e2e test"
-  );
-  await createDialog.getByRole("button", { name: "Create project" }).click();
-
-  await expectToast(page, "Project created successfully");
+  await createProjectThroughUI(page, name);
   await page.getByRole("link", { name: new RegExp(name) }).click();
   await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
 }

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import {
+  createProjectThroughUI,
   expect,
   expectToast,
   test,
@@ -16,18 +17,9 @@ async function fillRichText(editor: Locator, page: Page, value: string) {
 }
 
 async function createProject(page: Page, name: string) {
-  await page.getByRole("button", { name: "New project" }).first().click();
-
-  const createDialog = page.getByRole("dialog", { name: "Create project" });
-  await createDialog.locator("#name").fill(name);
-  await fillRichText(
-    createDialog.locator("#description"),
-    page,
-    "Project created by the task creation e2e test"
-  );
-  await createDialog.getByRole("button", { name: "Create project" }).click();
-
-  await expectToast(page, "Project created successfully");
+  await createProjectThroughUI(page, name, {
+    description: "Project created by the task creation e2e test",
+  });
   await page.getByRole("link", { name: new RegExp(name) }).click();
   await expect(page.getByRole("button", { name, exact: true })).toBeVisible();
 }

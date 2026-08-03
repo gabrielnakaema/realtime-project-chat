@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import {
   addProjectMember,
+  createProjectThroughUI,
   expect,
   expectToast,
   loginAsUser,
@@ -30,18 +31,9 @@ test("project collaborators see task creation and movement on their board in rea
   const projectName = `E2E Realtime Task Project ${crypto.randomUUID()}`;
   const taskTitle = `E2E Realtime Task ${crypto.randomUUID()}`;
 
-  await ownerPage.getByRole("button", { name: "New project" }).first().click();
-  const createProjectDialog = ownerPage.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(ownerPage, projectName, {
+    description: "Created by the real-time task board e2e test.",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the real-time task board e2e test.");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(ownerPage, "Project created successfully");
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   const projectId = ownerPage.url().split("/projects/")[1];
@@ -120,18 +112,9 @@ test("an open task details dialog updates when a collaborator edits the task", a
   const taskTitle = `E2E Realtime Task Details ${crypto.randomUUID()}`;
   const updatedTaskTitle = `${taskTitle} updated`;
 
-  await ownerPage.getByRole("button", { name: "New project" }).first().click();
-  const createProjectDialog = ownerPage.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(ownerPage, projectName, {
+    description: "Created by the real-time task details e2e test.",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the real-time task details e2e test.");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(ownerPage, "Project created successfully");
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   const projectId = ownerPage.url().split("/projects/")[1];

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import {
+  createProjectThroughUI,
   expect,
   expectToast,
   test,
@@ -12,19 +13,9 @@ test("project owner sees task creation in recent activity and can return to the 
   const projectName = `E2E Activity Project ${crypto.randomUUID()}`;
   const taskTitle = `E2E Activity Task ${crypto.randomUUID()}`;
 
-  await page.getByRole("button", { name: "New project" }).first().click();
-
-  const createProjectDialog = page.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(page, projectName, {
+    description: "Created by the project activity e2e test",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the project activity e2e test");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(page, "Project created successfully");
 
   await page.getByRole("link", { name: projectName }).click();
   await page.getByRole("button", { name: "Open actions for Doing" }).click();
@@ -69,18 +60,9 @@ test("project owner sees a task move in recent activity and can return to the pr
   const projectName = `E2E Updated Activity Project ${crypto.randomUUID()}`;
   const taskTitle = `E2E Updated Activity Task ${crypto.randomUUID()}`;
 
-  await page.getByRole("button", { name: "New project" }).first().click();
-  const createProjectDialog = page.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(page, projectName, {
+    description: "Created by the task update activity e2e test.",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the task update activity e2e test.");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(page, "Project created successfully");
 
   await page.getByRole("link", { name: projectName }).click();
   await page.getByRole("button", { name: "Open actions for Doing" }).click();

@@ -4,6 +4,7 @@ import { registerUser } from "../src/fixtures/test-user.js";
 import {
   addProjectMember,
   backendURL,
+  createProjectThroughUI,
   expectToast,
   loginAsUser,
   openProjectMembersSettings,
@@ -21,17 +22,9 @@ test("a chat message sent by one member appears for another member in real time"
 
   const projectName = `E2E Project ${crypto.randomUUID()}`;
 
-  await pageA.getByRole("button", { name: "New project" }).first().click();
-  await pageA.locator("#name").fill(projectName);
-  await pageA.locator("#description").click();
-  await pageA
-    .locator("#description")
-    .pressSequentially("Created by the chat-realtime e2e test");
-  await pageA
-    .getByRole("dialog")
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(pageA, "Project created successfully");
+  await createProjectThroughUI(pageA, projectName, {
+    description: "Created by the chat-realtime e2e test",
+  });
 
   await pageA.getByRole("link", { name: projectName }).click();
   await expect(pageA).toHaveURL(/\/projects\/[^/]+$/);
@@ -111,18 +104,9 @@ test("project collaborators can start a direct message and receive it in real ti
   const pageB = await loginAsUser(browser, userB);
 
   const projectName = `E2E Direct Message Project ${crypto.randomUUID()}`;
-  await pageA.getByRole("button", { name: "New project" }).first().click();
-  const createProjectDialog = pageA.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(pageA, projectName, {
+    description: "Created by the direct-message e2e test",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the direct-message e2e test");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(pageA, "Project created successfully");
 
   await pageA.getByRole("link", { name: projectName }).click();
   await addProjectMember(pageA, userB.email);
@@ -202,18 +186,9 @@ test("project collaborators can start a group message and all recipients receive
   const pageC = await loginAsUser(browser, userC);
   const projectName = `E2E Group Message Project ${crypto.randomUUID()}`;
 
-  await pageA.getByRole("button", { name: "New project" }).first().click();
-  const createProjectDialog = pageA.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(pageA, projectName, {
+    description: "Created by the group-message e2e test",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the group-message e2e test");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(pageA, "Project created successfully");
 
   await pageA.getByRole("link", { name: projectName }).click();
   await openProjectMembersSettings(pageA);

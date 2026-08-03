@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import {
   addProjectMember,
+  createProjectThroughUI,
   expect,
   expectToast,
   loginAsUser,
@@ -31,20 +32,9 @@ test("project collaborators receive new task comments in an open task in real ti
   const taskTitle = `E2E Realtime Comments Task ${crypto.randomUUID()}`;
   const commentText = `E2E live comment ${crypto.randomUUID()}`;
 
-  await ownerPage.getByRole("button", { name: "New project" }).first().click();
-  const createProjectDialog = ownerPage.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(ownerPage, projectName, {
+    description: "Created by the real-time task comments e2e test.",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await fillRichText(
-    createProjectDialog.locator("#description"),
-    ownerPage,
-    "Created by the real-time task comments e2e test."
-  );
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(ownerPage, "Project created successfully");
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   const projectId = ownerPage.url().split("/projects/")[1];

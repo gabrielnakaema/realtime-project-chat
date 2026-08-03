@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import {
   addProjectMember,
+  createProjectThroughUI,
   expect,
   expectToast,
   loginAsUser,
@@ -21,18 +22,9 @@ test("new project member receives a notification and can open the project", asyn
   const memberPage = await loginAsUser(browser, member);
   const projectName = `E2E Member Notification Project ${crypto.randomUUID()}`;
 
-  await ownerPage.getByRole("button", { name: "New project" }).first().click();
-  const createProjectDialog = ownerPage.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(ownerPage, projectName, {
+    description: "Created by the project-member notification e2e test.",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the project-member notification e2e test.");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(ownerPage, "Project created successfully");
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   await addProjectMember(ownerPage, member.email);
@@ -67,21 +59,9 @@ test("user can mark all project notifications as read and the state persists", a
   const secondProjectName = `E2E Notification Inbox Two ${crypto.randomUUID()}`;
 
   const addMemberToNewProject = async (projectName: string) => {
-    await ownerPage
-      .getByRole("button", { name: "New project" })
-      .first()
-      .click();
-    const createProjectDialog = ownerPage.getByRole("dialog", {
-      name: "Create project",
+    await createProjectThroughUI(ownerPage, projectName, {
+      description: "Created by the notification inbox e2e test.",
     });
-    await createProjectDialog.locator("#name").fill(projectName);
-    await createProjectDialog
-      .locator("#description")
-      .pressSequentially("Created by the notification inbox e2e test.");
-    await createProjectDialog
-      .getByRole("button", { name: "Create project" })
-      .click();
-    await expectToast(ownerPage, "Project created successfully");
 
     await ownerPage.getByRole("link", { name: projectName }).click();
     await addProjectMember(ownerPage, member.email);
@@ -156,19 +136,9 @@ test("assigned project collaborator receives a notification and can open the tas
   const projectName = `E2E Notification Project ${crypto.randomUUID()}`;
   const taskTitle = `E2E Assigned Task ${crypto.randomUUID()}`;
 
-  await ownerPage.getByRole("button", { name: "New project" }).first().click();
-
-  const createProjectDialog = ownerPage.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(ownerPage, projectName, {
+    description: "Created by the notification e2e test",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the notification e2e test");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(ownerPage, "Project created successfully");
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   await addProjectMember(ownerPage, member.email);
@@ -224,18 +194,9 @@ test("task author receives a comment notification and opens the commented task",
   const taskTitle = `E2E Commented Task ${crypto.randomUUID()}`;
   const commentText = `E2E notification comment ${crypto.randomUUID()}`;
 
-  await ownerPage.getByRole("button", { name: "New project" }).first().click();
-  const createProjectDialog = ownerPage.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(ownerPage, projectName, {
+    description: "Created by the comment notification e2e test.",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the comment notification e2e test.");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(ownerPage, "Project created successfully");
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   const projectId = ownerPage.url().split("/projects/")[1];

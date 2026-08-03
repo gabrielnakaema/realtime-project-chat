@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import {
   addProjectMember,
+  createProjectThroughUI,
   test,
   expect,
   expectToast,
@@ -45,17 +46,6 @@ async function openSettingsColumn(container: Locator, name: string) {
     .click();
 }
 
-async function createProject(page: Page, name: string, description: string) {
-  await page.getByRole("button", { name: "New project" }).first().click();
-
-  const createDialog = page.getByRole("dialog", { name: "Create project" });
-  await createDialog.locator("#name").fill(name);
-  await fillRichText(createDialog.locator("#description"), page, description);
-  await createDialog.getByRole("button", { name: "Create project" }).click();
-
-  await expectToast(page, "Project created successfully");
-}
-
 function boardColumnHeadings(page: Page, names: string[]) {
   return page
     .getByRole("heading", { level: 3 })
@@ -81,11 +71,9 @@ test.describe("projects", () => {
     const memberPage = await loginAsUser(browser, member);
     const projectName = `E2E Membership ${crypto.randomUUID()}`;
 
-    await createProject(
-      ownerPage,
-      projectName,
-      "Created by the project membership e2e test"
-    );
+    await createProjectThroughUI(ownerPage, projectName, {
+      description: "Created by the project membership e2e test",
+    });
     await expect(projectListLink(memberPage, projectName)).toHaveCount(0);
 
     await projectListLink(ownerPage, projectName).click();
@@ -181,11 +169,9 @@ test.describe("projects", () => {
   }) => {
     const projectName = `E2E Project Search ${crypto.randomUUID()}`;
 
-    await createProject(
-      page,
-      projectName,
-      "Created by the project search e2e test"
-    );
+    await createProjectThroughUI(page, projectName, {
+      description: "Created by the project search e2e test",
+    });
 
     const searchInput = page.getByRole("searchbox", {
       name: "Search projects and tasks",
@@ -226,45 +212,26 @@ test.describe("projects", () => {
     const customColumnName = "Review";
     const customColumnDescription = "Validate work before it is done.";
 
-    await page.getByRole("button", { name: "New project" }).first().click();
-
-    const createDialog = page.getByRole("dialog", { name: "Create project" });
-    await createDialog.locator("#name").fill(projectName);
-    await fillRichText(
-      createDialog.locator("#description"),
-      page,
-      projectDescription
-    );
-    await createDialog.locator("#repository_url").fill(repositoryURL);
-    await createDialog.locator("#repository_owner").fill(repositoryOwner);
-    await createDialog.locator("#repository_name").fill(repositoryName);
-    await createDialog.locator("#default_branch").fill(defaultBranch);
-    await createDialog.locator("#branch_name_prefix").fill(branchNamePrefix);
-
-    await createDialog.getByRole("button", { name: "Add column" }).click();
-    await createDialog.locator("#column-3").fill(customColumnName);
-    await createDialog
-      .locator("#column-description-3")
-      .fill(customColumnDescription);
-    await markColumnAsDone(createDialog, 3);
-
-    await expect(
-      createDialog.getByRole("button", { name: "Done column" })
-    ).toHaveCount(1);
-    await expect(
-      columnEditor(createDialog, 3).getByRole("button", {
-        name: "Done column",
-      })
-    ).toBeVisible();
-    await expect(
-      columnEditor(createDialog, 2).getByRole("button", {
-        name: "Mark as done",
-      })
-    ).toBeVisible();
-
-    await createDialog.getByRole("button", { name: "Create project" }).click();
-
-    await expectToast(page, "Project created successfully");
+    await createProjectThroughUI(page, projectName, {
+      description: projectDescription,
+      repository: {
+        url: repositoryURL,
+        owner: repositoryOwner,
+        name: repositoryName,
+        defaultBranch,
+        branchNamePrefix,
+      },
+      columns: [
+        { name: "Pending" },
+        { name: "Doing" },
+        { name: "Done" },
+        {
+          name: customColumnName,
+          description: customColumnDescription,
+          isDone: true,
+        },
+      ],
+    });
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
 
     await expect(page.getByRole("button", { name: projectName })).toBeVisible();
@@ -354,18 +321,9 @@ test.describe("projects", () => {
     const addedColumnName = "QA";
     const addedColumnDescription = "Quality checks before completion.";
 
-    await page.getByRole("button", { name: "New project" }).first().click();
-
-    const createDialog = page.getByRole("dialog", { name: "Create project" });
-    await createDialog.locator("#name").fill(projectName);
-    await fillRichText(
-      createDialog.locator("#description"),
-      page,
-      projectDescription
-    );
-    await createDialog.getByRole("button", { name: "Create project" }).click();
-
-    await expectToast(page, "Project created successfully");
+    await createProjectThroughUI(page, projectName, {
+      description: projectDescription,
+    });
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
     await expect(page.getByRole("button", { name: projectName })).toBeVisible();
 
@@ -442,11 +400,9 @@ test.describe("projects", () => {
       "Work that is ready to count as completed.";
     const updatedColumnColor = "#7c3aed";
 
-    await createProject(
-      page,
-      projectName,
-      "Created by the direct column editing e2e test"
-    );
+    await createProjectThroughUI(page, projectName, {
+      description: "Created by the direct column editing e2e test",
+    });
     await projectListLink(page, projectName).click();
     await expect(page.getByRole("button", { name: projectName })).toBeVisible();
 
@@ -517,11 +473,9 @@ test.describe("projects", () => {
   }) => {
     const projectName = `E2E Column Order ${crypto.randomUUID()}`;
 
-    await createProject(
-      page,
-      projectName,
-      "Created by the project column ordering e2e test"
-    );
+    await createProjectThroughUI(page, projectName, {
+      description: "Created by the project column ordering e2e test",
+    });
 
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
     await expect(page.getByRole("button", { name: projectName })).toBeVisible();
@@ -560,11 +514,9 @@ test.describe("projects", () => {
   }) => {
     const projectName = `E2E Column Delete ${crypto.randomUUID()}`;
 
-    await createProject(
-      page,
-      projectName,
-      "Created by the project column deletion e2e test"
-    );
+    await createProjectThroughUI(page, projectName, {
+      description: "Created by the project column deletion e2e test",
+    });
 
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
     await expect(page.getByRole("button", { name: projectName })).toBeVisible();
@@ -608,11 +560,9 @@ test.describe("projects", () => {
     const projectName = `E2E Column Reassignment ${crypto.randomUUID()}`;
     const taskTitle = `E2E Reassigned Task ${crypto.randomUUID()}`;
 
-    await createProject(
-      page,
-      projectName,
-      "Created by the populated column deletion e2e test"
-    );
+    await createProjectThroughUI(page, projectName, {
+      description: "Created by the populated column deletion e2e test",
+    });
 
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
     await expect(page.getByRole("button", { name: projectName })).toBeVisible();
@@ -676,18 +626,9 @@ test.describe("projects", () => {
     const defaultBranch = "release";
     const branchNamePrefix = "e2e/settings/";
 
-    await page.getByRole("button", { name: "New project" }).first().click();
-
-    const createDialog = page.getByRole("dialog", { name: "Create project" });
-    await createDialog.locator("#name").fill(projectName);
-    await fillRichText(
-      createDialog.locator("#description"),
-      page,
-      projectDescription
-    );
-    await createDialog.getByRole("button", { name: "Create project" }).click();
-
-    await expectToast(page, "Project created successfully");
+    await createProjectThroughUI(page, projectName, {
+      description: projectDescription,
+    });
     await expect(
       page.getByRole("link", { name: new RegExp(projectName) })
     ).toBeVisible();
@@ -752,11 +693,9 @@ test.describe("projects", () => {
   }) => {
     const projectName = `E2E Project Delete ${crypto.randomUUID()}`;
 
-    await createProject(
-      page,
-      projectName,
-      "Created by the project deletion e2e test"
-    );
+    await createProjectThroughUI(page, projectName, {
+      description: "Created by the project deletion e2e test",
+    });
 
     await page.getByRole("link", { name: new RegExp(projectName) }).click();
     await expect(page.getByRole("button", { name: projectName })).toBeVisible();
