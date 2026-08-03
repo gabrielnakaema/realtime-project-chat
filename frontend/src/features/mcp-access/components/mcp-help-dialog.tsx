@@ -1,6 +1,5 @@
 import { CircleQuestionMark } from 'lucide-react';
 import { useState } from 'react';
-import { Button } from '../../../components/button';
 import {
   Dialog,
   DialogContent,
@@ -8,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../../shared/components/ui/dialog';
+import { Button } from '@/shared/components/button';
 
 const helpCodeBlockClassName = 'overflow-x-auto rounded-xl border border-border bg-muted p-3 font-mono text-sm  ';
 
@@ -18,7 +18,7 @@ export const MCPHelpDialog = ({ serverUrl, rawSecret }: { serverUrl: string; raw
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+      <Button type="button" variant="outline" onClick={() => setOpen(true)}>
         <CircleQuestionMark className="h-4 w-4" />
         Help
       </Button>

@@ -12,10 +12,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/components/ui/dialog';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
+import { Button } from '@/shared/components/button';
+import { Input } from '@/shared/components/input';
 import { LoadingSpinner } from '@/shared/components/loading';
-import { Textarea } from '@/components/textarea';
+import { Input as Textarea } from '@/shared/components/textarea';
 import { editColumnSchema } from '@/features/projects/schemas/edit-column.schema';
 import { invalidateProjectBoardData } from '@/features/projects/services/project-board-invalidation';
 import { updateProjectColumn } from '@/features/projects/services/projects';
@@ -103,6 +103,7 @@ export const EditColumnDialog = ({ column, open, onOpenChange }: EditColumnDialo
           <Textarea
             id={`column-description-${column.id}`}
             label="Column description"
+            classNames={{ input: 'min-h-32 py-2' }}
             rows={4}
             placeholder="Optional guidance or instructions for this column."
             error={errors.description?.message}
@@ -139,7 +140,7 @@ export const EditColumnDialog = ({ column, open, onOpenChange }: EditColumnDialo
 
           <div className="border-border flex items-center justify-end gap-3 border-t pt-4">
             <DialogClose asChild>
-              <Button type="button" variant="secondary">
+              <Button type="button" variant="outline">
                 Cancel
               </Button>
             </DialogClose>

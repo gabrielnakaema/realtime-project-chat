@@ -6,7 +6,7 @@ import { TaskCodeBadge } from '../task-code-badge';
 import { formatTaskDependencyLabel } from './task-form-utils';
 import type { ITaskForm } from '@/features/tasks/schemas/task.schema';
 import type { TaskDependencyRef } from '@/features/tasks/types/task';
-import { Button } from '@/components/button';
+import { Button } from '@/shared/components/button';
 import { LoadingSpinner } from '@/shared/components/loading';
 import {
   Command,
@@ -134,7 +134,7 @@ export const TaskDependencyPicker = ({
               <PopoverTrigger asChild>
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   className="border-border bg-card text-foreground hover:bg-muted w-full justify-between border"
                 >
                   <span>{selectedTasks.length > 0 ? 'Add another dependency' : 'Search tasks to depend on'}</span>

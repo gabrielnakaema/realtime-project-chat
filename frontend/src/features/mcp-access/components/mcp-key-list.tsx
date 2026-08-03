@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { Pencil, RefreshCcw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Button } from '../../../components/button';
 import { CreateMCPKeyButton } from './create-mcp-key-dialog';
 import { EditMCPKeyDialog } from './edit-mcp-key-dialog';
 import { formatMCPAPIKeyLastUsed, getMCPAccessScopeLabel, sortMCPAPIKeys } from './mcp-access-utils';
 import { RevokeMCPKeyDialog } from './revoke-mcp-key-dialog';
 import type { MCPAPIAvailableScope, MCPAPIKey } from '@/features/mcp-access/services/mcp-api-keys';
+import { Button } from '@/shared/components/button';
 import { LoadingSpinner } from '@/shared/components/loading';
 import { formatDateTime } from '@/shared/utils/date';
 import { mcpAPIKeyQueryKeys } from '@/shared/services/query-keys';
@@ -62,7 +62,7 @@ const MCPKeyListContent = () => {
           <p className="text-destructive font-semibold">Could not load your MCP keys</p>
           <p className="text-destructive text-sm">Retry to fetch the current list and continue managing access.</p>
         </div>
-        <Button type="button" variant="secondary" onClick={() => refetch()}>
+        <Button type="button" variant="outline" onClick={() => refetch()}>
           <RefreshCcw className="h-4 w-4" />
           Retry
         </Button>
@@ -124,13 +124,13 @@ const MCPKeyCard = ({ keyData, availableScopes }: { keyData: MCPAPIKey; availabl
 
           {!isRevoked && (
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" variant="secondary" onClick={() => setEditDialogOpen(true)}>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(true)}>
                 <Pencil className="h-4 w-4" />
                 Edit
               </Button>
               <Button
                 type="button"
-                variant="secondary"
+                variant="outline"
                 className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
                 onClick={() => setRevokeDialogOpen(true)}
               >

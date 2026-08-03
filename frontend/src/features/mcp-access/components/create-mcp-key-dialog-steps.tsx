@@ -1,5 +1,4 @@
 import { AlertTriangle, Check, Copy } from 'lucide-react';
-import { Button } from '../../../components/button';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +9,7 @@ import {
 } from '../../../shared/components/ui/dialog';
 import { MCPHelpDialog } from './mcp-help-dialog';
 import type { CopyType } from '../hooks/use-create-mcp-key-dialog';
+import { Button } from '@/shared/components/button';
 
 interface CreateMCPKeyRevealStepProps {
   copiedValue: CopyType | null;
@@ -100,7 +100,7 @@ export const DismissRevealPromptDialog = ({ onCloseAnyway, onKeepOpen, open }: D
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button type="button" variant="secondary" onClick={onKeepOpen}>
+          <Button type="button" variant="outline" onClick={onKeepOpen}>
             Keep this open
           </Button>
           <Button type="button" onClick={onCloseAnyway}>
@@ -140,7 +140,7 @@ const CopyableSecretCard = ({
           <p className="text-foreground text-sm font-semibold">{label}</p>
           <p className="text-muted-foreground text-sm">{helperText}</p>
         </div>
-        <Button type="button" variant="secondary" className="shrink-0" onClick={() => void onCopy(value, copyType)}>
+        <Button type="button" variant="outline" className="shrink-0" onClick={() => void onCopy(value, copyType)}>
           {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {isCopied ? 'Copied' : copyLabel}
         </Button>

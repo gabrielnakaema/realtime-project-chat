@@ -1,7 +1,7 @@
 import { SendHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import type { SubmitTaskComment } from './use-task-comments';
-import { Button } from '@/components/button';
+import { Button } from '@/shared/components/button';
 import { LoadingSpinner } from '@/shared/components/loading';
 import { TextEditor } from '@/shared/components/text-editor';
 import { isHtmlContentEmpty } from '@/shared/utils/html';

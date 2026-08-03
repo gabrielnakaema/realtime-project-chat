@@ -3,7 +3,7 @@ import { getProjectColumnKey } from './project-form-utils';
 import { ProjectColumnsEditor } from './project-columns-editor';
 import type { IProjectForm } from '@/features/projects/schemas/project.schema';
 import type { ProjectColumn } from '@/features/projects/types/project';
-import { Input } from '@/components/input';
+import { Input } from '@/shared/components/input';
 import { TextEditor } from '@/shared/components/text-editor';
 import { buildProjectColumnSurface } from '@/features/projects/utils/project-column-colors';
 

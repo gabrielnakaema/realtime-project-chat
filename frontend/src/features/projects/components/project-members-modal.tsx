@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ShieldUser, Trash, User, Users } from 'lucide-react';
 import { useState } from 'react';
 import type { Member, Project } from '@/features/projects/types/project';
-import { Button } from '@/components/button';
+import { Button } from '@/shared/components/button';
 import { LoadingSpinner } from '@/shared/components/loading';
 import {
   Dialog,
@@ -75,7 +75,7 @@ export const ProjectMembersModal = ({ project }: ProjectMembersModalProps) => {
             Are you sure you want to remove {removingMember.user.name} from the project?
           </DialogDescription>
           <DialogFooter>
-            <Button variant="secondary" onClick={() => setRemovingMember(null)}>
+            <Button variant="outline" onClick={() => setRemovingMember(null)}>
               Cancel
             </Button>
             <Button onClick={confirmRemoveMember} disabled={isPending}>

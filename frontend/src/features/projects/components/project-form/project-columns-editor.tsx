@@ -2,10 +2,10 @@ import { ArrowDown, ArrowUp, CheckCircle2, Flag, Plus, RotateCcw, Trash2 } from 
 import { createDefaultProjectColumns } from './project-form-utils';
 import type { IProjectForm } from '@/features/projects/schemas/project.schema';
 import type { ProjectColumn } from '@/features/projects/types/project';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
+import { Button } from '@/shared/components/button';
+import { Input } from '@/shared/components/input';
 import { Select } from '@/shared/components/select';
-import { Textarea } from '@/components/textarea';
+import { Input as Textarea } from '@/shared/components/textarea';
 import { cn } from '@/lib/utils';
 import {
   buildProjectColumnSurface,
@@ -138,7 +138,7 @@ export const ProjectColumnsEditor = ({
           {mode === 'create' && (
             <Button
               type="button"
-              variant="secondary"
+              variant="outline"
               className="px-3 py-2 text-sm"
               onClick={() => onChange(createDefaultProjectColumns())}
             >
@@ -148,7 +148,7 @@ export const ProjectColumnsEditor = ({
           )}
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             className="px-3 py-2 text-sm whitespace-nowrap"
             onClick={() =>
               onChange([
@@ -225,6 +225,7 @@ export const ProjectColumnsEditor = ({
                     <Textarea
                       id={`column-description-${index}`}
                       label="Column description"
+                      classNames={{ input: 'min-h-32 py-2' }}
                       rows={3}
                       value={column.description}
                       onChange={(event) => updateColumn(index, { description: event.target.value })}
@@ -270,7 +271,7 @@ export const ProjectColumnsEditor = ({
                 <div className="flex items-center gap-2 lg:pt-7">
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="outline"
                     className="px-3 py-2"
                     aria-label={`Move ${columnLabel} up`}
                     onClick={() => moveColumn(index, -1)}
@@ -280,7 +281,7 @@ export const ProjectColumnsEditor = ({
                   </Button>
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="outline"
                     className="px-3 py-2"
                     aria-label={`Move ${columnLabel} down`}
                     onClick={() => moveColumn(index, 1)}
@@ -290,7 +291,7 @@ export const ProjectColumnsEditor = ({
                   </Button>
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="outline"
                     className="px-3 py-2"
                     aria-label={`Delete ${columnLabel}`}
                     onClick={() => removeColumn(index)}
@@ -345,7 +346,7 @@ export const ProjectColumnsEditor = ({
 
                     <Button
                       type="button"
-                      variant="secondary"
+                      variant="outline"
                       className="px-3 py-2"
                       onClick={() => restoreRemovedColumn(removedColumn)}
                     >

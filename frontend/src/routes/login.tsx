@@ -4,12 +4,12 @@ import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
 import type { SubmitHandler } from 'react-hook-form';
 import type { ILoginForm } from '@/features/auth/schemas/login.schema';
-import { Input } from '@/components/input';
+import { Input } from '@/shared/components/input';
 import { loginSchema } from '@/features/auth/schemas/login.schema';
 import { login } from '@/features/auth/services/auth';
 import { LoadingSpinner } from '@/shared/components/loading';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { Button } from '@/components/button';
+import { Button } from '@/shared/components/button';
 
 export const Route = createFileRoute('/login')({
   component: RouteComponent,

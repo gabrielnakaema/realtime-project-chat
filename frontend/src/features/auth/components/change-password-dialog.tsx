@@ -3,8 +3,6 @@ import { useMutation } from '@tanstack/react-query';
 import { KeyRound } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useState } from 'react';
-import { Button } from '../../../components/button';
-import { Input } from '../../../components/input';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +12,8 @@ import {
   DialogTitle,
 } from '../../../shared/components/ui/dialog';
 import type { IChangePasswordForm } from '@/features/auth/schemas/change-password.schema';
+import { Button } from '@/shared/components/button';
+import { Input } from '@/shared/components/input';
 import { LoadingSpinner } from '@/shared/components/loading';
 import { changePasswordSchema } from '@/features/auth/schemas/change-password.schema';
 import { changePassword } from '@/features/auth/services/users';
@@ -115,7 +115,7 @@ export const ChangePasswordDialog = ({ open, onOpenChange }: ChangePasswordDialo
           </div>
 
           <DialogFooter className="border-border bg-muted/80 border-t px-6 py-4">
-            <Button type="button" variant="secondary" onClick={closeDialog}>
+            <Button type="button" variant="outline" onClick={closeDialog}>
               Cancel
             </Button>
             <Button type="submit" disabled={changePasswordMutation.isPending}>
