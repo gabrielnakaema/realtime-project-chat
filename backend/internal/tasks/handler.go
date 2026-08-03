@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gabrielnakaema/project-chat/internal/domain"
 	"github.com/gabrielnakaema/project-chat/internal/platform/auth"
@@ -13,7 +12,6 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/platform/httperr"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/gabrielnakaema/project-chat/internal/validator"
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -89,15 +87,13 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
-	projectId := platformhttp.GetQueryString(r, "project_id", "")
-	if projectId == "" {
-		httperr.BadRequestResponse(w, errors.New("project_id is required"))
-		return
-	}
-
-	parsedProjectId, err := uuid.Parse(projectId)
+	parsedProjectId, err := platformhttp.ParseOptionalQueryUUID(r, "project_id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
+		return
+	}
+	if parsedProjectId == nil {
+		httperr.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
@@ -107,35 +103,25 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := platformhttp.GetQueryInt(r, "limit", 15)
-	if limit <= 0 {
-		httperr.BadRequestResponse(w, errors.New("limit must be greater than 0"))
-		return
-	}
-
-	if limit > 100 {
-		httperr.BadRequestResponse(w, errors.New("limit must be less than 100"))
+	limit, err := platformhttp.ParseLimit(r, 15, 100)
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	taskOrder := platformhttp.GetQueryString(r, "task_order", "")
 
-	cursorUpdatedAt := platformhttp.GetQueryString(r, "updated_at", "")
-	var updatedAt *time.Time
-	if cursorUpdatedAt != "" {
-		parsedTime, err := time.Parse(time.RFC3339, cursorUpdatedAt)
-		if err != nil {
-			httperr.BadRequestResponse(w, err)
-			return
-		}
-		updatedAt = &parsedTime
+	updatedAt, err := platformhttp.ParseRFC3339Cursor(r, "updated_at")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
 	archived := platformhttp.GetQueryString(r, "archived", "") == "true"
 
 	serviceRequest := ListTasksRequest{
-		ProjectId:        parsedProjectId,
+		ProjectId:        *parsedProjectId,
 		RequestUserId:    userId,
 		ProjectColumnIDs: projectColumnIDs,
 		Archived:         archived,
@@ -158,41 +144,28 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) GroupByColumn(w http.ResponseWriter, r *http.Request) {
-	projectId := platformhttp.GetQueryString(r, "project_id", "")
-	if projectId == "" {
+	parsedProjectId, err := platformhttp.ParseOptionalQueryUUID(r, "project_id")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
+	}
+	if parsedProjectId == nil {
 		httperr.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
-	parsedProjectId, err := uuid.Parse(projectId)
+	limitInt, err := platformhttp.ParseLimit(r, 15, 100)
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
 	}
 
-	limitInt := platformhttp.GetQueryInt(r, "limit", 15)
-
-	if limitInt < 1 {
-		httperr.BadRequestResponse(w, errors.New("limit must be greater than 0"))
-		return
-	}
-
-	if limitInt > 100 {
-		httperr.BadRequestResponse(w, errors.New("limit must be less than 100"))
-		return
-	}
-
 	taskOrder := platformhttp.GetQueryString(r, "task_order", "")
 
-	cursorUpdatedAt := platformhttp.GetQueryString(r, "updated_at", "")
-	var updatedAt *time.Time
-	if cursorUpdatedAt != "" {
-		parsedTime, err := time.Parse(time.RFC3339, cursorUpdatedAt)
-		if err != nil {
-			httperr.BadRequestResponse(w, err)
-			return
-		}
-		updatedAt = &parsedTime
+	updatedAt, err := platformhttp.ParseRFC3339Cursor(r, "updated_at")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
 	}
 
 	projectColumnIDs, err := parseUUIDQueryParam(platformhttp.GetQueryString(r, "project_column_ids", ""))
@@ -205,7 +178,7 @@ func (h *TaskHandler) GroupByColumn(w http.ResponseWriter, r *http.Request) {
 	archived := platformhttp.GetQueryString(r, "archived", "") == "true"
 
 	serviceRequest := GroupByColumnRequest{
-		ProjectId:        parsedProjectId,
+		ProjectId:        *parsedProjectId,
 		UserId:           userId,
 		ProjectColumnIDs: projectColumnIDs,
 		Archived:         archived,
@@ -228,15 +201,13 @@ func (h *TaskHandler) GroupByColumn(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) CountByColumn(w http.ResponseWriter, r *http.Request) {
-	projectId := platformhttp.GetQueryString(r, "project_id", "")
-	if projectId == "" {
-		httperr.BadRequestResponse(w, errors.New("project_id is required"))
-		return
-	}
-
-	parsedProjectId, err := uuid.Parse(projectId)
+	parsedProjectId, err := platformhttp.ParseOptionalQueryUUID(r, "project_id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
+		return
+	}
+	if parsedProjectId == nil {
+		httperr.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
@@ -253,7 +224,7 @@ func (h *TaskHandler) CountByColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.taskService.CountByColumn(r.Context(), parsedProjectId, projectColumnIDs, userId)
+	result, err := h.taskService.CountByColumn(r.Context(), *parsedProjectId, projectColumnIDs, userId)
 	if err != nil {
 		httperr.ErrorResponse(w, r, err)
 		return
@@ -268,8 +239,7 @@ func (h *TaskHandler) CountByColumn(w http.ResponseWriter, r *http.Request) {
 
 func (h *TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
 
-	id := chi.URLParam(r, "id")
-	parsedId, err := uuid.Parse(id)
+	parsedId, err := platformhttp.ParseURLUUID(r, "id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
@@ -291,8 +261,7 @@ func (h *TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	parsedId, err := uuid.Parse(id)
+	parsedId, err := platformhttp.ParseURLUUID(r, "id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
@@ -342,8 +311,7 @@ func (h *TaskHandler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) Archive(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	parsedId, err := uuid.Parse(id)
+	parsedId, err := platformhttp.ParseURLUUID(r, "id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
@@ -370,8 +338,7 @@ func (h *TaskHandler) Archive(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) Restore(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	parsedId, err := uuid.Parse(id)
+	parsedId, err := platformhttp.ParseURLUUID(r, "id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
@@ -413,8 +380,7 @@ func (h *TaskHandler) Restore(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) Move(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	parsedId, err := uuid.Parse(id)
+	parsedId, err := platformhttp.ParseURLUUID(r, "id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
@@ -478,37 +444,22 @@ func parseUUIDQueryParam(value string) ([]uuid.UUID, error) {
 func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {
 	userId := auth.UserIdFromContext(r.Context())
 
-	limit := platformhttp.GetQueryInt(r, "limit", 15)
-	if limit <= 0 {
-		httperr.BadRequestResponse(w, errors.New("limit must be greater than 0"))
+	limit, err := platformhttp.ParseLimit(r, 15, 100)
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
-	if limit > 100 {
-		httperr.BadRequestResponse(w, errors.New("limit must be less than 100"))
+	dueDate, err := platformhttp.ParseRFC3339Cursor(r, "due_date")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
-	cursorDueDate := platformhttp.GetQueryString(r, "due_date", "")
-	var dueDate *time.Time
-	if cursorDueDate != "" {
-		parsedTime, err := time.Parse(time.RFC3339, cursorDueDate)
-		if err != nil {
-			httperr.BadRequestResponse(w, err)
-			return
-		}
-		dueDate = &parsedTime
-	}
-
-	cursorUpdatedAt := platformhttp.GetQueryString(r, "updated_at", "")
-	var updatedAt *time.Time
-	if cursorUpdatedAt != "" {
-		parsedTime, err := time.Parse(time.RFC3339, cursorUpdatedAt)
-		if err != nil {
-			httperr.BadRequestResponse(w, err)
-			return
-		}
-		updatedAt = &parsedTime
+	updatedAt, err := platformhttp.ParseRFC3339Cursor(r, "updated_at")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
 	}
 
 	serviceRequest := ListUserDueTasksRequest{
@@ -534,15 +485,13 @@ func (h *TaskHandler) ListUserDueTasks(w http.ResponseWriter, r *http.Request) {
 func (h *TaskHandler) SuggestTaskCodes(w http.ResponseWriter, r *http.Request) {
 	userId := auth.UserIdFromContext(r.Context())
 
-	projectId := platformhttp.GetQueryString(r, "project_id", "")
-	if projectId == "" {
-		httperr.BadRequestResponse(w, errors.New("project_id is required"))
-		return
-	}
-
-	parsedProjectId, err := uuid.Parse(projectId)
+	parsedProjectId, err := platformhttp.ParseOptionalQueryUUID(r, "project_id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
+		return
+	}
+	if parsedProjectId == nil {
+		httperr.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
@@ -552,19 +501,14 @@ func (h *TaskHandler) SuggestTaskCodes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := platformhttp.GetQueryInt(r, "limit", 8)
-	if limit <= 0 {
-		httperr.BadRequestResponse(w, errors.New("limit must be greater than 0"))
-		return
-	}
-
-	if limit > 20 {
-		httperr.BadRequestResponse(w, errors.New("limit must be at most 20"))
+	limit, err := platformhttp.ParseLimit(r, 8, 20)
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
 	result, err := h.taskService.SuggestTaskCodes(r.Context(), SuggestTaskCodesRequest{
-		ProjectId: parsedProjectId,
+		ProjectId: *parsedProjectId,
 		UserId:    userId,
 		Prefix:    prefix,
 		Limit:     int(limit),
@@ -584,15 +528,13 @@ func (h *TaskHandler) SuggestTaskCodes(w http.ResponseWriter, r *http.Request) {
 func (h *TaskHandler) SearchProjectTasksForDependencies(w http.ResponseWriter, r *http.Request) {
 	userId := auth.UserIdFromContext(r.Context())
 
-	projectId := platformhttp.GetQueryString(r, "project_id", "")
-	if projectId == "" {
-		httperr.BadRequestResponse(w, errors.New("project_id is required"))
-		return
-	}
-
-	parsedProjectId, err := uuid.Parse(projectId)
+	parsedProjectId, err := platformhttp.ParseOptionalQueryUUID(r, "project_id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
+		return
+	}
+	if parsedProjectId == nil {
+		httperr.BadRequestResponse(w, errors.New("project_id is required"))
 		return
 	}
 
@@ -602,30 +544,20 @@ func (h *TaskHandler) SearchProjectTasksForDependencies(w http.ResponseWriter, r
 		return
 	}
 
-	limit := platformhttp.GetQueryInt(r, "limit", 20)
-	if limit <= 0 {
-		httperr.BadRequestResponse(w, errors.New("limit must be greater than 0"))
+	limit, err := platformhttp.ParseLimit(r, 20, 100)
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
-	if limit > 100 {
-		httperr.BadRequestResponse(w, errors.New("limit must be less than 100"))
+	excludeTaskId, err := platformhttp.ParseOptionalQueryUUID(r, "exclude_task_id")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
 		return
-	}
-
-	var excludeTaskId *uuid.UUID
-	excludeTaskIdParam := platformhttp.GetQueryString(r, "exclude_task_id", "")
-	if excludeTaskIdParam != "" {
-		parsedExcludeTaskId, parseErr := uuid.Parse(excludeTaskIdParam)
-		if parseErr != nil {
-			httperr.BadRequestResponse(w, parseErr)
-			return
-		}
-		excludeTaskId = &parsedExcludeTaskId
 	}
 
 	result, err := h.taskService.SearchProjectTasksForDependencies(r.Context(), SearchProjectTasksForDependenciesRequest{
-		ProjectId:     parsedProjectId,
+		ProjectId:     *parsedProjectId,
 		UserId:        userId,
 		Query:         searchQuery,
 		ExcludeTaskId: excludeTaskId,
@@ -646,14 +578,9 @@ func (h *TaskHandler) SearchProjectTasksForDependencies(w http.ResponseWriter, r
 func (h *TaskHandler) SearchTasksForUser(w http.ResponseWriter, r *http.Request) {
 	userId := auth.UserIdFromContext(r.Context())
 
-	limit := platformhttp.GetQueryInt(r, "limit", 15)
-	if limit <= 0 {
-		httperr.BadRequestResponse(w, errors.New("limit must be greater than 0"))
-		return
-	}
-
-	if limit > 100 {
-		httperr.BadRequestResponse(w, errors.New("limit must be less than 100"))
+	limit, err := platformhttp.ParseLimit(r, 15, 100)
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
@@ -663,37 +590,22 @@ func (h *TaskHandler) SearchTasksForUser(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	cursorDueDate := platformhttp.GetQueryString(r, "due_date", "")
-	var dueDate *time.Time
-	if cursorDueDate != "" {
-		parsedTime, err := time.Parse(time.RFC3339, cursorDueDate)
-		if err != nil {
-			httperr.BadRequestResponse(w, err)
-			return
-		}
-		dueDate = &parsedTime
+	dueDate, err := platformhttp.ParseRFC3339Cursor(r, "due_date")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
 	}
 
-	cursorUpdatedAt := platformhttp.GetQueryString(r, "updated_at", "")
-	var updatedAt *time.Time
-	if cursorUpdatedAt != "" {
-		parsedTime, err := time.Parse(time.RFC3339, cursorUpdatedAt)
-		if err != nil {
-			httperr.BadRequestResponse(w, err)
-			return
-		}
-		updatedAt = &parsedTime
+	updatedAt, err := platformhttp.ParseRFC3339Cursor(r, "updated_at")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
 	}
 
-	cursorTaskId := platformhttp.GetQueryString(r, "task_id", "")
-	var taskId *uuid.UUID
-	if cursorTaskId != "" {
-		parsedId, err := uuid.Parse(cursorTaskId)
-		if err != nil {
-			httperr.BadRequestResponse(w, err)
-			return
-		}
-		taskId = &parsedId
+	taskId, err := platformhttp.ParseOptionalQueryUUID(r, "task_id")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
 	}
 
 	serviceRequest := SearchTasksRequest{
