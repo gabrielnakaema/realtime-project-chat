@@ -7,8 +7,6 @@ import (
 
 	"github.com/gabrielnakaema/project-chat/internal/platform/apphost"
 	"github.com/gabrielnakaema/project-chat/internal/platform/auth"
-	"github.com/gabrielnakaema/project-chat/internal/platform/postgres"
-	"github.com/gabrielnakaema/project-chat/internal/platform/token"
 	"github.com/gabrielnakaema/project-chat/internal/project"
 	"github.com/gabrielnakaema/project-chat/internal/tasks"
 	tasksv1 "github.com/gabrielnakaema/project-chat/internal/tasks/v1"
@@ -30,22 +28,11 @@ type Handlers struct {
 }
 
 func New() (*App, error) {
-	rt, err := apphost.New("tasks-service", "TASKS_SERVICE_PORT", "3339")
+	rt, pool, err := apphost.NewWithPostgres("tasks-service", "TASKS_SERVICE_PORT", "3339")
 	if err != nil {
 		return nil, err
 	}
-	pool, err := postgres.NewPool(rt.Config)
-	if err != nil {
-		rt.Close()
-		return nil, err
-	}
-	rt.TrackFunc(func() error {
-		pool.Close()
-		return nil
-	})
-
-	jwtProvider := token.NewTokenProvider(rt.Config)
-	authMiddleware := auth.NewMiddleware(jwtProvider)
+	authDependencies := rt.NewAuth()
 
 	taskRepo := tasks.NewTaskRepository(pool)
 	taskCommentRepo := tasks.NewTaskCommentRepository(pool)
@@ -77,7 +64,7 @@ func New() (*App, error) {
 		rt:         rt,
 		grpcServer: grpcServer,
 		handlers: &Handlers{
-			AuthMiddleware: authMiddleware,
+			AuthMiddleware: authDependencies.Middleware,
 			Task:           taskHandler,
 			TaskComment:    taskCommentHandler,
 		},

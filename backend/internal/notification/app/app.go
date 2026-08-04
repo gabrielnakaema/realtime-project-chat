@@ -4,8 +4,6 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/notification"
 	"github.com/gabrielnakaema/project-chat/internal/platform/apphost"
 	"github.com/gabrielnakaema/project-chat/internal/platform/auth"
-	"github.com/gabrielnakaema/project-chat/internal/platform/postgres"
-	"github.com/gabrielnakaema/project-chat/internal/platform/token"
 )
 
 type App struct {
@@ -19,22 +17,11 @@ type Handlers struct {
 }
 
 func New() (*App, error) {
-	rt, err := apphost.New("notification-service", "NOTIFICATION_SERVICE_PORT", "3335")
+	rt, pool, err := apphost.NewWithPostgres("notification-service", "NOTIFICATION_SERVICE_PORT", "3335")
 	if err != nil {
 		return nil, err
 	}
-	pool, err := postgres.NewPool(rt.Config)
-	if err != nil {
-		rt.Close()
-		return nil, err
-	}
-	rt.TrackFunc(func() error {
-		pool.Close()
-		return nil
-	})
-
-	jwtProvider := token.NewTokenProvider(rt.Config)
-	authMiddleware := auth.NewMiddleware(jwtProvider)
+	authDependencies := rt.NewAuth()
 
 	notificationRepo := notification.NewRepository(pool)
 	notificationService := notification.NewService(notificationRepo)
@@ -50,7 +37,7 @@ func New() (*App, error) {
 	app := App{
 		rt: rt,
 		handlers: &Handlers{
-			AuthMiddleware: authMiddleware,
+			AuthMiddleware: authDependencies.Middleware,
 			Notification:   notificationHandler,
 		},
 	}

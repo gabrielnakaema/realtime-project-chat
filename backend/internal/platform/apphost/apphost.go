@@ -13,9 +13,23 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gabrielnakaema/project-chat/internal/platform/auth"
 	"github.com/gabrielnakaema/project-chat/internal/platform/config"
 	"github.com/gabrielnakaema/project-chat/internal/platform/logger"
+	"github.com/gabrielnakaema/project-chat/internal/platform/postgres"
+	"github.com/gabrielnakaema/project-chat/internal/platform/token"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type Application interface {
+	Serve() error
+	Close()
+}
+
+type AuthDependencies struct {
+	TokenProvider *token.TokenProvider
+	Middleware    *auth.Middleware
+}
 
 type Runtime struct {
 	Name   string
@@ -32,6 +46,20 @@ type closerFunc func() error
 
 func (f closerFunc) Close() error {
 	return f()
+}
+
+func Run[T Application](serviceName string, factory func() (T, error)) error {
+	application, err := factory()
+	if err != nil {
+		return fmt.Errorf("error while starting %s: %w", serviceName, err)
+	}
+	defer application.Close()
+
+	if err := application.Serve(); err != nil {
+		return fmt.Errorf("received error from %s serve: %w", serviceName, err)
+	}
+
+	return nil
 }
 
 func New(name, portEnvVar, defaultPort string) (*Runtime, error) {
@@ -59,6 +87,33 @@ func New(name, portEnvVar, defaultPort string) (*Runtime, error) {
 		Ctx:    ctx,
 		cancel: cancel,
 	}, nil
+}
+
+func NewWithPostgres(name, portEnvVar, defaultPort string) (*Runtime, *pgxpool.Pool, error) {
+	rt, err := New(name, portEnvVar, defaultPort)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pool, err := postgres.NewPool(rt.Config)
+	if err != nil {
+		rt.Close()
+		return nil, nil, err
+	}
+	rt.TrackFunc(func() error {
+		pool.Close()
+		return nil
+	})
+
+	return rt, pool, nil
+}
+
+func (r *Runtime) NewAuth() *AuthDependencies {
+	tokenProvider := token.NewTokenProvider(r.Config)
+	return &AuthDependencies{
+		TokenProvider: tokenProvider,
+		Middleware:    auth.NewMiddleware(tokenProvider),
+	}
 }
 
 func (r *Runtime) Track(c io.Closer) {

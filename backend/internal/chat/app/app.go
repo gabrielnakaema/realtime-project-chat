@@ -9,8 +9,6 @@ import (
 	chatv1 "github.com/gabrielnakaema/project-chat/internal/chat/v1"
 	"github.com/gabrielnakaema/project-chat/internal/platform/apphost"
 	"github.com/gabrielnakaema/project-chat/internal/platform/auth"
-	"github.com/gabrielnakaema/project-chat/internal/platform/postgres"
-	"github.com/gabrielnakaema/project-chat/internal/platform/token"
 	"github.com/gabrielnakaema/project-chat/internal/user"
 	"google.golang.org/grpc"
 )
@@ -28,22 +26,11 @@ type Handlers struct {
 }
 
 func New() (*App, error) {
-	rt, err := apphost.New("chat-service", "CHAT_SERVICE_PORT", "3337")
+	rt, pool, err := apphost.NewWithPostgres("chat-service", "CHAT_SERVICE_PORT", "3337")
 	if err != nil {
 		return nil, err
 	}
-	pool, err := postgres.NewPool(rt.Config)
-	if err != nil {
-		rt.Close()
-		return nil, err
-	}
-	rt.TrackFunc(func() error {
-		pool.Close()
-		return nil
-	})
-
-	jwtProvider := token.NewTokenProvider(rt.Config)
-	authMiddleware := auth.NewMiddleware(jwtProvider)
+	authDependencies := rt.NewAuth()
 
 	chatRepo := chat.NewRepository(pool)
 	userRepo := user.NewUserRepository(pool)
@@ -63,7 +50,7 @@ func New() (*App, error) {
 		rt:         rt,
 		grpcServer: grpcServer,
 		handlers: &Handlers{
-			AuthMiddleware: authMiddleware,
+			AuthMiddleware: authDependencies.Middleware,
 			Chat:           chatHandler,
 		},
 	}

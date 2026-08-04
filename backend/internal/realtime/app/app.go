@@ -6,8 +6,6 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/notification"
 	"github.com/gabrielnakaema/project-chat/internal/platform/apphost"
 	"github.com/gabrielnakaema/project-chat/internal/platform/outbox"
-	"github.com/gabrielnakaema/project-chat/internal/platform/postgres"
-	"github.com/gabrielnakaema/project-chat/internal/platform/token"
 	"github.com/gabrielnakaema/project-chat/internal/project"
 	projectv1 "github.com/gabrielnakaema/project-chat/internal/project/v1"
 	"github.com/gabrielnakaema/project-chat/internal/realtime"
@@ -21,21 +19,11 @@ type App struct {
 }
 
 func New() (*App, error) {
-	rt, err := apphost.New("websocket-service", "WEBSOCKET_SERVICE_PORT", "3336")
+	rt, pool, err := apphost.NewWithPostgres("websocket-service", "WEBSOCKET_SERVICE_PORT", "3336")
 	if err != nil {
 		return nil, err
 	}
-	pool, err := postgres.NewPool(rt.Config)
-	if err != nil {
-		rt.Close()
-		return nil, err
-	}
-	rt.TrackFunc(func() error {
-		pool.Close()
-		return nil
-	})
-
-	jwtProvider := token.NewTokenProvider(rt.Config)
+	authDependencies := rt.NewAuth()
 
 	projectGRPCConnection, err := grpc.NewClient(
 		rt.Config.AuthorizationGRPCTarget,
@@ -59,7 +47,7 @@ func New() (*App, error) {
 
 	chatAuthorizer := chat.NewClient(chatv1.NewChatServiceClient(chatGRPCConnection))
 	projectAuthorizer := project.NewClient(projectv1.NewProjectServiceClient(projectGRPCConnection))
-	server := realtime.NewServer(rt.Ctx, jwtProvider, rt.Logger, chatAuthorizer, projectAuthorizer, rt.Config.RoomAuthorizationTimeout, outbox.NewPoolEnqueuer(pool))
+	server := realtime.NewServer(rt.Ctx, authDependencies.TokenProvider, rt.Logger, chatAuthorizer, projectAuthorizer, rt.Config.RoomAuthorizationTimeout, outbox.NewPoolEnqueuer(pool))
 
 	realtimeSub, err := realtime.NewRealtimeSubscriber(rt.Ctx, rt.Config, rt.Logger, server)
 	if err != nil {
