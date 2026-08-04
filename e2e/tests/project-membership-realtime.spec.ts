@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { Page } from "@playwright/test";
 import {
   addProjectMember,
+  createProjectThroughUI,
   expect,
   expectToast,
   loginAsUser,
@@ -11,14 +12,9 @@ import {
 import { registerUser } from "../src/fixtures/test-user.js";
 
 async function createProject(page: Page, projectName: string) {
-  await page.getByRole("button", { name: "New project" }).first().click();
-  const dialog = page.getByRole("dialog", { name: "Create project" });
-  await dialog.locator("#name").fill(projectName);
-  await dialog
-    .locator("#description")
-    .pressSequentially("Created by a project realtime e2e test.");
-  await dialog.getByRole("button", { name: "Create project" }).click();
-  await expectToast(page, "Project created successfully");
+  await createProjectThroughUI(page, projectName, {
+    description: "Created by a project realtime e2e test.",
+  });
   await page.getByRole("link", { name: projectName }).click();
 
   return page.url().split("/projects/")[1];
@@ -267,9 +263,7 @@ test("project deletion redirects an open collaborator and revokes access without
   });
   await projectListLink(memberPage, projectName).click();
   await memberPage.getByRole("link", { name: "Settings" }).click();
-  await expect(
-    memberPage.locator("#general-project-settings")
-  ).toBeVisible();
+  await expect(memberPage.locator("#general-project-settings")).toBeVisible();
 
   await ownerPage.getByRole("link", { name: "Settings" }).click();
   await ownerPage.getByRole("button", { name: "Delete" }).click();

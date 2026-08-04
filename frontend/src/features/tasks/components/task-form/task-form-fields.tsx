@@ -8,7 +8,7 @@ import type { TaskMemberOption } from './task-form-utils';
 import type { TaskDependencyRef } from '@/features/tasks/types/task';
 import { TextEditor } from '@/shared/components/text-editor';
 import { Select } from '@/shared/components/select';
-import { Input } from '@/components/input';
+import { Input } from '@/shared/components/input';
 
 interface TaskFormFieldsProps {
   projectId: string;

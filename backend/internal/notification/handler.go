@@ -12,7 +12,6 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/platform/httperr"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/gabrielnakaema/project-chat/internal/validator"
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -36,32 +35,26 @@ func NewHandler(notificationService notificationService) *Handler {
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	userId := auth.UserIdFromContext(r.Context())
 
-	limit := platformhttp.GetQueryInt(r, "limit", 10)
-	before := platformhttp.GetQueryString(r, "before", "")
-	beforeId := platformhttp.GetQueryString(r, "id", "")
-
 	v := validator.New()
-	v.Check("limit", "limit must be greater than 0", limit > 0)
-	v.Check("limit", "limit must be less than or equal to 50", limit <= 50)
+	limit, limitErr := platformhttp.ParseLimit(r, 10, 50)
+	if limitErr != nil {
+		v.Add("limit", limitErr.Error())
+	}
 
 	beforeTime := time.Now()
-	if before != "" {
-		date, err := time.Parse(time.RFC3339, before)
-		if err != nil {
-			v.Add("before", "invalid before date")
-		} else {
-			beforeTime = date
-		}
+	parsedBeforeTime, parseErr := platformhttp.ParseRFC3339Cursor(r, "before")
+	if parseErr != nil {
+		v.Add("before", "invalid before date")
+	} else if parsedBeforeTime != nil {
+		beforeTime = *parsedBeforeTime
 	}
 
 	beforeIdUUID := uuid.Nil
-	if beforeId != "" {
-		parsedBeforeId, err := uuid.Parse(beforeId)
-		if err != nil {
-			v.Add("id", "invalid before id")
-		} else {
-			beforeIdUUID = parsedBeforeId
-		}
+	parsedBeforeId, parseErr := platformhttp.ParseOptionalQueryUUID(r, "id")
+	if parseErr != nil {
+		v.Add("id", "invalid before id")
+	} else if parsedBeforeId != nil {
+		beforeIdUUID = *parsedBeforeId
 	}
 
 	if !v.Valid() {
@@ -102,8 +95,7 @@ func (h *Handler) CountUnread(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 	userId := auth.UserIdFromContext(r.Context())
 
-	id := chi.URLParam(r, "id")
-	notificationId, err := uuid.Parse(id)
+	notificationId, err := platformhttp.ParseURLUUID(r, "id")
 	if err != nil {
 		httperr.BadRequestResponse(w, errors.New("invalid notification id"))
 		return

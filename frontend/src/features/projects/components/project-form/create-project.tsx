@@ -7,7 +7,7 @@ import { useProjectForm } from './use-project-form';
 import type { SubmitHandler } from 'react-hook-form';
 import type { IProjectForm } from '@/features/projects/schemas/project.schema';
 import { LoadingSpinner } from '@/shared/components/loading';
-import { Button } from '@/components/button';
+import { Button } from '@/shared/components/button';
 import {
   Dialog,
   DialogContent,

@@ -4,7 +4,7 @@ import { registerUser } from "../src/fixtures/test-user.js";
 import {
   addProjectMember,
   backendURL,
-  expectToast,
+  createProjectThroughUI,
   loginAsUser,
 } from "../src/fixtures/authenticated-page.js";
 
@@ -23,21 +23,9 @@ test("project chat sender can see when a collaborator reads a message", async ({
   const projectName = `E2E Read Receipts Project ${crypto.randomUUID()}`;
   const messageContent = `E2E read receipt message ${crypto.randomUUID()}`;
 
-  await senderPage
-    .getByRole("button", { name: "New project" })
-    .first()
-    .click();
-  const createProjectDialog = senderPage.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(senderPage, projectName, {
+    description: "Created by the chat read-receipts e2e test.",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the chat read-receipts e2e test.");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(senderPage, "Project created successfully");
 
   await senderPage.getByRole("link", { name: projectName }).click();
   const projectId = senderPage.url().split("/projects/")[1];

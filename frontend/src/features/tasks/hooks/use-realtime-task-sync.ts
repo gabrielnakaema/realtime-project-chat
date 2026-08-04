@@ -4,7 +4,7 @@ import { invalidateBoard, reconcileTask } from './task-board-cache';
 import type { SocketEvent } from '@/shared/types/websocket';
 import { useSocket } from '@/shared/hooks/use-socket';
 import { isProjectMembershipEvent } from '@/shared/types/websocket';
-import { projectQueryKeys } from '@/shared/services/query-keys';
+import { projectQueryKeys, taskQueryKeys } from '@/shared/services/query-keys';
 
 export const useRealtimeTaskSync = (projectId: string) => {
   const queryClient = useQueryClient();
@@ -30,6 +30,7 @@ export const useRealtimeTaskSync = (projectId: string) => {
     if (event.type === 'task_updated') {
       const { task, previous_project_column_id } = event.data;
       reconcileTask(queryClient, task, { previousColumnId: previous_project_column_id });
+      queryClient.invalidateQueries({ queryKey: taskQueryKeys.details(task.id), exact: true });
     }
   });
 

@@ -1,10 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { useEffect } from 'react';
-import { Button } from '../../../components/button';
-import { Input } from '../../../components/input';
 import { DialogFooter } from '../../../shared/components/ui/dialog';
 import type { IMCPAPIKeyForm } from '@/features/mcp-access/schemas/mcp-api-key.schema';
+import { Button } from '@/shared/components/button';
+import { Input } from '@/shared/components/input';
 import { LoadingSpinner } from '@/shared/components/loading';
 import { useMCPAPIAvailableScopes } from '@/features/mcp-access/hooks/use-mcp-api-available-scopes';
 import { mcpAPIKeySchema } from '@/features/mcp-access/schemas/mcp-api-key.schema';
@@ -54,7 +54,7 @@ export const MCPAPIKeyForm = ({
         </div>
 
         <DialogFooter className="border-border bg-muted/80 border-t px-6 py-4">
-          <Button type="button" variant="secondary" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
         </DialogFooter>
@@ -73,14 +73,14 @@ export const MCPAPIKeyForm = ({
                 Retry to load the current MCP permissions before saving this key.
               </p>
             </div>
-            <Button type="button" variant="secondary" onClick={() => void refetchScopes()}>
+            <Button type="button" variant="outline" onClick={() => void refetchScopes()}>
               Retry
             </Button>
           </div>
         </div>
 
         <DialogFooter className="border-border bg-muted/80 border-t px-6 py-4">
-          <Button type="button" variant="secondary" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
         </DialogFooter>
@@ -158,7 +158,7 @@ export const MCPAPIKeyForm = ({
       </div>
 
       <DialogFooter className="border-border bg-muted/80 border-t px-6 py-4">
-        <Button type="button" variant="secondary" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>

@@ -12,8 +12,6 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/platform/httperr"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/gabrielnakaema/project-chat/internal/validator"
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 )
 
 type taskCommentService interface {
@@ -32,8 +30,7 @@ func NewTaskCommentHandler(taskCommentService taskCommentService) *TaskCommentHa
 }
 
 func (h *TaskCommentHandler) Create(w http.ResponseWriter, r *http.Request) {
-	taskID := chi.URLParam(r, "id")
-	parsedTaskID, err := uuid.Parse(taskID)
+	parsedTaskID, err := platformhttp.ParseURLUUID(r, "id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
@@ -74,49 +71,31 @@ func (h *TaskCommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request) {
-	taskID := chi.URLParam(r, "id")
-	parsedTaskID, err := uuid.Parse(taskID)
+	parsedTaskID, err := platformhttp.ParseURLUUID(r, "id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
 	}
 
-	limit := platformhttp.GetQueryInt(r, "limit", 10)
-	if limit <= 0 {
-		httperr.BadRequestResponse(w, errors.New("limit must be greater than 0"))
+	limit, err := platformhttp.ParseLimit(r, 10, 50)
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
 		return
 	}
 
-	if limit > 50 {
-		httperr.BadRequestResponse(w, errors.New("limit must be less than 50"))
+	beforeTime, err := platformhttp.ParseRFC3339Cursor(r, "before")
+	if err != nil {
+		httperr.BadRequestResponse(w, errors.New("invalid before date"))
 		return
 	}
-
-	before := platformhttp.GetQueryString(r, "before", "")
-	after := platformhttp.GetQueryString(r, "after", "")
-	if before != "" && after != "" {
+	afterTime, err := platformhttp.ParseRFC3339Cursor(r, "after")
+	if err != nil {
+		httperr.BadRequestResponse(w, errors.New("invalid after date"))
+		return
+	}
+	if beforeTime != nil && afterTime != nil {
 		httperr.BadRequestResponse(w, errors.New("before and after cannot be used together"))
 		return
-	}
-
-	var beforeTime *time.Time
-	if before != "" {
-		parsedBefore, err := time.Parse(time.RFC3339, before)
-		if err != nil {
-			httperr.BadRequestResponse(w, errors.New("invalid before date"))
-			return
-		}
-		beforeTime = &parsedBefore
-	}
-
-	var afterTime *time.Time
-	if after != "" {
-		parsedAfter, err := time.Parse(time.RFC3339, after)
-		if err != nil {
-			httperr.BadRequestResponse(w, errors.New("invalid after date"))
-			return
-		}
-		afterTime = &parsedAfter
 	}
 
 	if beforeTime == nil && afterTime == nil {
@@ -124,26 +103,16 @@ func (h *TaskCommentHandler) ListByTaskID(w http.ResponseWriter, r *http.Request
 		beforeTime = &now
 	}
 
-	beforeCommentID := platformhttp.GetQueryString(r, "comment_id", "")
-	var parsedBeforeCommentID *uuid.UUID
-	if beforeCommentID != "" {
-		id, err := uuid.Parse(beforeCommentID)
-		if err != nil {
-			httperr.BadRequestResponse(w, err)
-			return
-		}
-		parsedBeforeCommentID = &id
+	parsedBeforeCommentID, err := platformhttp.ParseOptionalQueryUUID(r, "comment_id")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
 	}
 
-	afterCommentID := platformhttp.GetQueryString(r, "after_comment_id", "")
-	var parsedAfterCommentID *uuid.UUID
-	if afterCommentID != "" {
-		id, err := uuid.Parse(afterCommentID)
-		if err != nil {
-			httperr.BadRequestResponse(w, err)
-			return
-		}
-		parsedAfterCommentID = &id
+	parsedAfterCommentID, err := platformhttp.ParseOptionalQueryUUID(r, "after_comment_id")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
 	}
 
 	userID := auth.UserIdFromContext(r.Context())

@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button } from '../../../components/button';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +8,7 @@ import {
   DialogTitle,
 } from '../../../shared/components/ui/dialog';
 import type { MCPAPIKey } from '@/features/mcp-access/services/mcp-api-keys';
+import { Button } from '@/shared/components/button';
 import { LoadingSpinner } from '@/shared/components/loading';
 import { revokeMCPAPIKey } from '@/features/mcp-access/services/mcp-api-keys';
 import { mcpAPIKeyQueryKeys } from '@/shared/services/query-keys';
@@ -65,7 +65,7 @@ export const RevokeMCPKeyDialog = ({ isOpen, keyData, onOpenChange }: RevokeMCPK
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button type="button" disabled={revokeMutation.isPending} onClick={confirmRevoke}>

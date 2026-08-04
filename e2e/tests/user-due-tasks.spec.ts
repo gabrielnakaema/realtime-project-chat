@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import {
   addProjectMember,
+  createProjectThroughUI,
   expect,
   expectToast,
   loginAsUser,
@@ -22,19 +23,9 @@ test("assigned user can open an upcoming task from the dashboard", async ({
   const taskTitle = `E2E Due Task ${crypto.randomUUID()}`;
   const dueDate = "2026-08-20";
 
-  await ownerPage.getByRole("button", { name: "New project" }).first().click();
-
-  const createProjectDialog = ownerPage.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(ownerPage, projectName, {
+    description: "Created by the user due-tasks e2e test",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the user due-tasks e2e test");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(ownerPage, "Project created successfully");
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   await addProjectMember(ownerPage, member.email);
@@ -93,18 +84,9 @@ test("assigned user can complete an upcoming task and remove it from the dashboa
   const taskTitle = `E2E Complete Due Task ${crypto.randomUUID()}`;
   const dueDate = "2026-08-20";
 
-  await ownerPage.getByRole("button", { name: "New project" }).first().click();
-  const createProjectDialog = ownerPage.getByRole("dialog", {
-    name: "Create project",
+  await createProjectThroughUI(ownerPage, projectName, {
+    description: "Created by the due-task completion e2e test.",
   });
-  await createProjectDialog.locator("#name").fill(projectName);
-  await createProjectDialog
-    .locator("#description")
-    .pressSequentially("Created by the due-task completion e2e test.");
-  await createProjectDialog
-    .getByRole("button", { name: "Create project" })
-    .click();
-  await expectToast(ownerPage, "Project created successfully");
 
   await ownerPage.getByRole("link", { name: projectName }).click();
   const projectId = ownerPage.url().split("/projects/")[1];

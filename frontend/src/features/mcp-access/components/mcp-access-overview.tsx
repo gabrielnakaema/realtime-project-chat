@@ -1,6 +1,6 @@
 import { Check, Copy, Shield } from 'lucide-react';
-import { Button } from '../../../components/button';
 import { MCPHelpDialog } from './mcp-help-dialog';
+import { Button } from '@/shared/components/button';
 import { useCopyFeedback } from '@/shared/hooks/use-copy-feedback';
 import { handleSuccess } from '@/shared/utils/handle-success';
 import { getMCPServerURL } from '@/features/mcp-access/services/mcp-api-keys';
@@ -42,7 +42,7 @@ export const MCPAccessOverview = () => {
           <div className="border-border bg-card min-w-0 flex-1 rounded-xl border px-3 py-2 font-mono text-sm break-all">
             {serverUrl}
           </div>
-          <Button type="button" variant="secondary" className="sm:shrink-0" onClick={() => void copyServerURL()}>
+          <Button type="button" variant="outline" className="sm:shrink-0" onClick={() => void copyServerURL()}>
             {copiedValue === 'url' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copiedValue === 'url' ? 'Copied' : 'Copy URL'}
           </Button>

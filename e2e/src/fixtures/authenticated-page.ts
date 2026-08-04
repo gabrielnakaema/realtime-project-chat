@@ -4,6 +4,7 @@ import {
   test as base,
   type Browser,
   type BrowserContext,
+  type Locator,
   type Page,
 } from "@playwright/test";
 import { registerUser, type TestUser } from "./test-user.js";
@@ -22,6 +23,27 @@ interface AuthFixtures {
   backendURL: string;
   testUser: TestUser;
   authenticatedPage: Page;
+}
+
+export interface ProjectRepositorySettings {
+  url?: string;
+  owner?: string;
+  name?: string;
+  defaultBranch?: string;
+  branchNamePrefix?: string;
+}
+
+export interface ProjectColumnSettings {
+  name: string;
+  description?: string;
+  color?: string;
+  isDone?: boolean;
+}
+
+export interface CreateProjectThroughUIOptions {
+  description?: string;
+  repository?: ProjectRepositorySettings;
+  columns?: ProjectColumnSettings[];
 }
 
 const toastClickThroughScript = `
@@ -54,6 +76,93 @@ async function makeToastsClickThrough(target: BrowserContext | Page) {
 export async function expectToast(page: Page, message: string | RegExp) {
   const toast = page.getByRole("alert").filter({ hasText: message }).last();
   await expect(toast).toBeVisible();
+}
+
+function projectColumnEditor(container: Page | Locator, index: number) {
+  return container
+    .locator(`#column-${index}`)
+    .locator(`xpath=ancestor::*[.//*[@id="column-description-${index}"]][1]`);
+}
+
+export async function createProjectThroughUI(
+  page: Page,
+  name: string,
+  options: CreateProjectThroughUIOptions = {}
+) {
+  const {
+    description = "Created by an end-to-end test.",
+    repository,
+    columns,
+  } = options;
+
+  if (columns?.length === 0) {
+    throw new Error("A project needs at least one column");
+  }
+
+  if (columns && columns.filter((column) => column.isDone).length > 1) {
+    throw new Error("A project can only have one done column");
+  }
+
+  await page.getByRole("button", { name: "New project" }).first().click();
+
+  const dialog = page.getByRole("dialog", { name: "Create project" });
+  await dialog.locator("#name").fill(name);
+  await dialog.locator("#description").pressSequentially(description);
+
+  const repositoryFields = {
+    repository_url: repository?.url,
+    repository_owner: repository?.owner,
+    repository_name: repository?.name,
+    default_branch: repository?.defaultBranch,
+    branch_name_prefix: repository?.branchNamePrefix,
+  };
+
+  for (const [field, value] of Object.entries(repositoryFields)) {
+    if (value !== undefined) {
+      await dialog.locator(`#${field}`).fill(value);
+    }
+  }
+
+  if (columns) {
+    let columnCount = 3;
+
+    while (columnCount < columns.length) {
+      await dialog.getByRole("button", { name: "Add column" }).click();
+      columnCount += 1;
+    }
+
+    while (columnCount > columns.length) {
+      const index = columnCount - 1;
+      await projectColumnEditor(dialog, index)
+        .getByRole("button", { name: /^Delete / })
+        .click();
+      columnCount -= 1;
+    }
+
+    for (const [index, column] of columns.entries()) {
+      const editor = projectColumnEditor(dialog, index);
+      await editor.locator(`#column-${index}`).fill(column.name);
+
+      if (column.description !== undefined) {
+        await editor
+          .locator(`#column-description-${index}`)
+          .fill(column.description);
+      }
+
+      if (column.color !== undefined) {
+        await editor.locator(`#column-color-${index}`).fill(column.color);
+      }
+
+      if (column.isDone) {
+        await editor
+          .getByRole("button", { name: /^(Mark as done|Done column)$/ })
+          .click();
+      }
+    }
+  }
+
+  await dialog.getByRole("button", { name: "Create project" }).click();
+  await expectToast(page, "Project created successfully");
 }
 
 export async function openProjectMembersSettings(page: Page) {

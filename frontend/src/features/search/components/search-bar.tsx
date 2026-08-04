@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { Button } from '@/components/button';
-import { Input } from '@/components/input';
+import { Button } from '@/shared/components/button';
+import { Input } from '@/shared/components/input';
 import { cn } from '@/lib/utils';
 import { hasSearchQuery, normalizeSearchQuery } from '@/shared/utils/search';
 

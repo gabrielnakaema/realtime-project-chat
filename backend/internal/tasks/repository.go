@@ -29,11 +29,12 @@ func NewTaskRepository(pool *pgxpool.Pool) *TaskRepository {
 	}
 }
 
-func mapProjectColumn(columnID uuid.UUID, projectID uuid.UUID, name string, color string, position int32, isDone bool, createdAt pgtype.Timestamptz, updatedAt pgtype.Timestamptz) *domain.ProjectColumn {
+func mapProjectColumn(columnID uuid.UUID, projectID uuid.UUID, name string, description string, color string, position int32, isDone bool, createdAt pgtype.Timestamptz, updatedAt pgtype.Timestamptz) *domain.ProjectColumn {
 	return &domain.ProjectColumn{
 		Id:           columnID,
 		ProjectId:    projectID,
 		Name:         name,
+		Description:  description,
 		Color:        color,
 		Position:     int(position),
 		IsDoneColumn: isDone,
@@ -161,9 +162,6 @@ func (tr *TaskRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Ta
 	return tr.getByID(ctx, taskqueries.New(tr.pool), id)
 }
 
-// ClearResponsibleForProjectMember unassigns every task in the given project
-// that was assigned to the given user. Invoked asynchronously when a project
-// member is removed.
 func (tr *TaskRepository) ClearResponsibleForProjectMember(ctx context.Context, projectID uuid.UUID, userID uuid.UUID) error {
 	q := taskqueries.New(tr.pool)
 	return q.ClearTasksResponsibleForProjectMember(ctx, taskqueries.ClearTasksResponsibleForProjectMemberParams{
@@ -304,81 +302,10 @@ func (tr *TaskRepository) ListByProjectId(ctx context.Context, projectId uuid.UU
 
 	tasks := []domain.Task{}
 	for _, result := range results {
-
-		task := domain.Task{
-			Id:              result.ID,
-			ProjectId:       result.ProjectID,
-			AuthorId:        result.AuthorID,
-			Title:           result.Title,
-			Description:     result.Description,
-			Code:            "",
-			ProjectColumnId: result.ProjectColumnID,
-			Priority:        domain.TaskPriority(result.Priority),
-			Order:           result.TaskOrder,
-			Version:         int(result.Version),
-			CreatedAt:       result.CreatedAt.Time,
-			UpdatedAt:       result.UpdatedAt.Time,
-			ProjectColumn: mapProjectColumn(
-				result.ProjectColumnID2,
-				result.ProjectColumnProjectID,
-				result.ProjectColumnName,
-				result.ProjectColumnColor,
-				result.ProjectColumnPosition,
-				result.ProjectColumnIsDoneColumn,
-				result.ProjectColumnCreatedAt,
-				result.ProjectColumnUpdatedAt,
-			),
-		}
-
-		if result.AuthorAuthorID.Valid {
-			user := domain.User{
-				Id:   result.AuthorID,
-				Name: result.AuthorName.String,
-			}
-
-			task.Author = &user
-		}
-
-		if result.ResponsibleResponsibleID.Valid {
-			task.ResponsibleId = (*uuid.UUID)(result.ResponsibleResponsibleID.Bytes[:])
-			task.Responsible = &domain.User{
-				Id:   *task.ResponsibleId,
-				Name: result.ResponsibleName.String,
-			}
-		}
-
-		if result.Tags != nil {
-			bytes, err := json.Marshal(result.Tags)
-			if err != nil {
-				return nil, err
-			}
-			err = json.Unmarshal(bytes, &task.Tags)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if err := mapDependsOnTaskIdsFromResult(result.DependsOnTaskIds, &task); err != nil {
+		task, err := toDomainTask(normalizeListByProjectTask(result))
+		if err != nil {
 			return nil, err
 		}
-
-		if result.DueDate.Valid {
-			task.DueDate = &result.DueDate.Time
-		}
-
-		if result.Code.Valid {
-			task.Code = result.Code.String
-		}
-
-		if result.DoneAt.Valid {
-			task.DoneAt = &result.DoneAt.Time
-		}
-
-		if result.ArchivedAt.Valid {
-			task.ArchivedAt = &result.ArchivedAt.Time
-		}
-
-		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
 
 		tasks = append(tasks, task)
 	}
@@ -797,71 +724,10 @@ func (tr *TaskRepository) ListUserDueTasks(ctx context.Context, userId uuid.UUID
 
 	tasks := []domain.Task{}
 	for _, result := range results {
-		task := domain.Task{
-			Id:              result.ID,
-			ProjectId:       result.ProjectID,
-			ResponsibleId:   (*uuid.UUID)(result.ResponsibleResponsibleID.Bytes[:]),
-			Title:           result.Title,
-			Description:     result.Description,
-			Code:            "",
-			ProjectColumnId: result.ProjectColumnID,
-			Priority:        domain.TaskPriority(result.Priority),
-			Order:           result.TaskOrder,
-			Version:         int(result.Version),
-			CreatedAt:       result.CreatedAt.Time,
-			UpdatedAt:       result.UpdatedAt.Time,
-			ProjectColumn: mapProjectColumn(
-				result.ProjectColumnID2,
-				result.ProjectColumnProjectID,
-				result.ProjectColumnName,
-				result.ProjectColumnColor,
-				result.ProjectColumnPosition,
-				result.ProjectColumnIsDoneColumn,
-				result.ProjectColumnCreatedAt,
-				result.ProjectColumnUpdatedAt,
-			),
-			Project: &domain.Project{
-				Id:          result.ProjectProjectID,
-				Name:        result.ProjectName,
-				Description: result.ProjectDescription,
-				CreatedAt:   result.ProjectCreatedAt.Time,
-				UpdatedAt:   result.ProjectUpdatedAt.Time,
-				UserId:      result.ProjectUserID,
-			},
-		}
-
-		if result.Tags != nil {
-			bytes, err := json.Marshal(result.Tags)
-			if err != nil {
-				return nil, err
-			}
-			err = json.Unmarshal(bytes, &task.Tags)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if err := mapDependsOnTaskIdsFromResult(result.DependsOnTaskIds, &task); err != nil {
+		task, err := toDomainTask(normalizeUserDueTask(result))
+		if err != nil {
 			return nil, err
 		}
-
-		if result.DueDate.Valid {
-			task.DueDate = &result.DueDate.Time
-		}
-
-		if result.Code.Valid {
-			task.Code = result.Code.String
-		}
-
-		if result.DoneAt.Valid {
-			task.DoneAt = &result.DoneAt.Time
-		}
-
-		if result.ArchivedAt.Valid {
-			task.ArchivedAt = &result.ArchivedAt.Time
-		}
-
-		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
 
 		tasks = append(tasks, task)
 	}
@@ -917,92 +783,9 @@ func (tr *TaskRepository) SearchTasks(ctx context.Context, request SearchTasksRe
 
 	tasks := []domain.Task{}
 	for _, result := range results {
-		task := domain.Task{
-			Id:              result.ID,
-			ProjectId:       result.ProjectID,
-			Title:           result.Title,
-			Description:     result.Description,
-			Code:            "",
-			ProjectColumnId: result.ProjectColumnID,
-			Priority:        domain.TaskPriority(result.Priority),
-			Order:           result.TaskOrder,
-			Version:         int(result.Version),
-			CreatedAt:       result.CreatedAt.Time,
-			UpdatedAt:       result.UpdatedAt.Time,
-			AuthorId:        result.AuthorID,
-			ResponsibleId:   (*uuid.UUID)(result.ResponsibleID.Bytes[:]),
-			ProjectColumn: mapProjectColumn(
-				result.ProjectColumnID2,
-				result.ProjectColumnProjectID,
-				result.ProjectColumnName,
-				result.ProjectColumnColor,
-				result.ProjectColumnPosition,
-				result.ProjectColumnIsDoneColumn,
-				result.ProjectColumnCreatedAt,
-				result.ProjectColumnUpdatedAt,
-			),
-		}
-
-		if result.Tags != nil {
-			bytes, err := json.Marshal(result.Tags)
-			if err != nil {
-				return nil, err
-			}
-			err = json.Unmarshal(bytes, &task.Tags)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if err := mapDependsOnTaskIdsFromResult(result.DependsOnTaskIds, &task); err != nil {
+		task, err := toDomainTask(normalizeSearchTask(result))
+		if err != nil {
 			return nil, err
-		}
-
-		if result.DueDate.Valid {
-			task.DueDate = &result.DueDate.Time
-		}
-
-		if result.Code.Valid {
-			task.Code = result.Code.String
-		}
-
-		if result.DoneAt.Valid {
-			task.DoneAt = &result.DoneAt.Time
-		}
-
-		if result.ArchivedAt.Valid {
-			task.ArchivedAt = &result.ArchivedAt.Time
-		}
-
-		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
-
-		if result.ProjectProjectID != uuid.Nil {
-			task.Project = &domain.Project{
-				Id:          result.ProjectProjectID,
-				Name:        result.ProjectName,
-				Description: result.ProjectDescription,
-				CreatedAt:   result.ProjectCreatedAt.Time,
-				UpdatedAt:   result.ProjectUpdatedAt.Time,
-				UserId:      result.ProjectUserID,
-			}
-		}
-
-		if result.AuthorAuthorID.Valid {
-			task.Author = &domain.User{
-				Id:        *(*uuid.UUID)(result.AuthorAuthorID.Bytes[:]),
-				Name:      result.AuthorName.String,
-				Email:     result.AuthorEmail.String,
-				CreatedAt: result.AuthorCreatedAt.Time,
-			}
-		}
-
-		if result.ResponsibleResponsibleID.Valid {
-			task.ResponsibleId = (*uuid.UUID)(result.ResponsibleResponsibleID.Bytes[:])
-			task.Responsible = &domain.User{
-				Id:    *task.ResponsibleId,
-				Name:  result.ResponsibleName.String,
-				Email: result.ResponsibleEmail.String,
-			}
 		}
 
 		tasks = append(tasks, task)
@@ -1146,13 +929,8 @@ func (tr *TaskRepository) FindTaskRefsByProjectAndCode(ctx context.Context, proj
 	return refs, nil
 }
 
-// trailingDigitsPattern matches a run of digits at the end of a task code
-// prefix, e.g. the "9" in "BACKEND-9".
 var trailingDigitsPattern = regexp.MustCompile(`\d+$`)
 
-// taskCodeSequenceBase strips a trailing run of digits from prefix so that
-// e.g. "BACKEND-9" and "BACKEND-" both group under the same numbering
-// sequence. Falls back to the full prefix when it's entirely digits.
 func taskCodeSequenceBase(prefix string) string {
 	base := trailingDigitsPattern.ReplaceAllString(prefix, "")
 	if base == "" {
@@ -1161,9 +939,6 @@ func taskCodeSequenceBase(prefix string) string {
 	return base
 }
 
-// taskCodeLikePattern escapes Postgres LIKE metacharacters so value is
-// matched literally (e.g. a prefix of "AB_1" won't match "ABX1"), then
-// appends a trailing wildcard for prefix matching.
 func taskCodeLikePattern(value string) string {
 	replacer := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 	return replacer.Replace(value) + "%"

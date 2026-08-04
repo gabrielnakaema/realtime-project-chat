@@ -12,7 +12,6 @@ import (
 	"github.com/gabrielnakaema/project-chat/internal/platform/httperr"
 	"github.com/gabrielnakaema/project-chat/internal/utils"
 	"github.com/gabrielnakaema/project-chat/internal/validator"
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -39,13 +38,7 @@ func NewHandler(chatService chatService) *Handler {
 }
 
 func (ch *Handler) GetChatByProjectId(w http.ResponseWriter, r *http.Request) {
-	projectId := chi.URLParam(r, "id")
-	if projectId == "" {
-		httperr.BadRequestResponse(w, errors.New("project_id is required"))
-		return
-	}
-
-	parsedProjectId, err := uuid.Parse(projectId)
+	parsedProjectId, err := platformhttp.ParseURLUUID(r, "id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
@@ -71,13 +64,7 @@ func (ch *Handler) GetChatByProjectId(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ch *Handler) GetChatById(w http.ResponseWriter, r *http.Request) {
-	chatId := chi.URLParam(r, "chatId")
-	if chatId == "" {
-		httperr.BadRequestResponse(w, errors.New("chatId is required"))
-		return
-	}
-
-	parsedChatId, err := uuid.Parse(chatId)
+	parsedChatId, err := platformhttp.ParseURLUUID(r, "chatId")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
@@ -197,49 +184,36 @@ func (ch *Handler) ListGeneralChats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ch *Handler) ListChatMessages(w http.ResponseWriter, r *http.Request) {
-	chatId := chi.URLParam(r, "chatId")
-	if chatId == "" {
-		httperr.BadRequestResponse(w, errors.New("chatId is required"))
-		return
-	}
-
-	limit := platformhttp.GetQueryInt(r, "limit", 10)
-	if limit <= 0 {
-		httperr.BadRequestResponse(w, errors.New("limit must be greater than 0"))
-		return
-	}
-
-	if limit > 50 {
-		httperr.BadRequestResponse(w, errors.New("limit must be less than 50"))
-		return
-	}
-
-	before := platformhttp.GetQueryString(r, "before", "")
-	beforeTime := time.Now()
-	if before != "" {
-		date, err := time.Parse(time.RFC3339, before)
-		if err != nil {
-			httperr.BadRequestResponse(w, errors.New("invalid before date"))
-			return
-		}
-		beforeTime = date
-	}
-
-	beforeId := platformhttp.GetQueryString(r, "id", "")
-	beforeIdUUID := uuid.Nil
-	if beforeId != "" {
-		parsedBeforeId, err := uuid.Parse(beforeId)
-		if err != nil {
-			httperr.BadRequestResponse(w, err)
-			return
-		}
-		beforeIdUUID = parsedBeforeId
-	}
-
-	parsedChatId, err := uuid.Parse(chatId)
+	parsedChatId, err := platformhttp.ParseURLUUID(r, "chatId")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
+	}
+
+	limit, err := platformhttp.ParseLimit(r, 10, 50)
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
+	}
+
+	beforeTime := time.Now()
+	parsedBeforeTime, err := platformhttp.ParseRFC3339Cursor(r, "before")
+	if err != nil {
+		httperr.BadRequestResponse(w, errors.New("invalid before date"))
+		return
+	}
+	if parsedBeforeTime != nil {
+		beforeTime = *parsedBeforeTime
+	}
+
+	beforeIdUUID := uuid.Nil
+	parsedBeforeId, err := platformhttp.ParseOptionalQueryUUID(r, "id")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
+	}
+	if parsedBeforeId != nil {
+		beforeIdUUID = *parsedBeforeId
 	}
 
 	userId := auth.UserIdFromContext(r.Context())
@@ -274,13 +248,7 @@ func (ch *Handler) ListChatMessages(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ch *Handler) MarkChatRead(w http.ResponseWriter, r *http.Request) {
-	chatId := chi.URLParam(r, "chatId")
-	if chatId == "" {
-		httperr.BadRequestResponse(w, errors.New("chatId is required"))
-		return
-	}
-
-	parsedChatId, err := uuid.Parse(chatId)
+	parsedChatId, err := platformhttp.ParseURLUUID(r, "chatId")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
@@ -320,20 +288,13 @@ func (ch *Handler) MarkChatRead(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ch *Handler) ListMessageReads(w http.ResponseWriter, r *http.Request) {
-	chatId := chi.URLParam(r, "chatId")
-	messageId := chi.URLParam(r, "messageId")
-	if chatId == "" || messageId == "" {
-		httperr.BadRequestResponse(w, errors.New("chatId and messageId are required"))
-		return
-	}
-
-	parsedChatId, err := uuid.Parse(chatId)
+	parsedChatId, err := platformhttp.ParseURLUUID(r, "chatId")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
 	}
 
-	parsedMessageId, err := uuid.Parse(messageId)
+	parsedMessageId, err := platformhttp.ParseURLUUID(r, "messageId")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
@@ -363,49 +324,36 @@ func (ch *Handler) ListMessageReads(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ch *Handler) ListMessagesByProjectId(w http.ResponseWriter, r *http.Request) {
-	projectId := chi.URLParam(r, "id")
-	if projectId == "" {
-		httperr.BadRequestResponse(w, errors.New("project_id is required"))
-		return
-	}
-
-	limit := platformhttp.GetQueryInt(r, "limit", 10)
-	if limit <= 0 {
-		httperr.BadRequestResponse(w, errors.New("limit must be greater than 0"))
-		return
-	}
-
-	if limit > 50 {
-		httperr.BadRequestResponse(w, errors.New("limit must be less than 50"))
-		return
-	}
-
-	before := platformhttp.GetQueryString(r, "before", "")
-	beforeTime := time.Now()
-	if before != "" {
-		date, err := time.Parse(time.RFC3339, before)
-		if err != nil {
-			httperr.BadRequestResponse(w, errors.New("invalid before date"))
-			return
-		}
-		beforeTime = date
-	}
-
-	beforeId := platformhttp.GetQueryString(r, "id", "")
-	beforeIdUUID := uuid.Nil
-	if beforeId != "" {
-		parsedBeforeId, err := uuid.Parse(beforeId)
-		if err != nil {
-			httperr.BadRequestResponse(w, err)
-			return
-		}
-		beforeIdUUID = parsedBeforeId
-	}
-
-	parsedProjectId, err := uuid.Parse(projectId)
+	parsedProjectId, err := platformhttp.ParseURLUUID(r, "id")
 	if err != nil {
 		httperr.BadRequestResponse(w, err)
 		return
+	}
+
+	limit, err := platformhttp.ParseLimit(r, 10, 50)
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
+	}
+
+	beforeTime := time.Now()
+	parsedBeforeTime, err := platformhttp.ParseRFC3339Cursor(r, "before")
+	if err != nil {
+		httperr.BadRequestResponse(w, errors.New("invalid before date"))
+		return
+	}
+	if parsedBeforeTime != nil {
+		beforeTime = *parsedBeforeTime
+	}
+
+	beforeIdUUID := uuid.Nil
+	parsedBeforeId, err := platformhttp.ParseOptionalQueryUUID(r, "id")
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
+	}
+	if parsedBeforeId != nil {
+		beforeIdUUID = *parsedBeforeId
 	}
 
 	userId := auth.UserIdFromContext(r.Context())

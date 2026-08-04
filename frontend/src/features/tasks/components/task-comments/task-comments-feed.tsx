@@ -2,7 +2,7 @@ import { EmptyTaskCommentsState } from './empty-task-comments-state';
 import { TaskCommentItem } from './task-comment-item';
 import type { UseTaskCommentsResult } from './use-task-comments';
 import { LoadingSpinner } from '@/shared/components/loading';
-import { Button } from '@/components/button';
+import { Button } from '@/shared/components/button';
 
 interface TaskCommentsFeedProps {
   taskComments: UseTaskCommentsResult;
@@ -39,7 +39,7 @@ export const TaskCommentsFeed = ({ taskComments }: TaskCommentsFeedProps) => {
         <div className="flex justify-center pb-2">
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             onClick={() => fetchPreviousPage()}
             disabled={isFetchingPreviousPage}
             className="text-muted-foreground hover:bg-card bg-transparent"

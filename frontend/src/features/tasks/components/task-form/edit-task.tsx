@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from '@/shared/components/ui/dialog';
 import { LoadingSpinner } from '@/shared/components/loading';
-import { Button } from '@/components/button';
+import { Button } from '@/shared/components/button';
 import { useProjectMembers } from '@/features/projects/hooks/use-project-members';
 import { handleSuccess } from '@/shared/utils/handle-success';
 import { reconcileTask } from '@/features/tasks/hooks/task-board-cache';
@@ -145,7 +145,7 @@ export const EditTask = ({ taskId, open, onOpenChange }: EditTaskProps) => {
             </div>
             <div className="border-border flex w-full shrink-0 items-center justify-end gap-4 border-t px-6 py-4">
               <DialogClose asChild>
-                <Button type="button" variant="secondary">
+                <Button type="button" variant="outline">
                   Cancel
                 </Button>
               </DialogClose>

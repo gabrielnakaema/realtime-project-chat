@@ -496,6 +496,7 @@ SELECT
     'id', ps.id,
     'project_id', ps.project_id,
     'name', ps.name,
+    'description', ps.description,
     'color', ps.color,
     'position', ps.position,
     'is_done_column', ps.is_done_column,
@@ -637,6 +638,7 @@ SELECT
   ps.id as project_column_id_2,
   ps.project_id as project_column_project_id,
   ps.name as project_column_name,
+  ps.description as project_column_description,
   ps.color as project_column_color,
   ps.position as project_column_position,
   ps.is_done_column as project_column_is_done_column,
@@ -644,8 +646,12 @@ SELECT
   ps.updated_at as project_column_updated_at,
   a.id as author_author_id,
   a.name as author_name,
+  a.email as author_email,
+  a.created_at as author_created_at,
   r.id as responsible_responsible_id,
   r.name as responsible_name,
+  r.email as responsible_email,
+  r.created_at as responsible_created_at,
   coalesce(jsonb_agg(DISTINCT tt.name) filter (where tt.name is not null), '[]') as tags,
   coalesce(jsonb_agg(DISTINCT td.depends_on_task_id) filter (where td.depends_on_task_id is not null), '[]') as depends_on_task_ids
 FROM tasks t
@@ -668,7 +674,7 @@ AND (
   OR t.task_order > $6::text
   OR (t.task_order = $6::text AND t.updated_at < $5::timestamptz)
 )
-GROUP BY t.id, ps.id, a.name, a.id, r.name, r.id
+GROUP BY t.id, ps.id, a.id, a.name, a.email, a.created_at, r.id, r.name, r.email, r.created_at
 ORDER BY t.task_order ASC, t.updated_at DESC
 LIMIT $2
 `
@@ -702,6 +708,7 @@ type ListTasksByProjectIdRow struct {
 	ProjectColumnID2          uuid.UUID
 	ProjectColumnProjectID    uuid.UUID
 	ProjectColumnName         string
+	ProjectColumnDescription  string
 	ProjectColumnColor        string
 	ProjectColumnPosition     int32
 	ProjectColumnIsDoneColumn bool
@@ -709,8 +716,12 @@ type ListTasksByProjectIdRow struct {
 	ProjectColumnUpdatedAt    pgtype.Timestamptz
 	AuthorAuthorID            pgtype.UUID
 	AuthorName                pgtype.Text
+	AuthorEmail               pgtype.Text
+	AuthorCreatedAt           pgtype.Timestamptz
 	ResponsibleResponsibleID  pgtype.UUID
 	ResponsibleName           pgtype.Text
+	ResponsibleEmail          pgtype.Text
+	ResponsibleCreatedAt      pgtype.Timestamptz
 	Tags                      interface{}
 	DependsOnTaskIds          interface{}
 }
@@ -751,6 +762,7 @@ func (q *Queries) ListTasksByProjectId(ctx context.Context, arg ListTasksByProje
 			&i.ProjectColumnID2,
 			&i.ProjectColumnProjectID,
 			&i.ProjectColumnName,
+			&i.ProjectColumnDescription,
 			&i.ProjectColumnColor,
 			&i.ProjectColumnPosition,
 			&i.ProjectColumnIsDoneColumn,
@@ -758,8 +770,12 @@ func (q *Queries) ListTasksByProjectId(ctx context.Context, arg ListTasksByProje
 			&i.ProjectColumnUpdatedAt,
 			&i.AuthorAuthorID,
 			&i.AuthorName,
+			&i.AuthorEmail,
+			&i.AuthorCreatedAt,
 			&i.ResponsibleResponsibleID,
 			&i.ResponsibleName,
+			&i.ResponsibleEmail,
+			&i.ResponsibleCreatedAt,
 			&i.Tags,
 			&i.DependsOnTaskIds,
 		); err != nil {
@@ -779,6 +795,7 @@ SELECT
   ps.id as project_column_id_2,
   ps.project_id as project_column_project_id,
   ps.name as project_column_name,
+  ps.description as project_column_description,
   ps.color as project_column_color,
   ps.position as project_column_position,
   ps.is_done_column as project_column_is_done_column,
@@ -790,12 +807,24 @@ SELECT
   p.created_at as project_created_at,
   p.updated_at as project_updated_at,
   p.user_id as project_user_id,
+  p.repository_url as project_repository_url,
+  p.repository_owner as project_repository_owner,
+  p.repository_name as project_repository_name,
+  p.default_branch as project_default_branch,
+  p.branch_name_prefix as project_branch_name_prefix,
+  a.id as author_author_id,
+  a.name as author_name,
+  a.email as author_email,
+  a.created_at as author_created_at,
   r.id as responsible_responsible_id,
   r.name as responsible_name,
+  r.email as responsible_email,
+  r.created_at as responsible_created_at,
   coalesce(jsonb_agg(DISTINCT tt.name) filter (where tt.name is not null), '[]') as tags,
   coalesce(jsonb_agg(DISTINCT td.depends_on_task_id) filter (where td.depends_on_task_id is not null), '[]') as depends_on_task_ids
 FROM tasks t
 JOIN project_columns ps ON ps.id = t.project_column_id
+LEFT JOIN users a ON a.id = t.author_id
 LEFT JOIN users r ON r.id = t.responsible_id
 LEFT JOIN task_tags tt ON tt.task_id = t.id
 LEFT JOIN task_dependencies td ON td.task_id = t.id
@@ -810,7 +839,9 @@ AND (
   OR t.due_date > $3::timestamptz
   OR (t.due_date = $3::timestamptz AND t.updated_at < $4::timestamptz)
 )
-GROUP BY t.id, ps.id, r.name, r.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id
+GROUP BY t.id, ps.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id,
+  p.repository_url, p.repository_owner, p.repository_name, p.default_branch, p.branch_name_prefix,
+  a.id, a.name, a.email, a.created_at, r.id, r.name, r.email, r.created_at
 ORDER BY t.due_date ASC, t.updated_at DESC
 LIMIT $2
 `
@@ -842,6 +873,7 @@ type ListUserDueTasksRow struct {
 	ProjectColumnID2          uuid.UUID
 	ProjectColumnProjectID    uuid.UUID
 	ProjectColumnName         string
+	ProjectColumnDescription  string
 	ProjectColumnColor        string
 	ProjectColumnPosition     int32
 	ProjectColumnIsDoneColumn bool
@@ -853,8 +885,19 @@ type ListUserDueTasksRow struct {
 	ProjectCreatedAt          pgtype.Timestamptz
 	ProjectUpdatedAt          pgtype.Timestamptz
 	ProjectUserID             uuid.UUID
+	ProjectRepositoryUrl      pgtype.Text
+	ProjectRepositoryOwner    pgtype.Text
+	ProjectRepositoryName     pgtype.Text
+	ProjectDefaultBranch      pgtype.Text
+	ProjectBranchNamePrefix   pgtype.Text
+	AuthorAuthorID            pgtype.UUID
+	AuthorName                pgtype.Text
+	AuthorEmail               pgtype.Text
+	AuthorCreatedAt           pgtype.Timestamptz
 	ResponsibleResponsibleID  pgtype.UUID
 	ResponsibleName           pgtype.Text
+	ResponsibleEmail          pgtype.Text
+	ResponsibleCreatedAt      pgtype.Timestamptz
 	Tags                      interface{}
 	DependsOnTaskIds          interface{}
 }
@@ -893,6 +936,7 @@ func (q *Queries) ListUserDueTasks(ctx context.Context, arg ListUserDueTasksPara
 			&i.ProjectColumnID2,
 			&i.ProjectColumnProjectID,
 			&i.ProjectColumnName,
+			&i.ProjectColumnDescription,
 			&i.ProjectColumnColor,
 			&i.ProjectColumnPosition,
 			&i.ProjectColumnIsDoneColumn,
@@ -904,8 +948,19 @@ func (q *Queries) ListUserDueTasks(ctx context.Context, arg ListUserDueTasksPara
 			&i.ProjectCreatedAt,
 			&i.ProjectUpdatedAt,
 			&i.ProjectUserID,
+			&i.ProjectRepositoryUrl,
+			&i.ProjectRepositoryOwner,
+			&i.ProjectRepositoryName,
+			&i.ProjectDefaultBranch,
+			&i.ProjectBranchNamePrefix,
+			&i.AuthorAuthorID,
+			&i.AuthorName,
+			&i.AuthorEmail,
+			&i.AuthorCreatedAt,
 			&i.ResponsibleResponsibleID,
 			&i.ResponsibleName,
+			&i.ResponsibleEmail,
+			&i.ResponsibleCreatedAt,
 			&i.Tags,
 			&i.DependsOnTaskIds,
 		); err != nil {
@@ -1036,6 +1091,7 @@ SELECT t.id, t.project_id, t.title, t.description, t.created_at, t.updated_at, t
   ps.id as project_column_id_2,
   ps.project_id as project_column_project_id,
   ps.name as project_column_name,
+  ps.description as project_column_description,
   ps.color as project_column_color,
   ps.position as project_column_position,
   ps.is_done_column as project_column_is_done_column,
@@ -1047,6 +1103,11 @@ SELECT t.id, t.project_id, t.title, t.description, t.created_at, t.updated_at, t
   p.created_at as project_created_at,
   p.updated_at as project_updated_at,
   p.user_id as project_user_id,
+  p.repository_url as project_repository_url,
+  p.repository_owner as project_repository_owner,
+  p.repository_name as project_repository_name,
+  p.default_branch as project_default_branch,
+  p.branch_name_prefix as project_branch_name_prefix,
   r.id as responsible_responsible_id,
   r.name as responsible_name,
   r.email as responsible_email,
@@ -1100,7 +1161,9 @@ AND (
     )
   )
 )
-GROUP BY t.id, ps.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id, r.id, r.name, r.email, r.created_at, a.id, a.name, a.email, a.created_at
+GROUP BY t.id, ps.id, p.id, p.name, p.description, p.created_at, p.updated_at, p.user_id,
+  p.repository_url, p.repository_owner, p.repository_name, p.default_branch, p.branch_name_prefix,
+  r.id, r.name, r.email, r.created_at, a.id, a.name, a.email, a.created_at
 ORDER BY t.due_date ASC NULLS LAST, t.updated_at DESC, t.id ASC
 LIMIT $2
 `
@@ -1138,6 +1201,7 @@ type SearchTasksForUserRow struct {
 	ProjectColumnID2          uuid.UUID
 	ProjectColumnProjectID    uuid.UUID
 	ProjectColumnName         string
+	ProjectColumnDescription  string
 	ProjectColumnColor        string
 	ProjectColumnPosition     int32
 	ProjectColumnIsDoneColumn bool
@@ -1149,6 +1213,11 @@ type SearchTasksForUserRow struct {
 	ProjectCreatedAt          pgtype.Timestamptz
 	ProjectUpdatedAt          pgtype.Timestamptz
 	ProjectUserID             uuid.UUID
+	ProjectRepositoryUrl      pgtype.Text
+	ProjectRepositoryOwner    pgtype.Text
+	ProjectRepositoryName     pgtype.Text
+	ProjectDefaultBranch      pgtype.Text
+	ProjectBranchNamePrefix   pgtype.Text
 	ResponsibleResponsibleID  pgtype.UUID
 	ResponsibleName           pgtype.Text
 	ResponsibleEmail          pgtype.Text
@@ -1201,6 +1270,7 @@ func (q *Queries) SearchTasksForUser(ctx context.Context, arg SearchTasksForUser
 			&i.ProjectColumnID2,
 			&i.ProjectColumnProjectID,
 			&i.ProjectColumnName,
+			&i.ProjectColumnDescription,
 			&i.ProjectColumnColor,
 			&i.ProjectColumnPosition,
 			&i.ProjectColumnIsDoneColumn,
@@ -1212,6 +1282,11 @@ func (q *Queries) SearchTasksForUser(ctx context.Context, arg SearchTasksForUser
 			&i.ProjectCreatedAt,
 			&i.ProjectUpdatedAt,
 			&i.ProjectUserID,
+			&i.ProjectRepositoryUrl,
+			&i.ProjectRepositoryOwner,
+			&i.ProjectRepositoryName,
+			&i.ProjectDefaultBranch,
+			&i.ProjectBranchNamePrefix,
 			&i.ResponsibleResponsibleID,
 			&i.ResponsibleName,
 			&i.ResponsibleEmail,

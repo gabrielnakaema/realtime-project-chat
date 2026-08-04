@@ -1,5 +1,4 @@
 import { KeyRound, Plus } from 'lucide-react';
-import { Button } from '../../../components/button';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +10,7 @@ import {
 import { useCreateMcpKeyDialog } from '../hooks/use-create-mcp-key-dialog';
 import { CreateMCPKeyRevealStep, DismissRevealPromptDialog } from './create-mcp-key-dialog-steps';
 import { MCPAPIKeyForm } from './mcp-key-form';
+import { Button } from '@/shared/components/button';
 import { mcpAPIKeyDefaultValues } from '@/features/mcp-access/schemas/mcp-api-key.schema';
 
 interface CreateMCPKeyButtonProps {

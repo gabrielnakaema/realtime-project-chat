@@ -98,16 +98,28 @@ interface ReconcileOptions {
   optimistic?: boolean;
 }
 
+function updateTaskDetailsCache(queryClient: QueryClient, task: Task, currentDetails: Task | undefined) {
+  if (!currentDetails) return;
+
+  queryClient.setQueryData<Task>(taskQueryKeys.details(task.id), {
+    ...currentDetails,
+    ...task,
+    updates: Array.isArray(task.updates) && task.updates.length > 0 ? task.updates : currentDetails.updates,
+  });
+}
+
 export function reconcileTask(queryClient: QueryClient, task: Task, options: ReconcileOptions = {}) {
   const projectId = task.project_id;
   const targetColumnId = task.project_column_id;
   const current = findTaskOnBoard(queryClient, projectId, task.id);
+  const currentDetails = queryClient.getQueryData<Task>(taskQueryKeys.details(task.id));
 
   if (!options.optimistic) {
     const versions = versionsFor(queryClient);
-    const lastSeen = Math.max(versions.get(task.id) ?? -1, current?.task.version ?? -1);
+    const lastSeen = Math.max(versions.get(task.id) ?? -1, current?.task.version ?? -1, currentDetails?.version ?? -1);
     if (task.version <= lastSeen) return;
     versions.set(task.id, task.version);
+    updateTaskDetailsCache(queryClient, task, currentDetails);
   }
 
   const invalidateCounts = () => {
