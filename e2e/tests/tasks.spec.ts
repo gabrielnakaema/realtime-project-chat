@@ -152,7 +152,7 @@ test.describe("tasks", () => {
     ).toBeVisible();
     await expect(
       taskDetails
-        .getByText("Status", { exact: true })
+        .getByText("Column", { exact: true })
         .locator("..")
         .getByText("Doing", { exact: true })
     ).toBeVisible();
@@ -251,7 +251,7 @@ test.describe("tasks", () => {
     let taskDetails = page.getByRole("dialog", { name: taskTitle });
     await expect(
       taskDetails
-        .getByText("Status", { exact: true })
+        .getByText("Column", { exact: true })
         .locator("..")
         .getByText("Done", { exact: true })
     ).toBeVisible();
@@ -265,7 +265,7 @@ test.describe("tasks", () => {
     taskDetails = page.getByRole("dialog", { name: taskTitle });
     await expect(
       taskDetails
-        .getByText("Status", { exact: true })
+        .getByText("Column", { exact: true })
         .locator("..")
         .getByText("Done", { exact: true })
     ).toBeVisible();
@@ -538,7 +538,7 @@ test.describe("tasks", () => {
     taskDetails = await openTaskDetails(page, taskTitle);
     await expect(
       taskDetails
-        .getByText("Status", { exact: true })
+        .getByText("Column", { exact: true })
         .locator("..")
         .getByText("Doing", { exact: true })
     ).toBeVisible();

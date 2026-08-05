@@ -8,7 +8,6 @@ const createTask = (overrides: Partial<Task> = {}): Task => ({
   title: 'Implement dependencies',
   description: '<p>Details</p>',
   code: 'FRONTEND-3',
-  status: 'pending',
   project_column_id: 'column-1',
   project_column: null,
   created_at: '2026-06-08T00:00:00Z',

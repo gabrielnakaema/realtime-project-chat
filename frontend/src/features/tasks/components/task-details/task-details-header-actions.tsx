@@ -1,15 +1,19 @@
 import { Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import type { TaskStatus } from '@/features/tasks/types/task';
 
 interface TaskDetailsHeaderActionsProps {
-  status: TaskStatus;
+  archivedAt: string | null;
   isArchiving: boolean;
   onEdit: () => void;
   onArchive: () => void;
 }
 
-export const TaskDetailsHeaderActions = ({ status, isArchiving, onEdit, onArchive }: TaskDetailsHeaderActionsProps) => {
+export const TaskDetailsHeaderActions = ({
+  archivedAt,
+  isArchiving,
+  onEdit,
+  onArchive,
+}: TaskDetailsHeaderActionsProps) => {
   const [isConfirmingArchive, setIsConfirmingArchive] = useState(false);
 
   if (isConfirmingArchive) {
@@ -45,7 +49,7 @@ export const TaskDetailsHeaderActions = ({ status, isArchiving, onEdit, onArchiv
       >
         <Pencil className="text-muted-foreground h-4 w-4" />
       </button>
-      {status !== 'archived' && (
+      {archivedAt === null && (
         <button
           type="button"
           aria-label="Archive task"

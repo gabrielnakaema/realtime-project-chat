@@ -9,7 +9,6 @@ const createTask = (id: string, order: string, updatedAt: string): Task => ({
   title: `Task ${id}`,
   description: '',
   code: '',
-  status: 'todo',
   project_column_id: 'column-1',
   project_column: null,
   created_at: updatedAt,

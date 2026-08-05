@@ -2,8 +2,6 @@ import type { ActionOrigin } from './action-origin';
 import type { Project, ProjectColumn } from '@/features/projects/types/project';
 import type { User } from '@/shared/types/user';
 
-export type TaskStatus = string;
-
 export type TaskPriority = 'low' | 'medium' | 'high';
 
 export interface TaskDependencyRef {
@@ -23,7 +21,6 @@ export interface Task {
   title: string;
   description: string;
   code: string | null;
-  status: TaskStatus;
   project_column_id: string;
   project_column: ProjectColumn | null;
   created_at: string;

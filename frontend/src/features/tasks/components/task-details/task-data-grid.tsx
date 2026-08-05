@@ -1,7 +1,7 @@
 import { Calendar, CircleCheck, ClockArrowUp, GitBranch, Hash, Tag, User } from 'lucide-react';
 import { TaskCodeBadge } from '../task-code-badge';
 import { TaskPriorityBadge } from '../task-priority-badge';
-import { TaskStatusBadge } from '../task-status-badge';
+import { TaskColumnBadge } from '../task-column-badge';
 import type { Task } from '@/features/tasks/types/task';
 import { formatDateString, formatTaskDueDate } from '@/shared/utils/date';
 import { useTaskDetailsRouting } from '@/features/tasks/hooks/use-task-details-routing';
@@ -35,8 +35,8 @@ export const TaskDataGrid = ({ task }: TaskDataGridProps) => {
 
       <div className={infoFieldClassNames}>
         <CircleCheck className={infoIconClassNames} />
-        <p className={infoTitleClassNames}>Status</p>
-        <TaskStatusBadge status={task.status} label={task.project_column?.name} color={task.project_column?.color} />
+        <p className={infoTitleClassNames}>Column</p>
+        <TaskColumnBadge label={task.project_column?.name} color={task.project_column?.color} />
       </div>
 
       <div className={infoFieldClassNames}>

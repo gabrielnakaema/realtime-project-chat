@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import { ActionOriginBadge } from '../action-origin-badge';
 import { TaskPriorityBadge } from '../task-priority-badge';
-import { TaskStatusBadge } from '../task-status-badge';
+import { TaskColumnBadge } from '../task-column-badge';
 import type { TaskChange, TaskPriority, TaskUpdate } from '@/features/tasks/types/task';
 import { Avatar } from '@/shared/components/avatar';
 import { formatTaskDueDate } from '@/shared/utils/date';
@@ -110,7 +110,7 @@ const UpdateSummary = ({ update, currentUserId }: { update: TaskUpdate; currentU
     return (
       <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm">
         <Actor name={update.user.name} actionOrigin={update.action_origin} isCurrentUser={isCurrentUser} /> moved to{' '}
-        <TaskStatusBadge status={changes[0].new_value} label={changes[0].new_display_value ?? changes[0].new_value} />
+        <TaskColumnBadge label={changes[0].new_display_value ?? changes[0].new_value} />
       </p>
     );
   }
@@ -160,9 +160,9 @@ const ChangeRow = ({ change }: { change: TaskChange }) => {
     return (
       <div className="flex items-center gap-1.5">
         <span className="text-muted-foreground w-20 shrink-0 text-xs">{fieldLabels.column}</span>
-        <TaskStatusBadge status={change.old_value} label={change.old_display_value ?? change.old_value} />
+        <TaskColumnBadge label={change.old_display_value ?? change.old_value} />
         <ArrowRight className="text-muted-foreground h-3 w-3 shrink-0" />
-        <TaskStatusBadge status={change.new_value} label={change.new_display_value ?? change.new_value} />
+        <TaskColumnBadge label={change.new_display_value ?? change.new_value} />
       </div>
     );
   }

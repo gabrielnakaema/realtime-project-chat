@@ -44,7 +44,6 @@ const createTaskActivity = (actionOrigin?: TaskProjectActivity['action_origin'])
     title: 'Ship MCP badge',
     description: 'desc',
     code: 'MCP-1',
-    status: 'doing',
     project_column_id: 'column-1',
     project_column: null,
     created_at: '2026-06-03T10:00:00.000Z',

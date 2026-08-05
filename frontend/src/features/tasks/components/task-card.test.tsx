@@ -39,7 +39,6 @@ const task: Task = {
   title: 'Ship prop-drilling fix',
   description: '<p>Refactor the board click path</p>',
   code: 'TASK-1',
-  status: 'todo',
   project_column_id: 'column-1',
   project_column: null,
   created_at: '2026-06-05T10:00:00.000Z',

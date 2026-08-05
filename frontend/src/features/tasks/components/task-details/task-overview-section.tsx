@@ -1,4 +1,4 @@
-import { TaskStatusBadge } from '../task-status-badge';
+import { TaskColumnBadge } from '../task-column-badge';
 import { TaskDataGrid } from './task-data-grid';
 import type { Task } from '@/features/tasks/types/task';
 import { isHtmlContentEmpty, richTextListClassName, sanitizeHTML } from '@/shared/utils/html';
@@ -13,7 +13,7 @@ export const TaskOverviewSection = ({ task }: TaskOverviewSectionProps) => {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase">Overview</h3>
-        <TaskStatusBadge status={task.status} label={task.project_column?.name} color={task.project_column?.color} />
+        <TaskColumnBadge label={task.project_column?.name} color={task.project_column?.color} />
       </div>
 
       <div className="border-border bg-muted/60 rounded-2xl border p-5">

@@ -1,5 +1,5 @@
 import { ListTodo, Loader2 } from 'lucide-react';
-import { TaskStatusBadge } from '@/features/tasks/components/task-status-badge';
+import { TaskColumnBadge } from '@/features/tasks/components/task-column-badge';
 import { TaskLinkRow } from '@/features/tasks/components/task-link-row';
 import { SearchEmptyState } from '@/features/search/components/empty-state';
 import { useSearchTasks } from '@/features/search/hooks/use-search-tasks';
@@ -31,11 +31,7 @@ export const TaskSearchResults = ({ query }: TaskSearchResultsProps) => {
                 key={task.id}
                 task={task}
                 trailingContent={
-                  <TaskStatusBadge
-                    status={task.status}
-                    label={task.project_column?.name}
-                    color={task.project_column?.color}
-                  />
+                  <TaskColumnBadge label={task.project_column?.name} color={task.project_column?.color} />
                 }
               />
             ))}

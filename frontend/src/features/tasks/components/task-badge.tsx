@@ -1,4 +1,4 @@
-import type { TaskPriority, TaskStatus } from '@/features/tasks/types/task';
+import type { TaskPriority } from '@/features/tasks/types/task';
 import { cn } from '@/lib/utils';
 
 export type TaskBadgeColor = 'blue' | 'green' | 'yellow' | 'red' | 'slate';
@@ -22,13 +22,6 @@ export const priorityToColor: Record<TaskPriority, TaskBadgeColor> = {
   low: 'green',
   medium: 'yellow',
   high: 'red',
-};
-
-export const statusToColor: Record<TaskStatus, TaskBadgeColor> = {
-  pending: 'slate',
-  doing: 'blue',
-  done: 'green',
-  archived: 'red',
 };
 
 export const TaskBadge = ({ children, color, className, style }: TaskBadgeProps) => {

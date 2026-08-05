@@ -605,7 +605,7 @@ test.describe("projects", () => {
     const taskDetails = page.getByRole("dialog", { name: taskTitle });
     await expect(
       taskDetails
-        .getByText("Status", { exact: true })
+        .getByText("Column", { exact: true })
         .locator("..")
         .getByText("Done", { exact: true })
     ).toBeVisible();
@@ -708,9 +708,7 @@ test.describe("projects", () => {
       name: `Delete ${projectName}?`,
     });
     await expect(confirmDialog).toBeVisible();
-    await confirmDialog
-      .getByRole("button", { name: "Delete project" })
-      .click();
+    await confirmDialog.getByRole("button", { name: "Delete project" }).click();
 
     await expectToast(page, "Project deleted successfully");
     await expect(page).toHaveURL(/\/projects\/?$/);

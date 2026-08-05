@@ -59,7 +59,7 @@ export const TaskDetails = ({
           </div>
           <div className="flex items-center gap-2">
             <TaskDetailsHeaderActions
-              status={task.status}
+              archivedAt={task.archived_at}
               isArchiving={isArchiving}
               onEdit={onEdit}
               onArchive={archive}
