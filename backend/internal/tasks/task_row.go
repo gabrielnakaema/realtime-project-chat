@@ -273,9 +273,7 @@ func toDomainTask(record taskRecord) (domain.Task, error) {
 		return domain.Task{}, err
 	}
 
-	if task.ProjectColumn != nil {
-		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
-	}
+	task.Status = domain.TaskStatusIn(task.ProjectColumn, task.ArchivedAt)
 
 	return task, nil
 }

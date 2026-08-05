@@ -16,23 +16,23 @@ import (
 )
 
 type taskRepository interface {
+	CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error)
 	Create(ctx context.Context, task *domain.Task, buildEvents func(*domain.Task) []outbox.Message) error
-	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
-	FindTaskRefsByProjectAndCode(ctx context.Context, projectId uuid.UUID, code string) ([]domain.TaskDependencyRef, error)
-	SuggestTaskCodesByProjectPrefix(ctx context.Context, projectId uuid.UUID, prefix string, limit int) ([]domain.TaskCodeSuggestion, error)
-	ListByProjectId(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, archived bool, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
-	Update(ctx context.Context, task *domain.Task, buildEvents func(*domain.Task) []outbox.Message) error
 	CreateUpdates(ctx context.Context, task *domain.Task, updates []domain.TaskUpdate) error
+	FindTaskRefsByProjectAndCode(ctx context.Context, projectId uuid.UUID, code string) ([]domain.TaskDependencyRef, error)
+	GetById(ctx context.Context, id uuid.UUID) (*domain.Task, error)
 	GetFirstTaskInColumn(ctx context.Context, projectId uuid.UUID, projectColumnID uuid.UUID) (*domain.Task, error)
 	GetProjectTaskAfterId(ctx context.Context, id uuid.UUID, projectId uuid.UUID) (*domain.Task, error)
-	MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error)
-	WithProjectColumnMoveLock(ctx context.Context, projectColumnID uuid.UUID, fn func(context.Context) error) error
-	CountTasksByProjectIdAndColumn(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID) (map[string]int, error)
-	ListUserDueTasks(ctx context.Context, userId uuid.UUID, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
-	SearchTasks(ctx context.Context, request SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error)
-	SearchProjectTasksForDependencies(ctx context.Context, projectId uuid.UUID, query string, excludeTaskId *uuid.UUID, limit int) ([]domain.TaskDependencyRef, error)
 	GetTaskDependencyRefsByProjectAndIds(ctx context.Context, projectId uuid.UUID, taskIds []uuid.UUID) ([]domain.TaskDependencyRef, error)
+	ListByProjectId(ctx context.Context, projectId uuid.UUID, projectColumnIDs []uuid.UUID, archived bool, taskOrder string, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
 	ListTaskDependenciesByProjectId(ctx context.Context, projectId uuid.UUID) ([]domain.TaskDependencyEdge, error)
+	ListUserDueTasks(ctx context.Context, userId uuid.UUID, cursorDueDate *time.Time, cursorUpdatedAt *time.Time, limit int) (*utils.CursorPaginated[domain.Task], error)
+	MoveTask(ctx context.Context, placement *domain.TaskPlacement, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error)
+	SearchProjectTasksForDependencies(ctx context.Context, projectId uuid.UUID, query string, excludeTaskId *uuid.UUID, limit int) ([]domain.TaskDependencyRef, error)
+	SearchTasks(ctx context.Context, request SearchTasksRequest) (*utils.CursorPaginated[domain.Task], error)
+	SuggestTaskCodesByProjectPrefix(ctx context.Context, projectId uuid.UUID, prefix string, limit int) ([]domain.TaskCodeSuggestion, error)
+	Update(ctx context.Context, task *domain.Task, buildEvents func(*domain.Task) []outbox.Message) error
+	WithProjectColumnMoveLock(ctx context.Context, projectColumnID uuid.UUID, fn func(context.Context) error) error
 }
 
 type taskServiceProjectRepository interface {
@@ -139,15 +139,6 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		return nil, apperr.ServerError("failed to generate task order", err)
 	}
 
-	formattedTags := []string{}
-	for _, tag := range request.Tags {
-		if strings.TrimSpace(tag) == "" {
-			continue
-		}
-
-		formattedTags = append(formattedTags, tag)
-	}
-
 	dependsOnRefs, err := ts.validateDependsOnTaskIds(ctx, request.ProjectId, uuid.Nil, request.DependsOnTaskIds)
 	if err != nil {
 		return nil, err
@@ -158,7 +149,7 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		Title:            request.Title,
 		Description:      request.Description,
 		Code:             strings.TrimSpace(request.Code),
-		Status:           domain.TaskStatus(strings.ToLower(projectColumn.Name)),
+		Status:           domain.TaskStatusIn(projectColumn, nil),
 		AuthorId:         request.RequestUserId,
 		ProjectColumnId:  request.ProjectColumnId,
 		CreatedAt:        time.Now(),
@@ -169,16 +160,12 @@ func (ts *TaskService) Create(ctx context.Context, request CreateTaskRequest) (*
 		ResponsibleId:    request.ResponsibleId,
 		Responsible:      responsible,
 		DueDate:          request.DueDate,
-		Tags:             formattedTags,
+		Tags:             domain.NormalizeTaskTags(request.Tags),
 		DependsOnTaskIds: domain.TaskDependencyRefsToIDs(dependsOnRefs),
 		DependsOnTasks:   dependsOnRefs,
+		DoneAt:           projectColumn.CompletedAt(nil),
 		Updates:          []domain.TaskUpdate{},
 		ProjectColumn:    projectColumn,
-	}
-
-	if projectColumn.IsDoneColumn {
-		now := time.Now()
-		task.DoneAt = &now
 	}
 
 	err = ts.taskRepository.Create(ctx, &task, func(t *domain.Task) []outbox.Message {
@@ -358,46 +345,17 @@ type ArchiveTaskRequest struct {
 }
 
 func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) (*domain.Task, error) {
-	if request.RequestUserId == uuid.Nil {
-		return nil, apperr.UnauthorizedError("unauthorized")
-	}
-
-	task, err := ts.taskRepository.GetById(ctx, request.TaskId)
+	task, _, err := ts.getTaskAndProjectForUser(ctx, request.TaskId, request.RequestUserId)
 	if err != nil {
-		var domainErr apperr.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == apperr.NotFoundErrorCode {
-				return nil, apperr.NotFoundError("task not found")
-			}
-			return nil, domainErr
-		}
-		return nil, apperr.ServerError("failed to get task", err)
+		return nil, err
 	}
 
-	project, err := ts.projectRepository.GetById(ctx, task.ProjectId)
+	archivedTask, err := task.Archive()
 	if err != nil {
-		var domainErr apperr.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == apperr.NotFoundErrorCode {
-				return nil, apperr.NotFoundError("project not found")
-			}
-			return nil, domainErr
-		}
-		return nil, apperr.ServerError("failed to get project", err)
+		return nil, archiveTransitionError(err)
 	}
 
-	if !project.IsMember(request.RequestUserId) {
-		return nil, apperr.ForbiddenError("forbidden")
-	}
-
-	archivedTask := *task
-	archivedTask.Status = domain.TaskStatusArchived
-	now := time.Now()
-	archivedTask.ArchivedAt = &now
-	archivedTask.UpdatedAt = time.Now()
-	archivedTask.Updates = []domain.TaskUpdate{}
-
-	err = ts.taskRepository.Update(ctx, &archivedTask, func(updated *domain.Task) []outbox.Message {
+	err = ts.taskRepository.Update(ctx, archivedTask, func(updated *domain.Task) []outbox.Message {
 		return []outbox.Message{{
 			Topic:       events.TaskUpdated,
 			AggregateID: updated.Id,
@@ -416,7 +374,7 @@ func (ts *TaskService) Archive(ctx context.Context, request ArchiveTaskRequest) 
 		return nil, apperr.ServerError("failed to archive task", err)
 	}
 
-	return &archivedTask, nil
+	return archivedTask, nil
 }
 
 type RestoreTaskRequest struct {
@@ -426,63 +384,17 @@ type RestoreTaskRequest struct {
 }
 
 func (ts *TaskService) Restore(ctx context.Context, request RestoreTaskRequest) (*domain.Task, error) {
-	if request.RequestUserId == uuid.Nil {
-		return nil, apperr.UnauthorizedError("unauthorized")
-	}
-
-	task, err := ts.taskRepository.GetById(ctx, request.TaskId)
-	if err != nil {
-		var domainErr apperr.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == apperr.NotFoundErrorCode {
-				return nil, apperr.NotFoundError("task not found")
-			}
-			return nil, domainErr
-		}
-		return nil, apperr.ServerError("failed to get task", err)
-	}
-
-	project, err := ts.projectRepository.GetById(ctx, task.ProjectId)
-	if err != nil {
-		var domainErr apperr.DomainError
-		if errors.As(err, &domainErr) {
-			if domainErr.Code == apperr.NotFoundErrorCode {
-				return nil, apperr.NotFoundError("project not found")
-			}
-			return nil, domainErr
-		}
-		return nil, apperr.ServerError("failed to get project", err)
-	}
-
-	if !project.IsMember(request.RequestUserId) {
-		return nil, apperr.ForbiddenError("forbidden")
-	}
-
-	if task.ArchivedAt == nil {
-		return nil, apperr.BusinessValidationError("task is not archived")
-	}
-
-	projectColumn, err := findProjectColumn(project, request.ProjectColumnId)
+	task, project, err := ts.getTaskAndProjectForUser(ctx, request.TaskId, request.RequestUserId)
 	if err != nil {
 		return nil, err
 	}
 
-	restoredTask := *task
-	restoredTask.ProjectColumnId = request.ProjectColumnId
-	restoredTask.ProjectColumn = projectColumn
-	restoredTask.Status = domain.TaskStatus(strings.ToLower(projectColumn.Name))
-	restoredTask.ArchivedAt = nil
-	restoredTask.UpdatedAt = time.Now()
-	restoredTask.Updates = []domain.TaskUpdate{}
-
-	if projectColumn.IsDoneColumn {
-		now := time.Now()
-		restoredTask.DoneAt = &now
-	} else {
-		restoredTask.DoneAt = nil
+	restoredTask, err := task.Restore(project, request.ProjectColumnId)
+	if err != nil {
+		return nil, archiveTransitionError(err)
 	}
 
-	err = ts.taskRepository.Update(ctx, &restoredTask, func(updated *domain.Task) []outbox.Message {
+	err = ts.taskRepository.Update(ctx, restoredTask, func(updated *domain.Task) []outbox.Message {
 		return []outbox.Message{{
 			Topic:       events.TaskUpdated,
 			AggregateID: updated.Id,
@@ -501,7 +413,7 @@ func (ts *TaskService) Restore(ctx context.Context, request RestoreTaskRequest) 
 		return nil, apperr.ServerError("failed to restore task", err)
 	}
 
-	return &restoredTask, nil
+	return restoredTask, nil
 }
 
 type ListUserDueTasksRequest struct {
@@ -561,7 +473,7 @@ func (ts *TaskService) MarkTaskDone(ctx context.Context, request MarkTaskDoneReq
 		return nil, err
 	}
 
-	if task.ProjectColumnId == doneColumn.Id && task.DoneAt != nil {
+	if task.IsCompletedIn(doneColumn) {
 		return task, nil
 	}
 
@@ -584,7 +496,7 @@ func (ts *TaskService) AssignTaskToSelf(ctx context.Context, request AssignTaskT
 		return nil, err
 	}
 
-	if task.ResponsibleId != nil && *task.ResponsibleId == request.RequestUserId {
+	if task.IsAssignedTo(request.RequestUserId) {
 		return task, nil
 	}
 
@@ -604,6 +516,10 @@ func (ts *TaskService) AssignTaskToSelf(ctx context.Context, request AssignTaskT
 }
 
 func (ts *TaskService) moveLoadedTask(ctx context.Context, oldTask *domain.Task, project *domain.Project, request MoveTaskRequest) (*domain.Task, error) {
+	if oldTask.IsArchived() {
+		return nil, apperr.BusinessValidationError(domain.ErrTaskArchived.Error())
+	}
+
 	projectColumn, err := findProjectColumn(project, request.ProjectColumnId)
 	if err != nil {
 		return nil, err
@@ -616,21 +532,9 @@ func (ts *TaskService) moveLoadedTask(ctx context.Context, oldTask *domain.Task,
 			return err
 		}
 
-		task := domain.Task{
-			Id:              request.TaskId,
-			ProjectId:       request.ProjectId,
-			Order:           newOrder,
-			Status:          domain.TaskStatus(strings.ToLower(projectColumn.Name)),
-			ProjectColumnId: request.ProjectColumnId,
-			ProjectColumn:   projectColumn,
-		}
+		placement := oldTask.MoveTo(projectColumn, newOrder)
 
-		if projectColumn.IsDoneColumn {
-			now := time.Now()
-			task.DoneAt = &now
-		}
-
-		moved, err := ts.taskRepository.MoveTask(ctx, &task, request.RequestUserId, func(moved *domain.Task) []outbox.Message {
+		moved, err := ts.taskRepository.MoveTask(ctx, placement, request.RequestUserId, func(moved *domain.Task) []outbox.Message {
 			var previousProjectColumnID *uuid.UUID
 			if oldTask.ProjectColumnId != moved.ProjectColumnId {
 				previousProjectColumnID = &oldTask.ProjectColumnId
@@ -672,6 +576,10 @@ func (ts *TaskService) moveLoadedTask(ctx context.Context, oldTask *domain.Task,
 }
 
 func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, project *domain.Project, request UpdateTaskRequest) (*domain.Task, error) {
+	if task.IsArchived() {
+		return nil, apperr.BusinessValidationError(domain.ErrTaskArchived.Error())
+	}
+
 	if request.ResponsibleId != nil && *request.ResponsibleId != uuid.Nil {
 		if !project.IsMember(*request.ResponsibleId) {
 			return nil, apperr.BusinessValidationError("responsible is not a member of the project")
@@ -695,60 +603,29 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 
 	oldProjectColumnID := task.ProjectColumnId
 
-	formattedTags := []string{}
-	for _, tag := range request.Tags {
-		if strings.TrimSpace(tag) == "" {
-			continue
-		}
-		formattedTags = append(formattedTags, tag)
-	}
-
 	dependsOnRefs, err := ts.validateDependsOnTaskIds(ctx, task.ProjectId, task.Id, request.DependsOnTaskIds)
 	if err != nil {
 		return nil, err
 	}
 
-	code := task.Code
-	if request.Code != nil {
-		code = strings.TrimSpace(*request.Code)
-	}
-
-	updatedTask := domain.Task{
-		Id:               task.Id,
-		ProjectId:        task.ProjectId,
-		ProjectColumnId:  request.ProjectColumnId,
-		AuthorId:         task.AuthorId,
-		CreatedAt:        task.CreatedAt,
-		Author:           task.Author,
-		Order:            task.Order,
-		Title:            request.Title,
-		Description:      request.Description,
-		Code:             code,
-		Status:           domain.TaskStatus(strings.ToLower(projectColumn.Name)),
-		Priority:         request.Priority,
-		ResponsibleId:    request.ResponsibleId,
-		Responsible:      responsible,
-		DueDate:          request.DueDate,
-		Tags:             formattedTags,
-		DependsOnTaskIds: domain.TaskDependencyRefsToIDs(dependsOnRefs),
-		DependsOnTasks:   dependsOnRefs,
-		UpdatedAt:        time.Now(),
-		Updates:          []domain.TaskUpdate{},
-		ProjectColumn:    projectColumn,
-		ArchivedAt:       task.ArchivedAt,
-	}
-
-	if projectColumn.IsDoneColumn {
-		now := time.Now()
-		updatedTask.DoneAt = &now
-	}
+	updatedTask := task.ApplyEdit(domain.TaskEdit{
+		Title:          request.Title,
+		Description:    request.Description,
+		Code:           request.Code,
+		Priority:       request.Priority,
+		DueDate:        request.DueDate,
+		ResponsibleId:  request.ResponsibleId,
+		Responsible:    responsible,
+		Tags:           request.Tags,
+		DependsOnTasks: dependsOnRefs,
+	}, projectColumn)
 
 	var previousProjectColumnID *uuid.UUID
 	if oldProjectColumnID != updatedTask.ProjectColumnId {
 		previousProjectColumnID = &oldProjectColumnID
 	}
 
-	err = ts.taskRepository.Update(ctx, &updatedTask, func(updated *domain.Task) []outbox.Message {
+	err = ts.taskRepository.Update(ctx, updatedTask, func(updated *domain.Task) []outbox.Message {
 		return []outbox.Message{{
 			Topic:       events.TaskUpdated,
 			AggregateID: updated.Id,
@@ -767,7 +644,7 @@ func (ts *TaskService) updateLoadedTask(ctx context.Context, task *domain.Task, 
 		return nil, apperr.ServerError("failed to update task", err)
 	}
 
-	return &updatedTask, nil
+	return updatedTask, nil
 }
 
 func (ts *TaskService) getTaskAndProjectForUser(ctx context.Context, taskID uuid.UUID, userID uuid.UUID) (*domain.Task, *domain.Project, error) {
@@ -1068,49 +945,42 @@ func (ts *TaskService) SearchProjectTasksForDependencies(ctx context.Context, re
 	return results, nil
 }
 
-func findProjectColumn(project *domain.Project, statusID uuid.UUID) (*domain.ProjectColumn, error) {
-	for _, status := range project.Columns {
-		if status.Id == statusID {
-			statusCopy := status
-			return &statusCopy, nil
-		}
+func archiveTransitionError(err error) error {
+	switch {
+	case errors.Is(err, domain.ErrTaskNotArchived),
+		errors.Is(err, domain.ErrTaskAlreadyArchived),
+		errors.Is(err, domain.ErrProjectColumnNotFound):
+		return apperr.BusinessValidationError(err.Error())
+	default:
+		return apperr.ServerError("failed to change task archive state", err)
 	}
-
-	return nil, apperr.BusinessValidationError("invalid project_column_id")
 }
 
-func validateProjectColumnIDs(project *domain.Project, statusIDs []uuid.UUID) error {
-	if len(statusIDs) == 0 {
-		return nil
+func findProjectColumn(project *domain.Project, columnID uuid.UUID) (*domain.ProjectColumn, error) {
+	column, err := project.Column(columnID)
+	if err != nil {
+		return nil, apperr.BusinessValidationError(err.Error())
 	}
 
-	valid := map[uuid.UUID]struct{}{}
-	for _, column := range project.Columns {
-		valid[column.Id] = struct{}{}
-	}
+	return column, nil
+}
 
-	for _, statusID := range statusIDs {
-		if _, ok := valid[statusID]; !ok {
-			return apperr.BusinessValidationError("invalid project_column_id")
-		}
+func validateProjectColumnIDs(project *domain.Project, columnIDs []uuid.UUID) error {
+	if err := project.ValidateColumnIDs(columnIDs); err != nil {
+		return apperr.BusinessValidationError(err.Error())
 	}
 
 	return nil
 }
 
 func (ts *TaskService) validateDependsOnTaskIds(ctx context.Context, projectId uuid.UUID, taskId uuid.UUID, dependsOnTaskIds []uuid.UUID) ([]domain.TaskDependencyRef, error) {
-	uniqueIDs := dedupeDependsOnTaskIds(dependsOnTaskIds)
+	uniqueIDs := domain.DedupeTaskIDs(dependsOnTaskIds)
 	if len(uniqueIDs) == 0 {
 		return []domain.TaskDependencyRef{}, nil
 	}
 
-	for _, dependsOnTaskID := range uniqueIDs {
-		if dependsOnTaskID == uuid.Nil {
-			return nil, apperr.BusinessValidationError("depends_on_task_ids contains an invalid task id")
-		}
-		if taskId != uuid.Nil && dependsOnTaskID == taskId {
-			return nil, apperr.BusinessValidationError("task cannot depend on itself")
-		}
+	if err := domain.ValidateDependencyIDs(taskId, uniqueIDs); err != nil {
+		return nil, apperr.BusinessValidationError(err.Error())
 	}
 
 	refs, err := ts.taskRepository.GetTaskDependencyRefsByProjectAndIds(ctx, projectId, uniqueIDs)
@@ -1118,18 +988,9 @@ func (ts *TaskService) validateDependsOnTaskIds(ctx context.Context, projectId u
 		return nil, apperr.ServerError("failed to validate task dependencies", err)
 	}
 
-	refByID := make(map[uuid.UUID]domain.TaskDependencyRef, len(refs))
-	for _, ref := range refs {
-		refByID[ref.Id] = ref
-	}
-
-	orderedRefs := make([]domain.TaskDependencyRef, 0, len(uniqueIDs))
-	for _, id := range uniqueIDs {
-		ref, ok := refByID[id]
-		if !ok {
-			return nil, apperr.BusinessValidationError("depends_on_task_ids contains unknown tasks")
-		}
-		orderedRefs = append(orderedRefs, ref)
+	orderedRefs, err := domain.ResolveDependencyRefs(uniqueIDs, refs)
+	if err != nil {
+		return nil, apperr.BusinessValidationError(err.Error())
 	}
 
 	if taskId == uuid.Nil {
@@ -1141,80 +1002,18 @@ func (ts *TaskService) validateDependsOnTaskIds(ctx context.Context, projectId u
 		return nil, apperr.ServerError("failed to validate task dependencies", err)
 	}
 
-	if hasDependencyCycle(taskId, uniqueIDs, edges) {
-		return nil, apperr.BusinessValidationError("depends_on_task_ids would create a dependency cycle")
+	if domain.HasDependencyCycle(taskId, uniqueIDs, edges) {
+		return nil, apperr.BusinessValidationError(domain.ErrDependencyCycle.Error())
 	}
 
 	return orderedRefs, nil
 }
 
-func dedupeDependsOnTaskIds(ids []uuid.UUID) []uuid.UUID {
-	if len(ids) == 0 {
-		return []uuid.UUID{}
-	}
-
-	seen := make(map[uuid.UUID]struct{}, len(ids))
-	unique := make([]uuid.UUID, 0, len(ids))
-	for _, id := range ids {
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		unique = append(unique, id)
-	}
-
-	return unique
-}
-
-func hasDependencyCycle(taskId uuid.UUID, dependsOnTaskIds []uuid.UUID, edges []domain.TaskDependencyEdge) bool {
-	adjacency := make(map[uuid.UUID][]uuid.UUID)
-	for _, edge := range edges {
-		if edge.TaskId == taskId {
-			continue
-		}
-		adjacency[edge.TaskId] = append(adjacency[edge.TaskId], edge.DependsOnTaskId)
-	}
-	adjacency[taskId] = dependsOnTaskIds
-
-	for _, dependsOnTaskID := range dependsOnTaskIds {
-		if dependencyPathReachesTask(dependsOnTaskID, taskId, adjacency, map[uuid.UUID]bool{}) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func dependencyPathReachesTask(current, target uuid.UUID, adjacency map[uuid.UUID][]uuid.UUID, visited map[uuid.UUID]bool) bool {
-	if current == target {
-		return true
-	}
-	if visited[current] {
-		return false
-	}
-
-	visited[current] = true
-	for _, next := range adjacency[current] {
-		if dependencyPathReachesTask(next, target, adjacency, visited) {
-			return true
-		}
-	}
-
-	return false
-}
-
 func resolveDoneColumn(project *domain.Project) (*domain.ProjectColumn, error) {
-	doneColumns := make([]domain.ProjectColumn, 0, 1)
-	for _, column := range project.Columns {
-		if column.IsDoneColumn {
-			doneColumns = append(doneColumns, column)
-		}
+	column, err := project.DoneColumn()
+	if err != nil {
+		return nil, apperr.BusinessValidationError(err.Error())
 	}
 
-	if len(doneColumns) != 1 {
-		return nil, apperr.BusinessValidationError("project must have exactly one done column")
-	}
-
-	column := doneColumns[0]
-	return &column, nil
+	return column, nil
 }

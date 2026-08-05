@@ -43,14 +43,6 @@ func mapProjectColumn(columnID uuid.UUID, projectID uuid.UUID, name string, desc
 	}
 }
 
-func compatibilityTaskStatus(projectColumnName string, archivedAt *time.Time) domain.TaskStatus {
-	if archivedAt != nil {
-		return domain.TaskStatusArchived
-	}
-
-	return domain.TaskStatus(strings.ToLower(projectColumnName))
-}
-
 func (tr *TaskRepository) Create(ctx context.Context, task *domain.Task, buildEvents func(*domain.Task) []outbox.Message) error {
 	q := taskqueries.New(tr.pool)
 	actionOrigin := domain.ActionOriginFromContext(ctx)
@@ -235,7 +227,7 @@ func (tr *TaskRepository) getByID(ctx context.Context, q *taskqueries.Queries, i
 		if err := json.Unmarshal(result.ProjectColumn, task.ProjectColumn); err != nil {
 			return nil, err
 		}
-		task.Status = compatibilityTaskStatus(task.ProjectColumn.Name, task.ArchivedAt)
+		task.Status = domain.TaskStatusIn(task.ProjectColumn, task.ArchivedAt)
 	}
 
 	if result.Tags != nil {
@@ -540,7 +532,6 @@ func (tr *TaskRepository) GetFirstTaskInColumn(ctx context.Context, projectId uu
 		CreatedAt:       result.CreatedAt.Time,
 		UpdatedAt:       result.UpdatedAt.Time,
 	}
-	task.Status = compatibilityTaskStatus("", nil)
 
 	if result.Code.Valid {
 		task.Code = result.Code.String
@@ -578,7 +569,6 @@ func (tr *TaskRepository) GetProjectTaskAfterId(ctx context.Context, id uuid.UUI
 		CreatedAt:       result.CreatedAt.Time,
 		UpdatedAt:       result.UpdatedAt.Time,
 	}
-	task.Status = compatibilityTaskStatus("", nil)
 
 	if result.Code.Valid {
 		task.Code = result.Code.String
@@ -605,7 +595,7 @@ func (tr *TaskRepository) WithProjectColumnMoveLock(ctx context.Context, project
 	return tx.Commit(ctx)
 }
 
-func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error) {
+func (tr *TaskRepository) MoveTask(ctx context.Context, placement *domain.TaskPlacement, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error) {
 	q := taskqueries.New(tr.pool)
 	tx, err := tr.pool.Begin(ctx)
 	if err != nil {
@@ -616,15 +606,15 @@ func (tr *TaskRepository) MoveTask(ctx context.Context, task *domain.Task, userI
 	qtx := q.WithTx(tx)
 
 	params := taskqueries.MoveTaskParams{
-		TaskOrder:       task.Order,
-		ProjectColumnID: task.ProjectColumnId,
+		TaskOrder:       placement.Order,
+		ProjectColumnID: placement.ProjectColumnId,
 		UserID:          userId,
-		ID:              task.Id,
+		ID:              placement.TaskId,
 	}
 
-	if task.DoneAt != nil {
+	if placement.DoneAt != nil {
 		params.DoneAt = pgtype.Timestamptz{
-			Time:  *task.DoneAt,
+			Time:  *placement.DoneAt,
 			Valid: true,
 		}
 	}

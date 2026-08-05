@@ -112,8 +112,8 @@ func (m *mockTaskRepository) WithProjectColumnMoveLock(ctx context.Context, proj
 	return fn(ctx)
 }
 
-func (m *mockTaskRepository) MoveTask(ctx context.Context, task *domain.Task, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error) {
-	args := m.Called(ctx, task, userId)
+func (m *mockTaskRepository) MoveTask(ctx context.Context, placement *domain.TaskPlacement, userId uuid.UUID, buildEvents func(*domain.Task) []outbox.Message) (*domain.Task, error) {
+	args := m.Called(ctx, placement, userId)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -1042,6 +1042,24 @@ func TestTaskService_Archive(t *testing.T) {
 			shouldSucceed:     false,
 			expectedErrorCode: string(apperr.ForbiddenErrorCode),
 		},
+		{
+			name: "archiving an already archived task does not overwrite when it was archived",
+			request: tasks.ArchiveTaskRequest{
+				TaskId:        validTaskId,
+				RequestUserId: validUserId,
+			},
+			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository, userRepo *mockUserRepository) {
+				archivedAt := time.Now().Add(-72 * time.Hour)
+				alreadyArchived := validTask
+				alreadyArchived.ArchivedAt = &archivedAt
+				alreadyArchived.Status = domain.TaskStatusArchived
+
+				repo.On("GetById", mock.Anything, validTaskId).Return(&alreadyArchived, nil)
+				projectRepo.On("GetById", mock.Anything, validProjectId).Return(&validProject, nil)
+			},
+			shouldSucceed:     false,
+			expectedErrorCode: string(apperr.BusinessValidationErrorCode),
+		},
 	}
 
 	for _, tt := range tests {
@@ -1134,6 +1152,114 @@ func TestTaskService_Archive_PublishesPreviousProjectColumnID(t *testing.T) {
 
 	mockRepo.AssertExpectations(t)
 	mockProjectRepo.AssertExpectations(t)
+}
+
+func TestTaskService_ArchivedTaskIsFrozen(t *testing.T) {
+	userID := uuid.New()
+	projectID := uuid.New()
+	taskID := uuid.New()
+	pendingColumnID := uuid.New()
+	doneColumnID := uuid.New()
+	archivedAt := time.Now().Add(-time.Hour)
+
+	project := domain.Project{
+		Id:      projectID,
+		UserId:  userID,
+		Members: []domain.ProjectMember{{UserId: userID, Role: domain.ProjectMemberRoleCreator}},
+		Columns: []domain.ProjectColumn{
+			{Id: pendingColumnID, ProjectId: projectID, Name: "Pending", Position: 0},
+			{Id: doneColumnID, ProjectId: projectID, Name: "Done", Position: 1, IsDoneColumn: true},
+		},
+	}
+
+	archivedTask := domain.Task{
+		Id:              taskID,
+		ProjectId:       projectID,
+		AuthorId:        userID,
+		Title:           "Archived Task",
+		Description:     "Test Description",
+		Status:          domain.TaskStatusArchived,
+		ProjectColumnId: pendingColumnID,
+		Priority:        domain.TaskPriorityLow,
+		ArchivedAt:      &archivedAt,
+	}
+
+	tests := []struct {
+		name string
+		call func(*tasks.TaskService) error
+	}{
+		{
+			name: "update",
+			call: func(svc *tasks.TaskService) error {
+				_, err := svc.Update(context.Background(), tasks.UpdateTaskRequest{
+					TaskId:          taskID,
+					Title:           "New title",
+					Description:     "New description",
+					ProjectColumnId: pendingColumnID,
+					RequestUserId:   userID,
+					Priority:        domain.TaskPriorityHigh,
+				})
+				return err
+			},
+		},
+		{
+			name: "move",
+			call: func(svc *tasks.TaskService) error {
+				_, err := svc.Move(context.Background(), tasks.MoveTaskRequest{
+					TaskId:          taskID,
+					ProjectId:       projectID,
+					RequestUserId:   userID,
+					ProjectColumnId: doneColumnID,
+				})
+				return err
+			},
+		},
+		{
+			name: "mark done",
+			call: func(svc *tasks.TaskService) error {
+				_, err := svc.MarkTaskDone(context.Background(), tasks.MarkTaskDoneRequest{
+					TaskId:        taskID,
+					RequestUserId: userID,
+				})
+				return err
+			},
+		},
+		{
+			name: "assign to self",
+			call: func(svc *tasks.TaskService) error {
+				_, err := svc.AssignTaskToSelf(context.Background(), tasks.AssignTaskToSelfRequest{
+					TaskId:        taskID,
+					RequestUserId: userID,
+				})
+				return err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+" is refused", func(t *testing.T) {
+			mockRepo := &mockTaskRepository{}
+			mockProjectRepo := &mockProjectRepository{}
+			mockUserRepo := &mockUserRepository{}
+
+			mockRepo.On("GetById", mock.Anything, taskID).Return(&archivedTask, nil)
+			mockProjectRepo.On("GetById", mock.Anything, projectID).Return(&project, nil)
+
+			svc := tasks.NewTaskService(mockRepo, mockProjectRepo, mockUserRepo)
+
+			err := tt.call(svc)
+
+			require.Error(t, err)
+			var domainErr apperr.DomainError
+			if assert.ErrorAs(t, err, &domainErr) {
+				assert.Equal(t, apperr.BusinessValidationErrorCode, domainErr.Code)
+				assert.Equal(t, "task is archived", domainErr.Message)
+			}
+
+			mockRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+			mockRepo.AssertNotCalled(t, "MoveTask", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
 }
 
 func TestTaskService_Restore(t *testing.T) {
@@ -1636,8 +1762,8 @@ func TestTaskService_MarkTaskDone(t *testing.T) {
 		mockRepo.On("GetById", mock.Anything, taskID).Return(task, nil)
 		mockProjectRepo.On("GetById", mock.Anything, projectID).Return(project, nil)
 		mockRepo.On("GetFirstTaskInColumn", mock.Anything, projectID, doneColumnID).Return(nil, apperr.NotFoundError("not found"))
-		mockRepo.On("MoveTask", mock.Anything, mock.MatchedBy(func(updated *domain.Task) bool {
-			return updated.ProjectColumnId == doneColumnID && updated.DoneAt != nil
+		mockRepo.On("MoveTask", mock.Anything, mock.MatchedBy(func(placement *domain.TaskPlacement) bool {
+			return placement.ProjectColumnId == doneColumnID && placement.DoneAt != nil
 		}), requestUserID).Return(&domain.Task{
 			Id:              taskID,
 			ProjectId:       projectID,

@@ -575,46 +575,61 @@ func (h *TaskHandler) SearchProjectTasksForDependencies(w http.ResponseWriter, r
 	}
 }
 
-func (h *TaskHandler) SearchTasksForUser(w http.ResponseWriter, r *http.Request) {
-	userId := auth.UserIdFromContext(r.Context())
-
+func parseSearchTasksRequest(r *http.Request, userId uuid.UUID) (SearchTasksRequest, error) {
 	limit, err := platformhttp.ParseLimit(r, 15, 100)
 	if err != nil {
-		httperr.BadRequestResponse(w, err)
-		return
+		return SearchTasksRequest{}, err
 	}
 
 	searchQuery := platformhttp.GetQueryString(r, "query", "")
 	if searchQuery == "" {
-		httperr.BadRequestResponse(w, errors.New("query is required"))
-		return
+		return SearchTasksRequest{}, errors.New("query is required")
 	}
 
 	dueDate, err := platformhttp.ParseRFC3339Cursor(r, "due_date")
 	if err != nil {
-		httperr.BadRequestResponse(w, err)
-		return
+		return SearchTasksRequest{}, err
 	}
 
 	updatedAt, err := platformhttp.ParseRFC3339Cursor(r, "updated_at")
 	if err != nil {
-		httperr.BadRequestResponse(w, err)
-		return
+		return SearchTasksRequest{}, err
 	}
 
 	taskId, err := platformhttp.ParseOptionalQueryUUID(r, "task_id")
 	if err != nil {
-		httperr.BadRequestResponse(w, err)
-		return
+		return SearchTasksRequest{}, err
 	}
 
-	serviceRequest := SearchTasksRequest{
-		UserId:          userId,
-		Limit:           int(limit),
-		SearchQuery:     searchQuery,
-		CursorDueDate:   dueDate,
-		CursorUpdatedAt: updatedAt,
-		CursorTaskId:    taskId,
+	projectId, err := platformhttp.ParseOptionalQueryUUID(r, "project_id")
+	if err != nil {
+		return SearchTasksRequest{}, err
+	}
+
+	projectColumnIDs, err := parseUUIDQueryParam(platformhttp.GetQueryString(r, "project_column_ids", ""))
+	if err != nil {
+		return SearchTasksRequest{}, err
+	}
+
+	return SearchTasksRequest{
+		UserId:           userId,
+		ProjectId:        projectId,
+		ProjectColumnIDs: projectColumnIDs,
+		Limit:            int(limit),
+		SearchQuery:      searchQuery,
+		IncludeArchived:  platformhttp.GetQueryString(r, "include_archived", "") == "true",
+		IncludeDone:      platformhttp.GetQueryString(r, "include_done", "") == "true",
+		CursorDueDate:    dueDate,
+		CursorUpdatedAt:  updatedAt,
+		CursorTaskId:     taskId,
+	}, nil
+}
+
+func (h *TaskHandler) SearchTasksForUser(w http.ResponseWriter, r *http.Request) {
+	serviceRequest, err := parseSearchTasksRequest(r, auth.UserIdFromContext(r.Context()))
+	if err != nil {
+		httperr.BadRequestResponse(w, err)
+		return
 	}
 
 	result, err := h.taskService.SearchTasks(r.Context(), serviceRequest)

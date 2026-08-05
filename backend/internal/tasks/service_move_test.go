@@ -53,7 +53,7 @@ func TestTaskService_Move(t *testing.T) {
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(nil, apperr.NotFoundError("not found"))
-				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
+				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.TaskPlacement) bool {
 					return t.Order == topOrder
 				}), validUserId).Return(&domain.Task{Order: topOrder}, nil)
 			},
@@ -72,7 +72,7 @@ func TestTaskService_Move(t *testing.T) {
 			mockSetup: func(repo *mockTaskRepository, projectRepo *mockProjectRepository) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetFirstTaskInColumn", mock.Anything, validProjectId, pendingStatusID).Return(&taskA, nil)
-				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
+				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.TaskPlacement) bool {
 					return t.Order == beforeFirstOrder
 				}), validUserId).Return(&domain.Task{Order: beforeFirstOrder}, nil)
 			},
@@ -92,7 +92,7 @@ func TestTaskService_Move(t *testing.T) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetById", mock.Anything, taskIdA).Return(&taskA, nil)
 				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdA, validProjectId).Return(&taskB, nil)
-				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
+				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.TaskPlacement) bool {
 					return t.Order == betweenOrder
 				}), validUserId).Return(&domain.Task{Order: betweenOrder}, nil)
 			},
@@ -112,7 +112,7 @@ func TestTaskService_Move(t *testing.T) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Status: domain.TaskStatusPending}, nil)
 				repo.On("GetById", mock.Anything, taskIdB).Return(&taskB, nil)
 				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdB, validProjectId).Return(nil, apperr.NotFoundError("not found"))
-				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
+				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.TaskPlacement) bool {
 					return t.Order == afterLastOrder
 				}), validUserId).Return(&domain.Task{Order: afterLastOrder}, nil)
 			},
@@ -133,7 +133,7 @@ func TestTaskService_Move(t *testing.T) {
 				repo.On("GetById", mock.Anything, taskIdA).Return(&taskA, nil)
 				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdA, validProjectId).Return(&movedTaskBetweenAAndB, nil)
 				repo.On("GetProjectTaskAfterId", mock.Anything, validTaskId, validProjectId).Return(&taskB, nil)
-				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
+				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.TaskPlacement) bool {
 					return t.Order == betweenOrder
 				}), validUserId).Return(&domain.Task{Order: betweenOrder}, nil)
 			},
@@ -153,7 +153,7 @@ func TestTaskService_Move(t *testing.T) {
 				repo.On("GetById", mock.Anything, validTaskId).Return(&domain.Task{Id: validTaskId, ProjectId: validProjectId, ProjectColumnId: pendingStatusID, Order: "250000000000", Status: domain.TaskStatusPending}, nil)
 				repo.On("GetById", mock.Anything, taskIdA).Return(&taskA, nil)
 				repo.On("GetProjectTaskAfterId", mock.Anything, taskIdA, validProjectId).Return(&taskWithDuplicateOrder, nil)
-				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.Task) bool {
+				repo.On("MoveTask", mock.Anything, mock.MatchedBy(func(t *domain.TaskPlacement) bool {
 					return t.Order == afterDuplicateOrder
 				}), validUserId).Return(&domain.Task{Order: afterDuplicateOrder}, nil)
 			},
