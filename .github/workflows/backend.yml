@@ -50,6 +50,6 @@ jobs:
           DEPLOY_WEBHOOK_URL: ${{ secrets.BACKEND_DEPLOY_WEBHOOK_URL }}
           DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
         run: |
-          curl --fail --silent --show-error --max-time 60 \
+          curl --fail --silent --show-error --max-time 60 -X POST \
             -H "Authorization: Bearer $DEPLOY_TOKEN" \
             "$DEPLOY_WEBHOOK_URL" > /dev/null
