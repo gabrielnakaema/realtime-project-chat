@@ -13,20 +13,22 @@ import (
 )
 
 type Relay struct {
-	pool      *pgxpool.Pool
-	producer  sarama.SyncProducer
-	logger    *slog.Logger
-	interval  time.Duration
-	batchSize int32
+	pool        *pgxpool.Pool
+	producer    sarama.SyncProducer
+	logger      *slog.Logger
+	interval    time.Duration
+	batchSize   int32
+	topicPrefix string
 }
 
-func NewRelay(pool *pgxpool.Pool, producer sarama.SyncProducer, logger *slog.Logger, interval time.Duration, batchSize int32) *Relay {
+func NewRelay(pool *pgxpool.Pool, producer sarama.SyncProducer, logger *slog.Logger, interval time.Duration, batchSize int32, topicPrefix string) *Relay {
 	return &Relay{
-		pool:      pool,
-		producer:  producer,
-		logger:    logger,
-		interval:  interval,
-		batchSize: batchSize,
+		pool:        pool,
+		producer:    producer,
+		logger:      logger,
+		interval:    interval,
+		batchSize:   batchSize,
+		topicPrefix: topicPrefix,
 	}
 }
 
@@ -76,7 +78,7 @@ func (r *Relay) processBatch(ctx context.Context) (int, error) {
 	var publishErr error
 	for _, row := range rows {
 		message := &sarama.ProducerMessage{
-			Topic: row.Topic,
+			Topic: r.topicPrefix + row.Topic,
 			Value: sarama.ByteEncoder(row.Payload),
 		}
 		if row.AggregateID.Valid {

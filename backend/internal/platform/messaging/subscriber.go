@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/IBM/sarama"
@@ -11,7 +12,8 @@ import (
 )
 
 type Subscriber struct {
-	consumer sarama.ConsumerGroup
+	consumer    sarama.ConsumerGroup
+	topicPrefix string
 }
 
 func NewSubscriber(config *config.Config, groupId string) (*Subscriber, error) {
@@ -40,7 +42,7 @@ type MessageHandler func(ctx context.Context, message Message) error
 func (s *Subscriber) Subscribe(ctx context.Context, topic []events.Topic, handler MessageHandler, logger *slog.Logger) error {
 	topics := []string{}
 	for _, t := range topic {
-		topics = append(topics, t.String())
+		topics = append(topics, s.topicPrefix+t.String())
 	}
 
 	go func() {
@@ -52,7 +54,7 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic []events.Topic, handle
 			default:
 			}
 
-			err := s.consumer.Consume(ctx, topics, &consumerGroupHandler{handler: handler, logger: logger})
+			err := s.consumer.Consume(ctx, topics, &consumerGroupHandler{handler: handler, logger: logger, topicPrefix: s.topicPrefix})
 			if err != nil {
 				logger.Error("error consuming topic", "error", err.Error())
 				select {
@@ -75,8 +77,9 @@ const maxHandlerRetries = 3
 const handlerRetryBackoff = 200 * time.Millisecond
 
 type consumerGroupHandler struct {
-	handler MessageHandler
-	logger  *slog.Logger
+	handler     MessageHandler
+	logger      *slog.Logger
+	topicPrefix string
 }
 
 func (h *consumerGroupHandler) Setup(sarama.ConsumerGroupSession) error {
@@ -90,7 +93,7 @@ func (h *consumerGroupHandler) Cleanup(sarama.ConsumerGroupSession) error {
 func (h *consumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for message := range claim.Messages() {
 		m := Message{
-			Topic:     events.Topic(message.Topic),
+			Topic:     events.Topic(strings.TrimPrefix(message.Topic, h.topicPrefix)),
 			Key:       message.Key,
 			Value:     message.Value,
 			Timestamp: message.Timestamp,

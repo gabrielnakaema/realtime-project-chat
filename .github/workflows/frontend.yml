@@ -3,51 +3,45 @@ name: frontend
 on:
   workflow_call:
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/project-chat-web
+  IMAGE_TAG: ${{ github.ref == 'refs/heads/main' && 'latest' || 'dev' }}
+
 jobs:
-  build-and-deploy:
+  publish:
+    name: Publish Image
     runs-on: ubuntu-latest
     environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
-    defaults:
-      run:
-        working-directory: ./frontend
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - uses: actions/checkout@v4
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-      - name: Use Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: "pnpm"
-          cache-dependency-path: "frontend/pnpm-lock.yaml"
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Build
-        run: pnpm build
+      - name: login
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build and Publish
+        run: |
+          docker build frontend/. \
+            --label org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }} \
+            --build-arg VITE_API_URL=${{ secrets.API_URL }} \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push --all-tags ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+  deploy:
+    needs: publish
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+
+    steps:
+      - name: Trigger deployment
         env:
-          VITE_API_URL: ${{ secrets.API_URL }}
-
-      - name: Upload build to server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          source: "frontend/dist/*"
-          target: "${{ secrets.FRONTEND_DIR }}/releases/${{ github.run_id }}/"
-          strip_components: 2
-
-      - name: Update symlink
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          script: |
-            set -e
-            cd "${{ secrets.FRONTEND_DIR }}"
-            ln -sfn "releases/${{ github.run_id }}" current
+          DEPLOY_WEBHOOK_URL: ${{ secrets.FRONTEND_DEPLOY_WEBHOOK_URL }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          curl --fail --silent --show-error --max-time 60 \
+            -H "Authorization: Bearer $DEPLOY_TOKEN" \
+            "$DEPLOY_WEBHOOK_URL" > /dev/null

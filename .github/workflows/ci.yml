@@ -134,6 +134,9 @@ jobs:
 
   backend-publish-and-deploy:
     name: Backend publish and deploy
+    permissions:
+      contents: read
+      packages: write
     concurrency:
       group: backend-deploy
       cancel-in-progress: false
@@ -154,6 +157,9 @@ jobs:
 
   frontend-build-and-deploy:
     name: Frontend build and deploy
+    permissions:
+      contents: read
+      packages: write
     concurrency:
       group: frontend-deploy-${{ github.ref }}
       cancel-in-progress: false

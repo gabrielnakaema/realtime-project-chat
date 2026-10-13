@@ -15,6 +15,7 @@ type Config struct {
 	JwtSecret                      string
 	DSN                            string
 	PubsubBrokers                  []string
+	PubsubTopicPrefix              string
 	Environment                    string
 	CORSOrigins                    []string
 	InternalGRPCListenAddress      string
@@ -63,6 +64,7 @@ func New() (*Config, error) {
 		Port:                           port,
 		DSN:                            getEnv("DB_DSN", ""),
 		PubsubBrokers:                  strings.Split(getEnv("PUBSUB_BROKERS", ""), ","),
+		PubsubTopicPrefix:              getEnv("PUBSUB_TOPIC_PREFIX", ""),
 		JwtSecret:                      getEnv("JWT_SECRET", "SECRET"),
 		Environment:                    env,
 		CORSOrigins:                    strings.Split(getEnv("CORS_ORIGINS", "http://localhost:3000"), ","),

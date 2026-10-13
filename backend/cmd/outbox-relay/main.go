@@ -35,7 +35,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	relay := outbox.NewRelay(pool, producer, log, cfg.OutboxPollInterval, cfg.OutboxBatchSize)
+	relay := outbox.NewRelay(pool, producer, log, cfg.OutboxPollInterval, cfg.OutboxBatchSize, cfg.PubsubTopicPrefix)
 	defer relay.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())

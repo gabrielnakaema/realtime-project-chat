@@ -1,0 +1,52 @@
+http:
+  routers:
+    websocket-service:
+      rule: "PathPrefix(`/ws`)"
+      service: websocket-service
+      priority: 20
+    chat-service:
+      rule: "PathPrefix(`/chats`) || PathRegexp(`^/projects/[^/]+/chat`)"
+      service: chat-service
+      priority: 15
+    tasks-service:
+      rule: "PathPrefix(`/tasks`)"
+      service: tasks-service
+      priority: 16
+    mcp-service:
+      rule: "PathPrefix(`/mcp`)"
+      service: mcp-service
+      priority: 12
+    notification-service:
+      rule: "PathPrefix(`/notifications`)"
+      service: notification-service
+      priority: 10
+    api:
+      rule: "PathPrefix(`/`)"
+      service: api
+      priority: 1
+
+  services:
+    websocket-service:
+      loadBalancer:
+        servers:
+          - url: "http://websocket-service:3336"
+    chat-service:
+      loadBalancer:
+        servers:
+          - url: "http://chat-service:3337"
+    tasks-service:
+      loadBalancer:
+        servers:
+          - url: "http://tasks-service:3339"
+    mcp-service:
+      loadBalancer:
+        servers:
+          - url: "http://mcp-service:3341"
+    notification-service:
+      loadBalancer:
+        servers:
+          - url: "http://notification-service:3335"
+    api:
+      loadBalancer:
+        servers:
+          - url: "http://api:3333"
