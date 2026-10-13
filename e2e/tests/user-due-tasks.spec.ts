@@ -9,6 +9,15 @@ import {
 } from "../src/fixtures/authenticated-page.js";
 import { registerUser } from "../src/fixtures/test-user.js";
 
+const daysFromNow = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${date.getFullYear()}-${month}-${day}`;
+};
+
 test("assigned user can open an upcoming task from the dashboard", async ({
   authenticatedPage: ownerPage,
   backendURL,
@@ -21,7 +30,7 @@ test("assigned user can open an upcoming task from the dashboard", async ({
   const memberPage = await loginAsUser(browser, member);
   const projectName = `E2E Due Task Project ${crypto.randomUUID()}`;
   const taskTitle = `E2E Due Task ${crypto.randomUUID()}`;
-  const dueDate = "2026-08-20";
+  const dueDate = daysFromNow(7);
 
   await createProjectThroughUI(ownerPage, projectName, {
     description: "Created by the user due-tasks e2e test",
@@ -82,7 +91,7 @@ test("assigned user can complete an upcoming task and remove it from the dashboa
   const memberPage = await loginAsUser(browser, member);
   const projectName = `E2E Complete Due Task Project ${crypto.randomUUID()}`;
   const taskTitle = `E2E Complete Due Task ${crypto.randomUUID()}`;
-  const dueDate = "2026-08-20";
+  const dueDate = daysFromNow(7);
 
   await createProjectThroughUI(ownerPage, projectName, {
     description: "Created by the due-task completion e2e test.",
